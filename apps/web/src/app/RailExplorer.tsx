@@ -107,6 +107,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [isHydratedFromUrl, setIsHydratedFromUrl] = useState(false);
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
   const [copiedReviewCsv, setCopiedReviewCsv] = useState(false);
+  const [showAllReviewStops, setShowAllReviewStops] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -259,6 +260,11 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   );
 
   const lowConfidenceLines = bundle.lines.filter((line) => countLowConfidence(line) > 0);
+
+  useEffect(() => {
+    setShowAllReviewStops(false);
+  }, [selectedBranchId, selectedLineKey]);
+
 
   const selectedReviewStops = useMemo<
     (CanonicalRouteStop & {
@@ -568,7 +574,9 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
                 {selectedReviewStops.length > 0 ? (
                   <div className="mt-3 grid gap-2">
-                    {selectedReviewStops.slice(0, 8).map((stop) => (
+                    {selectedReviewStops
+                      .slice(0, showAllReviewStops ? selectedReviewStops.length : 8)
+                      .map((stop) => (
                       <div
                         key={`${stop.branchId}:${stop.sourceCandidateId}`}
                         className="rounded-xl bg-slate-50 px-3 py-2 text-xs"
@@ -589,9 +597,15 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                     ))}
 
                     {selectedReviewStops.length > 8 ? (
-                      <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
-                        외 {formatNumber(selectedReviewStops.length - 8)}개는 CSV 복사로 확인
-                      </p>
+                      <button
+                        type="button"
+                        className="rounded-xl bg-slate-50 px-3 py-2 text-left text-xs font-semibold text-slate-500 hover:bg-slate-100"
+                        onClick={() => setShowAllReviewStops((value) => !value)}
+                      >
+                        {showAllReviewStops
+                          ? "접기"
+                          : `외 ${formatNumber(selectedReviewStops.length - 8)}개 더 보기`}
+                      </button>
                     ) : null}
                   </div>
                 ) : (
