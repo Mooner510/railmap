@@ -23,7 +23,7 @@ interface CanonicalRouteStop {
 interface CanonicalBranch {
   id: string;
   canonicalLineId: string;
-  role: "main" | "branch" | string;
+  role: "본선" | "branch" | string;
   sourceLineNumber: string;
   sourceLineName: string;
   origin: string | null;
@@ -106,8 +106,6 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [isHydratedFromUrl, setIsHydratedFromUrl] = useState(false);
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
-  const [copiedReviewCsv, setCopiedReviewCsv] = useState(false);
-  const [showAllReviewStops, setShowAllReviewStops] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -259,83 +257,9 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     [mapStations, visibleStationIds],
   );
 
-  const lowConfidenceLines = bundle.lines.filter((line) => countLowConfidence(line) > 0);
-
-  useEffect(() => {
-    setShowAllReviewStops(false);
-  }, [selectedBranchId, selectedLineKey]);
 
 
-  const selectedReviewStops = useMemo<
-    (CanonicalRouteStop & {
-      branchId: string;
-      branchName: string;
-      branchNumber: string;
-    })[]
-  >(() => {
-    if (!selectedLine) return [];
 
-    const targetBranches = selectedBranch ? [selectedBranch] : selectedLine.branches;
-
-    return targetBranches
-      .flatMap((branch) =>
-        getLowConfidenceStops(branch).map((stop) => ({
-          ...stop,
-          branchId: branch.id,
-          branchName: branch.sourceLineName,
-          branchNumber: branch.sourceLineNumber,
-        })),
-      )
-      .sort(
-        (a, b) =>
-          a.branchName.localeCompare(b.branchName, "ko-KR") || a.sequence - b.sequence,
-      );
-  }, [selectedBranch, selectedLine]);
-
-  const copySelectedReviewCsv = async () => {
-    if (!selectedLine || selectedReviewStops.length === 0) return;
-
-    const rows = [
-      [
-        "canonicalKey",
-        "canonicalName",
-        "branchNumber",
-        "branchName",
-        "sourceCandidateId",
-        "sequence",
-        "sourceStationCode",
-        "displayNameKo",
-        "stationId",
-        "matchStatus",
-        "confidence",
-        "diagnostics",
-      ],
-      ...selectedReviewStops.map((stop) => [
-        selectedLine.canonicalKey,
-        selectedLine.nameKo,
-        stop.branchNumber,
-        stop.branchName,
-        stop.sourceCandidateId,
-        stop.sequence,
-        stop.sourceStationCode,
-        stop.displayNameKo,
-        stop.stationId,
-        stop.matchStatus,
-        stop.confidence,
-        stop.diagnostics?.join("; ") ?? "",
-      ]),
-    ];
-
-    const csv = rows
-      .map((row) =>
-        row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","),
-      )
-      .join("\n");
-
-    await navigator.clipboard.writeText(csv);
-    setCopiedReviewCsv(true);
-    window.setTimeout(() => setCopiedReviewCsv(false), 1200);
-  };
 
 
 
@@ -347,7 +271,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
-              <h2 className="text-xl font-bold">Canonical Line Cards</h2>
+              <h2 className="text-xl font-bold">노선 목록</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
                 필터 적용 결과 {formatNumber(filteredLines.length)}개 노선 · 지도 branch{" "}
                 {formatNumber(visibleMapBranches.length)}개 · 지도 역{" "}
@@ -359,7 +283,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
               <input
                 className="min-w-56 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400 focus:border-sky-300"
                 value={searchQuery}
-                placeholder="노선명, 코드, source 검색"
+                placeholder="노선명, 코드 검색"
                 onChange={(event) => {
                   setSearchQuery(event.target.value);
                   setSelectedLineKey(null);
@@ -517,15 +441,15 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
               </div>
               <p className="mt-2 text-sm text-slate-500">{selectedLine.canonicalKey}</p>
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-                <MetricMini label="Branches" value={selectedLine.branches.length} />
-                <MetricMini label="Stops" value={countRouteStops(selectedLine)} />
-                <MetricMini label="Low" value={countLowConfidence(selectedLine)} />
-                <MetricMini label="Area" value={selectedLine.mreaWideCd} />
-                <MetricMini label="Visible" value={selectedBranch ? "Branch" : "Line"} />
+                <MetricMini label="구간" value={selectedLine.branches.length} />
+                <MetricMini label="정차역" value={countRouteStops(selectedLine)} />
+                <MetricMini label="확인 필요" value={countLowConfidence(selectedLine)} />
+                <MetricMini label="권역" value={selectedLine.mreaWideCd} />
+                <MetricMini label="표시" value={selectedBranch ? "구간" : "노선"} />
               </div>
 
               <div className="mt-4">
-                <p className="text-xs font-bold text-slate-400 uppercase">Branch filter</p>
+                <p className="text-xs font-bold text-slate-400 uppercase">구간 선택</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -556,112 +480,13 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                 </div>
               </div>
 
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-bold text-slate-400 uppercase">Review queue</p>
-                    <p className="mt-1 text-sm font-bold text-slate-900">
-                      검수 필요 {formatNumber(selectedReviewStops.length)}개
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      현재 선택한 {selectedBranch ? "branch" : "line"} 기준
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
-                    disabled={selectedReviewStops.length === 0}
-                    onClick={copySelectedReviewCsv}
-                  >
-                    {copiedReviewCsv ? "복사됨" : "CSV 복사"}
-                  </button>
-                </div>
-
-                {selectedReviewStops.length > 0 ? (
-                  <div className="mt-3 grid gap-2">
-                    {selectedReviewStops
-                      .slice(0, showAllReviewStops ? selectedReviewStops.length : 8)
-                      .map((stop) => (
-                      <div
-                        key={`${stop.branchId}:${stop.sourceCandidateId}`}
-                        className="rounded-xl bg-slate-50 px-3 py-2 text-xs"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-slate-800">{stop.displayNameKo}</span>
-                          <span className="text-slate-500">
-                            {stop.confidence}
-                          </span>
-                        </div>
-                        <p className="mt-1 truncate text-slate-500">
-                          {stop.branchName} · seq {stop.sequence} · code {stop.sourceStationCode}
-                        </p>
-                        <p className="mt-0.5 truncate text-slate-400">
-                          stationId {stop.stationId || "없음"} · {stop.matchStatus}
-                        </p>
-                      </div>
-                    ))}
-
-                    {selectedReviewStops.length > 8 ? (
-                      <button
-                        type="button"
-                        className="rounded-xl bg-slate-50 px-3 py-2 text-left text-xs font-semibold text-slate-500 hover:bg-slate-100"
-                        onClick={() => setShowAllReviewStops((value) => !value)}
-                      >
-                        {showAllReviewStops
-                          ? "접기"
-                          : `외 ${formatNumber(selectedReviewStops.length - 8)}개 더 보기`}
-                      </button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-xs text-slate-500">현재 선택 범위에 검수 대상이 없습니다.</p>
-                )}
-              </div>
             </div>
           ) : (
             <p className="mt-3 text-sm text-slate-500">선택된 노선 없음</p>
           )}
         </section>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-bold">검수 상태</h2>
-          <div className="mt-4 space-y-3 text-sm">
-            <StatusRow label="Skipped route stops" value={bundle.counts.skippedRouteStops} />
-            <StatusRow label="Missing canonical lines" value={bundle.counts.missingCanonicalLines} warn />
-            <StatusRow label="Low confidence lines" value={lowConfidenceLines.length} warn />
-          </div>
-        </section>
 
-        <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
-          <h2 className="text-lg font-bold text-amber-950">검수 필요 노선</h2>
-          <p className="mt-2 text-sm leading-6 text-amber-800">
-            low confidence는 전역 역명 fallback으로 복구된 route stop입니다.
-          </p>
-          <div className="mt-4 space-y-3">
-            {lowConfidenceLines.map((line) => (
-              <button
-                type="button"
-                key={line.canonicalKey}
-                className="w-full rounded-2xl border border-amber-200 bg-white/70 p-4 text-left hover:bg-white"
-                onClick={() => {
-                  setSelectedArea("all");
-                  setOnlyLowConfidence(false);
-                  setSearchQuery("");
-                  setSelectedLineKey(line.canonicalKey);
-                }}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="font-semibold text-amber-950">{line.nameKo}</p>
-                  <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
-                    {countLowConfidence(line)}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-amber-700">{line.canonicalKey}</p>
-              </button>
-            ))}
-          </div>
-        </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-bold">제외된 canonical line</h2>
@@ -728,7 +553,7 @@ function BranchTable({
                       }
                     }}
                   >
-                    {isSelected ? "selected" : branch.role}
+                    {isSelected ? "선택됨" : branch.role}
                   </button>
                 </td>
                 <td className="px-4 py-3 align-top">
