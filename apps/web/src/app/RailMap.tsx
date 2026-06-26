@@ -30,6 +30,79 @@ export interface RailMapBranch {
   }>;
 }
 
+
+type ValidRailMapStation = RailMapStation & {
+  lat: number;
+  lng: number;
+};
+
+function isValidCoordinate(station: RailMapStation | null | undefined): station is ValidRailMapStation {
+  return (
+    station !== null &&
+    station !== undefined &&
+    typeof station.lat === "number" &&
+    typeof station.lng === "number" &&
+    Number.isFinite(station.lat) &&
+    Number.isFinite(station.lng)
+  );
+}
+
+function buildBranchFeatures(branches: RailMapBranch[]) {
+  return {
+    type: "FeatureCollection" as const,
+    features: branches
+      .map((branch) => {
+        const coordinates = branch.routeStops
+          .map((stop) => stop.station)
+          .filter(isValidCoordinate)
+          .map((station) => [station.lng, station.lat]);
+
+        if (coordinates.length < 2) return null;
+
+        return {
+          type: "Feature" as const,
+          properties: {
+            id: branch.id,
+            branchId: branch.id,
+            canonicalLineId: branch.canonicalLineId,
+            colorHex: branch.colorHex,
+          },
+          geometry: {
+            type: "LineString" as const,
+            coordinates: smoothCoordinates(coordinates),
+          },
+        };
+      })
+      .filter((feature): feature is NonNullable<typeof feature> => feature !== null),
+  };
+}
+
+function getMapErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "지도를 불러오지 못했습니다.";
+}
+
+function getFitPadding() {
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+
+  if (isMobile) {
+    return {
+      top: 56,
+      right: 24,
+      bottom: 260,
+      left: 24,
+    };
+  }
+
+  return {
+    top: 48,
+    right: 320,
+    bottom: 48,
+    left: 320,
+  };
+}
+
 interface RailMapProps {
   stations: RailMapStation[];
   branches: RailMapBranch[];
@@ -48,65 +121,75 @@ const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
   [134.3, 43.1],
 ];
 
-function isValidCoordinate(station: RailMapStation | null): station is RailMapStation & {
-  lat: number;
-  lng: number;
-} {
-  return (
-    !!station &&
-    typeof station.lat === "number" &&
-    typeof station.lng === "number" &&
-    Number.isFinite(station.lat) &&
-    Number.isFinite(station.lng)
-  );
+
+type LngLatTuple = [number, number];
+
+function catmullRomPoint(
+  p0: LngLatTuple,
+  p1: LngLatTuple,
+  p2: LngLatTuple,
+  p3: LngLatTuple,
+  t: number,
+): LngLatTuple {
+  const [p0Lng, p0Lat] = p0;
+  const [p1Lng, p1Lat] = p1;
+  const [p2Lng, p2Lat] = p2;
+  const [p3Lng, p3Lat] = p3;
+
+  const t2 = t * t;
+  const t3 = t2 * t;
+
+  const lng =
+    0.5 *
+    (2 * p1Lng +
+      (-p0Lng + p2Lng) * t +
+      (2 * p0Lng - 5 * p1Lng + 4 * p2Lng - p3Lng) * t2 +
+      (-p0Lng + 3 * p1Lng - 3 * p2Lng + p3Lng) * t3);
+
+  const lat =
+    0.5 *
+    (2 * p1Lat +
+      (-p0Lat + p2Lat) * t +
+      (2 * p0Lat - 5 * p1Lat + 4 * p2Lat - p3Lat) * t2 +
+      (-p0Lat + 3 * p1Lat - 3 * p2Lat + p3Lat) * t3);
+
+  return [lng, lat];
 }
 
-function buildBranchFeatures(branches: RailMapBranch[]) {
-  return branches
-    .map((branch) => {
-      const coordinates = branch.routeStops
-        .map((stop) => stop.station)
-        .filter(isValidCoordinate)
-        .map((station) => [station.lng, station.lat]);
+function toLngLatTuple(point: number[]): LngLatTuple | null {
+  const [lng, lat] = point;
 
-      if (coordinates.length < 2) return null;
+  if (typeof lng !== "number" || typeof lat !== "number") return null;
 
-      return {
-        type: "Feature" as const,
-        properties: {
-          id: branch.id,
-          canonicalLineId: branch.canonicalLineId,
-          canonicalLineNameKo: branch.canonicalLineNameKo,
-          colorHex: branch.colorHex,
-          role: branch.role,
-          sourceLineNumber: branch.sourceLineNumber,
-          sourceLineName: branch.sourceLineName,
-          routeStopCount: branch.routeStops.length,
-          coordinateCount: coordinates.length,
-        },
-        geometry: {
-          type: "LineString" as const,
-          coordinates,
-        },
-      };
-    })
-    .filter((feature): feature is NonNullable<typeof feature> => feature !== null);
+  return [lng, lat];
 }
 
-function getFitPadding() {
-  if (typeof window === "undefined") return 64;
+function smoothCoordinates(coordinates: number[][]): LngLatTuple[] {
+  const points = coordinates
+    .map(toLngLatTuple)
+    .filter((point): point is LngLatTuple => point !== null);
 
-  if (window.innerWidth >= 1024) {
-    return { top: 40, bottom: 40, left: 300, right: 296 };
+  if (points.length < 3) return points;
+
+  const samplesPerSegment = 5;
+  const result: LngLatTuple[] = [];
+
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[Math.max(0, i - 1)] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)] ?? p2;
+
+    if (!p0 || !p1 || !p2 || !p3) continue;
+
+    if (i === 0) result.push(p1);
+
+    for (let step = 1; step <= samplesPerSegment; step += 1) {
+      result.push(catmullRomPoint(p0, p1, p2, p3, step / samplesPerSegment));
+    }
   }
 
-  return { top: 32, bottom: 210, left: 24, right: 24 };
-}
-
-function getMapErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === "string") return error;
-  return "지도 초기화 중 오류가 발생했습니다.";
+  return result;
 }
 
 export default function RailMap({
@@ -257,8 +340,8 @@ export default function RailMap({
             source: "branch-preview-lines",
             paint: {
               "line-color": "#ffffff",
-              "line-width": 4.2,
-              "line-opacity": 0.9,
+              "line-width": 3.8,
+              "line-opacity": 0.88,
             },
             layout: {
               "line-cap": "round",
@@ -272,8 +355,8 @@ export default function RailMap({
             source: "branch-preview-lines",
             paint: {
               "line-color": ["coalesce", ["get", "colorHex"], "#0284c7"],
-              "line-width": 2.0,
-              "line-opacity": 0.7,
+              "line-width": 2.2,
+              "line-opacity": 0.76,
             },
             layout: {
               "line-cap": "round",
@@ -288,8 +371,8 @@ export default function RailMap({
             filter: ["==", ["get", "id"], ""],
             paint: {
               "line-color": ["coalesce", ["get", "colorHex"], "#0369a1"],
-              "line-width": 4.6,
-              "line-opacity": 0.95,
+              "line-width": 4.2,
+              "line-opacity": 0.96,
             },
             layout: {
               "line-cap": "round",
@@ -426,7 +509,7 @@ export default function RailMap({
 
     if (selectedStation) {
       map.flyTo({
-        center: [selectedStation.lng, selectedStation.lat],
+        center: isValidCoordinate(selectedStation) ? [selectedStation.lng, selectedStation.lat] : undefined,
         zoom: Math.max(map.getZoom(), 12.5),
         duration: 250,
       });
@@ -516,7 +599,7 @@ export default function RailMap({
       ) : null}
 
       <div className="pointer-events-none absolute bottom-2 left-2 z-10 hidden max-w-[260px] border border-slate-200 bg-white/90 px-2 py-1 text-[11px] font-medium leading-4 text-slate-500 shadow-sm backdrop-blur lg:block">
-        현재 구간선은 정차역 좌표를 연결한 참고 선형입니다. 실제 철도 선형은 OSM 매칭 단계에서 보강합니다.
+        현재 구간선은 정차역 좌표를 통과하는 부드러운 참고 선형입니다. 이후 에디터에서 중간 정점을 직접 보정할 수 있게 확장할 예정입니다.
       </div>
 
       {!showBranches && !showStations ? (
