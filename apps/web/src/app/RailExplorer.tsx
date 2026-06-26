@@ -202,17 +202,34 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     const query = normalizeSearchText(deferredSearchQuery);
     if (query.length < MIN_STATION_SEARCH_LENGTH) return [];
 
-    const results: RailMapStation[] = [];
+    const exactNameMatches: RailMapStation[] = [];
+    const similarNameMatches: RailMapStation[] = [];
+    const metadataMatches: RailMapStation[] = [];
 
     for (const station of mapStations) {
-      if (!(stationSearchIndex.get(station.id)?.includes(query) ?? false)) continue;
+      const name = normalizeSearchText(station.nameKo);
+      const searchable = stationSearchIndex.get(station.id) ?? "";
 
-      results.push(station);
+      if (!searchable.includes(query)) continue;
 
-      if (results.length >= MAX_STATION_SEARCH_RESULTS) break;
+      if (name === query) {
+        exactNameMatches.push(station);
+      } else if (name.includes(query)) {
+        similarNameMatches.push(station);
+      } else {
+        metadataMatches.push(station);
+      }
+
+      const collected =
+        exactNameMatches.length + similarNameMatches.length + metadataMatches.length;
+
+      if (collected >= MAX_STATION_SEARCH_RESULTS * 3) break;
     }
 
-    return results;
+    return [...exactNameMatches, ...similarNameMatches, ...metadataMatches].slice(
+      0,
+      MAX_STATION_SEARCH_RESULTS,
+    );
   }, [deferredSearchQuery, mapStations, stationSearchIndex]);
 
   const lineSearchResults = useMemo(() => {
