@@ -33,6 +33,10 @@ export interface RailMapBranch {
 interface RailMapProps {
   stations: RailMapStation[];
   branches: RailMapBranch[];
+  selectedBranchId?: string | null;
+  selectedStationId?: string | null;
+  onSelectBranch?: (branch: RailMapBranch) => void;
+  onSelectStation?: (station: RailMapStation) => void;
   className?: string;
 }
 
@@ -102,13 +106,30 @@ function getMapErrorMessage(error: unknown): string {
   return "지도 초기화 중 오류가 발생했습니다.";
 }
 
-export default function RailMap({ stations, branches, className = "" }: RailMapProps) {
+export default function RailMap({
+  stations,
+  branches,
+  selectedBranchId = null,
+  selectedStationId = null,
+  onSelectBranch,
+  onSelectStation,
+  className = "",
+}: RailMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const branchesRef = useRef(branches);
+  const onSelectBranchRef = useRef(onSelectBranch);
+
+  useEffect(() => {
+    branchesRef.current = branches;
+  }, [branches]);
+
+  useEffect(() => {
+    onSelectBranchRef.current = onSelectBranch;
+  }, [onSelectBranch]);
 
   const validStations = useMemo(() => stations.filter(isValidCoordinate), [stations]);
   const branchFeatures = useMemo(() => buildBranchFeatures(branches), [branches]);
@@ -117,14 +138,8 @@ export default function RailMap({ stations, branches, className = "" }: RailMapP
     [branches, selectedBranchId],
   );
 
-  useEffect(() => {
-    if (!selectedBranchId) return;
-    if (branches.some((branch) => branch.id === selectedBranchId)) return;
 
-    setSelectedBranchId(null);
-  }, [branches, selectedBranchId]);
-
-  const selectedStationIds = useMemo(() => {
+  const selectedBranchStationIds = useMemo(() => {
     if (!selectedBranch) return new Set<string>();
 
     return new Set(
@@ -286,27 +301,13 @@ export default function RailMap({ stations, branches, className = "" }: RailMapP
 
           map.on("click", "branch-preview-lines", (event) => {
             const feature = event.features?.[0];
-            const coordinates = event.lngLat;
-
             if (!feature) return;
 
             const props = feature.properties as Record<string, unknown>;
             const branchId = String(props.id ?? "");
+            const branch = branchesRef.current.find((item) => item.id === branchId);
 
-            setSelectedBranchId(branchId || null);
-
-            new maplibregl.Popup({ offset: 12 })
-              .setLngLat(coordinates)
-              .setHTML(
-                `<div style="font-size:12px;line-height:1.5">
-                  <strong>${String(props.canonicalLineNameKo ?? "")}</strong><br/>
-                  ${String(props.sourceLineName ?? "")} · ${String(props.role ?? "")}<br/>
-                  정차역 ${String(props.routeStopCount ?? "-")}개 · 좌표 ${String(
-                    props.coordinateCount ?? "-",
-                  )}개
-                </div>`,
-              )
-              .addTo(map);
+            if (branch) onSelectBranchRef.current?.(branch);
           });
 
           map.resize();
@@ -418,8 +419,8 @@ export default function RailMap({ stations, branches, className = "" }: RailMapP
     markersRef.current = [];
 
     const markerStations =
-      selectedStationIds.size > 0
-        ? validStations.filter((station) => selectedStationIds.has(station.id))
+      selectedBranchStationIds.size > 0
+        ? validStations.filter((station) => selectedBranchStationIds.has(station.id))
         : visibleBranchStations.length > 0
           ? visibleBranchStations
           : validStations.slice(0, 1200);
@@ -428,11 +429,14 @@ export default function RailMap({ stations, branches, className = "" }: RailMapP
       const element = document.createElement("button");
       element.type = "button";
       element.title = station.nameKo;
-      const isSelected = selectedStationIds.has(station.id);
+      const isSelected = selectedStationId === station.id;
+      const isInSelectedBranch = selectedBranchStationIds.has(station.id);
 
       element.className = isSelected
-        ? "h-3 w-3 rounded-full border-2 border-white bg-amber-500 shadow-md shadow-amber-500/40 transition-transform hover:scale-150"
-        : "h-2 w-2 rounded-full border border-white bg-sky-500 shadow-sm transition-transform hover:scale-150";
+        ? "h-3.5 w-3.5 rounded-full border-2 border-white bg-amber-500 shadow-md shadow-amber-500/40 transition-transform hover:scale-150"
+        : isInSelectedBranch
+          ? "h-2.5 w-2.5 rounded-full border border-white bg-sky-600 shadow-sm transition-transform hover:scale-150"
+          : "h-2 w-2 rounded-full border border-white bg-sky-500 shadow-sm transition-transform hover:scale-150";
 
       const popup = new maplibregl.Popup({
         offset: 12,
@@ -446,6 +450,10 @@ export default function RailMap({ stations, branches, className = "" }: RailMapP
 
       element.addEventListener("mouseenter", () => popup.addTo(map));
       element.addEventListener("mouseleave", () => popup.remove());
+      element.addEventListener("click", () => {
+        popup.remove();
+        onSelectStation?.(station);
+      });
 
       const marker = new maplibregl.Marker({ element })
         .setLngLat([station.lng, station.lat])
@@ -454,7 +462,7 @@ export default function RailMap({ stations, branches, className = "" }: RailMapP
 
       markersRef.current.push(marker);
     }
-  }, [validStations, visibleBranchStations, selectedStationIds, mapReady]);
+  }, [validStations, visibleBranchStations, selectedBranchStationIds, selectedStationId, onSelectStation, mapReady]);
 
   return (
     <div className={`relative h-full min-h-[100dvh] w-full min-w-0 overflow-hidden bg-slate-100 ${className}`}>
