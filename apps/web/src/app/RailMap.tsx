@@ -17,6 +17,7 @@ export interface RailMapBranch {
   id: string;
   canonicalLineId: string;
   canonicalLineNameKo: string;
+  colorHex: string;
   role: string;
   sourceLineNumber: string;
   sourceLineName: string;
@@ -63,6 +64,7 @@ function buildBranchFeatures(branches: RailMapBranch[]) {
           id: branch.id,
           canonicalLineId: branch.canonicalLineId,
           canonicalLineNameKo: branch.canonicalLineNameKo,
+          colorHex: branch.colorHex,
           role: branch.role,
           sourceLineNumber: branch.sourceLineNumber,
           sourceLineName: branch.sourceLineName,
@@ -161,12 +163,7 @@ export default function RailMap({ stations, branches }: RailMapProps) {
         type: "line",
         source: "branch-preview-lines",
         paint: {
-          "line-color": [
-            "case",
-            [">", ["get", "lowConfidenceCount"], 0],
-            "#f59e0b",
-            "#0284c7",
-          ],
+          "line-color": ["coalesce", ["get", "colorHex"], "#0284c7"],
           "line-width": 3,
           "line-opacity": 0.55,
         },
@@ -182,12 +179,7 @@ export default function RailMap({ stations, branches }: RailMapProps) {
         source: "branch-preview-lines",
         filter: ["==", ["get", "id"], ""],
         paint: {
-          "line-color": [
-            "case",
-            [">", ["get", "lowConfidenceCount"], 0],
-            "#d97706",
-            "#0369a1",
-          ],
+          "line-color": ["coalesce", ["get", "colorHex"], "#0369a1"],
           "line-width": 7,
           "line-opacity": 0.95,
         },
@@ -225,7 +217,8 @@ export default function RailMap({ stations, branches }: RailMapProps) {
               정차역 ${String(props.routeStopCount ?? "-")}개 · 좌표 ${String(
                 props.coordinateCount ?? "-",
               )}개<br/>
-              검수 ${String(props.lowConfidenceCount ?? "0")}개
+              검수 ${String(props.lowConfidenceCount ?? "0")}개<br/>
+              색상 ${String(props.colorHex ?? "-")}
             </div>`,
           )
           .addTo(map);
