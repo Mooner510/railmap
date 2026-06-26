@@ -103,6 +103,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [onlyLowConfidence, setOnlyLowConfidence] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLineKey, setSelectedLineKey] = useState<string | null>(null);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [isHydratedFromUrl, setIsHydratedFromUrl] = useState(false);
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
 
@@ -113,11 +114,13 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     const low = params.get("low");
     const q = params.get("q");
     const line = params.get("line");
+    const branch = params.get("branch");
 
     if (area) setSelectedArea(area);
     if (low === "1") setOnlyLowConfidence(true);
     if (q) setSearchQuery(q);
     if (line) setSelectedLineKey(line);
+    if (branch) setSelectedBranchId(branch);
 
     setIsHydratedFromUrl(true);
   }, []);
@@ -131,12 +134,20 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     if (onlyLowConfidence) params.set("low", "1");
     if (searchQuery.trim()) params.set("q", searchQuery.trim());
     if (selectedLineKey) params.set("line", selectedLineKey);
+    if (selectedBranchId) params.set("branch", selectedBranchId);
 
     const query = params.toString();
     const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
 
     window.history.replaceState(null, "", nextUrl);
-  }, [isHydratedFromUrl, onlyLowConfidence, searchQuery, selectedArea, selectedLineKey]);
+  }, [
+    isHydratedFromUrl,
+    onlyLowConfidence,
+    searchQuery,
+    selectedArea,
+    selectedBranchId,
+    selectedLineKey,
+  ]);
 
   const sortedLines = useMemo(
     () =>
@@ -192,7 +203,26 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     if (filteredLines.some((line) => line.canonicalKey === selectedLineKey)) return;
 
     setSelectedLineKey(null);
+    setSelectedBranchId(null);
   }, [filteredLines, selectedLineKey]);
+
+  const selectedBranch = useMemo(() => {
+    if (!selectedLine || !selectedBranchId) return null;
+
+    return selectedLine.branches.find((branch) => branch.id === selectedBranchId) ?? null;
+  }, [selectedBranchId, selectedLine]);
+
+  useEffect(() => {
+    if (!selectedLine) {
+      setSelectedBranchId(null);
+      return;
+    }
+
+    if (!selectedBranchId) return;
+    if (selectedLine.branches.some((branch) => branch.id === selectedBranchId)) return;
+
+    setSelectedBranchId(null);
+  }, [selectedBranchId, selectedLine]);
 
   const visibleLineKeys = useMemo(
     () => new Set(filteredLines.map((line) => line.canonicalKey)),
@@ -203,10 +233,11 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     () =>
       mapBranches.filter((branch) => {
         if (!visibleLineKeys.has(branch.canonicalLineId)) return false;
+        if (selectedBranch) return branch.id === selectedBranch.id;
         if (selectedLine) return branch.canonicalLineId === selectedLine.canonicalKey;
         return true;
       }),
-    [mapBranches, selectedLine, visibleLineKeys],
+    [mapBranches, selectedBranch, selectedLine, visibleLineKeys],
   );
 
   const visibleStationIds = useMemo(() => {
@@ -340,7 +371,10 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                     <button
                       type="button"
                       className="text-left"
-                      onClick={() => setSelectedLineKey(line.canonicalKey)}
+                      onClick={() => {
+                      setSelectedLineKey(line.canonicalKey);
+                      setSelectedBranchId(null);
+                    }}
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span
@@ -373,7 +407,14 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                     </div>
                   </div>
 
-                  {isSelected ? <BranchTable line={line} /> : null}
+                  {isSelected ? (
+                    <BranchTable
+                      line={line}
+                      selectedBranchId={selectedBranchId}
+                      onSelectBranch={(branchId) => setSelectedBranchId(branchId)}
+                      onClearBranch={() => setSelectedBranchId(null)}
+                    />
+                  ) : null}
                 </article>
               );
             })}
@@ -399,6 +440,38 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                 <MetricMini label="Stops" value={countRouteStops(selectedLine)} />
                 <MetricMini label="Low" value={countLowConfidence(selectedLine)} />
                 <MetricMini label="Area" value={selectedLine.mreaWideCd} />
+              </div>
+
+              <div className="mt-4">
+                <p className="text-xs font-bold text-slate-400 uppercase">Branch filter</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={
+                      selectedBranchId === null
+                        ? "rounded-full bg-sky-600 px-3 py-1 text-xs font-bold text-white"
+                        : "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700"
+                    }
+                    onClick={() => setSelectedBranchId(null)}
+                  >
+                    전체
+                  </button>
+
+                  {selectedLine.branches.map((branch) => (
+                    <button
+                      type="button"
+                      key={branch.id}
+                      className={
+                        selectedBranchId === branch.id
+                          ? "rounded-full bg-sky-600 px-3 py-1 text-xs font-bold text-white"
+                          : "rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-700"
+                      }
+                      onClick={() => setSelectedBranchId(branch.id)}
+                    >
+                      {branch.sourceLineName}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
@@ -464,7 +537,17 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   );
 }
 
-function BranchTable({ line }: { line: CanonicalLine }) {
+function BranchTable({
+  line,
+  selectedBranchId,
+  onSelectBranch,
+  onClearBranch,
+}: {
+  line: CanonicalLine;
+  selectedBranchId: string | null;
+  onSelectBranch: (branchId: string) => void;
+  onClearBranch: () => void;
+}) {
   return (
     <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <table className="w-full text-left text-sm">
@@ -480,13 +563,28 @@ function BranchTable({ line }: { line: CanonicalLine }) {
         <tbody className="divide-y divide-slate-100">
           {line.branches.map((branch) => {
             const low = getLowConfidenceStops(branch).length;
+            const isSelected = selectedBranchId === branch.id;
 
             return (
-              <tr key={branch.id}>
+              <tr key={branch.id} className={isSelected ? "bg-sky-50" : undefined}>
                 <td className="px-4 py-3 align-top">
-                  <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                    {branch.role}
-                  </span>
+                  <button
+                    type="button"
+                    className={
+                      isSelected
+                        ? "rounded-full bg-sky-600 px-2 py-1 text-xs font-semibold text-white"
+                        : "rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200"
+                    }
+                    onClick={() => {
+                      if (isSelected) {
+                        onClearBranch();
+                      } else {
+                        onSelectBranch(branch.id);
+                      }
+                    }}
+                  >
+                    {isSelected ? "selected" : branch.role}
+                  </button>
                 </td>
                 <td className="px-4 py-3 align-top">
                   <p className="font-semibold text-slate-900">{branch.sourceLineName}</p>
