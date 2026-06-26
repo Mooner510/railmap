@@ -627,6 +627,11 @@ export default function RailMap({
       dot.style.backgroundColor = color;
       dot.style.setProperty("--tw-ring-color", color);
       element.appendChild(dot);
+      element.addEventListener("click", (event) => {
+        event.stopPropagation();
+        onSelectStation?.(station);
+      });
+
 
       const popup = new maplibregl.Popup({
         offset: 12,
