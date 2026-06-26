@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import RailMap, { type RailMapStation } from "./RailMap";
+import RailMap, { type RailMapBranch, type RailMapStation } from "./RailMap";
 
 type MatchConfidence = "high" | "medium" | "low" | "none" | string;
 
@@ -121,6 +121,40 @@ function toMapStations(stations: CanonicalStation[]): RailMapStation[] {
   }));
 }
 
+function toMapBranches(bundle: CanonicalBundle): RailMapBranch[] {
+  const stationById = new Map(
+    bundle.stations.map((station) => [
+      station.id,
+      {
+        id: station.id,
+        nameKo: station.nameKo,
+        lineNameKo: station.lineNameKo,
+        lat: station.lat,
+        lng: station.lng,
+      } satisfies RailMapStation,
+    ]),
+  );
+
+  return bundle.lines.flatMap((line) =>
+    line.branches.map((branch) => ({
+      id: branch.id,
+      canonicalLineId: line.canonicalKey,
+      canonicalLineNameKo: line.nameKo,
+      role: branch.role,
+      sourceLineNumber: branch.sourceLineNumber,
+      sourceLineName: branch.sourceLineName,
+      routeStops: branch.routeStops.map((stop) => ({
+        id: stop.id,
+        sequence: stop.sequence,
+        displayNameKo: stop.displayNameKo,
+        station: stationById.get(stop.stationId) ?? null,
+        confidence: stop.confidence,
+      })),
+    })),
+  );
+}
+
+
 function formatNumber(value: number): string {
   return value.toLocaleString("ko-KR");
 }
@@ -184,7 +218,7 @@ export default function Home() {
 
       <section className="mx-auto grid max-w-7xl gap-6 px-6 py-8 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="flex flex-col gap-6">
-          <RailMap stations={toMapStations(bundle.stations)} />
+          <RailMap stations={toMapStations(bundle.stations)} branches={toMapBranches(bundle)} />
 
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex flex-col gap-2">
