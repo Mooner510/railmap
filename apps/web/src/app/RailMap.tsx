@@ -610,23 +610,23 @@ export default function RailMap({
           : validStations.slice(0, 1200);
 
     for (const station of markerStations) {
+      const isSelected = selectedStationId === station.id;
+      const color = stationColorIndex.get(station.id) ?? "#64748b";
+
       const element = document.createElement("button");
       element.type = "button";
-      element.title = station.nameKo;
-      const isSelected = selectedStationId === station.id;
-      const isInSelectedBranch = selectedBranchStationIds.has(station.id);
+      element.className = "flex h-7 w-7 items-center justify-center rounded-full";
+      element.setAttribute("aria-label", station.nameKo ?? "역");
 
-      const stationColor = stationColorIndex.get(station.id) ?? "#0284c7";
-
-      element.className = isSelected
-        ? "h-4 w-4 rounded-full border-2 border-white shadow-lg ring-2 transition-transform duration-150 ease-out hover:scale-150"
-        : isInSelectedBranch
-          ? "h-2.5 w-2.5 rounded-full border border-white shadow-sm transition-transform duration-150 ease-out hover:scale-150"
-          : "h-2 w-2 rounded-full border border-white shadow-sm opacity-90 transition-transform duration-150 ease-out hover:scale-150";
-      element.style.backgroundColor = stationColor;
-      element.style.boxShadow = isSelected
-        ? `0 0 0 3px ${stationColor}33, 0 6px 14px ${stationColor}33`
-        : "";
+      const dot = document.createElement("span");
+      dot.className = isSelected
+        ? "block h-4 w-4 rounded-full border-2 border-white shadow-lg ring-2 transition-transform duration-150 ease-out hover:scale-125"
+        : selectedBranchStationIds.has(station.id)
+          ? "block h-2.5 w-2.5 rounded-full border border-white shadow-sm transition-transform duration-150 ease-out hover:scale-125"
+          : "block h-2 w-2 rounded-full border border-white shadow-sm opacity-90 transition-transform duration-150 ease-out hover:scale-125";
+      dot.style.backgroundColor = color;
+      dot.style.setProperty("--tw-ring-color", color);
+      element.appendChild(dot);
 
       const popup = new maplibregl.Popup({
         offset: 12,
