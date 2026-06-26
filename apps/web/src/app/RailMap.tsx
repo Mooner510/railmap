@@ -33,7 +33,13 @@ export interface RailMapBranch {
 interface RailMapProps {
   stations: RailMapStation[];
   branches: RailMapBranch[];
+  className?: string;
 }
+
+const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
+  [121.4, 30.9],
+  [134.3, 43.1],
+];
 
 function isValidCoordinate(station: RailMapStation | null): station is RailMapStation & {
   lat: number;
@@ -70,7 +76,6 @@ function buildBranchFeatures(branches: RailMapBranch[]) {
           sourceLineName: branch.sourceLineName,
           routeStopCount: branch.routeStops.length,
           coordinateCount: coordinates.length,
-          lowConfidenceCount: branch.routeStops.filter((stop) => stop.confidence === "low").length,
         },
         geometry: {
           type: "LineString" as const,
@@ -81,11 +86,29 @@ function buildBranchFeatures(branches: RailMapBranch[]) {
     .filter((feature): feature is NonNullable<typeof feature> => feature !== null);
 }
 
-export default function RailMap({ stations, branches }: RailMapProps) {
+function getFitPadding() {
+  if (typeof window === "undefined") return 64;
+
+  if (window.innerWidth >= 1024) {
+    return { top: 40, bottom: 40, left: 300, right: 296 };
+  }
+
+  return { top: 32, bottom: 210, left: 24, right: 24 };
+}
+
+function getMapErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  return "지도 초기화 중 오류가 발생했습니다.";
+}
+
+export default function RailMap({ stations, branches, className = "" }: RailMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
   const validStations = useMemo(() => stations.filter(isValidCoordinate), [stations]);
   const branchFeatures = useMemo(() => buildBranchFeatures(branches), [branches]);
@@ -93,6 +116,7 @@ export default function RailMap({ stations, branches }: RailMapProps) {
     () => branches.find((branch) => branch.id === selectedBranchId) ?? null,
     [branches, selectedBranchId],
   );
+
   useEffect(() => {
     if (!selectedBranchId) return;
     if (branches.some((branch) => branch.id === selectedBranchId)) return;
@@ -124,144 +148,206 @@ export default function RailMap({ stations, branches }: RailMapProps) {
     return [...unique.values()];
   }, [branches]);
 
-  const markerDisplayCount =
-    selectedStationIds.size > 0
-      ? selectedStationIds.size
-      : visibleBranchStations.length > 0
-        ? visibleBranchStations.length
-        : Math.min(validStations.length, 1200);
-
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    if (mapRef.current) return;
 
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      center: [127.0276, 37.4979],
-      zoom: 9,
-      attributionControl: false,
-      style: {
-        version: 8,
-        sources: {
-          osm: {
-            type: "raster",
-            tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-            tileSize: 256,
-            attribution: "© OpenStreetMap contributors",
+    let frame = 0;
+    let resizeTimer: number | null = null;
+    let disposed = false;
+
+    const initialize = () => {
+      if (disposed || mapRef.current) return;
+
+      const container = containerRef.current;
+      const rect = container?.getBoundingClientRect();
+
+      if (!container || !rect || rect.width < 32 || rect.height < 32) {
+        frame = window.requestAnimationFrame(initialize);
+        return;
+      }
+
+      try {
+        const map = new maplibregl.Map({
+          container,
+          center: [127.8, 36.4],
+          zoom: 6.3,
+          minZoom: 5.7,
+          maxZoom: 17,
+          maxBounds: KOREA_MAX_BOUNDS,
+          renderWorldCopies: false,
+          attributionControl: false,
+          style: {
+            version: 8,
+            sources: {
+              osm: {
+                type: "raster",
+                tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                tileSize: 256,
+                attribution: "© OpenStreetMap contributors",
+              },
+            },
+            layers: [
+              {
+                id: "background",
+                type: "background",
+                paint: {
+                  "background-color": "#eef3f8",
+                },
+              },
+              {
+                id: "osm",
+                type: "raster",
+                source: "osm",
+                paint: {
+                  "raster-opacity": 0.82,
+                },
+              },
+            ],
           },
-        },
-        layers: [
-          {
-            id: "osm",
-            type: "raster",
-            source: "osm",
-          },
-        ],
-      },
-    });
+        });
 
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
+        mapRef.current = map;
 
-    map.on("load", () => {
-      map.addSource("branch-preview-lines", {
-        type: "geojson",
-        data: {
-          type: "FeatureCollection",
-          features: [],
-        },
-      });
+        map.dragRotate.disable();
+        map.touchZoomRotate.disableRotation();
+        map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
+        map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
 
-      map.addLayer({
-        id: "branch-preview-lines-casing",
-        type: "line",
-        source: "branch-preview-lines",
-        paint: {
-          "line-color": "#ffffff",
-          "line-width": 6,
-          "line-opacity": 0.9,
-        },
-        layout: {
-          "line-cap": "round",
-          "line-join": "round",
-        },
-      });
+        map.on("error", (event) => {
+          const error = (event as { error?: unknown }).error;
+          if (error) setMapError(getMapErrorMessage(error));
+        });
 
-      map.addLayer({
-        id: "branch-preview-lines",
-        type: "line",
-        source: "branch-preview-lines",
-        paint: {
-          "line-color": ["coalesce", ["get", "colorHex"], "#0284c7"],
-          "line-width": 3,
-          "line-opacity": 0.55,
-        },
-        layout: {
-          "line-cap": "round",
-          "line-join": "round",
-        },
-      });
+        map.on("load", () => {
+          setMapReady(true);
+          setMapError(null);
 
-      map.addLayer({
-        id: "branch-preview-lines-selected",
-        type: "line",
-        source: "branch-preview-lines",
-        filter: ["==", ["get", "id"], ""],
-        paint: {
-          "line-color": ["coalesce", ["get", "colorHex"], "#0369a1"],
-          "line-width": 7,
-          "line-opacity": 0.95,
-        },
-        layout: {
-          "line-cap": "round",
-          "line-join": "round",
-        },
-      });
+          map.addSource("branch-preview-lines", {
+            type: "geojson",
+            data: {
+              type: "FeatureCollection",
+              features: [],
+            },
+          });
 
-      map.on("mouseenter", "branch-preview-lines", () => {
-        map.getCanvas().style.cursor = "pointer";
-      });
+          map.addLayer({
+            id: "branch-preview-lines-casing",
+            type: "line",
+            source: "branch-preview-lines",
+            paint: {
+              "line-color": "#ffffff",
+              "line-width": 4.2,
+              "line-opacity": 0.9,
+            },
+            layout: {
+              "line-cap": "round",
+              "line-join": "round",
+            },
+          });
 
-      map.on("mouseleave", "branch-preview-lines", () => {
-        map.getCanvas().style.cursor = "";
-      });
+          map.addLayer({
+            id: "branch-preview-lines",
+            type: "line",
+            source: "branch-preview-lines",
+            paint: {
+              "line-color": ["coalesce", ["get", "colorHex"], "#0284c7"],
+              "line-width": 2.0,
+              "line-opacity": 0.7,
+            },
+            layout: {
+              "line-cap": "round",
+              "line-join": "round",
+            },
+          });
 
-      map.on("click", "branch-preview-lines", (event) => {
-        const feature = event.features?.[0];
-        const coordinates = event.lngLat;
+          map.addLayer({
+            id: "branch-preview-lines-selected",
+            type: "line",
+            source: "branch-preview-lines",
+            filter: ["==", ["get", "id"], ""],
+            paint: {
+              "line-color": ["coalesce", ["get", "colorHex"], "#0369a1"],
+              "line-width": 4.6,
+              "line-opacity": 0.95,
+            },
+            layout: {
+              "line-cap": "round",
+              "line-join": "round",
+            },
+          });
 
-        if (!feature) return;
+          map.on("mouseenter", "branch-preview-lines", () => {
+            map.getCanvas().style.cursor = "pointer";
+          });
 
-        const props = feature.properties as Record<string, unknown>;
-        const branchId = String(props.id ?? "");
+          map.on("mouseleave", "branch-preview-lines", () => {
+            map.getCanvas().style.cursor = "";
+          });
 
-        setSelectedBranchId(branchId || null);
+          map.on("click", "branch-preview-lines", (event) => {
+            const feature = event.features?.[0];
+            const coordinates = event.lngLat;
 
-        new maplibregl.Popup({ offset: 12 })
-          .setLngLat(coordinates)
-          .setHTML(
-            `<div style="font-size:12px;line-height:1.5">
-              <strong>${String(props.canonicalLineNameKo ?? "")}</strong><br/>
-              ${String(props.sourceLineName ?? "")} · ${String(props.role ?? "")}<br/>
-              정차역 ${String(props.routeStopCount ?? "-")}개 · 좌표 ${String(
-                props.coordinateCount ?? "-",
-              )}개<br/>
-              검수 ${String(props.lowConfidenceCount ?? "0")}개<br/>
-              색상 ${String(props.colorHex ?? "-")}
-            </div>`,
-          )
-          .addTo(map);
-      });
-    });
+            if (!feature) return;
 
-    mapRef.current = map;
+            const props = feature.properties as Record<string, unknown>;
+            const branchId = String(props.id ?? "");
+
+            setSelectedBranchId(branchId || null);
+
+            new maplibregl.Popup({ offset: 12 })
+              .setLngLat(coordinates)
+              .setHTML(
+                `<div style="font-size:12px;line-height:1.5">
+                  <strong>${String(props.canonicalLineNameKo ?? "")}</strong><br/>
+                  ${String(props.sourceLineName ?? "")} · ${String(props.role ?? "")}<br/>
+                  정차역 ${String(props.routeStopCount ?? "-")}개 · 좌표 ${String(
+                    props.coordinateCount ?? "-",
+                  )}개
+                </div>`,
+              )
+              .addTo(map);
+          });
+
+          map.resize();
+          resizeTimer = window.setTimeout(() => map.resize(), 80);
+        });
+      } catch (error) {
+        setMapError(getMapErrorMessage(error));
+      }
+    };
+
+    frame = window.requestAnimationFrame(initialize);
 
     return () => {
+      disposed = true;
+      window.cancelAnimationFrame(frame);
+      if (resizeTimer) window.clearTimeout(resizeTimer);
       markersRef.current.forEach((marker) => marker.remove());
       markersRef.current = [];
-      map.remove();
+      mapRef.current?.remove();
       mapRef.current = null;
+      setMapReady(false);
     };
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    if (!map || !container) return;
+
+    const resize = () => map.resize();
+    const observer = new ResizeObserver(resize);
+
+    observer.observe(container);
+    window.addEventListener("resize", resize);
+    resize();
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", resize);
+    };
+  }, [mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -275,10 +361,11 @@ export default function RailMap({ stations, branches }: RailMapProps) {
 
     const fit = () => {
       map.fitBounds(bounds, {
-        padding: 70,
-        maxZoom: visibleBranchStations.length <= 6 ? 13 : 10,
-        duration: 350,
+        padding: getFitPadding(),
+        maxZoom: visibleBranchStations.length <= 6 ? 13 : 10.5,
+        duration: 250,
       });
+      map.resize();
     };
 
     if (map.isStyleLoaded()) {
@@ -321,11 +408,11 @@ export default function RailMap({ stations, branches }: RailMapProps) {
         selectedBranchId ?? "",
       ]);
     }
-  }, [selectedBranchId]);
+  }, [selectedBranchId, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !mapReady) return;
 
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
@@ -344,8 +431,8 @@ export default function RailMap({ stations, branches }: RailMapProps) {
       const isSelected = selectedStationIds.has(station.id);
 
       element.className = isSelected
-        ? "h-4 w-4 rounded-full border-2 border-white bg-amber-500 shadow-lg shadow-amber-500/40 transition-transform hover:scale-150"
-        : "h-3 w-3 rounded-full border border-white bg-sky-500 shadow-md transition-transform hover:scale-150";
+        ? "h-3 w-3 rounded-full border-2 border-white bg-amber-500 shadow-md shadow-amber-500/40 transition-transform hover:scale-150"
+        : "h-2 w-2 rounded-full border border-white bg-sky-500 shadow-sm transition-transform hover:scale-150";
 
       const popup = new maplibregl.Popup({
         offset: 12,
@@ -367,52 +454,24 @@ export default function RailMap({ stations, branches }: RailMapProps) {
 
       markersRef.current.push(marker);
     }
-  }, [validStations, selectedStationIds]);
+  }, [validStations, visibleBranchStations, selectedStationIds, mapReady]);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-100">
-      <div ref={containerRef} className="h-[520px] w-full" />
-      <div className="absolute left-4 top-4 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-sm shadow-sm backdrop-blur">
-        <p className="font-semibold text-slate-900">Rail Map Preview</p>
-        <p className="mt-1 text-xs text-slate-500">
-          표시 역 {markerDisplayCount.toLocaleString("ko-KR")}개 · 전체 역{" "}
-          {validStations.length.toLocaleString("ko-KR")}개 · branch line{" "}
-          {branchFeatures.length.toLocaleString("ko-KR")}개
-        </p>
+    <div className={`relative h-full min-h-[100dvh] w-full min-w-0 overflow-hidden bg-slate-100 ${className}`}>
+      <div ref={containerRef} className="absolute inset-0 h-full min-h-[100dvh] w-full" />
 
-        {markerDisplayCount >= 1000 ? (
-          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            marker 표시량이 많습니다. 노선/branch를 선택하면 가벼워집니다.
-          </div>
-        ) : null}
-
-        {selectedBranch ? (
-          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs">
-            <p className="font-bold text-amber-950">{selectedBranch.canonicalLineNameKo}</p>
-            <p className="mt-1 text-amber-800">
-              {selectedBranch.sourceLineName} · {selectedBranch.routeStops.length}역
-            </p>
-            <button
-              type="button"
-              className="mt-2 rounded-full bg-white px-3 py-1 font-semibold text-amber-800 shadow-sm"
-              onClick={() => setSelectedBranchId(null)}
-            >
-              선택 해제
-            </button>
-          </div>
-        ) : null}
-      </div>
-
-      <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-xs shadow-sm backdrop-blur">
-        <div className="flex items-center gap-2">
-          <span className="h-1 w-6 rounded-full bg-sky-600" />
-          <span className="text-slate-600">일반 branch</span>
+      {!mapReady && !mapError ? (
+        <div className="absolute inset-0 grid place-items-center bg-slate-100 text-xs font-semibold text-slate-500">
+          지도를 불러오는 중입니다.
         </div>
-        <div className="mt-2 flex items-center gap-2">
-          <span className="h-1 w-6 rounded-full bg-amber-500" />
-          <span className="text-slate-600">검수 필요 포함</span>
+      ) : null}
+
+      {mapError ? (
+        <div className="absolute left-3 top-3 z-10 max-w-[320px] border border-red-200 bg-white px-3 py-2 text-xs leading-5 text-red-700 shadow-sm">
+          <p className="font-bold">지도 표시 오류</p>
+          <p className="mt-1 break-words">{mapError}</p>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
