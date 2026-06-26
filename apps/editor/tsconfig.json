@@ -6,6 +6,9 @@
         "name": "next"
       }
     ],
+    "paths": {
+      "@/*": ["./src/*"]
+    },
     "strictNullChecks": true
   },
   "include": [
