@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from "react";
 import RailMap, { type RailMapBranch, type RailMapStation } from "./RailMap";
 import {
   countRouteStops,
@@ -102,6 +102,8 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [showMapStations, setShowMapStations] = useState(true);
   const [mobilePanelMode, setMobilePanelMode] = useState<MobilePanelMode>("search");
 
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
 
@@ -184,7 +186,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   );
 
   const filteredLines = useMemo(() => {
-    const query = normalizeSearchText(searchQuery);
+    const query = normalizeSearchText(deferredSearchQuery);
 
     return sortedLines.filter((line) => {
       if (selectedArea !== "all" && line.mreaWideCd !== selectedArea) return false;
@@ -192,23 +194,23 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
       return lineSearchIndex.get(line.canonicalKey)?.includes(query) ?? false;
     });
-  }, [lineSearchIndex, searchQuery, selectedArea, sortedLines]);
+  }, [deferredSearchQuery, lineSearchIndex, selectedArea, sortedLines]);
 
   const stationSearchResults = useMemo(() => {
-    const query = normalizeSearchText(searchQuery);
-    if (!query) return [];
+    const query = normalizeSearchText(deferredSearchQuery);
+    if (query.length < 2) return [];
 
     return mapStations
       .filter((station) => stationSearchIndex.get(station.id)?.includes(query))
       .sort((a, b) => a.nameKo.localeCompare(b.nameKo, "ko"))
       .slice(0, 8);
-  }, [mapStations, searchQuery, stationSearchIndex]);
+  }, [deferredSearchQuery, mapStations, stationSearchIndex]);
 
   const lineSearchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
+    if (!deferredSearchQuery.trim()) return [];
 
     return filteredLines.slice(0, 8);
-  }, [filteredLines, searchQuery]);
+  }, [deferredSearchQuery, filteredLines]);
 
   const selectedLine = useMemo(
     () => bundle.lines.find((line) => line.canonicalKey === selectedLineKey) ?? null,
