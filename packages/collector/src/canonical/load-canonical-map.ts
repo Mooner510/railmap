@@ -1,5 +1,3 @@
-{
-cat > packages/collector/src/canonical/load-canonical-map.ts <<'EOF'
 import fs from "node:fs";
 import path from "node:path";
 
@@ -48,7 +46,3 @@ export function loadCanonicalMap(repoRoot: string): CanonicalSourceLine[] {
     };
   });
 }
-EOF
-
-echo OK
-} | tee /dev/stderr | pbcopy

@@ -1,102 +1,162 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
-import styles from "./page.module.css";
+import { RailMap } from "./RailMap";
 
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
+type RailLine = {
+  id: string;
+  nameKo: string;
+  sourceCandidateId: string;
 };
 
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+type RailStation = {
+  id: string;
+  stationNumber: string | null;
+  nameKo: string | null;
+  nameEn: string | null;
+  lineNumber: string | null;
+  lineNameKo: string | null;
+  lat: number | null;
+  lng: number | null;
+  operatorNameKo: string | null;
+};
+
+type RouteStop = {
+  lineId: string;
+  sequence: number;
+  stationId: string;
+  sourceStationCode: string | null;
+  displayNameKo: string | null;
+  matchStatus: string;
+  confidence: string;
+  sourceCandidateId: string;
+};
+
+type RailBundle = {
+  bundleId: string;
+  acquiredDate: string;
+  generatedAt: string;
+  counts: {
+    lines: number;
+    stations: number;
+    routeStops: number;
+    skippedRouteStops: number;
+  };
+  lines: RailLine[];
+  stations: RailStation[];
+  routeStops: RouteStop[];
+};
+
+async function getBundle(): Promise<RailBundle> {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+
+  const response = await fetch(`${baseUrl}/data/kric-minimal-app-bundle.json`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to load rail bundle: ${response.status}`);
+  }
+
+  return response.json() as Promise<RailBundle>;
+}
+
+export default async function Home() {
+  const bundle = await getBundle();
+
+  const stationsById = new Map(bundle.stations.map((station) => [station.id, station]));
+
+  const lines = bundle.lines
+    .map((line) => {
+      const routeStops = bundle.routeStops
+        .filter((stop) => stop.lineId === line.id)
+        .sort((a, b) => a.sequence - b.sequence);
+
+      return {
+        ...line,
+        routeStops,
+      };
+    })
+    .sort((a, b) => a.nameKo.localeCompare(b.nameKo, "ko"));
 
   return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
+    <main className="min-h-screen bg-[#f6f8fb] px-6 py-8 text-[#111827]">
+      <section className="mx-auto flex max-w-7xl flex-col gap-8">
+        <header className="flex flex-col gap-3">
+          <p className="text-sm font-semibold text-blue-600">Railmap</p>
+          <h1 className="text-4xl font-bold tracking-tight">철도 지도 데이터 뷰어</h1>
+          <p className="max-w-3xl text-base leading-7 text-gray-600">
+            KRIC 도시철도 원본 XLSX에서 생성한 최소 앱 번들입니다. 아직 최종 공개 데이터가
+            아니라 collector 후보 데이터이며, 수동 검토가 필요한 항목은 제외되어 있습니다.
+          </p>
+        </header>
+
+        <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <MetricCard label="노선" value={bundle.counts.lines} />
+          <MetricCard label="역 후보" value={bundle.counts.stations} />
+          <MetricCard label="정차 순서" value={bundle.counts.routeStops} />
+          <MetricCard label="검토 제외" value={bundle.counts.skippedRouteStops} />
+        </section>
+
+
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-col gap-1">
+            <h2 className="text-xl font-bold">역 위치 지도</h2>
+            <p className="text-sm text-gray-500">
+              KRIC 역사정보 좌표를 기준으로 역 후보를 지도에 표시합니다.
+            </p>
+          </div>
+          <RailMap stations={bundle.stations} />
+        </section>
+
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-col gap-1">
+            <h2 className="text-xl font-bold">노선 목록</h2>
+            <p className="text-sm text-gray-500">
+              총 {lines.length.toLocaleString("ko-KR")}개 노선. 각 노선의 정거장 순서를 원본 후보 기준으로 표시합니다.
+            </p>
+          </div>
+
+          <div className="grid gap-4">
+            {lines.map((line, lineIndex) => (
+              <article key={`${line.sourceCandidateId}:${lineIndex}`} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-lg font-bold">{line.nameKo}</h3>
+                    <p className="text-xs text-gray-500">{line.id}</p>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-gray-700">
+                    {line.routeStops.length.toLocaleString("ko-KR")}역
+                  </span>
+                </div>
+
+                <ol className="flex flex-wrap gap-2">
+                  {line.routeStops.map((stop, stopIndex) => {
+                    const station = stationsById.get(stop.stationId);
+
+                    return (
+                      <li
+                        key={`${stop.sourceCandidateId}:${stopIndex}`}
+                        className="rounded-full border border-gray-200 bg-white px-3 py-1 text-sm"
+                        title={`${stop.matchStatus}:${stop.confidence}`}
+                      >
+                        <span className="text-gray-400">{stop.sequence}. </span>
+                        <span>{station?.nameKo ?? stop.displayNameKo ?? "이름 없음"}</span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </article>
+            ))}
+          </div>
+        </section>
+      </section>
+    </main>
   );
-};
+}
 
-export default function Home() {
+function MetricCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.dev/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
-        </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.dev?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.dev →
-        </a>
-      </footer>
+    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <p className="text-sm font-medium text-gray-500">{label}</p>
+      <p className="mt-2 text-3xl font-bold">{value.toLocaleString("ko-KR")}</p>
     </div>
   );
 }
