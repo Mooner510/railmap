@@ -475,6 +475,50 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                   ))}
                 </div>
               </div>
+
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold text-slate-400 uppercase">Review queue</p>
+                    <p className="mt-1 text-sm font-bold text-slate-900">
+                      검수 필요 {formatNumber(selectedReviewStops.length)}개
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={selectedReviewStops.length === 0}
+                    onClick={copySelectedReviewCsv}
+                  >
+                    {copiedReviewCsv ? "복사됨" : "CSV 복사"}
+                  </button>
+                </div>
+
+                {selectedReviewStops.length > 0 ? (
+                  <div className="mt-3 grid gap-2">
+                    {selectedReviewStops.slice(0, 8).map((stop) => (
+                      <div
+                        key={`${stop.branchId}:${stop.sourceCandidateId}`}
+                        className="rounded-xl bg-slate-50 px-3 py-2 text-xs"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-bold text-slate-800">{stop.stationName}</span>
+                          <span className="text-slate-500">
+                            {Math.round((stop.matchConfidence ?? 0) * 100)}%
+                          </span>
+                        </div>
+                        <p className="mt-1 truncate text-slate-500">
+                          {stop.branchName} · {stop.sourceStationCode} →{" "}
+                          {stop.station?.nameKo ?? "매칭 없음"}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-500">현재 선택 범위에 검수 대상이 없습니다.</p>
+                )}
+              </div>
             </div>
           ) : (
             <p className="mt-3 text-sm text-slate-500">선택된 노선 없음</p>
