@@ -23,7 +23,7 @@ interface RailExplorerProps {
 
 type MobilePanelMode = "search" | "selected" | "lines";
 
-const MIN_STATION_SEARCH_LENGTH = 2;
+const MIN_STATION_SEARCH_LENGTH = 1;
 const MAX_LINE_SEARCH_RESULTS = 8;
 const MAX_STATION_SEARCH_RESULTS = 12;
 
@@ -188,7 +188,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
   const filteredLines = useMemo(() => {
     const query = normalizeSearchText(deferredSearchQuery);
-    const shouldFilterBySearch = query.length >= 2;
+    const shouldFilterBySearch = query.length > 0;
 
     return sortedLines.filter((line) => {
       if (selectedArea !== "all" && line.mreaWideCd !== selectedArea) return false;
