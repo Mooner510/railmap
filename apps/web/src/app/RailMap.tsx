@@ -3,7 +3,7 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import maplibregl, { type GeoJSONSource, type Map as MapLibreMap, type Marker } from "maplibre-gl";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export interface RailMapStation {
   id: string;
@@ -83,9 +83,23 @@ export default function RailMap({ stations, branches }: RailMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
 
   const validStations = useMemo(() => stations.filter(isValidCoordinate), [stations]);
   const branchFeatures = useMemo(() => buildBranchFeatures(branches), [branches]);
+  const selectedBranch = useMemo(
+    () => branches.find((branch) => branch.id === selectedBranchId) ?? null,
+    [branches, selectedBranchId],
+  );
+  const selectedStationIds = useMemo(() => {
+    if (!selectedBranch) return new Set<string>();
+
+    return new Set(
+      selectedBranch.routeStops
+        .map((stop) => stop.station?.id)
+        .filter((id): id is string => typeof id === "string"),
+    );
+  }, [selectedBranch]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -154,7 +168,28 @@ export default function RailMap({ stations, branches }: RailMapProps) {
             "#0284c7",
           ],
           "line-width": 3,
-          "line-opacity": 0.8,
+          "line-opacity": 0.55,
+        },
+        layout: {
+          "line-cap": "round",
+          "line-join": "round",
+        },
+      });
+
+      map.addLayer({
+        id: "branch-preview-lines-selected",
+        type: "line",
+        source: "branch-preview-lines",
+        filter: ["==", ["get", "id"], ""],
+        paint: {
+          "line-color": [
+            "case",
+            [">", ["get", "lowConfidenceCount"], 0],
+            "#d97706",
+            "#0369a1",
+          ],
+          "line-width": 7,
+          "line-opacity": 0.95,
         },
         layout: {
           "line-cap": "round",
@@ -177,6 +212,9 @@ export default function RailMap({ stations, branches }: RailMapProps) {
         if (!feature) return;
 
         const props = feature.properties as Record<string, unknown>;
+        const branchId = String(props.id ?? "");
+
+        setSelectedBranchId(branchId || null);
 
         new maplibregl.Popup({ offset: 12 })
           .setLngLat(coordinates)
@@ -206,6 +244,25 @@ export default function RailMap({ stations, branches }: RailMapProps) {
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || validStations.length === 0) return;
+
+    const bounds = new maplibregl.LngLatBounds();
+
+    for (const station of validStations) {
+      bounds.extend([station.lng, station.lat]);
+    }
+
+    map.once("load", () => {
+      map.fitBounds(bounds, {
+        padding: 60,
+        maxZoom: 10,
+        duration: 0,
+      });
+    });
+  }, [validStations]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map) return;
 
     const updateSource = () => {
@@ -228,19 +285,37 @@ export default function RailMap({ stations, branches }: RailMapProps) {
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (map.getLayer("branch-preview-lines-selected")) {
+      map.setFilter("branch-preview-lines-selected", [
+        "==",
+        ["get", "id"],
+        selectedBranchId ?? "",
+      ]);
+    }
+  }, [selectedBranchId]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map) return;
 
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
 
-    const markerStations = validStations.slice(0, 1200);
+    const markerStations = selectedStationIds.size > 0
+      ? validStations.filter((station) => selectedStationIds.has(station.id))
+      : validStations.slice(0, 1200);
 
     for (const station of markerStations) {
       const element = document.createElement("button");
       element.type = "button";
       element.title = station.nameKo;
-      element.className =
-        "h-3 w-3 rounded-full border border-white bg-sky-500 shadow-md transition-transform hover:scale-150";
+      const isSelected = selectedStationIds.has(station.id);
+
+      element.className = isSelected
+        ? "h-4 w-4 rounded-full border-2 border-white bg-amber-500 shadow-lg shadow-amber-500/40 transition-transform hover:scale-150"
+        : "h-3 w-3 rounded-full border border-white bg-sky-500 shadow-md transition-transform hover:scale-150";
 
       const popup = new maplibregl.Popup({
         offset: 12,
@@ -262,17 +337,33 @@ export default function RailMap({ stations, branches }: RailMapProps) {
 
       markersRef.current.push(marker);
     }
-  }, [validStations]);
+  }, [validStations, selectedStationIds]);
 
   return (
     <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-100">
       <div ref={containerRef} className="h-[520px] w-full" />
-      <div className="pointer-events-none absolute left-4 top-4 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-sm shadow-sm backdrop-blur">
+      <div className="absolute left-4 top-4 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-sm shadow-sm backdrop-blur">
         <p className="font-semibold text-slate-900">Rail Map Preview</p>
         <p className="mt-1 text-xs text-slate-500">
           역 {validStations.length.toLocaleString("ko-KR")}개 · branch preview line{" "}
           {branchFeatures.length.toLocaleString("ko-KR")}개
         </p>
+
+        {selectedBranch ? (
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs">
+            <p className="font-bold text-amber-950">{selectedBranch.canonicalLineNameKo}</p>
+            <p className="mt-1 text-amber-800">
+              {selectedBranch.sourceLineName} · {selectedBranch.routeStops.length}역
+            </p>
+            <button
+              type="button"
+              className="mt-2 rounded-full bg-white px-3 py-1 font-semibold text-amber-800 shadow-sm"
+              onClick={() => setSelectedBranchId(null)}
+            >
+              선택 해제
+            </button>
+          </div>
+        ) : null}
       </div>
 
       <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-xs shadow-sm backdrop-blur">
