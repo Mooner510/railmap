@@ -24,9 +24,19 @@ interface FilterControlsProps {
   selectedArea: string;
   searchQuery: string;
   copiedShareUrl: boolean;
+  stationResults: RailMapStation[];
+  lineResults: CanonicalLine[];
+  selectedStationId: string | null;
+  selectedLineKey: string | null;
+  hasSelection: boolean;
   onSelectArea: (area: string) => void;
   onSearch: (query: string) => void;
+  onClearSearch: () => void;
+  onSelectStation: (stationId: string) => void;
+  onSelectLine: (lineKey: string) => void;
+  onClearSelection: () => void;
   onReset: () => void;
+  onFocusSelection: () => void;
   onCopyUrl: () => void;
 }
 
@@ -79,6 +89,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const [isHydratedFromUrl, setIsHydratedFromUrl] = useState(false);
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
+  const [mapFocusVersion, setMapFocusVersion] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -141,6 +152,9 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
         ...line.sourceLineNumbers,
         ...line.branches.map((branch) => branch.sourceLineName),
         ...line.branches.map((branch) => branch.sourceLineNumber),
+        ...line.branches.flatMap((branch) =>
+          branch.routeStops.map((stop) => `${stop.displayNameKo} ${stop.sourceStationCode}`),
+        ),
       ]
         .join(" ")
         .toLowerCase();
@@ -148,6 +162,25 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
       return haystack.includes(query);
     });
   }, [searchQuery, selectedArea, sortedLines]);
+
+  const stationSearchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return [];
+
+    return mapStations
+      .filter((station) => {
+        const haystack = `${station.nameKo} ${station.id} ${station.lineNameKo ?? ""}`.toLowerCase();
+        return haystack.includes(query);
+      })
+      .sort((a, b) => a.nameKo.localeCompare(b.nameKo, "ko"))
+      .slice(0, 8);
+  }, [mapStations, searchQuery]);
+
+  const lineSearchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+
+    return filteredLines.slice(0, 8);
+  }, [filteredLines, searchQuery]);
 
   const selectedLine = useMemo(
     () => bundle.lines.find((line) => line.canonicalKey === selectedLineKey) ?? null,
@@ -250,6 +283,22 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setSelectedStationId(null);
   };
 
+  const clearSelection = () => {
+    setSelectedLineKey(null);
+    setSelectedBranchId(null);
+    setSelectedStationId(null);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
+  };
+
+  const focusSelection = () => {
+    setMapFocusVersion((version) => version + 1);
+  };
+
+  const hasSelection = Boolean(selectedLineKey || selectedBranchId || selectedStationId);
+
   const selectArea = (area: string) => {
     setSelectedArea(area);
     setSelectedLineKey(null);
@@ -282,8 +331,32 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   };
 
   const selectMapStation = (station: RailMapStation) => {
+    const firstServingBranch = mapBranches.find((branch) =>
+      branch.routeStops.some((stop) => stop.station?.id === station.id),
+    );
+
+    if (firstServingBranch && !selectedLineKey) {
+      setSelectedLineKey(firstServingBranch.canonicalLineId);
+      setSelectedBranchId(firstServingBranch.id);
+    }
+
     setSelectedStationId(station.id);
   };
+
+  const selectStationFromSearch = (stationId: string) => {
+    const firstServingBranch = mapBranches.find((branch) =>
+      branch.routeStops.some((stop) => stop.station?.id === stationId),
+    );
+
+    if (firstServingBranch) {
+      setSelectedLineKey(firstServingBranch.canonicalLineId);
+      setSelectedBranchId(firstServingBranch.id);
+    }
+
+    setSelectedStationId(stationId);
+    setMapFocusVersion((version) => version + 1);
+  };
+
 
   const copyUrl = async () => {
     await navigator.clipboard.writeText(window.location.href);
@@ -306,9 +379,19 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
               selectedArea={selectedArea}
               searchQuery={searchQuery}
               copiedShareUrl={copiedShareUrl}
+              stationResults={stationSearchResults}
+              lineResults={lineSearchResults}
+              selectedStationId={selectedStationId}
+              selectedLineKey={selectedLineKey}
+              hasSelection={hasSelection}
               onSelectArea={selectArea}
               onSearch={search}
+              onClearSearch={clearSearch}
+              onSelectStation={selectStationFromSearch}
+              onSelectLine={selectLine}
+              onClearSelection={clearSelection}
               onReset={resetFilters}
+              onFocusSelection={focusSelection}
               onCopyUrl={copyUrl}
             />
           </div>
@@ -328,6 +411,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
           branches={visibleMapBranches}
           selectedBranchId={selectedBranchId}
           selectedStationId={selectedStationId}
+          focusVersion={mapFocusVersion}
           onSelectBranch={selectMapBranch}
           onSelectStation={selectMapStation}
         />
@@ -374,9 +458,19 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                   selectedArea={selectedArea}
                   searchQuery={searchQuery}
                   copiedShareUrl={copiedShareUrl}
+                  stationResults={stationSearchResults}
+                  lineResults={lineSearchResults}
+                  selectedStationId={selectedStationId}
+                  selectedLineKey={selectedLineKey}
+                  hasSelection={hasSelection}
                   onSelectArea={selectArea}
                   onSearch={search}
+                  onClearSearch={clearSearch}
+                  onSelectStation={selectStationFromSearch}
+                  onSelectLine={selectLine}
+                  onClearSelection={clearSelection}
                   onReset={resetFilters}
+                  onFocusSelection={focusSelection}
                   onCopyUrl={copyUrl}
                   compact
                 />
@@ -451,20 +545,71 @@ function FilterControls({
   selectedArea,
   searchQuery,
   copiedShareUrl,
+  stationResults,
+  lineResults,
+  selectedStationId,
+  selectedLineKey,
+  hasSelection,
   onSelectArea,
   onSearch,
+  onClearSearch,
+  onSelectStation,
+  onSelectLine,
+  onClearSelection,
   onReset,
+  onFocusSelection,
   onCopyUrl,
   compact = false,
 }: FilterControlsProps & { compact?: boolean }) {
   return (
     <div className="space-y-2">
-      <input
-        className="h-8 w-full rounded border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-800 outline-none placeholder:text-slate-400 focus:border-sky-300 focus:ring-1 focus:ring-sky-100"
-        value={searchQuery}
-        placeholder="노선명, 코드 검색"
-        onChange={(event) => onSearch(event.target.value)}
+      <div className="relative">
+        <input
+          className="h-8 w-full rounded border border-slate-200 bg-white px-2.5 pr-8 text-xs font-medium text-slate-800 outline-none placeholder:text-slate-400 focus:border-sky-300 focus:ring-1 focus:ring-sky-100"
+          value={searchQuery}
+          placeholder="노선명, 역명, 코드 검색"
+          onChange={(event) => onSearch(event.target.value)}
+        />
+        {searchQuery.trim() ? (
+          <button
+            type="button"
+            className="absolute right-1 top-1 h-6 rounded px-2 text-[11px] font-bold text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            onClick={onClearSearch}
+          >
+            ×
+          </button>
+        ) : null}
+      </div>
+
+      <SearchResults
+        compact={compact}
+        query={searchQuery}
+        selectedStationId={selectedStationId}
+        selectedLineKey={selectedLineKey}
+        stations={stationResults}
+        lines={lineResults}
+        onSelectStation={onSelectStation}
+        onSelectLine={onSelectLine}
       />
+
+      {hasSelection ? (
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            className="h-7 rounded border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            onClick={onFocusSelection}
+          >
+            선택 이동
+          </button>
+          <button
+            type="button"
+            className="h-7 rounded border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+            onClick={onClearSelection}
+          >
+            선택 해제
+          </button>
+        </div>
+      ) : null}
 
       <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         <FilterChip active={selectedArea === "all"} onClick={() => onSelectArea("all")}>
@@ -487,7 +632,7 @@ function FilterControls({
           className="h-7 rounded border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
           onClick={onReset}
         >
-          초기화
+          전체 보기
         </button>
         <button
           type="button"
@@ -497,6 +642,109 @@ function FilterControls({
           {copiedShareUrl ? "복사됨" : compact ? "공유" : "URL 복사"}
         </button>
       </div>
+    </div>
+  );
+}
+
+function SearchResults({
+  compact,
+  query,
+  selectedStationId,
+  stations,
+  lines,
+  selectedLineKey,
+  onSelectStation,
+  onSelectLine,
+}: {
+  compact: boolean;
+  query: string;
+  selectedStationId: string | null;
+  selectedLineKey: string | null;
+  stations: RailMapStation[];
+  lines: CanonicalLine[];
+  onSelectStation: (stationId: string) => void;
+  onSelectLine: (lineKey: string) => void;
+}) {
+  if (!query.trim()) return null;
+
+  if (stations.length === 0 && lines.length === 0) {
+    return (
+      <div className="border border-dashed border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-500">
+        일치하는 역이나 노선이 없습니다.
+      </div>
+    );
+  }
+
+  return (
+    <div className="border border-slate-200 bg-slate-50 p-1.5">
+      {lines.length > 0 ? (
+        <div>
+          <div className="flex items-center justify-between gap-2 px-0.5">
+            <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">노선</p>
+            <p className="text-[10px] font-semibold text-slate-400">{formatNumber(lines.length)}개</p>
+          </div>
+          <div className={compact ? "mt-1 flex gap-1 overflow-x-auto pb-0.5" : "mt-1 grid gap-1"}>
+            {lines.map((line) => {
+              const isSelected = selectedLineKey === line.canonicalKey;
+
+              return (
+                <button
+                  key={line.canonicalKey}
+                  type="button"
+                  className={
+                    isSelected
+                      ? "shrink-0 rounded border border-sky-300 bg-sky-50 px-2 py-1 text-left text-[11px] font-bold text-sky-900"
+                      : "shrink-0 rounded border border-slate-200 bg-white px-2 py-1 text-left text-[11px] font-semibold text-slate-700 hover:border-sky-200 hover:bg-sky-50"
+                  }
+                  onClick={() => onSelectLine(line.canonicalKey)}
+                >
+                  <span className="flex max-w-40 items-center gap-1.5 truncate">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: line.colorHex }} />
+                    <span className="truncate">{line.nameKo}</span>
+                  </span>
+                  <span className="mt-0.5 block text-[10px] font-medium text-slate-400">
+                    {line.canonicalKey} · {formatNumber(countRouteStops(line))}역
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      {stations.length > 0 ? (
+        <div className={lines.length > 0 ? "mt-2" : undefined}>
+          <div className="flex items-center justify-between gap-2 px-0.5">
+            <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">역</p>
+            <p className="text-[10px] font-semibold text-slate-400">{formatNumber(stations.length)}개</p>
+          </div>
+          <div className={compact ? "mt-1 flex gap-1 overflow-x-auto pb-0.5" : "mt-1 grid gap-1"}>
+            {stations.map((station) => {
+          const isSelected = selectedStationId === station.id;
+
+          return (
+            <button
+              key={station.id}
+              type="button"
+              className={
+                isSelected
+                  ? "shrink-0 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-left text-[11px] font-bold text-amber-900"
+                  : "shrink-0 rounded border border-slate-200 bg-white px-2 py-1 text-left text-[11px] font-semibold text-slate-700 hover:border-sky-200 hover:bg-sky-50"
+              }
+              onClick={() => onSelectStation(station.id)}
+            >
+              <span className="block max-w-36 truncate">{station.nameKo}</span>
+              {station.lineNameKo ? (
+                <span className="mt-0.5 block max-w-36 truncate text-[10px] font-medium text-slate-400">
+                  {station.lineNameKo}
+                </span>
+              ) : null}
+            </button>
+          );
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
