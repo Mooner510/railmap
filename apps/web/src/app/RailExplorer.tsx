@@ -101,6 +101,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
   const [selectedArea, setSelectedArea] = useState<string>("all");
   const [onlyLowConfidence, setOnlyLowConfidence] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedLineKey, setSelectedLineKey] = useState<string | null>(null);
 
   const sortedLines = useMemo(
@@ -117,11 +118,31 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const filteredLines = useMemo(
     () =>
       sortedLines.filter((line) => {
+        const query = searchQuery.trim().toLowerCase();
+
         if (selectedArea !== "all" && line.mreaWideCd !== selectedArea) return false;
         if (onlyLowConfidence && countLowConfidence(line) === 0) return false;
+
+        if (query) {
+          const haystack = [
+            line.canonicalKey,
+            line.lnCd,
+            line.mreaWideCd,
+            line.nameKo,
+            line.colorHex,
+            ...line.sourceLineNumbers,
+            ...line.branches.map((branch) => branch.sourceLineName),
+            ...line.branches.map((branch) => branch.sourceLineNumber),
+          ]
+            .join(" ")
+            .toLowerCase();
+
+          if (!haystack.includes(query)) return false;
+        }
+
         return true;
       }),
-    [onlyLowConfidence, selectedArea, sortedLines],
+    [onlyLowConfidence, searchQuery, selectedArea, sortedLines],
   );
 
   const selectedLine = useMemo(
@@ -176,12 +197,22 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
             <div>
               <h2 className="text-xl font-bold">Canonical Line Cards</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                필터 적용 결과 {formatNumber(filteredLines.length)}개 노선. 지도는 선택 노선
-                또는 필터 결과만 표시합니다.
+                필터 적용 결과 {formatNumber(filteredLines.length)}개 노선. 검색어/권역/검수 필터가
+                지도와 노선 목록에 동시에 적용됩니다.
               </p>
             </div>
 
             <div className="flex flex-wrap gap-2">
+              <input
+                className="min-w-56 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-400 focus:border-sky-300"
+                value={searchQuery}
+                placeholder="노선명, 코드, source 검색"
+                onChange={(event) => {
+                  setSearchQuery(event.target.value);
+                  setSelectedLineKey(null);
+                }}
+              />
+
               <select
                 className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
                 value={selectedArea}
@@ -219,6 +250,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                 onClick={() => {
                   setSelectedArea("all");
                   setOnlyLowConfidence(false);
+                  setSearchQuery("");
                   setSelectedLineKey(null);
                 }}
               >
@@ -226,6 +258,15 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
               </button>
             </div>
           </div>
+
+          {filteredLines.length === 0 ? (
+            <div className="mt-6 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+              <p className="font-bold text-slate-900">검색 결과 없음</p>
+              <p className="mt-2 text-sm text-slate-500">
+                검색어, 권역 필터, 검수 필요 필터를 조정하세요.
+              </p>
+            </div>
+          ) : null}
 
           <div className="mt-6 grid gap-4">
             {filteredLines.map((line) => {
@@ -335,6 +376,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                 onClick={() => {
                   setSelectedArea("all");
                   setOnlyLowConfidence(false);
+                  setSearchQuery("");
                   setSelectedLineKey(line.canonicalKey);
                 }}
               >
