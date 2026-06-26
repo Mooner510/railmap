@@ -47,15 +47,25 @@ function isValidCoordinate(station: RailMapStation | null | undefined): station 
   );
 }
 
+function getBranchCoordinates(branch: RailMapBranch): LngLatTuple[] {
+  const coordinates = branch.routeStops
+    .map((stop) => stop.station)
+    .filter(isValidCoordinate)
+    .map((station): LngLatTuple => [station.lng, station.lat]);
+
+  if (coordinates.length < 2) return [];
+
+  const smoothed = smoothCoordinates(coordinates);
+
+  return smoothed.length >= 2 ? smoothed : coordinates;
+}
+
 function buildBranchFeatures(branches: RailMapBranch[]) {
   return {
     type: "FeatureCollection" as const,
     features: branches
       .map((branch) => {
-        const coordinates = branch.routeStops
-          .map((stop) => stop.station)
-          .filter(isValidCoordinate)
-          .map((station) => [station.lng, station.lat]);
+        const coordinates = getBranchCoordinates(branch);
 
         if (coordinates.length < 2) return null;
 
@@ -69,13 +79,14 @@ function buildBranchFeatures(branches: RailMapBranch[]) {
           },
           geometry: {
             type: "LineString" as const,
-            coordinates: smoothCoordinates(coordinates),
+            coordinates,
           },
         };
       })
       .filter((feature): feature is NonNullable<typeof feature> => feature !== null),
   };
 }
+
 
 function getMapErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -237,6 +248,26 @@ export default function RailMap({
         .filter((id): id is string => typeof id === "string"),
     );
   }, [selectedBranch]);
+
+  const stationColorIndex = useMemo(() => {
+    const index = new Map<string, string>();
+
+    if (selectedBranch) {
+      for (const stop of selectedBranch.routeStops) {
+        const stationId = stop.station?.id;
+        if (stationId) index.set(stationId, selectedBranch.colorHex);
+      }
+    }
+
+    for (const branch of branches) {
+      for (const stop of branch.routeStops) {
+        const stationId = stop.station?.id;
+        if (stationId && !index.has(stationId)) index.set(stationId, branch.colorHex);
+      }
+    }
+
+    return index;
+  }, [branches, selectedBranch]);
 
   const visibleBranchStations = useMemo(() => {
     const stationsInBranches = branches.flatMap((branch) =>
@@ -474,10 +505,7 @@ export default function RailMap({
 
       if (!source) return;
 
-      source.setData({
-        type: "FeatureCollection",
-        features: branchFeatures,
-      });
+      source.setData(branchFeatures);
     };
 
     if (map.isStyleLoaded()) {
@@ -556,11 +584,17 @@ export default function RailMap({
       const isSelected = selectedStationId === station.id;
       const isInSelectedBranch = selectedBranchStationIds.has(station.id);
 
+      const stationColor = stationColorIndex.get(station.id) ?? "#0284c7";
+
       element.className = isSelected
-        ? "h-3.5 w-3.5 rounded-full border-2 border-white bg-amber-500 shadow-md shadow-amber-500/40 transition-transform hover:scale-150"
+        ? "h-3.5 w-3.5 rounded-full border-2 border-white shadow-md transition-transform hover:scale-150"
         : isInSelectedBranch
-          ? "h-2.5 w-2.5 rounded-full border border-white bg-sky-600 shadow-sm transition-transform hover:scale-150"
-          : "h-2 w-2 rounded-full border border-white bg-sky-500 shadow-sm transition-transform hover:scale-150";
+          ? "h-2.5 w-2.5 rounded-full border border-white shadow-sm transition-transform hover:scale-150"
+          : "h-2 w-2 rounded-full border border-white shadow-sm transition-transform hover:scale-150";
+      element.style.backgroundColor = stationColor;
+      element.style.boxShadow = isSelected
+        ? `0 0 0 3px ${stationColor}33, 0 6px 14px ${stationColor}33`
+        : "";
 
       const popup = new maplibregl.Popup({
         offset: 12,
@@ -586,7 +620,7 @@ export default function RailMap({
 
       markersRef.current.push(marker);
     }
-  }, [validStations, visibleBranchStations, selectedBranchStationIds, selectedStationId, onSelectStation, mapReady, showStations]);
+  }, [validStations, visibleBranchStations, selectedBranchStationIds, selectedStationId, onSelectStation, mapReady, showStations, stationColorIndex]);
 
   return (
     <div className={`relative h-full min-h-[100dvh] w-full min-w-0 overflow-hidden bg-slate-100 ${className}`}>
