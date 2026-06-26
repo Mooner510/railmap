@@ -1,10 +1,11 @@
 {
   "bundleId": "kric-canonical-app-bundle",
   "acquiredDate": "2026-06-19",
-  "generatedAt": "2026-06-26T05:30:53.053Z",
+  "generatedAt": "2026-06-26T05:39:14.288Z",
   "policy": {
     "canonicalLineSource": "data/manual/kric-subway-route-info-line-map.csv",
     "canonicalSourceLineMap": "data/manual/kric-canonical-source-line-map.csv",
+    "canonicalLineColors": "data/manual/kric-canonical-line-colors.csv",
     "includedRouteStopMatches": [
       "exact",
       "normalized-code",
@@ -27,6 +28,8 @@
       "lnCd": "K5",
       "mreaWideCd": "01",
       "nameKo": "경강선",
+      "colorHex": "#003DA5",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:K5:main:I41K5:경강선:0",
@@ -242,6 +245,8 @@
       "lnCd": "K4",
       "mreaWideCd": "01",
       "nameKo": "경의중앙선",
+      "colorHex": "#77C4A3",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:K4:main:I4108:경의·중앙선:0",
@@ -1023,6 +1028,8 @@
       "lnCd": "K2",
       "mreaWideCd": "01",
       "nameKo": "경춘선",
+      "colorHex": "#0C8E72",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:K2:main:I41K2:경춘선:0",
@@ -1350,6 +1357,8 @@
       "lnCd": "A1",
       "mreaWideCd": "01",
       "nameKo": "공항철도",
+      "colorHex": "#0090D2",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:A1:main:I28A1:인천국제공항선:0",
@@ -1597,6 +1606,8 @@
       "lnCd": "G1",
       "mreaWideCd": "01",
       "nameKo": "김포골드라인",
+      "colorHex": "#A17800",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:G1:main:L41G1:김포도시철도:0",
@@ -1800,6 +1811,8 @@
       "lnCd": "1",
       "mreaWideCd": "01",
       "nameKo": "1호선",
+      "colorHex": "#0052A4",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:1:main:I4101:수도권 광역철도 1호선:0",
@@ -3573,6 +3586,8 @@
       "lnCd": "2",
       "mreaWideCd": "01",
       "nameKo": "2호선",
+      "colorHex": "#00A84D",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:2:main:S1102:수도권 도시철도 2호선:0",
@@ -4539,6 +4554,8 @@
       "lnCd": "3",
       "mreaWideCd": "01",
       "nameKo": "3호선",
+      "colorHex": "#EF7C1C",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:3:main:I1103:수도권 광역철도 3호선:0",
@@ -5174,6 +5191,8 @@
       "lnCd": "4",
       "mreaWideCd": "01",
       "nameKo": "4호선",
+      "colorHex": "#00A5DE",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:4:main:I1104:수도권 광역철도 4호선:0",
@@ -6013,6 +6032,8 @@
       "lnCd": "5",
       "mreaWideCd": "01",
       "nameKo": "5호선",
+      "colorHex": "#996CAC",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:5:main:S1105:수도권 도시철도 5호선:0",
@@ -7030,6 +7051,8 @@
       "lnCd": "6",
       "mreaWideCd": "01",
       "nameKo": "6호선",
+      "colorHex": "#CD7C2F",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:6:main:S1106:수도권 도시철도 6호선:0",
@@ -7755,6 +7778,8 @@
       "lnCd": "7",
       "mreaWideCd": "01",
       "nameKo": "7호선",
+      "colorHex": "#747F00",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:7:main:S1107:수도권 도시철도 7호선:0",
@@ -8721,6 +8746,8 @@
       "lnCd": "8",
       "mreaWideCd": "01",
       "nameKo": "8호선",
+      "colorHex": "#E6186C",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:8:main:S1108:수도권 도시철도 8호선:0",
@@ -9130,6 +9157,8 @@
       "lnCd": "9",
       "mreaWideCd": "01",
       "nameKo": "9호선",
+      "colorHex": "#BDB092",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:9:main:S1109:서울 도시철도 9호선:0",
@@ -9761,6 +9790,8 @@
       "lnCd": "K1",
       "mreaWideCd": "01",
       "nameKo": "수인분당선",
+      "colorHex": "#F5A200",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:K1:branch:I28K1:수인선:0",
@@ -10748,6 +10779,8 @@
       "lnCd": "D1",
       "mreaWideCd": "01",
       "nameKo": "신분당선",
+      "colorHex": "#D4003B",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:D1:main:I11D1:신분당선:0",
@@ -11059,6 +11092,8 @@
       "lnCd": "L1",
       "mreaWideCd": "01",
       "nameKo": "신림선",
+      "colorHex": "#6789CA",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:L1:main:L11SL:수도권 경량도시철도 신림선:0",
@@ -11258,6 +11293,8 @@
       "lnCd": "E1",
       "mreaWideCd": "01",
       "nameKo": "용인에버라인",
+      "colorHex": "#56AD2D",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:E1:main:L41E1:수도권 경량도시철도 에버라인:0",
@@ -11521,6 +11558,8 @@
       "lnCd": "UI",
       "mreaWideCd": "01",
       "nameKo": "우이신설선",
+      "colorHex": "#B0CE18",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:UI:main:L11UI:수도권 경량도시철도 우이신설선:0",
@@ -11752,6 +11791,8 @@
       "lnCd": "U1",
       "mreaWideCd": "01",
       "nameKo": "의정부 경전철",
+      "colorHex": "#FDA600",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:U1:main:L41U1:의정부:0",
@@ -12015,6 +12056,8 @@
       "lnCd": "I1",
       "mreaWideCd": "01",
       "nameKo": "인천1호선",
+      "colorHex": "#7CA8D5",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:I1:main:S2801:인천지하철 1호선:0",
@@ -12518,6 +12561,8 @@
       "lnCd": "I2",
       "mreaWideCd": "01",
       "nameKo": "인천2호선",
+      "colorHex": "#ED8B00",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:I2:main:S2802:인천지하철 2호선:0",
@@ -12973,6 +13018,8 @@
       "lnCd": "M1",
       "mreaWideCd": "01",
       "nameKo": "자기부상",
+      "colorHex": "#FFCD12",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:M1:main:S28M1:자기부상철도:0",
@@ -13092,6 +13139,8 @@
       "lnCd": "WS",
       "mreaWideCd": "01",
       "nameKo": "서해선",
+      "colorHex": "#8FC31F",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "01:WS:main:I41WS:서해선:0",
@@ -13355,6 +13404,8 @@
       "lnCd": "1",
       "mreaWideCd": "02",
       "nameKo": "부산1호선",
+      "colorHex": "#F06A00",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "02:1:main:S2601:부산 도시철도 1호선:0",
@@ -14018,6 +14069,8 @@
       "lnCd": "2",
       "mreaWideCd": "02",
       "nameKo": "부산2호선",
+      "colorHex": "#81BF48",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "02:2:main:S2602:부산 도시철도 2호선:0",
@@ -14729,6 +14782,8 @@
       "lnCd": "3",
       "mreaWideCd": "02",
       "nameKo": "부산3호선",
+      "colorHex": "#BB8C00",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "02:3:main:S2603:부산 도시철도 3호선:0",
@@ -15024,6 +15079,8 @@
       "lnCd": "4",
       "mreaWideCd": "02",
       "nameKo": "부산4호선",
+      "colorHex": "#217DCB",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "02:4:main:L2604:부산 경량도시철도 4호선:0",
@@ -15271,6 +15328,8 @@
       "lnCd": "B1",
       "mreaWideCd": "02",
       "nameKo": "부산김해경전철",
+      "colorHex": "#8652A1",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "02:B1:main:L48B1:부산김해경전철:0",
@@ -15672,6 +15731,8 @@
       "lnCd": "1",
       "mreaWideCd": "03",
       "nameKo": "대구1호선",
+      "colorHex": "#D93F5C",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "03:1:main:S2701:대구 도시철도 1호선:0",
@@ -16255,6 +16316,8 @@
       "lnCd": "2",
       "mreaWideCd": "03",
       "nameKo": "대구2호선",
+      "colorHex": "#00AA80",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "03:2:main:S2702:대구 도시철도 2호선:0",
@@ -16742,6 +16805,8 @@
       "lnCd": "3",
       "mreaWideCd": "03",
       "nameKo": "대구3호선",
+      "colorHex": "#FFB100",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "03:3:main:S2703:대구 도시철도 3호선:0",
@@ -17245,6 +17310,8 @@
       "lnCd": "1",
       "mreaWideCd": "04",
       "nameKo": "광주1호선",
+      "colorHex": "#009088",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "04:1:main:S2901:광주 도시철도 1호선:0",
@@ -17628,6 +17695,8 @@
       "lnCd": "1",
       "mreaWideCd": "05",
       "nameKo": "대전1호선",
+      "colorHex": "#007448",
+      "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
         {
           "id": "05:1:main:S3001:대전 도시철도 1호선:0",

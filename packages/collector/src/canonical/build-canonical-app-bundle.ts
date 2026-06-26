@@ -23,6 +23,38 @@ type CanonicalSourceLineMapRow = {
   role: "main" | "branch";
 };
 
+type CanonicalLineColorRow = {
+  canonicalKey: string;
+  colorHex: string;
+  description: string;
+};
+
+function loadCanonicalLineColors(repoRoot: string): Map<string, CanonicalLineColorRow> {
+  const csvPath = path.join(repoRoot, "data/manual/kric-canonical-line-colors.csv");
+
+  if (!fs.existsSync(csvPath)) {
+    return new Map();
+  }
+
+  const rows = fs
+    .readFileSync(csvPath, "utf8")
+    .trim()
+    .split(/\r?\n/)
+    .slice(1)
+    .filter(Boolean)
+    .map((row): CanonicalLineColorRow => {
+      const [canonicalKey, colorHex, description] = row.split(",");
+
+      return {
+        canonicalKey: normalizeKey(canonicalKey),
+        colorHex: normalizeKey(colorHex),
+        description: normalizeKey(description),
+      };
+    });
+
+  return new Map(rows.map((row) => [row.canonicalKey, row]));
+}
+
 function loadCanonicalMap(repoRoot: string): CanonicalSourceLineMapRow[] {
   const csv = fs.readFileSync(
     path.join(repoRoot, "data/manual/kric-canonical-source-line-map.csv"),
@@ -381,6 +413,7 @@ export function buildKricCanonicalAppBundle() {
   const publicDataDir = path.join(repoRoot, "apps/web/public/data");
 
   const canonicalMap = loadCanonicalMap(repoRoot);
+  const canonicalLineColors = loadCanonicalLineColors(repoRoot);
 
   const allowlistCsv = fs.readFileSync(
     path.join(repoRoot, "data/manual/kric-subway-route-info-line-map.csv"),
@@ -512,12 +545,16 @@ export function buildKricCanonicalAppBundle() {
       });
     }
 
+    const color = canonicalLineColors.get(allowlistRow.canonicalKey);
+
     appLines.push({
       id: allowlistRow.canonicalKey,
       canonicalKey: allowlistRow.canonicalKey,
       lnCd: allowlistRow.lnCd,
       mreaWideCd: allowlistRow.mreaWideCd,
       nameKo: allowlistRow.nameKo,
+      colorHex: color?.colorHex ?? "#64748b",
+      colorSource: color ? "data/manual/kric-canonical-line-colors.csv" : "fallback",
       branches,
       sourceLineNumbers: [...new Set(mapRows.map((row) => normalizeKey(row.sourceLineNumber)))],
     });
@@ -530,6 +567,7 @@ export function buildKricCanonicalAppBundle() {
     policy: {
       canonicalLineSource: "data/manual/kric-subway-route-info-line-map.csv",
       canonicalSourceLineMap: "data/manual/kric-canonical-source-line-map.csv",
+      canonicalLineColors: "data/manual/kric-canonical-line-colors.csv",
       includedRouteStopMatches: [
         "exact",
         "normalized-code",

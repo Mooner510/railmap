@@ -38,6 +38,8 @@ interface CanonicalLine {
   lnCd: string;
   mreaWideCd: string;
   nameKo: string;
+  colorHex: string;
+  colorSource: string;
   branches: CanonicalBranch[];
   sourceLineNumbers: string[];
 }
@@ -140,6 +142,7 @@ function toMapBranches(bundle: CanonicalBundle): RailMapBranch[] {
       id: branch.id,
       canonicalLineId: line.canonicalKey,
       canonicalLineNameKo: line.nameKo,
+      colorHex: line.colorHex,
       role: branch.role,
       sourceLineNumber: branch.sourceLineNumber,
       sourceLineName: branch.sourceLineName,
@@ -242,6 +245,11 @@ export default function Home() {
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className="h-4 w-4 rounded-full border border-white shadow-sm"
+                            style={{ backgroundColor: line.colorHex }}
+                            title={line.colorHex}
+                          />
                           <h3 className="text-lg font-bold text-slate-950">{line.nameKo}</h3>
                           <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">
                             {line.canonicalKey}
@@ -258,7 +266,7 @@ export default function Home() {
                         </div>
                         <p className="mt-2 text-sm text-slate-500">
                           branch {line.branches.length}개 · route stop {routeStopCount}개 · source{" "}
-                          {line.sourceLineNumbers.join(", ")}
+                          {line.sourceLineNumbers.join(", ")} · color {line.colorHex}
                         </p>
                       </div>
 
