@@ -23,6 +23,10 @@ interface RailExplorerProps {
 
 type MobilePanelMode = "search" | "selected" | "lines";
 
+const MIN_STATION_SEARCH_LENGTH = 2;
+const MAX_LINE_SEARCH_RESULTS = 8;
+const MAX_STATION_SEARCH_RESULTS = 12;
+
 interface FilterControlsProps {
   areaCodes: string[];
   selectedArea: string;
@@ -164,9 +168,6 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
               ...line.sourceLineNumbers,
               ...line.branches.map((branch) => branch.sourceLineName),
               ...line.branches.map((branch) => branch.sourceLineNumber),
-              ...line.branches.flatMap((branch) =>
-                branch.routeStops.map((stop) => `${stop.displayNameKo} ${stop.sourceStationCode}`),
-              ),
             ].join(" "),
           ),
         ]),
@@ -187,10 +188,11 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
   const filteredLines = useMemo(() => {
     const query = normalizeSearchText(deferredSearchQuery);
+    const shouldFilterBySearch = query.length >= 2;
 
     return sortedLines.filter((line) => {
       if (selectedArea !== "all" && line.mreaWideCd !== selectedArea) return false;
-      if (!query) return true;
+      if (!shouldFilterBySearch) return true;
 
       return lineSearchIndex.get(line.canonicalKey)?.includes(query) ?? false;
     });
@@ -198,19 +200,38 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
   const stationSearchResults = useMemo(() => {
     const query = normalizeSearchText(deferredSearchQuery);
-    if (query.length < 2) return [];
+    if (query.length < MIN_STATION_SEARCH_LENGTH) return [];
 
-    return mapStations
-      .filter((station) => stationSearchIndex.get(station.id)?.includes(query))
-      .sort((a, b) => a.nameKo.localeCompare(b.nameKo, "ko"))
-      .slice(0, 8);
+    const results: RailMapStation[] = [];
+
+    for (const station of mapStations) {
+      if (!(stationSearchIndex.get(station.id)?.includes(query) ?? false)) continue;
+
+      results.push(station);
+
+      if (results.length >= MAX_STATION_SEARCH_RESULTS) break;
+    }
+
+    return results;
   }, [deferredSearchQuery, mapStations, stationSearchIndex]);
 
   const lineSearchResults = useMemo(() => {
-    if (!deferredSearchQuery.trim()) return [];
+    const query = normalizeSearchText(deferredSearchQuery);
+    if (!query) return [];
 
-    return filteredLines.slice(0, 8);
-  }, [deferredSearchQuery, filteredLines]);
+    const results: CanonicalLine[] = [];
+
+    for (const line of sortedLines) {
+      if (selectedArea !== "all" && line.mreaWideCd !== selectedArea) continue;
+      if (!(lineSearchIndex.get(line.canonicalKey)?.includes(query) ?? false)) continue;
+
+      results.push(line);
+
+      if (results.length >= MAX_LINE_SEARCH_RESULTS) break;
+    }
+
+    return results;
+  }, [deferredSearchQuery, lineSearchIndex, selectedArea, sortedLines]);
 
   const selectedLine = useMemo(
     () => bundle.lines.find((line) => line.canonicalKey === selectedLineKey) ?? null,
@@ -297,8 +318,13 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   }, [searchQuery]);
 
   const visibleLineKeys = useMemo(
-    () => new Set(filteredLines.map((line) => line.canonicalKey)),
-    [filteredLines],
+    () =>
+      new Set(
+        sortedLines
+          .filter((line) => selectedArea === "all" || line.mreaWideCd === selectedArea)
+          .map((line) => line.canonicalKey),
+      ),
+    [selectedArea, sortedLines],
   );
 
   const visibleMapBranches = useMemo(
@@ -364,9 +390,6 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
   const search = (query: string) => {
     setSearchQuery(query);
-    setSelectedLineKey(null);
-    setSelectedBranchId(null);
-    setSelectedStationId(null);
     setMobilePanelMode(query.trim() ? "search" : "lines");
   };
 
@@ -851,7 +874,17 @@ function SearchResults({
   onSelectStation: (stationId: string) => void;
   onSelectLine: (lineKey: string) => void;
 }) {
-  if (!query.trim()) return null;
+  const normalizedQuery = normalizeSearchText(query);
+
+  if (!normalizedQuery) return null;
+
+  if (normalizedQuery.length < MIN_STATION_SEARCH_LENGTH && stations.length === 0 && lines.length === 0) {
+    return (
+      <div className="border border-dashed border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-500">
+        역 검색은 2글자 이상 입력하면 표시됩니다.
+      </div>
+    );
+  }
 
   if (stations.length === 0 && lines.length === 0) {
     return (
