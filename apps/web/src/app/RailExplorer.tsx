@@ -269,8 +269,9 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
             <div>
               <h2 className="text-xl font-bold">Canonical Line Cards</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                필터 적용 결과 {formatNumber(filteredLines.length)}개 노선. 선택한 노선/branch 기준으로
-                지도 범위가 자동 이동합니다.
+                필터 적용 결과 {formatNumber(filteredLines.length)}개 노선 · 지도 branch{" "}
+                {formatNumber(visibleMapBranches.length)}개 · 지도 역{" "}
+                {formatNumber(visibleMapStations.length)}개. 선택한 노선/branch 기준으로 지도 범위가 자동 이동합니다.
               </p>
             </div>
 

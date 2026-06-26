@@ -124,6 +124,13 @@ export default function RailMap({ stations, branches }: RailMapProps) {
     return [...unique.values()];
   }, [branches]);
 
+  const markerDisplayCount =
+    selectedStationIds.size > 0
+      ? selectedStationIds.size
+      : visibleBranchStations.length > 0
+        ? visibleBranchStations.length
+        : Math.min(validStations.length, 1200);
+
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -323,9 +330,12 @@ export default function RailMap({ stations, branches }: RailMapProps) {
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
 
-    const markerStations = selectedStationIds.size > 0
-      ? validStations.filter((station) => selectedStationIds.has(station.id))
-      : validStations.slice(0, 1200);
+    const markerStations =
+      selectedStationIds.size > 0
+        ? validStations.filter((station) => selectedStationIds.has(station.id))
+        : visibleBranchStations.length > 0
+          ? visibleBranchStations
+          : validStations.slice(0, 1200);
 
     for (const station of markerStations) {
       const element = document.createElement("button");
@@ -365,9 +375,16 @@ export default function RailMap({ stations, branches }: RailMapProps) {
       <div className="absolute left-4 top-4 rounded-2xl border border-white/70 bg-white/85 px-4 py-3 text-sm shadow-sm backdrop-blur">
         <p className="font-semibold text-slate-900">Rail Map Preview</p>
         <p className="mt-1 text-xs text-slate-500">
-          역 {validStations.length.toLocaleString("ko-KR")}개 · branch preview line{" "}
+          표시 역 {markerDisplayCount.toLocaleString("ko-KR")}개 · 전체 역{" "}
+          {validStations.length.toLocaleString("ko-KR")}개 · branch line{" "}
           {branchFeatures.length.toLocaleString("ko-KR")}개
         </p>
+
+        {markerDisplayCount >= 1000 ? (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            marker 표시량이 많습니다. 노선/branch를 선택하면 가벼워집니다.
+          </div>
+        ) : null}
 
         {selectedBranch ? (
           <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs">
