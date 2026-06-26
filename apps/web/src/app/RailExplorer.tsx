@@ -106,6 +106,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [isHydratedFromUrl, setIsHydratedFromUrl] = useState(false);
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
+  const [copiedReviewCsv, setCopiedReviewCsv] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -258,6 +259,73 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   );
 
   const lowConfidenceLines = bundle.lines.filter((line) => countLowConfidence(line) > 0);
+
+  const selectedReviewStops = useMemo<
+    (CanonicalRouteStop & {
+      branchId: string;
+      branchName: string;
+      branchNumber: string;
+    })[]
+  >(() => {
+    if (!selectedLine) return [];
+
+    const targetBranches = selectedBranch ? [selectedBranch] : selectedLine.branches;
+
+    return targetBranches
+      .flatMap((branch) =>
+        getLowConfidenceStops(branch).map((stop) => ({
+          ...stop,
+          branchId: branch.id,
+          branchName: branch.sourceLineName,
+          branchNumber: branch.sourceLineNumber,
+        })),
+      )
+      .sort(
+        (a, b) =>
+          a.branchName.localeCompare(b.branchName, "ko-KR") || a.sequence - b.sequence,
+      );
+  }, [selectedBranch, selectedLine]);
+
+  const copySelectedReviewCsv = async () => {
+    if (!selectedLine || selectedReviewStops.length === 0) return;
+
+    const rows = [
+      [
+        "canonicalKey",
+        "canonicalName",
+        "branchNumber",
+        "branchName",
+        "sourceStationCode",
+        "displayNameKo",
+        "stationId",
+        "matchStatus",
+        "confidence",
+      ],
+      ...selectedReviewStops.map((stop) => [
+        selectedLine.canonicalKey,
+        selectedLine.nameKo,
+        stop.branchNumber,
+        stop.branchName,
+        stop.sourceStationCode,
+        stop.displayNameKo,
+        stop.stationId,
+        stop.matchStatus,
+        stop.confidence,
+      ]),
+    ];
+
+    const csv = rows
+      .map((row) =>
+        row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","),
+      )
+      .join("\n");
+
+    await navigator.clipboard.writeText(csv);
+    setCopiedReviewCsv(true);
+    window.setTimeout(() => setCopiedReviewCsv(false), 1200);
+  };
+
+
 
   return (
     <section className="mx-auto grid max-w-7xl gap-6 px-6 py-8 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -503,14 +571,14 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                         className="rounded-xl bg-slate-50 px-3 py-2 text-xs"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-bold text-slate-800">{stop.stationName}</span>
+                          <span className="font-bold text-slate-800">{stop.displayNameKo}</span>
                           <span className="text-slate-500">
-                            {Math.round((stop.matchConfidence ?? 0) * 100)}%
+                            {stop.confidence}
                           </span>
                         </div>
                         <p className="mt-1 truncate text-slate-500">
                           {stop.branchName} · {stop.sourceStationCode} →{" "}
-                          {stop.station?.nameKo ?? "매칭 없음"}
+                          {stop.stationId || "매칭 없음"}
                         </p>
                       </div>
                     ))}
