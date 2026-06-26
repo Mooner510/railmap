@@ -1,57 +1,61 @@
-import { RailMap } from "./RailMap";
+import fs from "node:fs";
+import path from "node:path";
+import RailMap, { type RailMapStation } from "./RailMap";
 
-type RailStation = {
-  id: string;
-  stationNumber: string | null;
-  nameKo: string | null;
-  nameEn: string | null;
-  lat: number | null;
-  lng: number | null;
-  operatorNameKo: string | null;
-  sourceCandidateId: string;
-  sourceLineNumbers: string[];
-  canonicalLineIds: string[];
-};
+type MatchConfidence = "high" | "medium" | "low" | "none" | string;
 
-type RouteStop = {
+interface CanonicalRouteStop {
   id: string;
   canonicalLineId: string;
   branchId: string;
   sourceLineNumber: string;
   sourceLineName: string;
-  role: "main" | "branch";
+  role: string;
   sequence: number;
   stationId: string;
-  sourceStationCode: string | null;
-  displayNameKo: string | null;
+  sourceStationCode: string;
+  displayNameKo: string;
   matchStatus: string;
-  confidence: string;
+  confidence: MatchConfidence;
   sourceCandidateId: string;
-  diagnostics: string[];
-};
+  diagnostics?: string[];
+}
 
-type RailBranch = {
+interface CanonicalBranch {
   id: string;
   canonicalLineId: string;
-  role: "main" | "branch";
+  role: "main" | "branch" | string;
   sourceLineNumber: string;
   sourceLineName: string;
   origin: string | null;
   terminal: string | null;
-  routeStops: RouteStop[];
-};
+  routeStops: CanonicalRouteStop[];
+}
 
-type RailLine = {
+interface CanonicalLine {
   id: string;
   canonicalKey: string;
   lnCd: string;
   mreaWideCd: string;
   nameKo: string;
-  branches: RailBranch[];
+  branches: CanonicalBranch[];
   sourceLineNumbers: string[];
-};
+}
 
-type RailBundle = {
+interface CanonicalStation {
+  id: string;
+  stationNumber: string;
+  nameKo: string;
+  nameEn?: string | null;
+  lineNumber: string;
+  lineNameKo: string;
+  lat: number | null;
+  lng: number | null;
+  operatorNameKo?: string | null;
+  sourceCandidateId: string;
+}
+
+interface CanonicalBundle {
   bundleId: string;
   acquiredDate: string;
   generatedAt: string;
@@ -63,145 +67,277 @@ type RailBundle = {
     skippedRouteStops: number;
     missingCanonicalLines: number;
   };
-  lines: RailLine[];
-  stations: RailStation[];
+  lines: CanonicalLine[];
+  stations: CanonicalStation[];
+  routeStops: CanonicalRouteStop[];
   skippedRouteStops: unknown[];
   missingCanonicalLines: string[];
-};
-
-async function getBundle(): Promise<RailBundle> {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
-
-  const response = await fetch(`${baseUrl}/data/kric-canonical-app-bundle.json`, {
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to load rail bundle: ${response.status}`);
-  }
-
-  return response.json() as Promise<RailBundle>;
 }
 
-export default async function Home() {
-  const bundle = await getBundle();
-  const stationsById = new Map(bundle.stations.map((station) => [station.id, station]));
+function readBundle(): CanonicalBundle {
+  const bundlePath = path.join(
+    process.cwd(),
+    "public/data/kric-canonical-app-bundle.json",
+  );
 
-  const lines = [...bundle.lines].sort((a, b) => {
-    const area = a.mreaWideCd.localeCompare(b.mreaWideCd, "ko");
-    if (area !== 0) return area;
-    return a.nameKo.localeCompare(b.nameKo, "ko");
+  return JSON.parse(fs.readFileSync(bundlePath, "utf8")) as CanonicalBundle;
+}
+
+function countLowConfidence(line: CanonicalLine): number {
+  return line.branches.reduce(
+    (sum, branch) =>
+      sum + branch.routeStops.filter((stop) => stop.confidence === "low").length,
+    0,
+  );
+}
+
+function countRouteStops(line: CanonicalLine): number {
+  return line.branches.reduce((sum, branch) => sum + branch.routeStops.length, 0);
+}
+
+function getFirstStop(branch: CanonicalBranch): string {
+  return branch.routeStops[0]?.displayNameKo ?? "-";
+}
+
+function getLastStop(branch: CanonicalBranch): string {
+  return branch.routeStops[branch.routeStops.length - 1]?.displayNameKo ?? "-";
+}
+
+function toMapStations(stations: CanonicalStation[]): RailMapStation[] {
+  return stations.map((station) => ({
+    id: station.id,
+    nameKo: station.nameKo,
+    lineNameKo: station.lineNameKo,
+    lat: station.lat,
+    lng: station.lng,
+  }));
+}
+
+function formatNumber(value: number): string {
+  return value.toLocaleString("ko-KR");
+}
+
+export default function Home() {
+  const bundle = readBundle();
+
+  const linesWithLowConfidence = bundle.lines.filter((line) => countLowConfidence(line) > 0);
+
+  const topLines = [...bundle.lines].sort((a, b) => {
+    const areaCompare = a.mreaWideCd.localeCompare(b.mreaWideCd, "ko");
+    if (areaCompare !== 0) return areaCompare;
+
+    return a.nameKo.localeCompare(b.nameKo, "ko", { numeric: true });
   });
 
   return (
-    <main className="min-h-screen bg-[#f6f8fb] px-6 py-8 text-[#111827]">
-      <section className="mx-auto flex max-w-7xl flex-col gap-8">
-        <header className="flex flex-col gap-3">
-          <p className="text-sm font-semibold text-blue-600">Railmap</p>
-          <h1 className="text-4xl font-bold tracking-tight">철도 지도 데이터 뷰어</h1>
-          <p className="max-w-3xl text-base leading-7 text-gray-600">
-            KRIC 수동 canonical 분류표를 기준으로 생성한 도시철도 후보 데이터입니다. 지선은 source line 단위로 분리해 표시합니다.
-          </p>
-        </header>
-
-        <section className="grid grid-cols-2 gap-4 md:grid-cols-5">
-          <MetricCard label="Canonical 노선" value={bundle.counts.canonicalLines} />
-          <MetricCard label="지선/Source" value={bundle.counts.branches} />
-          <MetricCard label="역 후보" value={bundle.counts.stations} />
-          <MetricCard label="정차 순서" value={bundle.counts.routeStops} />
-          <MetricCard label="검토 제외" value={bundle.counts.skippedRouteStops} />
-        </section>
-
-        {bundle.missingCanonicalLines.length > 0 ? (
-          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
-            <h2 className="text-lg font-bold">매핑되지 않은 canonical 노선</h2>
-            <p className="mt-1 text-sm">{bundle.missingCanonicalLines.join(", ")}</p>
-          </section>
-        ) : null}
-
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-col gap-1">
-            <h2 className="text-xl font-bold">역 위치 지도</h2>
-            <p className="text-sm text-gray-500">KRIC 역사정보 좌표를 기준으로 역 후보를 지도에 표시합니다.</p>
-          </div>
-          <RailMap
-            stations={bundle.stations.map((station) => ({
-              id: station.id,
-              nameKo: station.nameKo,
-              lat: station.lat,
-              lng: station.lng,
-              lineNameKo: station.canonicalLineIds.join(", "),
-            }))}
-          />
-        </section>
-
-        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-          <div className="mb-4 flex flex-col gap-1">
-            <h2 className="text-xl font-bold">Canonical 노선 목록</h2>
-            <p className="text-sm text-gray-500">
-              총 {lines.length.toLocaleString("ko-KR")}개 canonical 노선. 각 노선 안에 main/branch source line을 표시합니다.
+    <main className="min-h-screen bg-slate-50 text-slate-950">
+      <section className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-10">
+          <div className="flex flex-col gap-4">
+            <p className="text-sm font-semibold tracking-[0.25em] text-sky-600 uppercase">
+              Korea Rail Map
             </p>
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h1 className="text-4xl font-black tracking-tight text-slate-950 md:text-5xl">
+                  Canonical Rail Bundle Preview
+                </h1>
+                <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
+                  KRIC 원천 노선을 그대로 노출하지 않고, 수동 allowlist 기준 canonical
+                  노선으로 병합한 개발 미리보기입니다. GTX-A는 현재 의도적으로 제외되어
+                  있습니다.
+                </p>
+              </div>
+
+              <div className="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-600">
+                <p>
+                  acquired: <span className="font-semibold text-slate-900">{bundle.acquiredDate}</span>
+                </p>
+                <p className="mt-1">
+                  generated:{" "}
+                  <span className="font-semibold text-slate-900">
+                    {new Date(bundle.generatedAt).toLocaleString("ko-KR")}
+                  </span>
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="grid gap-4">
-            {lines.map((line) => {
-              const totalStops = line.branches.reduce((sum, branch) => sum + branch.routeStops.length, 0);
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+            <MetricCard label="Canonical Lines" value={bundle.counts.canonicalLines} />
+            <MetricCard label="Branches" value={bundle.counts.branches} />
+            <MetricCard label="Stations" value={bundle.counts.stations} />
+            <MetricCard label="Route Stops" value={bundle.counts.routeStops} />
+            <MetricCard label="Skipped" value={bundle.counts.skippedRouteStops} />
+            <MetricCard label="Missing" value={bundle.counts.missingCanonicalLines} />
+          </div>
+        </div>
+      </section>
 
-              return (
-                <article key={line.id} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                  <div className="mb-4 flex items-center justify-between gap-3">
-                    <div>
-                      <h3 className="text-lg font-bold">{line.nameKo}</h3>
-                      <p className="text-xs text-gray-500">
-                        {line.canonicalKey} · source {line.sourceLineNumbers.join(", ")}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-gray-700">
-                      {totalStops.toLocaleString("ko-KR")}역
-                    </span>
-                  </div>
+      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-8 xl:grid-cols-[minmax(0,1fr)_420px]">
+        <div className="flex flex-col gap-6">
+          <RailMap stations={toMapStations(bundle.stations)} />
 
-                  <div className="grid gap-3">
-                    {line.branches.map((branch) => (
-                      <section key={branch.id} className="rounded-lg border border-gray-200 bg-white p-3">
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-gray-900 px-2 py-0.5 text-xs font-semibold text-white">
-                            {branch.role}
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-2">
+              <h2 className="text-xl font-bold">Canonical Line Cards</h2>
+              <p className="text-sm leading-6 text-slate-500">
+                노선 카드는 canonical 노선 단위입니다. 내부에는 KRIC source line을 branch로
+                보존합니다.
+              </p>
+            </div>
+
+            <div className="mt-6 grid gap-4">
+              {topLines.map((line) => {
+                const lowConfidenceCount = countLowConfidence(line);
+                const routeStopCount = countRouteStops(line);
+
+                return (
+                  <article
+                    key={line.canonicalKey}
+                    className="rounded-3xl border border-slate-200 bg-slate-50 p-5"
+                  >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-lg font-bold text-slate-950">{line.nameKo}</h3>
+                          <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">
+                            {line.canonicalKey}
                           </span>
-                          <span className="text-sm font-bold">{branch.sourceLineName}</span>
-                          <span className="text-xs text-gray-500">{branch.sourceLineNumber}</span>
-                          <span className="text-xs text-gray-400">
-                            {branch.origin ?? "?"} → {branch.terminal ?? "?"}
-                          </span>
-                          <span className="ml-auto text-xs font-semibold text-gray-500">
-                            {branch.routeStops.length.toLocaleString("ko-KR")}역
-                          </span>
+                          {lowConfidenceCount > 0 ? (
+                            <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
+                              검수 필요 {lowConfidenceCount}
+                            </span>
+                          ) : (
+                            <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
+                              매칭 안정
+                            </span>
+                          )}
                         </div>
+                        <p className="mt-2 text-sm text-slate-500">
+                          branch {line.branches.length}개 · route stop {routeStopCount}개 · source{" "}
+                          {line.sourceLineNumbers.join(", ")}
+                        </p>
+                      </div>
 
-                        <ol className="flex flex-wrap gap-2">
-                          {branch.routeStops.map((stop) => {
-                            const station = stationsById.get(stop.stationId);
+                      <div className="text-sm font-semibold text-slate-500">
+                        권역 {line.mreaWideCd} · lnCd {line.lnCd}
+                      </div>
+                    </div>
+
+                    <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                      <table className="w-full text-left text-sm">
+                        <thead className="bg-slate-100 text-xs font-semibold text-slate-500 uppercase">
+                          <tr>
+                            <th className="px-4 py-3">Role</th>
+                            <th className="px-4 py-3">Source</th>
+                            <th className="px-4 py-3">구간</th>
+                            <th className="px-4 py-3 text-right">역 수</th>
+                            <th className="px-4 py-3 text-right">검수</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {line.branches.map((branch) => {
+                            const low = branch.routeStops.filter(
+                              (stop) => stop.confidence === "low",
+                            ).length;
 
                             return (
-                              <li
-                                key={stop.id}
-                                className="rounded-full border border-gray-200 bg-white px-3 py-1 text-sm"
-                                title={`${stop.matchStatus}:${stop.confidence}`}
-                              >
-                                <span className="text-gray-400">{stop.sequence}. </span>
-                                <span>{station?.nameKo ?? stop.displayNameKo ?? "이름 없음"}</span>
-                              </li>
+                              <tr key={branch.id}>
+                                <td className="px-4 py-3">
+                                  <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                                    {branch.role}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <p className="font-semibold text-slate-900">
+                                    {branch.sourceLineName}
+                                  </p>
+                                  <p className="text-xs text-slate-500">
+                                    {branch.sourceLineNumber}
+                                  </p>
+                                </td>
+                                <td className="px-4 py-3 text-slate-600">
+                                  {branch.origin ?? getFirstStop(branch)} →{" "}
+                                  {branch.terminal ?? getLastStop(branch)}
+                                </td>
+                                <td className="px-4 py-3 text-right font-semibold">
+                                  {branch.routeStops.length}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  {low > 0 ? (
+                                    <span className="font-semibold text-amber-700">{low}</span>
+                                  ) : (
+                                    <span className="text-slate-400">0</span>
+                                  )}
+                                </td>
+                              </tr>
                             );
                           })}
-                        </ol>
-                      </section>
-                    ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        </div>
+
+        <aside className="flex flex-col gap-6">
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold">검수 상태</h2>
+            <div className="mt-4 space-y-3 text-sm">
+              <StatusRow label="Skipped route stops" value={bundle.counts.skippedRouteStops} ok />
+              <StatusRow
+                label="Missing canonical lines"
+                value={bundle.counts.missingCanonicalLines}
+              />
+              <StatusRow
+                label="Low confidence lines"
+                value={linesWithLowConfidence.length}
+              />
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-sm">
+            <h2 className="text-lg font-bold text-amber-950">검수 필요 노선</h2>
+            <p className="mt-2 text-sm leading-6 text-amber-800">
+              low confidence는 전역 역명 fallback으로 복구된 route stop입니다.
+            </p>
+            <div className="mt-4 space-y-3">
+              {linesWithLowConfidence.map((line) => (
+                <div
+                  key={line.canonicalKey}
+                  className="rounded-2xl border border-amber-200 bg-white/70 p-4"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-amber-950">{line.nameKo}</p>
+                    <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold text-amber-800">
+                      {countLowConfidence(line)}
+                    </span>
                   </div>
-                </article>
-              );
-            })}
-          </div>
-        </section>
+                  <p className="mt-1 text-xs text-amber-700">{line.canonicalKey}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-bold">제외된 canonical line</h2>
+            <div className="mt-4 space-y-2">
+              {bundle.missingCanonicalLines.map((line) => (
+                <div
+                  key={line}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                >
+                  <p className="font-semibold text-slate-900">{line}</p>
+                  <p className="mt-1 text-xs text-slate-500">GTX-A는 현재 제외 상태</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        </aside>
       </section>
     </main>
   );
@@ -209,9 +345,28 @@ export default async function Home() {
 
 function MetricCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-      <p className="text-sm font-medium text-gray-500">{label}</p>
-      <p className="mt-2 text-3xl font-bold">{value.toLocaleString("ko-KR")}</p>
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="text-xs font-bold tracking-wide text-slate-400 uppercase">{label}</p>
+      <p className="mt-3 text-3xl font-black text-slate-950">{formatNumber(value)}</p>
+    </div>
+  );
+}
+
+function StatusRow({ label, value, ok = false }: { label: string; value: number; ok?: boolean }) {
+  const isOk = ok ? value === 0 : value === 0;
+
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
+      <span className="text-slate-600">{label}</span>
+      <span
+        className={
+          isOk
+            ? "font-bold text-emerald-700"
+            : "font-bold text-amber-700"
+        }
+      >
+        {formatNumber(value)}
+      </span>
     </div>
   );
 }
