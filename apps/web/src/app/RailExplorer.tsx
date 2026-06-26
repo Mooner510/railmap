@@ -855,6 +855,30 @@ function ToggleButton({
   );
 }
 
+function HighlightText({ text, query }: { text: string; query: string }): ReactNode {
+  const keyword = query.trim();
+
+  if (!keyword) return text;
+
+  const textLower = text.toLocaleLowerCase("ko-KR");
+  const keywordLower = keyword.toLocaleLowerCase("ko-KR");
+  const index = textLower.indexOf(keywordLower);
+
+  if (index < 0) return text;
+
+  const before = text.slice(0, index);
+  const match = text.slice(index, index + keyword.length);
+  const after = text.slice(index + keyword.length);
+
+  return (
+    <>
+      {before}
+      <mark className="rounded-sm bg-amber-100 px-0.5 font-black text-amber-900">{match}</mark>
+      {after}
+    </>
+  );
+}
+
 function SearchResults({
   compact,
   query,
@@ -881,7 +905,7 @@ function SearchResults({
   if (normalizedQuery.length < MIN_STATION_SEARCH_LENGTH && stations.length === 0 && lines.length === 0) {
     return (
       <div className="border border-dashed border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-500">
-        역 검색은 2글자 이상 입력하면 표시됩니다.
+        검색 결과를 표시하려면 역명이나 노선명을 입력하세요.
       </div>
     );
   }
@@ -900,7 +924,7 @@ function SearchResults({
         <div>
           <div className="flex items-center justify-between gap-2 px-0.5">
             <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">노선</p>
-            <p className="text-[10px] font-semibold text-slate-400">{formatNumber(lines.length)}개</p>
+            <p className="text-[10px] font-semibold text-slate-400">상위 {formatNumber(lines.length)}개</p>
           </div>
           <div className="mt-1 grid gap-1">
             {lines.map((line) => {
@@ -919,7 +943,7 @@ function SearchResults({
                 >
                   <span className="flex min-w-0 items-center gap-1.5 truncate">
                     <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: line.colorHex }} />
-                    <span className="truncate">{line.nameKo}</span>
+                    <span className="truncate"><HighlightText text={line.nameKo} query={query} /></span>
                   </span>
                   <span className="mt-0.5 block text-[10px] font-medium text-slate-400">
                     {formatAreaName(line.mreaWideCd)} · {formatNumber(countRouteStops(line))}역
@@ -935,7 +959,7 @@ function SearchResults({
         <div className={lines.length > 0 ? "mt-2" : undefined}>
           <div className="flex items-center justify-between gap-2 px-0.5">
             <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">역</p>
-            <p className="text-[10px] font-semibold text-slate-400">{formatNumber(stations.length)}개</p>
+            <p className="text-[10px] font-semibold text-slate-400">상위 {formatNumber(stations.length)}개</p>
           </div>
           <div className="mt-1 grid gap-1">
             {stations.map((station) => {
@@ -952,7 +976,7 @@ function SearchResults({
               }
               onClick={() => onSelectStation(station.id)}
             >
-              <span className="block truncate">{station.nameKo}</span>
+              <span className="block truncate"><HighlightText text={station.nameKo} query={query} /></span>
               {station.lineNameKo ? (
                 <span className="mt-0.5 block truncate text-[10px] font-medium text-slate-400">
                   {station.lineNameKo}
