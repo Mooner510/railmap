@@ -124,6 +124,7 @@ interface RailMapProps {
   showStations?: boolean;
   onSelectBranch?: (branch: RailMapBranch) => void;
   onSelectStation?: (station: RailMapStation) => void;
+  onClearStation?: () => void;
   className?: string;
 }
 
@@ -213,6 +214,7 @@ export default function RailMap({
   showStations = true,
   onSelectBranch,
   onSelectStation,
+  onClearStation,
   className = "",
 }: RailMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -222,6 +224,8 @@ export default function RailMap({
   const [mapReady, setMapReady] = useState(false);
   const branchesRef = useRef(branches);
   const onSelectBranchRef = useRef(onSelectBranch);
+  const onSelectStationRef = useRef(onSelectStation);
+  const onClearStationRef = useRef(onClearStation);
 
   useEffect(() => {
     branchesRef.current = branches;
@@ -230,6 +234,14 @@ export default function RailMap({
   useEffect(() => {
     onSelectBranchRef.current = onSelectBranch;
   }, [onSelectBranch]);
+
+  useEffect(() => {
+    onSelectStationRef.current = onSelectStation;
+  }, [onSelectStation]);
+
+  useEffect(() => {
+    onClearStationRef.current = onClearStation;
+  }, [onClearStation]);
 
   const validStations = useMemo(() => stations.filter(isValidCoordinate), [stations]);
   const branchFeatures = useMemo(() => buildBranchFeatures(showBranches ? branches : []), [branches, showBranches]);
@@ -430,6 +442,14 @@ export default function RailMap({
             if (branch) onSelectBranchRef.current?.(branch);
           });
 
+          map.on("click", (event) => {
+            const lineFeatures = map.queryRenderedFeatures(event.point, {
+              layers: ["branch-preview-lines", "branch-preview-lines-selected"],
+            });
+
+            if (lineFeatures.length === 0) onClearStationRef.current?.();
+          });
+
           map.resize();
           resizeTimer = window.setTimeout(() => map.resize(), 80);
         });
@@ -526,6 +546,18 @@ export default function RailMap({
         selectedBranchId ?? "",
       ]);
     }
+
+    if (map.getLayer("branch-preview-lines")) {
+      map.setPaintProperty(
+        "branch-preview-lines",
+        "line-opacity",
+        selectedBranchId ? ["case", ["==", ["get", "id"], selectedBranchId], 0.42, 0.2] : 0.76,
+      );
+    }
+
+    if (map.getLayer("branch-preview-lines-casing")) {
+      map.setPaintProperty("branch-preview-lines-casing", "line-opacity", selectedBranchId ? 0.48 : 0.88);
+    }
   }, [selectedBranchId, mapReady]);
 
 
@@ -587,10 +619,10 @@ export default function RailMap({
       const stationColor = stationColorIndex.get(station.id) ?? "#0284c7";
 
       element.className = isSelected
-        ? "h-3.5 w-3.5 rounded-full border-2 border-white shadow-md transition-transform hover:scale-150"
+        ? "h-4 w-4 rounded-full border-2 border-white shadow-lg ring-2 transition-transform duration-150 ease-out hover:scale-150"
         : isInSelectedBranch
-          ? "h-2.5 w-2.5 rounded-full border border-white shadow-sm transition-transform hover:scale-150"
-          : "h-2 w-2 rounded-full border border-white shadow-sm transition-transform hover:scale-150";
+          ? "h-2.5 w-2.5 rounded-full border border-white shadow-sm transition-transform duration-150 ease-out hover:scale-150"
+          : "h-2 w-2 rounded-full border border-white shadow-sm opacity-90 transition-transform duration-150 ease-out hover:scale-150";
       element.style.backgroundColor = stationColor;
       element.style.boxShadow = isSelected
         ? `0 0 0 3px ${stationColor}33, 0 6px 14px ${stationColor}33`
@@ -610,7 +642,7 @@ export default function RailMap({
       element.addEventListener("mouseleave", () => popup.remove());
       element.addEventListener("click", () => {
         popup.remove();
-        onSelectStation?.(station);
+        onSelectStationRef.current?.(station);
       });
 
       const marker = new maplibregl.Marker({ element })
@@ -620,7 +652,7 @@ export default function RailMap({
 
       markersRef.current.push(marker);
     }
-  }, [validStations, visibleBranchStations, selectedBranchStationIds, selectedStationId, onSelectStation, mapReady, showStations, stationColorIndex]);
+  }, [validStations, visibleBranchStations, selectedBranchStationIds, selectedStationId, mapReady, showStations, stationColorIndex]);
 
   return (
     <div className={`relative h-full min-h-[100dvh] w-full min-w-0 overflow-hidden bg-slate-100 ${className}`}>
