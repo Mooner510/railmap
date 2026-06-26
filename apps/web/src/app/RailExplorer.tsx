@@ -551,6 +551,9 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                     <p className="mt-1 text-sm font-bold text-slate-900">
                       검수 필요 {formatNumber(selectedReviewStops.length)}개
                     </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      현재 선택한 {selectedBranch ? "branch" : "line"} 기준
+                    </p>
                   </div>
 
                   <button
@@ -577,8 +580,10 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                           </span>
                         </div>
                         <p className="mt-1 truncate text-slate-500">
-                          {stop.branchName} · {stop.sourceStationCode} →{" "}
-                          {stop.stationId || "매칭 없음"}
+                          {stop.branchName} · seq {stop.sequence} · code {stop.sourceStationCode}
+                        </p>
+                        <p className="mt-0.5 truncate text-slate-400">
+                          stationId {stop.stationId || "없음"} · {stop.matchStatus}
                         </p>
                       </div>
                     ))}
