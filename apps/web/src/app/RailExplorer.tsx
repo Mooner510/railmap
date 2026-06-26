@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import RailMap, { type RailMapBranch, type RailMapStation } from "./RailMap";
 
 interface CanonicalRouteStop {
@@ -103,6 +103,40 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [onlyLowConfidence, setOnlyLowConfidence] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLineKey, setSelectedLineKey] = useState<string | null>(null);
+  const [isHydratedFromUrl, setIsHydratedFromUrl] = useState(false);
+  const [copiedShareUrl, setCopiedShareUrl] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+
+    const area = params.get("area");
+    const low = params.get("low");
+    const q = params.get("q");
+    const line = params.get("line");
+
+    if (area) setSelectedArea(area);
+    if (low === "1") setOnlyLowConfidence(true);
+    if (q) setSearchQuery(q);
+    if (line) setSelectedLineKey(line);
+
+    setIsHydratedFromUrl(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isHydratedFromUrl) return;
+
+    const params = new URLSearchParams();
+
+    if (selectedArea !== "all") params.set("area", selectedArea);
+    if (onlyLowConfidence) params.set("low", "1");
+    if (searchQuery.trim()) params.set("q", searchQuery.trim());
+    if (selectedLineKey) params.set("line", selectedLineKey);
+
+    const query = params.toString();
+    const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
+
+    window.history.replaceState(null, "", nextUrl);
+  }, [isHydratedFromUrl, onlyLowConfidence, searchQuery, selectedArea, selectedLineKey]);
 
   const sortedLines = useMemo(
     () =>
@@ -152,6 +186,13 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
       null,
     [filteredLines, selectedLineKey],
   );
+
+  useEffect(() => {
+    if (!selectedLineKey) return;
+    if (filteredLines.some((line) => line.canonicalKey === selectedLineKey)) return;
+
+    setSelectedLineKey(null);
+  }, [filteredLines, selectedLineKey]);
 
   const visibleLineKeys = useMemo(
     () => new Set(filteredLines.map((line) => line.canonicalKey)),
@@ -255,6 +296,18 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                 }}
               >
                 초기화
+              </button>
+
+              <button
+                type="button"
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(window.location.href);
+                  setCopiedShareUrl(true);
+                  window.setTimeout(() => setCopiedShareUrl(false), 1200);
+                }}
+              >
+                {copiedShareUrl ? "복사됨" : "URL 복사"}
               </button>
             </div>
           </div>
