@@ -54,6 +54,32 @@ export interface CanonicalBundle {
   missingCanonicalLines: string[];
 }
 
+export type RouteGeometrySource = "station_sequence_smooth" | "manual_adjusted";
+
+export interface RouteGeometryPoint {
+  lng: number;
+  lat: number;
+  kind: "station" | "control";
+  stationId?: string;
+}
+
+const AREA_NAME_BY_CODE: Record<string, string> = {
+  "01": "수도권",
+  "02": "부산",
+  "03": "대구",
+  "04": "광주",
+  "05": "대전",
+};
+
+export function formatAreaName(areaCode: string): string {
+  if (areaCode === "all") return "전체";
+  return AREA_NAME_BY_CODE[areaCode] ?? areaCode;
+}
+
+export function normalizeSearchText(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, "");
+}
+
 export function countRouteStops(line: CanonicalLine): number {
   return line.branches.reduce((sum, branch) => sum + branch.routeStops.length, 0);
 }
