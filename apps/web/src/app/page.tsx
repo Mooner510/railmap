@@ -103,6 +103,14 @@ function getLastStop(branch: CanonicalBranch): string {
   return branch.routeStops[branch.routeStops.length - 1]?.displayNameKo ?? "-";
 }
 
+function getLowConfidenceStops(branch: CanonicalBranch): CanonicalRouteStop[] {
+  return branch.routeStops.filter((stop) => stop.confidence === "low");
+}
+
+function getBranchDetailsId(branch: CanonicalBranch): string {
+  return `branch-${branch.id.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
 function toMapStations(stations: CanonicalStation[]): RailMapStation[] {
   return stations.map((station) => ({
     id: station.id,
@@ -244,27 +252,66 @@ export default function Home() {
 
                             return (
                               <tr key={branch.id}>
-                                <td className="px-4 py-3">
+                                <td className="px-4 py-3 align-top">
                                   <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
                                     {branch.role}
                                   </span>
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-4 py-3 align-top">
                                   <p className="font-semibold text-slate-900">
                                     {branch.sourceLineName}
                                   </p>
                                   <p className="text-xs text-slate-500">
                                     {branch.sourceLineNumber}
                                   </p>
+
+                                  <details id={getBranchDetailsId(branch)} className="group mt-3">
+                                    <summary className="cursor-pointer select-none text-xs font-semibold text-sky-700 hover:text-sky-900">
+                                      정차역 {branch.routeStops.length}개 펼치기
+                                    </summary>
+
+                                    <ol className="mt-3 flex flex-wrap gap-1.5">
+                                      {branch.routeStops.map((stop) => (
+                                        <li
+                                          key={stop.id}
+                                          title={`${stop.matchStatus}:${stop.confidence}`}
+                                          className={
+                                            stop.confidence === "low"
+                                              ? "rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800"
+                                              : "rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+                                          }
+                                        >
+                                          <span className="text-slate-400">{stop.sequence}. </span>
+                                          {stop.displayNameKo}
+                                        </li>
+                                      ))}
+                                    </ol>
+
+                                    {getLowConfidenceStops(branch).length > 0 ? (
+                                      <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                                        <p className="text-xs font-bold text-amber-900">
+                                          검수 필요 정차역
+                                        </p>
+                                        <ul className="mt-2 space-y-1 text-xs text-amber-800">
+                                          {getLowConfidenceStops(branch).map((stop) => (
+                                            <li key={stop.id}>
+                                              {stop.sequence}. {stop.displayNameKo} ·{" "}
+                                              {stop.matchStatus}:{stop.confidence}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    ) : null}
+                                  </details>
                                 </td>
-                                <td className="px-4 py-3 text-slate-600">
+                                <td className="px-4 py-3 align-top text-slate-600">
                                   {branch.origin ?? getFirstStop(branch)} →{" "}
                                   {branch.terminal ?? getLastStop(branch)}
                                 </td>
-                                <td className="px-4 py-3 text-right font-semibold">
+                                <td className="px-4 py-3 text-right align-top font-semibold">
                                   {branch.routeStops.length}
                                 </td>
-                                <td className="px-4 py-3 text-right">
+                                <td className="px-4 py-3 text-right align-top">
                                   {low > 0 ? (
                                     <span className="font-semibold text-amber-700">{low}</span>
                                   ) : (
