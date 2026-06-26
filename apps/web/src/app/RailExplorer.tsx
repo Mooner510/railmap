@@ -269,8 +269,8 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
             <div>
               <h2 className="text-xl font-bold">Canonical Line Cards</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                필터 적용 결과 {formatNumber(filteredLines.length)}개 노선. 검색어/권역/검수 필터가
-                지도와 노선 목록에 동시에 적용됩니다.
+                필터 적용 결과 {formatNumber(filteredLines.length)}개 노선. 선택한 노선/branch 기준으로
+                지도 범위가 자동 이동합니다.
               </p>
             </div>
 
@@ -440,6 +440,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                 <MetricMini label="Stops" value={countRouteStops(selectedLine)} />
                 <MetricMini label="Low" value={countLowConfidence(selectedLine)} />
                 <MetricMini label="Area" value={selectedLine.mreaWideCd} />
+                <MetricMini label="Visible" value={selectedBranch ? "Branch" : "Line"} />
               </div>
 
               <div className="mt-4">

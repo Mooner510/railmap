@@ -93,6 +93,13 @@ export default function RailMap({ stations, branches }: RailMapProps) {
     () => branches.find((branch) => branch.id === selectedBranchId) ?? null,
     [branches, selectedBranchId],
   );
+  useEffect(() => {
+    if (!selectedBranchId) return;
+    if (branches.some((branch) => branch.id === selectedBranchId)) return;
+
+    setSelectedBranchId(null);
+  }, [branches, selectedBranchId]);
+
   const selectedStationIds = useMemo(() => {
     if (!selectedBranch) return new Set<string>();
 
@@ -102,6 +109,20 @@ export default function RailMap({ stations, branches }: RailMapProps) {
         .filter((id): id is string => typeof id === "string"),
     );
   }, [selectedBranch]);
+
+  const visibleBranchStations = useMemo(() => {
+    const stationsInBranches = branches.flatMap((branch) =>
+      branch.routeStops.map((stop) => stop.station).filter(isValidCoordinate),
+    );
+
+    const unique = new Map<string, RailMapStation & { lat: number; lng: number }>();
+
+    for (const station of stationsInBranches) {
+      unique.set(station.id, station);
+    }
+
+    return [...unique.values()];
+  }, [branches]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -237,22 +258,28 @@ export default function RailMap({ stations, branches }: RailMapProps) {
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || validStations.length === 0) return;
+    if (!map || visibleBranchStations.length === 0) return;
 
     const bounds = new maplibregl.LngLatBounds();
 
-    for (const station of validStations) {
+    for (const station of visibleBranchStations) {
       bounds.extend([station.lng, station.lat]);
     }
 
-    map.once("load", () => {
+    const fit = () => {
       map.fitBounds(bounds, {
-        padding: 60,
-        maxZoom: 10,
-        duration: 0,
+        padding: 70,
+        maxZoom: visibleBranchStations.length <= 6 ? 13 : 10,
+        duration: 350,
       });
-    });
-  }, [validStations]);
+    };
+
+    if (map.isStyleLoaded()) {
+      fit();
+    } else {
+      map.once("load", fit);
+    }
+  }, [visibleBranchStations]);
 
   useEffect(() => {
     const map = mapRef.current;
