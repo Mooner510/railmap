@@ -19,6 +19,8 @@ interface RailExplorerProps {
   mapBranches: RailMapBranch[];
 }
 
+type MobilePanelMode = "search" | "selected" | "lines";
+
 interface FilterControlsProps {
   areaCodes: string[];
   selectedArea: string;
@@ -29,6 +31,10 @@ interface FilterControlsProps {
   selectedStationId: string | null;
   selectedLineKey: string | null;
   hasSelection: boolean;
+  showMapLines: boolean;
+  showMapStations: boolean;
+  onToggleMapLines: () => void;
+  onToggleMapStations: () => void;
   onSelectArea: (area: string) => void;
   onSearch: (query: string) => void;
   onClearSearch: () => void;
@@ -90,6 +96,9 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [isHydratedFromUrl, setIsHydratedFromUrl] = useState(false);
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
   const [mapFocusVersion, setMapFocusVersion] = useState(0);
+  const [showMapLines, setShowMapLines] = useState(true);
+  const [showMapStations, setShowMapStations] = useState(true);
+  const [mobilePanelMode, setMobilePanelMode] = useState<MobilePanelMode>("search");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -242,6 +251,18 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setSelectedStationId(null);
   }, [mapStations, selectedStationId]);
 
+  useEffect(() => {
+    if (selectedLineKey || selectedBranchId || selectedStationId) {
+      setMobilePanelMode("selected");
+    }
+  }, [selectedBranchId, selectedLineKey, selectedStationId]);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      setMobilePanelMode("search");
+    }
+  }, [searchQuery]);
+
   const visibleLineKeys = useMemo(
     () => new Set(filteredLines.map((line) => line.canonicalKey)),
     [filteredLines],
@@ -287,6 +308,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setSelectedLineKey(null);
     setSelectedBranchId(null);
     setSelectedStationId(null);
+    setMobilePanelMode("lines");
   };
 
   const clearSearch = () => {
@@ -304,6 +326,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setSelectedLineKey(null);
     setSelectedBranchId(null);
     setSelectedStationId(null);
+    setMobilePanelMode("lines");
   };
 
   const search = (query: string) => {
@@ -311,23 +334,27 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setSelectedLineKey(null);
     setSelectedBranchId(null);
     setSelectedStationId(null);
+    setMobilePanelMode(query.trim() ? "search" : "lines");
   };
 
   const selectLine = (lineKey: string) => {
     setSelectedLineKey(lineKey);
     setSelectedBranchId(null);
     setSelectedStationId(null);
+    setMobilePanelMode("selected");
   };
 
   const selectMapBranch = (branch: RailMapBranch) => {
     setSelectedLineKey(branch.canonicalLineId);
     setSelectedBranchId(branch.id);
     setSelectedStationId(null);
+    setMobilePanelMode("selected");
   };
 
   const selectServingBranch = (branch: StationServingBranch) => {
     setSelectedLineKey(branch.canonicalLineId);
     setSelectedBranchId(branch.branchId);
+    setMobilePanelMode("selected");
   };
 
   const selectMapStation = (station: RailMapStation) => {
@@ -341,6 +368,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     }
 
     setSelectedStationId(station.id);
+    setMobilePanelMode("selected");
   };
 
   const selectStationFromSearch = (stationId: string) => {
@@ -355,6 +383,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
     setSelectedStationId(stationId);
     setMapFocusVersion((version) => version + 1);
+    setMobilePanelMode("selected");
   };
 
 
@@ -384,6 +413,10 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
               selectedStationId={selectedStationId}
               selectedLineKey={selectedLineKey}
               hasSelection={hasSelection}
+              showMapLines={showMapLines}
+              showMapStations={showMapStations}
+              onToggleMapLines={() => setShowMapLines((value) => !value)}
+              onToggleMapStations={() => setShowMapStations((value) => !value)}
               onSelectArea={selectArea}
               onSearch={search}
               onClearSearch={clearSearch}
@@ -412,6 +445,8 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
           selectedBranchId={selectedBranchId}
           selectedStationId={selectedStationId}
           focusVersion={mapFocusVersion}
+          showBranches={showMapLines}
+          showStations={showMapStations}
           onSelectBranch={selectMapBranch}
           onSelectStation={selectMapStation}
         />
@@ -442,7 +477,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
         ) : null}
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 lg:hidden">
-          <div className="pointer-events-auto max-h-[54dvh] overflow-hidden border-t border-slate-200 bg-white/97 shadow-md shadow-slate-950/10 backdrop-blur">
+          <div className="pointer-events-auto max-h-[56dvh] overflow-hidden border-t border-slate-200 bg-white/97 shadow-md shadow-slate-950/10 backdrop-blur">
             <div className="mx-auto mt-1.5 h-0.5 w-8 rounded bg-slate-300" />
 
             <div className="border-b border-slate-200 px-2.5 pb-2 pt-1.5">
@@ -452,7 +487,17 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                 visibleStationCount={visibleMapStations.length}
                 compact
               />
-              <div className="mt-1.5">
+              <MobilePanelTabs
+                activeMode={mobilePanelMode}
+                hasSelection={hasSelection}
+                resultCount={stationSearchResults.length + lineSearchResults.length}
+                lineCount={filteredLines.length}
+                onChange={setMobilePanelMode}
+              />
+            </div>
+
+            <div className="max-h-[calc(56dvh-82px)] overflow-y-auto px-2.5 pb-4 pt-2">
+              {mobilePanelMode === "search" ? (
                 <FilterControls
                   areaCodes={areaCodes}
                   selectedArea={selectedArea}
@@ -463,6 +508,10 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                   selectedStationId={selectedStationId}
                   selectedLineKey={selectedLineKey}
                   hasSelection={hasSelection}
+                  showMapLines={showMapLines}
+                  showMapStations={showMapStations}
+                  onToggleMapLines={() => setShowMapLines((value) => !value)}
+                  onToggleMapStations={() => setShowMapStations((value) => !value)}
                   onSelectArea={selectArea}
                   onSearch={search}
                   onClearSearch={clearSearch}
@@ -474,44 +523,90 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                   onCopyUrl={copyUrl}
                   compact
                 />
-              </div>
-            </div>
-
-            <div className="max-h-[calc(54dvh-104px)] overflow-y-auto px-2.5 pb-4 pt-2">
-              {selectedStation ? (
-                <SelectedStationPanel
-                  station={selectedStation}
-                  servingBranches={selectedStationServingBranches}
-                  onSelectServingBranch={selectServingBranch}
-                  onClear={() => setSelectedStationId(null)}
-                  compact
-                />
               ) : null}
 
-              <div className={selectedStation ? "mt-1.5" : undefined}>
-                <SelectedLinePanel
-                  selectedLine={selectedLine}
-                  selectedBranchId={selectedBranchId}
-                  selectedBranch={selectedBranch}
-                  onSelectBranch={setSelectedBranchId}
-                  onClearBranch={() => setSelectedBranchId(null)}
-                  compact
-                />
-              </div>
+              {mobilePanelMode === "selected" ? (
+                <div className="grid gap-1.5">
+                  {selectedStation ? (
+                    <SelectedStationPanel
+                      station={selectedStation}
+                      servingBranches={selectedStationServingBranches}
+                      onSelectServingBranch={selectServingBranch}
+                      onClear={() => setSelectedStationId(null)}
+                      compact
+                    />
+                  ) : null}
 
-              <div className="mt-1.5">
+                  <SelectedLinePanel
+                    selectedLine={selectedLine}
+                    selectedBranchId={selectedBranchId}
+                    selectedBranch={selectedBranch}
+                    onSelectBranch={setSelectedBranchId}
+                    onClearBranch={() => setSelectedBranchId(null)}
+                    compact
+                  />
+                </div>
+              ) : null}
+
+              {mobilePanelMode === "lines" ? (
                 <LineList
                   lines={filteredLines}
                   selectedLineKey={selectedLineKey}
                   onSelectLine={selectLine}
                   compact
                 />
-              </div>
+              ) : null}
             </div>
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+
+function MobilePanelTabs({
+  activeMode,
+  hasSelection,
+  resultCount,
+  lineCount,
+  onChange,
+}: {
+  activeMode: MobilePanelMode;
+  hasSelection: boolean;
+  resultCount: number;
+  lineCount: number;
+  onChange: (mode: MobilePanelMode) => void;
+}) {
+  const items: Array<{ mode: MobilePanelMode; label: string; badge?: number; disabled?: boolean }> = [
+    { mode: "search", label: "검색", badge: resultCount || undefined },
+    { mode: "selected", label: "선택", disabled: !hasSelection },
+    { mode: "lines", label: "노선", badge: lineCount },
+  ];
+
+  return (
+    <div className="mt-1.5 grid grid-cols-3 gap-1 rounded bg-slate-100 p-0.5">
+      {items.map((item) => {
+        const active = activeMode === item.mode;
+
+        return (
+          <button
+            key={item.mode}
+            type="button"
+            className={
+              active
+                ? "h-7 rounded bg-white px-2 text-[11px] font-bold text-slate-950 shadow-sm"
+                : "h-7 rounded px-2 text-[11px] font-semibold text-slate-500 disabled:cursor-not-allowed disabled:opacity-40"
+            }
+            disabled={item.disabled}
+            onClick={() => onChange(item.mode)}
+          >
+            {item.label}
+            {item.badge ? <span className="ml-1 text-[10px] text-slate-400">{formatNumber(item.badge)}</span> : null}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -550,6 +645,10 @@ function FilterControls({
   selectedStationId,
   selectedLineKey,
   hasSelection,
+  showMapLines,
+  showMapStations,
+  onToggleMapLines,
+  onToggleMapStations,
   onSelectArea,
   onSearch,
   onClearSearch,
@@ -590,6 +689,13 @@ function FilterControls({
         lines={lineResults}
         onSelectStation={onSelectStation}
         onSelectLine={onSelectLine}
+      />
+
+      <MapDisplayToggles
+        showMapLines={showMapLines}
+        showMapStations={showMapStations}
+        onToggleMapLines={onToggleMapLines}
+        onToggleMapStations={onToggleMapStations}
       />
 
       {hasSelection ? (
@@ -643,6 +749,53 @@ function FilterControls({
         </button>
       </div>
     </div>
+  );
+}
+
+function MapDisplayToggles({
+  showMapLines,
+  showMapStations,
+  onToggleMapLines,
+  onToggleMapStations,
+}: {
+  showMapLines: boolean;
+  showMapStations: boolean;
+  onToggleMapLines: () => void;
+  onToggleMapStations: () => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-1.5">
+      <ToggleButton active={showMapLines} onClick={onToggleMapLines}>
+        구간선
+      </ToggleButton>
+      <ToggleButton active={showMapStations} onClick={onToggleMapStations}>
+        역 표시
+      </ToggleButton>
+    </div>
+  );
+}
+
+function ToggleButton({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={
+        active
+          ? "h-7 rounded border border-sky-200 bg-sky-50 px-2 text-xs font-bold text-sky-700"
+          : "h-7 rounded border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+      }
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -755,7 +908,7 @@ function FilterChip({
   onClick,
 }: {
   active: boolean;
-  children: React.ReactNode;
+  children: string;
   onClick: () => void;
 }) {
   return (
@@ -838,9 +991,10 @@ function SelectedStationPanel({
   servingBranches,
   onSelectServingBranch,
   onClear,
+  compact = false,
 }: SelectedStationPanelProps) {
   const uniqueLineCount = new Set(servingBranches.map((branch) => branch.canonicalLineId)).size;
-  const visibleBranches = servingBranches.slice(0, 8);
+  const visibleBranches = servingBranches.slice(0, compact ? 5 : 8);
 
   return (
     <section className="border border-slate-200 bg-white p-2.5">
@@ -1000,7 +1154,7 @@ function BranchChip({
   onClick,
 }: {
   active: boolean;
-  children: React.ReactNode;
+  children: string;
   onClick: () => void;
 }) {
   return (
@@ -1019,7 +1173,7 @@ function BranchChip({
 }
 
 function RouteStopList({ branch, compact = false }: { branch: CanonicalBranch; compact?: boolean }) {
-  const stops = compact ? branch.routeStops.slice(0, 12) : branch.routeStops.slice(0, 18);
+  const stops = compact ? branch.routeStops.slice(0, 10) : branch.routeStops.slice(0, 14);
 
   return (
     <div className="mt-2 border border-slate-200 bg-white">
@@ -1096,7 +1250,7 @@ function BranchTable({
   }
 
   return (
-    <div className="mt-2 overflow-hidden border border-slate-200 bg-white">
+    <div className="mt-2 max-h-64 overflow-y-auto border border-slate-200 bg-white">
       <table className="w-full text-left text-xs">
         <thead className="bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase">
           <tr>
