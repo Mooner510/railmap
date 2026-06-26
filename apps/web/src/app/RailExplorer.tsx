@@ -587,6 +587,12 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                         </p>
                       </div>
                     ))}
+
+                    {selectedReviewStops.length > 8 ? (
+                      <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+                        외 {formatNumber(selectedReviewStops.length - 8)}개는 CSV 복사로 확인
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="mt-3 text-xs text-slate-500">현재 선택 범위에 검수 대상이 없습니다.</p>
