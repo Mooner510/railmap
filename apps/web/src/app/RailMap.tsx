@@ -36,6 +36,8 @@ interface RailMapProps {
   selectedBranchId?: string | null;
   selectedStationId?: string | null;
   focusVersion?: number;
+  showBranches?: boolean;
+  showStations?: boolean;
   onSelectBranch?: (branch: RailMapBranch) => void;
   onSelectStation?: (station: RailMapStation) => void;
   className?: string;
@@ -113,6 +115,8 @@ export default function RailMap({
   selectedBranchId = null,
   selectedStationId = null,
   focusVersion = 0,
+  showBranches = true,
+  showStations = true,
   onSelectBranch,
   onSelectStation,
   className = "",
@@ -134,7 +138,7 @@ export default function RailMap({
   }, [onSelectBranch]);
 
   const validStations = useMemo(() => stations.filter(isValidCoordinate), [stations]);
-  const branchFeatures = useMemo(() => buildBranchFeatures(branches), [branches]);
+  const branchFeatures = useMemo(() => buildBranchFeatures(showBranches ? branches : []), [branches, showBranches]);
   const selectedBranch = useMemo(
     () => branches.find((branch) => branch.id === selectedBranchId) ?? null,
     [branches, selectedBranchId],
@@ -453,6 +457,8 @@ export default function RailMap({
     markersRef.current.forEach((marker) => marker.remove());
     markersRef.current = [];
 
+    if (!showStations) return;
+
     const markerStations =
       selectedBranchStationIds.size > 0
         ? validStations.filter((station) => selectedBranchStationIds.has(station.id))
@@ -497,7 +503,7 @@ export default function RailMap({
 
       markersRef.current.push(marker);
     }
-  }, [validStations, visibleBranchStations, selectedBranchStationIds, selectedStationId, onSelectStation, mapReady]);
+  }, [validStations, visibleBranchStations, selectedBranchStationIds, selectedStationId, onSelectStation, mapReady, showStations]);
 
   return (
     <div className={`relative h-full min-h-[100dvh] w-full min-w-0 overflow-hidden bg-slate-100 ${className}`}>
@@ -506,6 +512,16 @@ export default function RailMap({
       {!mapReady && !mapError ? (
         <div className="absolute inset-0 grid place-items-center bg-slate-100 text-xs font-semibold text-slate-500">
           지도를 불러오는 중입니다.
+        </div>
+      ) : null}
+
+      <div className="pointer-events-none absolute bottom-2 left-2 z-10 hidden max-w-[260px] border border-slate-200 bg-white/90 px-2 py-1 text-[11px] font-medium leading-4 text-slate-500 shadow-sm backdrop-blur lg:block">
+        현재 구간선은 정차역 좌표를 연결한 참고 선형입니다. 실제 철도 선형은 OSM 매칭 단계에서 보강합니다.
+      </div>
+
+      {!showBranches && !showStations ? (
+        <div className="pointer-events-none absolute left-2 top-2 z-10 border border-slate-200 bg-white/90 px-2 py-1 text-[11px] font-semibold text-slate-600 shadow-sm backdrop-blur">
+          지도 표시 항목이 꺼져 있습니다.
         </div>
       ) : null}
 
