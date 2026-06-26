@@ -2,95 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import RailMap, { type RailMapBranch, type RailMapStation } from "./RailMap";
-
-interface CanonicalRouteStop {
-  id: string;
-  canonicalLineId: string;
-  branchId: string;
-  sourceLineNumber: string;
-  sourceLineName: string;
-  role: string;
-  sequence: number;
-  stationId: string;
-  sourceStationCode: string;
-  displayNameKo: string;
-  matchStatus: string;
-  confidence: string;
-  sourceCandidateId: string;
-  diagnostics?: string[];
-}
-
-interface CanonicalBranch {
-  id: string;
-  canonicalLineId: string;
-  role: "본선" | "branch" | string;
-  sourceLineNumber: string;
-  sourceLineName: string;
-  origin: string | null;
-  terminal: string | null;
-  routeStops: CanonicalRouteStop[];
-}
-
-interface CanonicalLine {
-  id: string;
-  canonicalKey: string;
-  lnCd: string;
-  mreaWideCd: string;
-  nameKo: string;
-  colorHex: string;
-  colorSource: string;
-  branches: CanonicalBranch[];
-  sourceLineNumbers: string[];
-}
-
-interface CanonicalBundle {
-  bundleId: string;
-  acquiredDate: string;
-  generatedAt: string;
-  counts: {
-    canonicalLines: number;
-    branches: number;
-    stations: number;
-    routeStops: number;
-    skippedRouteStops: number;
-    missingCanonicalLines: number;
-  };
-  lines: CanonicalLine[];
-  missingCanonicalLines: string[];
-}
+import {
+  countRouteStops,
+  formatBranchRole,
+  formatNumber,
+  getFirstStop,
+  getLastStop,
+  type CanonicalBundle,
+  type CanonicalLine,
+} from "./railExplorerModel";
 
 interface RailExplorerProps {
   bundle: CanonicalBundle;
   mapStations: RailMapStation[];
   mapBranches: RailMapBranch[];
-}
-
-function countLowConfidence(line: CanonicalLine): number {
-  return line.branches.reduce(
-    (sum, branch) =>
-      sum + branch.routeStops.filter((stop) => stop.confidence === "low").length,
-    0,
-  );
-}
-
-function countRouteStops(line: CanonicalLine): number {
-  return line.branches.reduce((sum, branch) => sum + branch.routeStops.length, 0);
-}
-
-function getFirstStop(branch: CanonicalBranch): string {
-  return branch.routeStops[0]?.displayNameKo ?? "-";
-}
-
-function getLastStop(branch: CanonicalBranch): string {
-  return branch.routeStops[branch.routeStops.length - 1]?.displayNameKo ?? "-";
-}
-
-function getLowConfidenceStops(branch: CanonicalBranch): CanonicalRouteStop[] {
-  return branch.routeStops.filter((stop) => stop.confidence === "low");
-}
-
-function formatNumber(value: number): string {
-  return value.toLocaleString("ko-KR");
 }
 
 export default function RailExplorer({ bundle, mapStations, mapBranches }: RailExplorerProps) {
@@ -100,7 +25,6 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   );
 
   const [selectedArea, setSelectedArea] = useState<string>("all");
-  const [onlyLowConfidence, setOnlyLowConfidence] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLineKey, setSelectedLineKey] = useState<string | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
@@ -111,13 +35,11 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     const params = new URLSearchParams(window.location.search);
 
     const area = params.get("area");
-    const low = params.get("low");
     const q = params.get("q");
     const line = params.get("line");
     const branch = params.get("branch");
 
     if (area) setSelectedArea(area);
-    if (low === "1") setOnlyLowConfidence(true);
     if (q) setSearchQuery(q);
     if (line) setSelectedLineKey(line);
     if (branch) setSelectedBranchId(branch);
@@ -131,7 +53,6 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     const params = new URLSearchParams();
 
     if (selectedArea !== "all") params.set("area", selectedArea);
-    if (onlyLowConfidence) params.set("low", "1");
     if (searchQuery.trim()) params.set("q", searchQuery.trim());
     if (selectedLineKey) params.set("line", selectedLineKey);
     if (selectedBranchId) params.set("branch", selectedBranchId);
@@ -142,7 +63,6 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     window.history.replaceState(null, "", nextUrl);
   }, [
     isHydratedFromUrl,
-    onlyLowConfidence,
     searchQuery,
     selectedArea,
     selectedBranchId,
@@ -166,7 +86,6 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
         const query = searchQuery.trim().toLowerCase();
 
         if (selectedArea !== "all" && line.mreaWideCd !== selectedArea) return false;
-        if (onlyLowConfidence && countLowConfidence(line) === 0) return false;
 
         if (query) {
           const haystack = [
@@ -187,7 +106,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
         return true;
       }),
-    [onlyLowConfidence, searchQuery, selectedArea, sortedLines],
+    [searchQuery, selectedArea, sortedLines],
   );
 
   const selectedLine = useMemo(
@@ -197,14 +116,6 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
       null,
     [filteredLines, selectedLineKey],
   );
-
-  useEffect(() => {
-    if (!selectedLineKey) return;
-    if (filteredLines.some((line) => line.canonicalKey === selectedLineKey)) return;
-
-    setSelectedLineKey(null);
-    setSelectedBranchId(null);
-  }, [filteredLines, selectedLineKey]);
 
   const selectedBranch = useMemo(() => {
     if (!selectedLine || !selectedBranchId) return null;
@@ -257,12 +168,6 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     [mapStations, visibleStationIds],
   );
 
-
-
-
-
-
-
   return (
     <section className="mx-auto grid max-w-7xl gap-6 px-6 py-8 xl:grid-cols-[minmax(0,1fr)_420px]">
       <div className="flex flex-col gap-6">
@@ -273,9 +178,9 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
             <div>
               <h2 className="text-xl font-bold">노선 목록</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                필터 적용 결과 {formatNumber(filteredLines.length)}개 노선 · 지도 branch{" "}
+                필터 적용 결과 {formatNumber(filteredLines.length)}개 노선 · 지도 구간{" "}
                 {formatNumber(visibleMapBranches.length)}개 · 지도 역{" "}
-                {formatNumber(visibleMapStations.length)}개. 선택한 노선/branch 기준으로 지도 범위가 자동 이동합니다.
+                {formatNumber(visibleMapStations.length)}개. 선택한 노선/구간 기준으로 지도 범위가 자동 이동합니다.
               </p>
             </div>
 
@@ -287,6 +192,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                 onChange={(event) => {
                   setSearchQuery(event.target.value);
                   setSelectedLineKey(null);
+                  setSelectedBranchId(null);
                 }}
               />
 
@@ -296,6 +202,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                 onChange={(event) => {
                   setSelectedArea(event.target.value);
                   setSelectedLineKey(null);
+                  setSelectedBranchId(null);
                 }}
               >
                 <option value="all">전체 권역</option>
@@ -308,27 +215,12 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
               <button
                 type="button"
-                className={
-                  onlyLowConfidence
-                    ? "rounded-2xl bg-amber-500 px-4 py-2 text-sm font-bold text-white"
-                    : "rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
-                }
-                onClick={() => {
-                  setOnlyLowConfidence((value) => !value);
-                  setSelectedLineKey(null);
-                }}
-              >
-                검수 필요만
-              </button>
-
-              <button
-                type="button"
                 className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
                 onClick={() => {
                   setSelectedArea("all");
-                  setOnlyLowConfidence(false);
                   setSearchQuery("");
                   setSelectedLineKey(null);
+                  setSelectedBranchId(null);
                 }}
               >
                 초기화
@@ -352,14 +244,13 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
             <div className="mt-6 rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
               <p className="font-bold text-slate-900">검색 결과 없음</p>
               <p className="mt-2 text-sm text-slate-500">
-                검색어, 권역 필터, 검수 필요 필터를 조정하세요.
+                검색어 또는 권역 필터를 조정하세요.
               </p>
             </div>
           ) : null}
 
           <div className="mt-6 grid gap-4">
             {filteredLines.map((line) => {
-              const lowConfidenceCount = countLowConfidence(line);
               const routeStopCount = countRouteStops(line);
               const isSelected = selectedLine?.canonicalKey === line.canonicalKey;
 
@@ -377,9 +268,9 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                       type="button"
                       className="text-left"
                       onClick={() => {
-                      setSelectedLineKey(line.canonicalKey);
-                      setSelectedBranchId(null);
-                    }}
+                        setSelectedLineKey(line.canonicalKey);
+                        setSelectedBranchId(null);
+                      }}
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span
@@ -391,19 +282,10 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                         <span className="rounded-full bg-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">
                           {line.canonicalKey}
                         </span>
-                        {lowConfidenceCount > 0 ? (
-                          <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">
-                            검수 필요 {lowConfidenceCount}
-                          </span>
-                        ) : (
-                          <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
-                            매칭 안정
-                          </span>
-                        )}
                       </div>
                       <p className="mt-2 text-sm text-slate-500">
-                        branch {line.branches.length}개 · route stop {routeStopCount}개 · source{" "}
-                        {line.sourceLineNumbers.join(", ")} · color {line.colorHex}
+                        구간 {line.branches.length}개 · 정차역 {routeStopCount}개 · 출처 코드{" "}
+                        {line.sourceLineNumbers.join(", ")}
                       </p>
                     </button>
 
@@ -443,7 +325,6 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
               <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
                 <MetricMini label="구간" value={selectedLine.branches.length} />
                 <MetricMini label="정차역" value={countRouteStops(selectedLine)} />
-                <MetricMini label="확인 필요" value={countLowConfidence(selectedLine)} />
                 <MetricMini label="권역" value={selectedLine.mreaWideCd} />
                 <MetricMini label="표시" value={selectedBranch ? "구간" : "노선"} />
               </div>
@@ -479,28 +360,10 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                   ))}
                 </div>
               </div>
-
             </div>
           ) : (
             <p className="mt-3 text-sm text-slate-500">선택된 노선 없음</p>
           )}
-        </section>
-
-
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-bold">제외된 canonical line</h2>
-          <div className="mt-4 space-y-2">
-            {bundle.missingCanonicalLines.map((line) => (
-              <div
-                key={line}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
-              >
-                <p className="font-semibold text-slate-900">{line}</p>
-                <p className="mt-1 text-xs text-slate-500">GTX-A는 현재 제외 상태</p>
-              </div>
-            ))}
-          </div>
         </section>
       </aside>
     </section>
@@ -523,16 +386,14 @@ function BranchTable({
       <table className="w-full text-left text-sm">
         <thead className="bg-slate-100 text-xs font-semibold text-slate-500 uppercase">
           <tr>
-            <th className="px-4 py-3">Role</th>
-            <th className="px-4 py-3">Source</th>
+            <th className="px-4 py-3">구분</th>
+            <th className="px-4 py-3">출처</th>
             <th className="px-4 py-3">구간</th>
             <th className="px-4 py-3 text-right">역 수</th>
-            <th className="px-4 py-3 text-right">검수</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {line.branches.map((branch) => {
-            const low = getLowConfidenceStops(branch).length;
             const isSelected = selectedBranchId === branch.id;
 
             return (
@@ -553,7 +414,7 @@ function BranchTable({
                       }
                     }}
                   >
-                    {isSelected ? "선택됨" : branch.role}
+                    {isSelected ? "선택됨" : formatBranchRole(branch.role)}
                   </button>
                 </td>
                 <td className="px-4 py-3 align-top">
@@ -570,31 +431,13 @@ function BranchTable({
                         <li
                           key={stop.id}
                           title={`${stop.matchStatus}:${stop.confidence}`}
-                          className={
-                            stop.confidence === "low"
-                              ? "rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800"
-                              : "rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
-                          }
+                          className="rounded-full border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
                         >
                           <span className="text-slate-400">{stop.sequence}. </span>
                           {stop.displayNameKo}
                         </li>
                       ))}
                     </ol>
-
-                    {low > 0 ? (
-                      <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-                        <p className="text-xs font-bold text-amber-900">검수 필요 정차역</p>
-                        <ul className="mt-2 space-y-1 text-xs text-amber-800">
-                          {getLowConfidenceStops(branch).map((stop) => (
-                            <li key={stop.id}>
-                              {stop.sequence}. {stop.displayNameKo} · {stop.matchStatus}:
-                              {stop.confidence}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
                   </details>
                 </td>
                 <td className="px-4 py-3 align-top text-slate-600">
@@ -602,13 +445,6 @@ function BranchTable({
                 </td>
                 <td className="px-4 py-3 text-right align-top font-semibold">
                   {branch.routeStops.length}
-                </td>
-                <td className="px-4 py-3 text-right align-top">
-                  {low > 0 ? (
-                    <span className="font-semibold text-amber-700">{low}</span>
-                  ) : (
-                    <span className="text-slate-400">0</span>
-                  )}
                 </td>
               </tr>
             );
@@ -624,19 +460,6 @@ function MetricMini({ label, value }: { label: string; value: number | string })
     <div className="rounded-2xl bg-slate-50 px-4 py-3">
       <p className="text-xs font-bold text-slate-400 uppercase">{label}</p>
       <p className="mt-1 text-lg font-black text-slate-950">{value}</p>
-    </div>
-  );
-}
-
-function StatusRow({ label, value, warn = false }: { label: string; value: number; warn?: boolean }) {
-  const ok = value === 0;
-
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
-      <span className="text-slate-600">{label}</span>
-      <span className={ok ? "font-bold text-emerald-700" : warn ? "font-bold text-amber-700" : "font-bold text-slate-900"}>
-        {formatNumber(value)}
-      </span>
     </div>
   );
 }
