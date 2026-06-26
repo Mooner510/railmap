@@ -37,6 +37,8 @@ interface FilterControlsProps {
   selectedStationId: string | null;
   selectedLineKey: string | null;
   hasSelection: boolean;
+  showSearchResults: boolean;
+  focusSelectionLabel: string;
   showMapLines: boolean;
   showMapStations: boolean;
   onToggleMapLines: () => void;
@@ -105,6 +107,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [showMapLines, setShowMapLines] = useState(true);
   const [showMapStations, setShowMapStations] = useState(true);
   const [mobilePanelMode, setMobilePanelMode] = useState<MobilePanelMode>("search");
+  const [isSearchResultsOpen, setIsSearchResultsOpen] = useState(false);
 
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
@@ -375,6 +378,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const resetFilters = () => {
     setSelectedArea("all");
     setSearchQuery("");
+    setIsSearchResultsOpen(false);
     setSelectedLineKey(null);
     setSelectedBranchId(null);
     setSelectedStationId(null);
@@ -389,6 +393,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
   const clearSearch = () => {
     setSearchQuery("");
+    setIsSearchResultsOpen(false);
   };
 
   const focusSelection = () => {
@@ -396,6 +401,13 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   };
 
   const hasSelection = Boolean(selectedLineKey || selectedBranchId || selectedStationId);
+  const focusSelectionLabel = selectedStationId
+    ? "역으로 이동"
+    : selectedBranchId
+      ? "구간 보기"
+      : selectedLineKey
+        ? "노선 보기"
+        : "선택 이동";
 
   const selectArea = (area: string) => {
     setSelectedArea(area);
@@ -407,6 +419,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
   const search = (query: string) => {
     setSearchQuery(query);
+    setIsSearchResultsOpen(Boolean(query.trim()));
     setMobilePanelMode(query.trim() ? "search" : "lines");
   };
 
@@ -414,6 +427,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setSelectedLineKey(lineKey);
     setSelectedBranchId(null);
     setSelectedStationId(null);
+    setIsSearchResultsOpen(false);
     setMobilePanelMode("selected");
   };
 
@@ -421,12 +435,14 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setSelectedLineKey(branch.canonicalLineId);
     setSelectedBranchId(branch.id);
     setSelectedStationId(null);
+    setIsSearchResultsOpen(false);
     setMobilePanelMode("selected");
   };
 
   const selectServingBranch = (branch: StationServingBranch) => {
     setSelectedLineKey(branch.canonicalLineId);
     setSelectedBranchId(branch.branchId);
+    setIsSearchResultsOpen(false);
     setMobilePanelMode("selected");
   };
 
@@ -441,6 +457,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     }
 
     setSelectedStationId(station.id);
+    setIsSearchResultsOpen(false);
     setMobilePanelMode("selected");
   };
 
@@ -455,6 +472,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     }
 
     setSelectedStationId(stationId);
+    setIsSearchResultsOpen(false);
     setMapFocusVersion((version) => version + 1);
     setMobilePanelMode("selected");
   };
@@ -486,6 +504,8 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
               selectedStationId={selectedStationId}
               selectedLineKey={selectedLineKey}
               hasSelection={hasSelection}
+              showSearchResults={isSearchResultsOpen}
+              focusSelectionLabel={focusSelectionLabel}
               showMapLines={showMapLines}
               showMapStations={showMapStations}
               onToggleMapLines={() => setShowMapLines((value) => !value)}
@@ -522,6 +542,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
           showStations={showMapStations}
           onSelectBranch={selectMapBranch}
           onSelectStation={selectMapStation}
+          onClearStation={() => setSelectedStationId(null)}
         />
 
         {selectedLine || selectedStation ? (
@@ -581,6 +602,8 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                   selectedStationId={selectedStationId}
                   selectedLineKey={selectedLineKey}
                   hasSelection={hasSelection}
+                  showSearchResults={isSearchResultsOpen}
+                  focusSelectionLabel={focusSelectionLabel}
                   showMapLines={showMapLines}
                   showMapStations={showMapStations}
                   onToggleMapLines={() => setShowMapLines((value) => !value)}
@@ -718,6 +741,8 @@ function FilterControls({
   selectedStationId,
   selectedLineKey,
   hasSelection,
+  showSearchResults,
+  focusSelectionLabel,
   showMapLines,
   showMapStations,
   onToggleMapLines,
@@ -753,16 +778,18 @@ function FilterControls({
         ) : null}
       </div>
 
-      <SearchResults
-        compact={compact}
-        query={searchQuery}
-        selectedStationId={selectedStationId}
-        selectedLineKey={selectedLineKey}
-        stations={stationResults}
-        lines={lineResults}
-        onSelectStation={onSelectStation}
-        onSelectLine={onSelectLine}
-      />
+      {showSearchResults ? (
+        <SearchResults
+          compact={compact}
+          query={searchQuery}
+          selectedStationId={selectedStationId}
+          selectedLineKey={selectedLineKey}
+          stations={stationResults}
+          lines={lineResults}
+          onSelectStation={onSelectStation}
+          onSelectLine={onSelectLine}
+        />
+      ) : null}
 
       <MapDisplayToggles
         showMapLines={showMapLines}
@@ -778,7 +805,7 @@ function FilterControls({
             className="h-7 rounded border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 transition duration-150 ease-out hover:bg-slate-50 active:scale-[0.99]"
             onClick={onFocusSelection}
           >
-            선택 이동
+            {focusSelectionLabel}
           </button>
           <button
             type="button"
