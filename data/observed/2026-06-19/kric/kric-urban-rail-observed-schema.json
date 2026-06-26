@@ -1,0 +1,143 @@
+{
+  "sourceFamily": "kric",
+  "acquiredDate": "2026-06-19",
+  "generatedAt": "2026-06-26T03:27:50.977Z",
+  "schemas": [
+    {
+      "fileName": "전체_도시철도운행정보_20260228.xlsx",
+      "sheetName": "표준데이터 운행(전체)",
+      "range": "A1:O223025",
+      "rowsIncludingHeader": 223025,
+      "dataRows": 223024,
+      "headers": [
+        "열차번호",
+        "노선번호",
+        "노선명",
+        "운행구간기점명",
+        "운행구간종점명",
+        "운행유형",
+        "요일구분",
+        "운행구간정거장",
+        "정거장도착시각",
+        "정가장출발시각",
+        "운행속도",
+        "운영기관전화번호",
+        "데이터기준일자",
+        null,
+        null
+      ],
+      "diagnostics": [
+        "empty-header-at-column-14",
+        "empty-header-at-column-15"
+      ]
+    },
+    {
+      "fileName": "전체_도시철도역사정보_20260228.xlsx",
+      "sheetName": "표준데이터 역사",
+      "range": "A1:O1100",
+      "rowsIncludingHeader": 1100,
+      "dataRows": 1099,
+      "headers": [
+        "역번호",
+        "역사명",
+        "노선번호",
+        "노선명",
+        "영문역사명",
+        "한자역사명",
+        "환승역구분",
+        "환승노선번호",
+        "환승노선명",
+        "역위도",
+        "역경도",
+        "운영기관명",
+        "역사도로명주소",
+        "역사전화번호",
+        "데이터기준일자"
+      ],
+      "diagnostics": []
+    },
+    {
+      "fileName": "전체_도시철도노선정보_20260228.xlsx",
+      "sheetName": "표준데이터 노선(전체)",
+      "range": "A1:K48",
+      "rowsIncludingHeader": 48,
+      "dataRows": 47,
+      "headers": [
+        "노선번호",
+        "노선명",
+        "기점명",
+        "종점명",
+        "정거장구성",
+        "노선연장",
+        "개통일자",
+        "운영기관명",
+        "운영기관전화번호",
+        "데이터기준일자",
+        null
+      ],
+      "diagnostics": [
+        "empty-header-at-column-11"
+      ]
+    },
+    {
+      "fileName": "운영기관_역사_코드정보_2026.05.11_일반.xlsx",
+      "sheetName": "역사고유번호",
+      "range": "A1:F1109",
+      "rowsIncludingHeader": 1109,
+      "dataRows": 1108,
+      "headers": [
+        "RAIL_OPR_ISTT_CD",
+        "RAIL_OPR_ISTT_NM",
+        "LN_CD",
+        "LN_NM",
+        "STIN_CD",
+        "STIN_NM"
+      ],
+      "diagnostics": []
+    },
+    {
+      "fileName": "운영기관_역사_코드정보_2026.05.11_일반.xlsx",
+      "sheetName": "코드값유형",
+      "range": "B1:U44",
+      "rowsIncludingHeader": 43,
+      "dataRows": 42,
+      "headers": [
+        "RAIL_OPR_ISTT_CD",
+        null,
+        null,
+        "LN_CD",
+        null,
+        null,
+        "MV_PATH_DV_CD",
+        null,
+        null,
+        "PLF_TP_CD",
+        null,
+        null,
+        "psrmClCd",
+        null,
+        null,
+        "dfbrOprWayCd",
+        null,
+        null,
+        "envrMsmtDvCd",
+        null
+      ],
+      "diagnostics": [
+        "empty-header-at-column-2",
+        "empty-header-at-column-3",
+        "empty-header-at-column-5",
+        "empty-header-at-column-6",
+        "empty-header-at-column-8",
+        "empty-header-at-column-9",
+        "empty-header-at-column-11",
+        "empty-header-at-column-12",
+        "empty-header-at-column-14",
+        "empty-header-at-column-15",
+        "empty-header-at-column-17",
+        "empty-header-at-column-18",
+        "empty-header-at-column-20"
+      ]
+    }
+  ]
+}

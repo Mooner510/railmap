@@ -1,0 +1,1534 @@
+{
+  "generatedAt": "2026-06-26T05:00:34.708Z",
+  "summary": {
+    "canonicalAllowlistCount": 35,
+    "kricSourceLineRows": 47,
+    "diagnosticsByStatus": {
+      "missing-source-line": 3,
+      "single-source-line-candidate": 13,
+      "multiple-source-line-candidates": 19
+    },
+    "unmappedSourceLineRows": 9
+  },
+  "diagnostics": [
+    {
+      "canonical": {
+        "lnCd": "A",
+        "lineNameKo": "GTX-A",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:A"
+      },
+      "matchCount": 0,
+      "exactNameCount": 0,
+      "containsNameCount": 0,
+      "likelySourceLines": [],
+      "status": "missing-source-line"
+    },
+    {
+      "canonical": {
+        "lnCd": "K5",
+        "lineNameKo": "경강선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:K5"
+      },
+      "matchCount": 1,
+      "exactNameCount": 1,
+      "containsNameCount": 0,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "I41K5",
+          "sourceLineNameKo": "경강선",
+          "normalizedName": "경강",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I41K5",
+          "routeStopCount": 12,
+          "stationCount": 12,
+          "origin": "판교",
+          "terminal": "여주"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "K4",
+        "lineNameKo": "경의중앙선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:K4"
+      },
+      "matchCount": 1,
+      "exactNameCount": 1,
+      "containsNameCount": 0,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "I4108",
+          "sourceLineNameKo": "경의·중앙선",
+          "normalizedName": "경의중앙",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I4108",
+          "routeStopCount": 47,
+          "stationCount": 54,
+          "origin": "용문",
+          "terminal": "문산"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "K2",
+        "lineNameKo": "경춘선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:K2"
+      },
+      "matchCount": 1,
+      "exactNameCount": 1,
+      "containsNameCount": 0,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "I41K2",
+          "sourceLineNameKo": "경춘선",
+          "normalizedName": "경춘",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I41K2",
+          "routeStopCount": 19,
+          "stationCount": 20,
+          "origin": "상봉",
+          "terminal": "춘천"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "A1",
+        "lineNameKo": "공항철도",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:A1"
+      },
+      "matchCount": 0,
+      "exactNameCount": 0,
+      "containsNameCount": 0,
+      "likelySourceLines": [],
+      "status": "missing-source-line"
+    },
+    {
+      "canonical": {
+        "lnCd": "G1",
+        "lineNameKo": "김포골드라인",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:G1"
+      },
+      "matchCount": 1,
+      "exactNameCount": 0,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "L41G1",
+          "sourceLineNameKo": "김포도시철도",
+          "normalizedName": "김포",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:L41G1",
+          "routeStopCount": 10,
+          "stationCount": 10,
+          "origin": "양촌역",
+          "terminal": "김포공항역"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "1",
+        "lineNameKo": "1호선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:1"
+      },
+      "matchCount": 6,
+      "exactNameCount": 5,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2901",
+          "sourceLineNameKo": "광주 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2901",
+          "routeStopCount": 20,
+          "stationCount": 20,
+          "origin": "녹동",
+          "terminal": "평동"
+        },
+        {
+          "sourceLineNumber": "S2701",
+          "sourceLineNameKo": "대구 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2701",
+          "routeStopCount": 35,
+          "stationCount": 35,
+          "origin": "설화명곡",
+          "terminal": "하양(대구가톨릭대)"
+        },
+        {
+          "sourceLineNumber": "S3001",
+          "sourceLineNameKo": "대전 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S3001",
+          "routeStopCount": 22,
+          "stationCount": 22,
+          "origin": "판암",
+          "terminal": "반석"
+        },
+        {
+          "sourceLineNumber": "S2601",
+          "sourceLineNameKo": "부산 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2601",
+          "routeStopCount": 40,
+          "stationCount": 40,
+          "origin": "다대포해수욕장",
+          "terminal": "노포"
+        },
+        {
+          "sourceLineNumber": "I4101",
+          "sourceLineNameKo": "수도권  광역철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I4101",
+          "routeStopCount": 56,
+          "stationCount": 47,
+          "origin": "청량리(서울시립대입구)",
+          "terminal": "서울역"
+        },
+        {
+          "sourceLineNumber": "S2801",
+          "sourceLineNameKo": "인천지하철 1호선",
+          "normalizedName": "인천1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2801",
+          "routeStopCount": 30,
+          "stationCount": 33,
+          "origin": "계양역",
+          "terminal": "송도달빛축제공원역"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "2",
+        "lineNameKo": "2호선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:2"
+      },
+      "matchCount": 6,
+      "exactNameCount": 5,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2702",
+          "sourceLineNameKo": "대구 도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2702",
+          "routeStopCount": 29,
+          "stationCount": 29,
+          "origin": "문양",
+          "terminal": "영남대"
+        },
+        {
+          "sourceLineNumber": "S2602",
+          "sourceLineNameKo": "부산 도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2602",
+          "routeStopCount": 43,
+          "stationCount": 43,
+          "origin": "장산",
+          "terminal": "양산"
+        },
+        {
+          "sourceLineNumber": "S1102",
+          "sourceLineNameKo": "수도권  도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1102",
+          "routeStopCount": 43,
+          "stationCount": 43,
+          "origin": "성수",
+          "terminal": "성수"
+        },
+        {
+          "sourceLineNumber": "S1121",
+          "sourceLineNameKo": "수도권  도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1121",
+          "routeStopCount": 4,
+          "stationCount": 4,
+          "origin": "성수",
+          "terminal": "신설동"
+        },
+        {
+          "sourceLineNumber": "S1122",
+          "sourceLineNameKo": "수도권  도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1122",
+          "routeStopCount": 4,
+          "stationCount": 3,
+          "origin": "신도림",
+          "terminal": "까치산"
+        },
+        {
+          "sourceLineNumber": "S2802",
+          "sourceLineNameKo": "인천지하철 2호선",
+          "normalizedName": "인천2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2802",
+          "routeStopCount": 27,
+          "stationCount": 27,
+          "origin": "검단오류역",
+          "terminal": "운연역"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "3",
+        "lineNameKo": "3호선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:3"
+      },
+      "matchCount": 3,
+      "exactNameCount": 3,
+      "containsNameCount": 0,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2703",
+          "sourceLineNameKo": "대구 도시철도 3호선",
+          "normalizedName": "3호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2703",
+          "routeStopCount": 30,
+          "stationCount": 30,
+          "origin": "칠곡경대병원",
+          "terminal": "용지"
+        },
+        {
+          "sourceLineNumber": "S2603",
+          "sourceLineNameKo": "부산 도시철도 3호선",
+          "normalizedName": "3호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2603",
+          "routeStopCount": 17,
+          "stationCount": 17,
+          "origin": "수영",
+          "terminal": "대저"
+        },
+        {
+          "sourceLineNumber": "I1103",
+          "sourceLineNameKo": "수도권  광역철도 3호선",
+          "normalizedName": "3호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I1103",
+          "routeStopCount": 34,
+          "stationCount": 34,
+          "origin": "지축",
+          "terminal": "오금"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "4",
+        "lineNameKo": "4호선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:4"
+      },
+      "matchCount": 2,
+      "exactNameCount": 1,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "I1104",
+          "sourceLineNameKo": "수도권  광역철도 4호선",
+          "normalizedName": "4호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I1104",
+          "routeStopCount": 26,
+          "stationCount": 26,
+          "origin": "불암산",
+          "terminal": "남태령"
+        },
+        {
+          "sourceLineNumber": "L2604",
+          "sourceLineNameKo": "부산 경량도시철도 4호선",
+          "normalizedName": "경량4호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:L2604",
+          "routeStopCount": 14,
+          "stationCount": 14,
+          "origin": "미남",
+          "terminal": "안평"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "5",
+        "lineNameKo": "5호선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:5"
+      },
+      "matchCount": 1,
+      "exactNameCount": 1,
+      "containsNameCount": 0,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S1105",
+          "sourceLineNameKo": "수도권  도시철도 5호선",
+          "normalizedName": "5호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1105",
+          "routeStopCount": 56,
+          "stationCount": 56,
+          "origin": "방화",
+          "terminal": "하남검단산/마천"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "6",
+        "lineNameKo": "6호선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:6"
+      },
+      "matchCount": 1,
+      "exactNameCount": 1,
+      "containsNameCount": 0,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S1106",
+          "sourceLineNameKo": "수도권  도시철도 6호선",
+          "normalizedName": "6호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1106",
+          "routeStopCount": 39,
+          "stationCount": 39,
+          "origin": "응암",
+          "terminal": "신내"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "7",
+        "lineNameKo": "7호선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:7"
+      },
+      "matchCount": 2,
+      "exactNameCount": 2,
+      "containsNameCount": 0,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S1107",
+          "sourceLineNameKo": "수도권  도시철도 7호선",
+          "normalizedName": "7호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1107",
+          "routeStopCount": 53,
+          "stationCount": 54,
+          "origin": "장암",
+          "terminal": "온수(성공회대입구)"
+        },
+        {
+          "sourceLineNumber": "S1107",
+          "sourceLineNameKo": "도시철도 7호선",
+          "normalizedName": "7호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1107",
+          "routeStopCount": 53,
+          "stationCount": 54,
+          "origin": "까치울역",
+          "terminal": "석남역"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "8",
+        "lineNameKo": "8호선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:8"
+      },
+      "matchCount": 2,
+      "exactNameCount": 2,
+      "containsNameCount": 0,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S4108",
+          "sourceLineNameKo": "수도권 전철 8호선",
+          "normalizedName": "8호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S4108",
+          "routeStopCount": 2,
+          "stationCount": 2,
+          "origin": "다산역",
+          "terminal": "별내역"
+        },
+        {
+          "sourceLineNumber": "S1108",
+          "sourceLineNameKo": "수도권  도시철도 8호선",
+          "normalizedName": "8호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1108",
+          "routeStopCount": 19,
+          "stationCount": 22,
+          "origin": "암사역사공원",
+          "terminal": "모란"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "9",
+        "lineNameKo": "9호선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:9"
+      },
+      "matchCount": 1,
+      "exactNameCount": 0,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S1109",
+          "sourceLineNameKo": "서울 도시철도 9호선",
+          "normalizedName": "서울9호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1109",
+          "routeStopCount": 38,
+          "stationCount": 38,
+          "origin": "개화",
+          "terminal": "중앙보훈병원"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "K1",
+        "lineNameKo": "수인분당선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:K1"
+      },
+      "matchCount": 2,
+      "exactNameCount": 0,
+      "containsNameCount": 2,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "I28K1",
+          "sourceLineNameKo": "수인선",
+          "normalizedName": "수인",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I28K1",
+          "routeStopCount": 53,
+          "stationCount": 26,
+          "origin": "오이도",
+          "terminal": "인천"
+        },
+        {
+          "sourceLineNumber": "I28K1",
+          "sourceLineNameKo": "분당선",
+          "normalizedName": "분당",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I28K1",
+          "routeStopCount": 53,
+          "stationCount": 26,
+          "origin": "왕십리",
+          "terminal": "수원"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "D1",
+        "lineNameKo": "신분당선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:D1"
+      },
+      "matchCount": 2,
+      "exactNameCount": 1,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "I11D1",
+          "sourceLineNameKo": "신분당선",
+          "normalizedName": "신분당",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I11D1",
+          "routeStopCount": 16,
+          "stationCount": 16,
+          "origin": "신사역",
+          "terminal": "광교(경기대)"
+        },
+        {
+          "sourceLineNumber": "I28K1",
+          "sourceLineNameKo": "분당선",
+          "normalizedName": "분당",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I28K1",
+          "routeStopCount": 53,
+          "stationCount": 26,
+          "origin": "왕십리",
+          "terminal": "수원"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "L1",
+        "lineNameKo": "신림선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:L1"
+      },
+      "matchCount": 1,
+      "exactNameCount": 0,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "L11SL",
+          "sourceLineNameKo": "수도권 경량도시철도 신림선",
+          "normalizedName": "경량신림",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:L11SL",
+          "routeStopCount": 11,
+          "stationCount": 11,
+          "origin": "샛강",
+          "terminal": "관악산"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "E1",
+        "lineNameKo": "용인에버라인",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:E1"
+      },
+      "matchCount": 0,
+      "exactNameCount": 0,
+      "containsNameCount": 0,
+      "likelySourceLines": [],
+      "status": "missing-source-line"
+    },
+    {
+      "canonical": {
+        "lnCd": "UI",
+        "lineNameKo": "우이신설선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:UI"
+      },
+      "matchCount": 1,
+      "exactNameCount": 0,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "L11UI",
+          "sourceLineNameKo": "수도권 경량도시철도 우이신설선",
+          "normalizedName": "경량우이신설",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:L11UI",
+          "routeStopCount": 13,
+          "stationCount": 13,
+          "origin": "북한산우이",
+          "terminal": "신설동"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "U1",
+        "lineNameKo": "의정부 경전철",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:U1"
+      },
+      "matchCount": 1,
+      "exactNameCount": 0,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "L41U1",
+          "sourceLineNameKo": "의정부",
+          "normalizedName": "의정부",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:L41U1",
+          "routeStopCount": 15,
+          "stationCount": 15,
+          "origin": "탑석",
+          "terminal": "발곡"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "I1",
+        "lineNameKo": "인천1호선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:I1"
+      },
+      "matchCount": 6,
+      "exactNameCount": 1,
+      "containsNameCount": 5,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2801",
+          "sourceLineNameKo": "인천지하철 1호선",
+          "normalizedName": "인천1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2801",
+          "routeStopCount": 30,
+          "stationCount": 33,
+          "origin": "계양역",
+          "terminal": "송도달빛축제공원역"
+        },
+        {
+          "sourceLineNumber": "S2901",
+          "sourceLineNameKo": "광주 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2901",
+          "routeStopCount": 20,
+          "stationCount": 20,
+          "origin": "녹동",
+          "terminal": "평동"
+        },
+        {
+          "sourceLineNumber": "S2701",
+          "sourceLineNameKo": "대구 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2701",
+          "routeStopCount": 35,
+          "stationCount": 35,
+          "origin": "설화명곡",
+          "terminal": "하양(대구가톨릭대)"
+        },
+        {
+          "sourceLineNumber": "S3001",
+          "sourceLineNameKo": "대전 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S3001",
+          "routeStopCount": 22,
+          "stationCount": 22,
+          "origin": "판암",
+          "terminal": "반석"
+        },
+        {
+          "sourceLineNumber": "S2601",
+          "sourceLineNameKo": "부산 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2601",
+          "routeStopCount": 40,
+          "stationCount": 40,
+          "origin": "다대포해수욕장",
+          "terminal": "노포"
+        },
+        {
+          "sourceLineNumber": "I4101",
+          "sourceLineNameKo": "수도권  광역철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I4101",
+          "routeStopCount": 56,
+          "stationCount": 47,
+          "origin": "청량리(서울시립대입구)",
+          "terminal": "서울역"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "I2",
+        "lineNameKo": "인천2호선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:I2"
+      },
+      "matchCount": 6,
+      "exactNameCount": 1,
+      "containsNameCount": 5,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2802",
+          "sourceLineNameKo": "인천지하철 2호선",
+          "normalizedName": "인천2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2802",
+          "routeStopCount": 27,
+          "stationCount": 27,
+          "origin": "검단오류역",
+          "terminal": "운연역"
+        },
+        {
+          "sourceLineNumber": "S2702",
+          "sourceLineNameKo": "대구 도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2702",
+          "routeStopCount": 29,
+          "stationCount": 29,
+          "origin": "문양",
+          "terminal": "영남대"
+        },
+        {
+          "sourceLineNumber": "S2602",
+          "sourceLineNameKo": "부산 도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2602",
+          "routeStopCount": 43,
+          "stationCount": 43,
+          "origin": "장산",
+          "terminal": "양산"
+        },
+        {
+          "sourceLineNumber": "S1102",
+          "sourceLineNameKo": "수도권  도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1102",
+          "routeStopCount": 43,
+          "stationCount": 43,
+          "origin": "성수",
+          "terminal": "성수"
+        },
+        {
+          "sourceLineNumber": "S1121",
+          "sourceLineNameKo": "수도권  도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1121",
+          "routeStopCount": 4,
+          "stationCount": 4,
+          "origin": "성수",
+          "terminal": "신설동"
+        },
+        {
+          "sourceLineNumber": "S1122",
+          "sourceLineNameKo": "수도권  도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1122",
+          "routeStopCount": 4,
+          "stationCount": 3,
+          "origin": "신도림",
+          "terminal": "까치산"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "M1",
+        "lineNameKo": "자기부상",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:M1"
+      },
+      "matchCount": 1,
+      "exactNameCount": 0,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S28M1",
+          "sourceLineNameKo": "자기부상철도",
+          "normalizedName": "자기부상철도",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S28M1",
+          "routeStopCount": 6,
+          "stationCount": 6,
+          "origin": "인천공항1터미널역",
+          "terminal": "용유역"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "WS",
+        "lineNameKo": "서해선",
+        "mreaWideCd": "01",
+        "canonicalKey": "01:WS"
+      },
+      "matchCount": 1,
+      "exactNameCount": 1,
+      "containsNameCount": 0,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "I41WS",
+          "sourceLineNameKo": "서해선",
+          "normalizedName": "서해",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I41WS",
+          "routeStopCount": 15,
+          "stationCount": 21,
+          "origin": "소사",
+          "terminal": "원시"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "1",
+        "lineNameKo": "부산1호선",
+        "mreaWideCd": "02",
+        "canonicalKey": "02:1"
+      },
+      "matchCount": 6,
+      "exactNameCount": 5,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2901",
+          "sourceLineNameKo": "광주 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2901",
+          "routeStopCount": 20,
+          "stationCount": 20,
+          "origin": "녹동",
+          "terminal": "평동"
+        },
+        {
+          "sourceLineNumber": "S2701",
+          "sourceLineNameKo": "대구 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2701",
+          "routeStopCount": 35,
+          "stationCount": 35,
+          "origin": "설화명곡",
+          "terminal": "하양(대구가톨릭대)"
+        },
+        {
+          "sourceLineNumber": "S3001",
+          "sourceLineNameKo": "대전 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S3001",
+          "routeStopCount": 22,
+          "stationCount": 22,
+          "origin": "판암",
+          "terminal": "반석"
+        },
+        {
+          "sourceLineNumber": "S2601",
+          "sourceLineNameKo": "부산 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2601",
+          "routeStopCount": 40,
+          "stationCount": 40,
+          "origin": "다대포해수욕장",
+          "terminal": "노포"
+        },
+        {
+          "sourceLineNumber": "I4101",
+          "sourceLineNameKo": "수도권  광역철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I4101",
+          "routeStopCount": 56,
+          "stationCount": 47,
+          "origin": "청량리(서울시립대입구)",
+          "terminal": "서울역"
+        },
+        {
+          "sourceLineNumber": "S2801",
+          "sourceLineNameKo": "인천지하철 1호선",
+          "normalizedName": "인천1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2801",
+          "routeStopCount": 30,
+          "stationCount": 33,
+          "origin": "계양역",
+          "terminal": "송도달빛축제공원역"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "2",
+        "lineNameKo": "부산2호선",
+        "mreaWideCd": "02",
+        "canonicalKey": "02:2"
+      },
+      "matchCount": 6,
+      "exactNameCount": 5,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2702",
+          "sourceLineNameKo": "대구 도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2702",
+          "routeStopCount": 29,
+          "stationCount": 29,
+          "origin": "문양",
+          "terminal": "영남대"
+        },
+        {
+          "sourceLineNumber": "S2602",
+          "sourceLineNameKo": "부산 도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2602",
+          "routeStopCount": 43,
+          "stationCount": 43,
+          "origin": "장산",
+          "terminal": "양산"
+        },
+        {
+          "sourceLineNumber": "S1102",
+          "sourceLineNameKo": "수도권  도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1102",
+          "routeStopCount": 43,
+          "stationCount": 43,
+          "origin": "성수",
+          "terminal": "성수"
+        },
+        {
+          "sourceLineNumber": "S1121",
+          "sourceLineNameKo": "수도권  도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1121",
+          "routeStopCount": 4,
+          "stationCount": 4,
+          "origin": "성수",
+          "terminal": "신설동"
+        },
+        {
+          "sourceLineNumber": "S1122",
+          "sourceLineNameKo": "수도권  도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1122",
+          "routeStopCount": 4,
+          "stationCount": 3,
+          "origin": "신도림",
+          "terminal": "까치산"
+        },
+        {
+          "sourceLineNumber": "S2802",
+          "sourceLineNameKo": "인천지하철 2호선",
+          "normalizedName": "인천2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2802",
+          "routeStopCount": 27,
+          "stationCount": 27,
+          "origin": "검단오류역",
+          "terminal": "운연역"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "3",
+        "lineNameKo": "부산3호선",
+        "mreaWideCd": "02",
+        "canonicalKey": "02:3"
+      },
+      "matchCount": 3,
+      "exactNameCount": 3,
+      "containsNameCount": 0,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2703",
+          "sourceLineNameKo": "대구 도시철도 3호선",
+          "normalizedName": "3호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2703",
+          "routeStopCount": 30,
+          "stationCount": 30,
+          "origin": "칠곡경대병원",
+          "terminal": "용지"
+        },
+        {
+          "sourceLineNumber": "S2603",
+          "sourceLineNameKo": "부산 도시철도 3호선",
+          "normalizedName": "3호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2603",
+          "routeStopCount": 17,
+          "stationCount": 17,
+          "origin": "수영",
+          "terminal": "대저"
+        },
+        {
+          "sourceLineNumber": "I1103",
+          "sourceLineNameKo": "수도권  광역철도 3호선",
+          "normalizedName": "3호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I1103",
+          "routeStopCount": 34,
+          "stationCount": 34,
+          "origin": "지축",
+          "terminal": "오금"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "4",
+        "lineNameKo": "부산4호선",
+        "mreaWideCd": "02",
+        "canonicalKey": "02:4"
+      },
+      "matchCount": 2,
+      "exactNameCount": 1,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "I1104",
+          "sourceLineNameKo": "수도권  광역철도 4호선",
+          "normalizedName": "4호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I1104",
+          "routeStopCount": 26,
+          "stationCount": 26,
+          "origin": "불암산",
+          "terminal": "남태령"
+        },
+        {
+          "sourceLineNumber": "L2604",
+          "sourceLineNameKo": "부산 경량도시철도 4호선",
+          "normalizedName": "경량4호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:L2604",
+          "routeStopCount": 14,
+          "stationCount": 14,
+          "origin": "미남",
+          "terminal": "안평"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "B1",
+        "lineNameKo": "부산김해경전철",
+        "mreaWideCd": "02",
+        "canonicalKey": "02:B1"
+      },
+      "matchCount": 1,
+      "exactNameCount": 1,
+      "containsNameCount": 0,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "L48B1",
+          "sourceLineNameKo": "부산김해경전철",
+          "normalizedName": "김해경",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:L48B1",
+          "routeStopCount": 21,
+          "stationCount": 21,
+          "origin": "사상",
+          "terminal": "가야대"
+        }
+      ],
+      "status": "single-source-line-candidate"
+    },
+    {
+      "canonical": {
+        "lnCd": "1",
+        "lineNameKo": "대구1호선",
+        "mreaWideCd": "03",
+        "canonicalKey": "03:1"
+      },
+      "matchCount": 6,
+      "exactNameCount": 5,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2901",
+          "sourceLineNameKo": "광주 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2901",
+          "routeStopCount": 20,
+          "stationCount": 20,
+          "origin": "녹동",
+          "terminal": "평동"
+        },
+        {
+          "sourceLineNumber": "S2701",
+          "sourceLineNameKo": "대구 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2701",
+          "routeStopCount": 35,
+          "stationCount": 35,
+          "origin": "설화명곡",
+          "terminal": "하양(대구가톨릭대)"
+        },
+        {
+          "sourceLineNumber": "S3001",
+          "sourceLineNameKo": "대전 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S3001",
+          "routeStopCount": 22,
+          "stationCount": 22,
+          "origin": "판암",
+          "terminal": "반석"
+        },
+        {
+          "sourceLineNumber": "S2601",
+          "sourceLineNameKo": "부산 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2601",
+          "routeStopCount": 40,
+          "stationCount": 40,
+          "origin": "다대포해수욕장",
+          "terminal": "노포"
+        },
+        {
+          "sourceLineNumber": "I4101",
+          "sourceLineNameKo": "수도권  광역철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I4101",
+          "routeStopCount": 56,
+          "stationCount": 47,
+          "origin": "청량리(서울시립대입구)",
+          "terminal": "서울역"
+        },
+        {
+          "sourceLineNumber": "S2801",
+          "sourceLineNameKo": "인천지하철 1호선",
+          "normalizedName": "인천1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2801",
+          "routeStopCount": 30,
+          "stationCount": 33,
+          "origin": "계양역",
+          "terminal": "송도달빛축제공원역"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "2",
+        "lineNameKo": "대구2호선",
+        "mreaWideCd": "03",
+        "canonicalKey": "03:2"
+      },
+      "matchCount": 6,
+      "exactNameCount": 5,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2702",
+          "sourceLineNameKo": "대구 도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2702",
+          "routeStopCount": 29,
+          "stationCount": 29,
+          "origin": "문양",
+          "terminal": "영남대"
+        },
+        {
+          "sourceLineNumber": "S2602",
+          "sourceLineNameKo": "부산 도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2602",
+          "routeStopCount": 43,
+          "stationCount": 43,
+          "origin": "장산",
+          "terminal": "양산"
+        },
+        {
+          "sourceLineNumber": "S1102",
+          "sourceLineNameKo": "수도권  도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1102",
+          "routeStopCount": 43,
+          "stationCount": 43,
+          "origin": "성수",
+          "terminal": "성수"
+        },
+        {
+          "sourceLineNumber": "S1121",
+          "sourceLineNameKo": "수도권  도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1121",
+          "routeStopCount": 4,
+          "stationCount": 4,
+          "origin": "성수",
+          "terminal": "신설동"
+        },
+        {
+          "sourceLineNumber": "S1122",
+          "sourceLineNameKo": "수도권  도시철도 2호선",
+          "normalizedName": "2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S1122",
+          "routeStopCount": 4,
+          "stationCount": 3,
+          "origin": "신도림",
+          "terminal": "까치산"
+        },
+        {
+          "sourceLineNumber": "S2802",
+          "sourceLineNameKo": "인천지하철 2호선",
+          "normalizedName": "인천2호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2802",
+          "routeStopCount": 27,
+          "stationCount": 27,
+          "origin": "검단오류역",
+          "terminal": "운연역"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "3",
+        "lineNameKo": "대구3호선",
+        "mreaWideCd": "03",
+        "canonicalKey": "03:3"
+      },
+      "matchCount": 3,
+      "exactNameCount": 3,
+      "containsNameCount": 0,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2703",
+          "sourceLineNameKo": "대구 도시철도 3호선",
+          "normalizedName": "3호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2703",
+          "routeStopCount": 30,
+          "stationCount": 30,
+          "origin": "칠곡경대병원",
+          "terminal": "용지"
+        },
+        {
+          "sourceLineNumber": "S2603",
+          "sourceLineNameKo": "부산 도시철도 3호선",
+          "normalizedName": "3호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2603",
+          "routeStopCount": 17,
+          "stationCount": 17,
+          "origin": "수영",
+          "terminal": "대저"
+        },
+        {
+          "sourceLineNumber": "I1103",
+          "sourceLineNameKo": "수도권  광역철도 3호선",
+          "normalizedName": "3호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I1103",
+          "routeStopCount": 34,
+          "stationCount": 34,
+          "origin": "지축",
+          "terminal": "오금"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "1",
+        "lineNameKo": "광주1호선",
+        "mreaWideCd": "04",
+        "canonicalKey": "04:1"
+      },
+      "matchCount": 6,
+      "exactNameCount": 5,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2901",
+          "sourceLineNameKo": "광주 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2901",
+          "routeStopCount": 20,
+          "stationCount": 20,
+          "origin": "녹동",
+          "terminal": "평동"
+        },
+        {
+          "sourceLineNumber": "S2701",
+          "sourceLineNameKo": "대구 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2701",
+          "routeStopCount": 35,
+          "stationCount": 35,
+          "origin": "설화명곡",
+          "terminal": "하양(대구가톨릭대)"
+        },
+        {
+          "sourceLineNumber": "S3001",
+          "sourceLineNameKo": "대전 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S3001",
+          "routeStopCount": 22,
+          "stationCount": 22,
+          "origin": "판암",
+          "terminal": "반석"
+        },
+        {
+          "sourceLineNumber": "S2601",
+          "sourceLineNameKo": "부산 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2601",
+          "routeStopCount": 40,
+          "stationCount": 40,
+          "origin": "다대포해수욕장",
+          "terminal": "노포"
+        },
+        {
+          "sourceLineNumber": "I4101",
+          "sourceLineNameKo": "수도권  광역철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I4101",
+          "routeStopCount": 56,
+          "stationCount": 47,
+          "origin": "청량리(서울시립대입구)",
+          "terminal": "서울역"
+        },
+        {
+          "sourceLineNumber": "S2801",
+          "sourceLineNameKo": "인천지하철 1호선",
+          "normalizedName": "인천1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2801",
+          "routeStopCount": 30,
+          "stationCount": 33,
+          "origin": "계양역",
+          "terminal": "송도달빛축제공원역"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    },
+    {
+      "canonical": {
+        "lnCd": "1",
+        "lineNameKo": "대전1호선",
+        "mreaWideCd": "05",
+        "canonicalKey": "05:1"
+      },
+      "matchCount": 6,
+      "exactNameCount": 5,
+      "containsNameCount": 1,
+      "likelySourceLines": [
+        {
+          "sourceLineNumber": "S2901",
+          "sourceLineNameKo": "광주 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2901",
+          "routeStopCount": 20,
+          "stationCount": 20,
+          "origin": "녹동",
+          "terminal": "평동"
+        },
+        {
+          "sourceLineNumber": "S2701",
+          "sourceLineNameKo": "대구 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2701",
+          "routeStopCount": 35,
+          "stationCount": 35,
+          "origin": "설화명곡",
+          "terminal": "하양(대구가톨릭대)"
+        },
+        {
+          "sourceLineNumber": "S3001",
+          "sourceLineNameKo": "대전 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S3001",
+          "routeStopCount": 22,
+          "stationCount": 22,
+          "origin": "판암",
+          "terminal": "반석"
+        },
+        {
+          "sourceLineNumber": "S2601",
+          "sourceLineNameKo": "부산 도시철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2601",
+          "routeStopCount": 40,
+          "stationCount": 40,
+          "origin": "다대포해수욕장",
+          "terminal": "노포"
+        },
+        {
+          "sourceLineNumber": "I4101",
+          "sourceLineNameKo": "수도권  광역철도 1호선",
+          "normalizedName": "1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:I4101",
+          "routeStopCount": 56,
+          "stationCount": 47,
+          "origin": "청량리(서울시립대입구)",
+          "terminal": "서울역"
+        },
+        {
+          "sourceLineNumber": "S2801",
+          "sourceLineNameKo": "인천지하철 1호선",
+          "normalizedName": "인천1호",
+          "sourceCandidateId": "candidate:kric:urban-rail-line:S2801",
+          "routeStopCount": 30,
+          "stationCount": 33,
+          "origin": "계양역",
+          "terminal": "송도달빛축제공원역"
+        }
+      ],
+      "status": "multiple-source-line-candidates"
+    }
+  ],
+  "unmappedSourceLines": [
+    {
+      "sourceLineNumber": "I28A1",
+      "sourceLineNameKo": "인천국제공항선",
+      "normalizedName": "인천국제공항",
+      "sourceCandidateId": "candidate:kric:urban-rail-line:I28A1",
+      "routeStopCount": 14,
+      "stationCount": 14,
+      "origin": "서울",
+      "terminal": "인천공항2터미널"
+    },
+    {
+      "sourceLineNumber": "I4104",
+      "sourceLineNameKo": "진접선",
+      "normalizedName": "진접",
+      "sourceCandidateId": "candidate:kric:urban-rail-line:I4104",
+      "routeStopCount": 3,
+      "stationCount": 3,
+      "origin": "별내별가람역",
+      "terminal": "진접역"
+    },
+    {
+      "sourceLineNumber": "L41E1",
+      "sourceLineNameKo": "수도권  경량도시철도 에버라인",
+      "normalizedName": "경량에버라인",
+      "sourceCandidateId": "candidate:kric:urban-rail-line:L41E1",
+      "routeStopCount": 15,
+      "stationCount": 15,
+      "origin": "기흥(백남준아트센터)",
+      "terminal": "전대·에버랜드"
+    },
+    {
+      "sourceLineNumber": "I26K6",
+      "sourceLineNameKo": "동해선",
+      "normalizedName": "동해",
+      "sourceCandidateId": "candidate:kric:urban-rail-line:I26K6",
+      "routeStopCount": 23,
+      "stationCount": 23,
+      "origin": "부전",
+      "terminal": "태화강"
+    },
+    {
+      "sourceLineNumber": "I4106",
+      "sourceLineNameKo": "일산선",
+      "normalizedName": "일산",
+      "sourceCandidateId": "candidate:kric:urban-rail-line:I4106",
+      "routeStopCount": 11,
+      "stationCount": 11,
+      "origin": "지축",
+      "terminal": "대화"
+    },
+    {
+      "sourceLineNumber": "I4103",
+      "sourceLineNameKo": "안산·과천선",
+      "normalizedName": "안산과천",
+      "sourceCandidateId": "candidate:kric:urban-rail-line:I4103",
+      "routeStopCount": 21,
+      "stationCount": 22,
+      "origin": "남태령",
+      "terminal": "오이도"
+    },
+    {
+      "sourceLineNumber": "I4102",
+      "sourceLineNameKo": "경원선",
+      "normalizedName": "경원",
+      "sourceCandidateId": "candidate:kric:urban-rail-line:I4102",
+      "routeStopCount": 28,
+      "stationCount": 35,
+      "origin": "청량리",
+      "terminal": "소요산"
+    },
+    {
+      "sourceLineNumber": "I1101",
+      "sourceLineNameKo": "경인선",
+      "normalizedName": "경인",
+      "sourceCandidateId": "candidate:kric:urban-rail-line:I1101",
+      "routeStopCount": 20,
+      "stationCount": 21,
+      "origin": "구로",
+      "terminal": "인천"
+    },
+    {
+      "sourceLineNumber": "I27K7",
+      "sourceLineNameKo": "대경선",
+      "normalizedName": "대경",
+      "sourceCandidateId": "candidate:kric:urban-rail-line:I27K7",
+      "routeStopCount": 8,
+      "stationCount": 8,
+      "origin": "구미",
+      "terminal": "경산"
+    }
+  ]
+}

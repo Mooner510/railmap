@@ -1,0 +1,2104 @@
+{
+  "acquiredDate": "2026-06-19",
+  "generatedAt": "2026-06-26T03:58:20.773Z",
+  "counts": {
+    "stations": 1099,
+    "routeStops": 1062,
+    "exactMatches": 674,
+    "exactNameMismatches": 107,
+    "codeOnlyMatches": 73,
+    "nameBasedMatches": 311,
+    "missingMatches": 1,
+    "ambiguousExactMatches": 3
+  },
+  "samples": {
+    "exactNameMismatches": [
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S4108:1",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S4108:805:row-228",
+        "lineNumber": "S4108",
+        "sourceStationCode": "805",
+        "routeStopNameKo": "다산",
+        "stationNameKo": "다산역",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S4108:2",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S4108:804:row-438",
+        "lineNumber": "S4108",
+        "sourceStationCode": "804",
+        "routeStopNameKo": "별내",
+        "stationNameKo": "별내역",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2701:3",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0117:row-243",
+        "lineNumber": "S2701",
+        "sourceStationCode": "0117",
+        "routeStopNameKo": "대곡",
+        "stationNameKo": "대곡(정부대구청사)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2701:9",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0123:row-548",
+        "lineNumber": "S2701",
+        "sourceStationCode": "0123",
+        "routeStopNameKo": "성당못",
+        "stationNameKo": "서부정류장(관문시장)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2701:15",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0129:row-371",
+        "lineNumber": "S2701",
+        "sourceStationCode": "0129",
+        "routeStopNameKo": "명덕",
+        "stationNameKo": "명덕(2.28민주운동기념회관)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2701:18",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0132:row-245",
+        "lineNumber": "S2701",
+        "sourceStationCode": "0132",
+        "routeStopNameKo": "대구",
+        "stationNameKo": "대구역",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2701:20",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0134:row-691",
+        "lineNumber": "S2701",
+        "sourceStationCode": "0134",
+        "routeStopNameKo": "신천",
+        "stationNameKo": "신천(경북대입구)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2701:21",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0135:row-297",
+        "lineNumber": "S2701",
+        "sourceStationCode": "0135",
+        "routeStopNameKo": "동대구",
+        "stationNameKo": "동대구역",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2701:22",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0136:row-296",
+        "lineNumber": "S2701",
+        "sourceStationCode": "0136",
+        "routeStopNameKo": "동구청",
+        "stationNameKo": "동구청(큰고개)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2701:23",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0137:row-708",
+        "lineNumber": "S2701",
+        "sourceStationCode": "0137",
+        "routeStopNameKo": "아양교",
+        "stationNameKo": "아양교(대구국제공항입구)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2701:24",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0138:row-327",
+        "lineNumber": "S2701",
+        "sourceStationCode": "0138",
+        "routeStopNameKo": "동촌",
+        "stationNameKo": "동촌(동촌유원지)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2701:32",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0146:row-715",
+        "lineNumber": "S2701",
+        "sourceStationCode": "0146",
+        "routeStopNameKo": "안심",
+        "stationNameKo": "안심(혁신도시·첨복단지)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2702:6",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2702:0221:row-586",
+        "lineNumber": "S2702",
+        "sourceStationCode": "0221",
+        "routeStopNameKo": "성서공단",
+        "stationNameKo": "성서산업단지",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2702:8",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2702:0223:row-815",
+        "lineNumber": "S2702",
+        "sourceStationCode": "0223",
+        "routeStopNameKo": "용산",
+        "stationNameKo": "용산(서부법원․검찰청입구)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2702:17",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2702:0232:row-247",
+        "lineNumber": "S2702",
+        "sourceStationCode": "0232",
+        "routeStopNameKo": "대구은행",
+        "stationNameKo": "대구은행(대구교육청)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2702:19",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2702:0234:row-624",
+        "lineNumber": "S2702",
+        "sourceStationCode": "0234",
+        "routeStopNameKo": "수성구청",
+        "stationNameKo": "수성구청(KBS)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2702:21",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2702:0236:row-233",
+        "lineNumber": "S2702",
+        "sourceStationCode": "0236",
+        "routeStopNameKo": "담티",
+        "stationNameKo": "담티(수성대·대륜)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2702:23",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2702:0238:row-627",
+        "lineNumber": "S2702",
+        "sourceStationCode": "0238",
+        "routeStopNameKo": "수성알파시티",
+        "stationNameKo": "수성알파시티(삼성라이온즈파크)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2703:3",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2703:0314:row-1034",
+        "lineNumber": "S2703",
+        "sourceStationCode": "0314",
+        "routeStopNameKo": "팔거",
+        "stationNameKo": "팔거(국립농관원통계청)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2703:6",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2703:0317:row-137",
+        "lineNumber": "S2703",
+        "sourceStationCode": "0317",
+        "routeStopNameKo": "구암",
+        "stationNameKo": "구암(과학대보건대입구)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2703:15",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2703:0326:row-480",
+        "lineNumber": "S2703",
+        "sourceStationCode": "0326",
+        "routeStopNameKo": "북구청",
+        "stationNameKo": "북구청\r\n(대구iM뱅크파크)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2703:17",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2703:0328:row-545",
+        "lineNumber": "S2703",
+        "sourceStationCode": "0328",
+        "routeStopNameKo": "서문시장",
+        "stationNameKo": "서문시장(동산병원)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2703:18",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2703:0329:row-990",
+        "lineNumber": "S2703",
+        "sourceStationCode": "0329",
+        "routeStopNameKo": "청라언덕",
+        "stationNameKo": "청라언덕(신남)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2703:19",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2703:0330:row-189",
+        "lineNumber": "S2703",
+        "sourceStationCode": "0330",
+        "routeStopNameKo": "남산",
+        "stationNameKo": "남산(계명네거리)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2703:20",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2703:0331:row-372",
+        "lineNumber": "S2703",
+        "sourceStationCode": "0331",
+        "routeStopNameKo": "명덕",
+        "stationNameKo": "명덕(2·28민주운동기념회관)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2703:27",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2703:0338:row-625",
+        "lineNumber": "S2703",
+        "sourceStationCode": "0338",
+        "routeStopNameKo": "수성못",
+        "stationNameKo": "수성못(TBC)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2601:28",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0122:row-647",
+        "lineNumber": "S2601",
+        "sourceStationCode": "0122",
+        "routeStopNameKo": "시청",
+        "stationNameKo": "시청(연제)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2601:30",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0124:row-118",
+        "lineNumber": "S2601",
+        "sourceStationCode": "0124",
+        "routeStopNameKo": "교대앞",
+        "stationNameKo": "교대",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S1109:36",
+        "stationCandidateId": "candidate:kric:urban-rail-station:S1109:4136:row-798",
+        "lineNumber": "S1109",
+        "sourceStationCode": "4136",
+        "routeStopNameKo": "올림픽공원",
+        "stationNameKo": "올림픽공원(한국체대)",
+        "nameMatches": false
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L41E1:5",
+        "stationCandidateId": "candidate:kric:urban-rail-station:L41E1:Y114:row-316",
+        "lineNumber": "L41E1",
+        "sourceStationCode": "Y114",
+        "routeStopNameKo": "동백",
+        "stationNameKo": "동백(용인세브란스)",
+        "nameMatches": false
+      }
+    ],
+    "codeOnlyMatches": [
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:1",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0100",
+        "routeStopNameKo": "녹동",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0100:row-312",
+            "lineNumber": "S2601",
+            "stationNameKo": "동매"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:2",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0101",
+        "routeStopNameKo": "소태",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0101:row-694",
+            "lineNumber": "S2601",
+            "stationNameKo": "신평"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0101:row-1033",
+            "lineNumber": "S3001",
+            "stationNameKo": "판암"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:3",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0102",
+        "routeStopNameKo": "학동증심사입구",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0102:row-699",
+            "lineNumber": "S3001",
+            "stationNameKo": "신흥"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0102:row-1051",
+            "lineNumber": "S2601",
+            "stationNameKo": "하단"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:4",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0103",
+        "routeStopNameKo": "남광주",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0103:row-236",
+            "lineNumber": "S2601",
+            "stationNameKo": "당리"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0103:row-249",
+            "lineNumber": "S3001",
+            "stationNameKo": "대동"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:5",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0104",
+        "routeStopNameKo": "문화전당",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0104:row-264",
+            "lineNumber": "S3001",
+            "stationNameKo": "대전"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0104:row-500",
+            "lineNumber": "S2601",
+            "stationNameKo": "사하"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:6",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0105",
+        "routeStopNameKo": "금남로4가",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0105:row-117",
+            "lineNumber": "S2601",
+            "stationNameKo": "괴정"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0105:row-955",
+            "lineNumber": "S3001",
+            "stationNameKo": "중앙로"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:7",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0106",
+        "routeStopNameKo": "금남로5가",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0106:row-267",
+            "lineNumber": "S2601",
+            "stationNameKo": "대티"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0106:row-946",
+            "lineNumber": "S3001",
+            "stationNameKo": "중구청"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:8",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0107",
+        "routeStopNameKo": "양동시장",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0107:row-539",
+            "lineNumber": "S2601",
+            "stationNameKo": "서대신"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0107:row-540",
+            "lineNumber": "S3001",
+            "stationNameKo": "서대전네거리"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:9",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0108",
+        "routeStopNameKo": "돌고개",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0108:row-304",
+            "lineNumber": "S2601",
+            "stationNameKo": "동대신"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0108:row-780",
+            "lineNumber": "S3001",
+            "stationNameKo": "오룡"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:10",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0109",
+        "routeStopNameKo": "농성",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0109:row-811",
+            "lineNumber": "S3001",
+            "stationNameKo": "용문"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0109:row-1027",
+            "lineNumber": "S2601",
+            "stationNameKo": "토성"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:11",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0110",
+        "routeStopNameKo": "화정",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0110:row-892",
+            "lineNumber": "S2601",
+            "stationNameKo": "자갈치"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0110:row-1017",
+            "lineNumber": "S3001",
+            "stationNameKo": "탄방"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:12",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0111",
+        "routeStopNameKo": "쌍촌",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0111:row-200",
+            "lineNumber": "S2601",
+            "stationNameKo": "남포"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0111:row-645",
+            "lineNumber": "S3001",
+            "stationNameKo": "시청"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:13",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0112",
+        "routeStopNameKo": "운천",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0112:row-918",
+            "lineNumber": "S3001",
+            "stationNameKo": "정부청사"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0112:row-951",
+            "lineNumber": "S2601",
+            "stationNameKo": "중앙"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:14",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0113",
+        "routeStopNameKo": "상무",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0113:row-21",
+            "lineNumber": "S3001",
+            "stationNameKo": "갈마"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0113:row-460",
+            "lineNumber": "S2601",
+            "stationNameKo": "부산역"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:15",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0114",
+        "routeStopNameKo": "김대중컨벤션센터",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0114:row-845",
+            "lineNumber": "S3001",
+            "stationNameKo": "월평"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0114:row-999",
+            "lineNumber": "S2601",
+            "stationNameKo": "초량"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:16",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0115",
+        "routeStopNameKo": "공항",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0115:row-26",
+            "lineNumber": "S3001",
+            "stationNameKo": "갑천"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0115:row-464",
+            "lineNumber": "S2601",
+            "stationNameKo": "부산진"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0115:row-582",
+            "lineNumber": "S2701",
+            "stationNameKo": "설화명곡"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:17",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0116",
+        "routeStopNameKo": "송정공원",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0116:row-847",
+            "lineNumber": "S3001",
+            "stationNameKo": "유성온천"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0116:row-934",
+            "lineNumber": "S2601",
+            "stationNameKo": "좌천"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0116:row-1087",
+            "lineNumber": "S2701",
+            "stationNameKo": "화원"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:18",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0117",
+        "routeStopNameKo": "광주송정역",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0117:row-136",
+            "lineNumber": "S3001",
+            "stationNameKo": "구암"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0117:row-243",
+            "lineNumber": "S2701",
+            "stationNameKo": "대곡(정부대구청사)"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0117:row-435",
+            "lineNumber": "S2601",
+            "stationNameKo": "범일"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:19",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0118",
+        "routeStopNameKo": "도산",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0118:row-431",
+            "lineNumber": "S2601",
+            "stationNameKo": "범내골"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0118:row-974",
+            "lineNumber": "S2701",
+            "stationNameKo": "진천"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0118:row-1074",
+            "lineNumber": "S3001",
+            "stationNameKo": "현충원"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S2901:20",
+        "lineNumber": "S2901",
+        "sourceStationCode": "0119",
+        "routeStopNameKo": "평동",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2601:0119:row-543",
+            "lineNumber": "S2601",
+            "stationNameKo": "서면"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S3001:0119:row-840",
+            "lineNumber": "S3001",
+            "stationNameKo": "월드컵경기장"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2701:0119:row-843",
+            "lineNumber": "S2701",
+            "stationNameKo": "월배"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L41G1:1",
+        "lineNumber": "L41G1",
+        "sourceStationCode": "100",
+        "routeStopNameKo": "양촌역",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2901:100:row-213",
+            "lineNumber": "S2901",
+            "stationNameKo": "녹동"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L41G1:2",
+        "lineNumber": "L41G1",
+        "sourceStationCode": "101",
+        "routeStopNameKo": "구래역",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2901:101:row-602",
+            "lineNumber": "S2901",
+            "stationNameKo": "소태"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S28M1:101:row-876",
+            "lineNumber": "S28M1",
+            "stationNameKo": "인천국제공항역"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L41G1:3",
+        "lineNumber": "L41G1",
+        "sourceStationCode": "102",
+        "routeStopNameKo": "마산역",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S28M1:102:row-901",
+            "lineNumber": "S28M1",
+            "stationNameKo": "장기주차장역"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2901:102:row-1054",
+            "lineNumber": "S2901",
+            "stationNameKo": "학동증심사입구"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L41G1:4",
+        "lineNumber": "L41G1",
+        "sourceStationCode": "103",
+        "routeStopNameKo": "장기역",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2901:103:row-184",
+            "lineNumber": "S2901",
+            "stationNameKo": "남광주"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S28M1:103:row-1066",
+            "lineNumber": "S28M1",
+            "stationNameKo": "합동청사역"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L41G1:5",
+        "lineNumber": "L41G1",
+        "sourceStationCode": "104",
+        "routeStopNameKo": "운양역",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2901:104:row-394",
+            "lineNumber": "S2901",
+            "stationNameKo": "문화전당(구도청)"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S28M1:104:row-1029",
+            "lineNumber": "S28M1",
+            "stationNameKo": "파라다이스시티역"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L41G1:6",
+        "lineNumber": "L41G1",
+        "sourceStationCode": "105",
+        "routeStopNameKo": "걸포북변역",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2901:105:row-155",
+            "lineNumber": "S2901",
+            "stationNameKo": "금남로4가"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S28M1:105:row-827",
+            "lineNumber": "S28M1",
+            "stationNameKo": "워터파크역"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L41G1:7",
+        "lineNumber": "L41G1",
+        "sourceStationCode": "106",
+        "routeStopNameKo": "사우역",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2901:106:row-156",
+            "lineNumber": "S2901",
+            "stationNameKo": "금남로5가"
+          },
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S28M1:106:row-816",
+            "lineNumber": "S28M1",
+            "stationNameKo": "용유역"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L41G1:8",
+        "lineNumber": "L41G1",
+        "sourceStationCode": "107",
+        "routeStopNameKo": "풍무역",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2901:107:row-730",
+            "lineNumber": "S2901",
+            "stationNameKo": "양동시장"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L41G1:9",
+        "lineNumber": "L41G1",
+        "sourceStationCode": "108",
+        "routeStopNameKo": "고촌역",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2901:108:row-293",
+            "lineNumber": "S2901",
+            "stationNameKo": "돌고개"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L41G1:10",
+        "lineNumber": "L41G1",
+        "sourceStationCode": "109",
+        "routeStopNameKo": "김포공항역",
+        "codeOnlyMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:S2901:109:row-220",
+            "lineNumber": "S2901",
+            "stationNameKo": "농성"
+          }
+        ]
+      }
+    ],
+    "nameBasedMatches": [
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I4104:1",
+        "lineNumber": "I4104",
+        "sourceStationCode": "405",
+        "routeStopNameKo": "진접",
+        "normalizedRouteStopName": "진접",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I4104:0405:row-973",
+            "stationNumber": "0405",
+            "stationNameKo": "진접역"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I4104:2",
+        "lineNumber": "I4104",
+        "sourceStationCode": "406",
+        "routeStopNameKo": "오남",
+        "normalizedRouteStopName": "오남",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I4104:0406:row-779",
+            "stationNumber": "0406",
+            "stationNameKo": "오남역"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I4104:3",
+        "lineNumber": "I4104",
+        "sourceStationCode": "408",
+        "routeStopNameKo": "별내별가람",
+        "normalizedRouteStopName": "별내별가람",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I4104:0408:row-440",
+            "stationNumber": "0408",
+            "stationNameKo": "별내별가람역"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:1",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D04",
+        "routeStopNameKo": "신사",
+        "normalizedRouteStopName": "신사",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D004:row-677",
+            "stationNumber": "D004",
+            "stationNameKo": "신사"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:2",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D05",
+        "routeStopNameKo": "논현",
+        "normalizedRouteStopName": "논현",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D005:row-219",
+            "stationNumber": "D005",
+            "stationNameKo": "논현"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:3",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D06",
+        "routeStopNameKo": "신논현",
+        "normalizedRouteStopName": "신논현",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D006:row-661",
+            "stationNumber": "D006",
+            "stationNameKo": "신논현"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:4",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D07",
+        "routeStopNameKo": "강남",
+        "normalizedRouteStopName": "강남",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D007:row-28",
+            "stationNumber": "D007",
+            "stationNameKo": "강남"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:5",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D08",
+        "routeStopNameKo": "양재",
+        "normalizedRouteStopName": "양재",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D008:row-735",
+            "stationNumber": "D008",
+            "stationNameKo": "양재(서초구청)"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:6",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D09",
+        "routeStopNameKo": "양재시민의숲",
+        "normalizedRouteStopName": "양재시민의숲",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D009:row-736",
+            "stationNumber": "D009",
+            "stationNameKo": "양재시민의숲(매헌)"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:7",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D10",
+        "routeStopNameKo": "청계산입구",
+        "normalizedRouteStopName": "청계산입구",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D010:row-984",
+            "stationNumber": "D010",
+            "stationNameKo": "청계산입구"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:8",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D11",
+        "routeStopNameKo": "판교",
+        "normalizedRouteStopName": "판교",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D011:row-1031",
+            "stationNumber": "D011",
+            "stationNameKo": "판교"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:9",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D12",
+        "routeStopNameKo": "정자",
+        "normalizedRouteStopName": "정자",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D012:row-921",
+            "stationNumber": "D012",
+            "stationNameKo": "정자"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:10",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D13",
+        "routeStopNameKo": "미금",
+        "normalizedRouteStopName": "미금",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D013:row-396",
+            "stationNumber": "D013",
+            "stationNameKo": "미금"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:11",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D14",
+        "routeStopNameKo": "동천",
+        "normalizedRouteStopName": "동천",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D014:row-326",
+            "stationNumber": "D014",
+            "stationNameKo": "동천"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:12",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D15",
+        "routeStopNameKo": "수지구청",
+        "normalizedRouteStopName": "수지구청",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D015:row-636",
+            "stationNumber": "D015",
+            "stationNameKo": "수지구청"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:13",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D16",
+        "routeStopNameKo": "성복",
+        "normalizedRouteStopName": "성복",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D016:row-585",
+            "stationNumber": "D016",
+            "stationNameKo": "성복"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:14",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D17",
+        "routeStopNameKo": "상현",
+        "normalizedRouteStopName": "상현",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D017:row-530",
+            "stationNumber": "D017",
+            "stationNameKo": "상현"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:15",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D18",
+        "routeStopNameKo": "광교중앙",
+        "normalizedRouteStopName": "광교중앙",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D018:row-105",
+            "stationNumber": "D018",
+            "stationNameKo": "광교중앙(아주대)"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I11D1:16",
+        "lineNumber": "I11D1",
+        "sourceStationCode": "D19",
+        "routeStopNameKo": "광교",
+        "normalizedRouteStopName": "광교",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I11D1:D019:row-104",
+            "stationNumber": "D019",
+            "stationNameKo": "광교(경기대)"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:1",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "1",
+        "routeStopNameKo": "사상",
+        "normalizedRouteStopName": "사상",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0001:row-495",
+            "stationNumber": "0001",
+            "stationNameKo": "사상"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:2",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "2",
+        "routeStopNameKo": "괘법르네시떼",
+        "normalizedRouteStopName": "괘법르네시떼",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0002:row-116",
+            "stationNumber": "0002",
+            "stationNameKo": "괘법르네시떼"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:3",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "3",
+        "routeStopNameKo": "서부산유통지구",
+        "normalizedRouteStopName": "서부산유통지구",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0003:row-546",
+            "stationNumber": "0003",
+            "stationNameKo": "서부산유통지구"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:4",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "4",
+        "routeStopNameKo": "공항",
+        "normalizedRouteStopName": "공항",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0004:row-98",
+            "stationNumber": "0004",
+            "stationNameKo": "공항"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:5",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "5",
+        "routeStopNameKo": "덕두",
+        "normalizedRouteStopName": "덕두",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0005:row-271",
+            "stationNumber": "0005",
+            "stationNameKo": "덕두"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:6",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "6",
+        "routeStopNameKo": "등구",
+        "normalizedRouteStopName": "등구",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0006:row-335",
+            "stationNumber": "0006",
+            "stationNameKo": "등구"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:7",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "7",
+        "routeStopNameKo": "대저",
+        "normalizedRouteStopName": "대저",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0007:row-263",
+            "stationNumber": "0007",
+            "stationNameKo": "대저"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:8",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "8",
+        "routeStopNameKo": "평강",
+        "normalizedRouteStopName": "평강",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0008:row-1038",
+            "stationNumber": "0008",
+            "stationNameKo": "평강"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:9",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "9",
+        "routeStopNameKo": "대사",
+        "normalizedRouteStopName": "대사",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0009:row-257",
+            "stationNumber": "0009",
+            "stationNameKo": "대사"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:10",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "10",
+        "routeStopNameKo": "불암",
+        "normalizedRouteStopName": "불암",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0010:row-486",
+            "stationNumber": "0010",
+            "stationNameKo": "불암"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:11",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "11",
+        "routeStopNameKo": "지내",
+        "normalizedRouteStopName": "지내",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0011:row-962",
+            "stationNumber": "0011",
+            "stationNameKo": "지내"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:12",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "12",
+        "routeStopNameKo": "김해대학",
+        "normalizedRouteStopName": "김해대학",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0012:row-178",
+            "stationNumber": "0012",
+            "stationNameKo": "김해대학"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:13",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "13",
+        "routeStopNameKo": "인제대",
+        "normalizedRouteStopName": "인제대",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0013:row-871",
+            "stationNumber": "0013",
+            "stationNameKo": "인제대"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:14",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "14",
+        "routeStopNameKo": "김해시청",
+        "normalizedRouteStopName": "김해시청",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0014:row-179",
+            "stationNumber": "0014",
+            "stationNameKo": "김해시청"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:15",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "15",
+        "routeStopNameKo": "부원",
+        "normalizedRouteStopName": "부원",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0015:row-466",
+            "stationNumber": "0015",
+            "stationNameKo": "부원"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:16",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "16",
+        "routeStopNameKo": "봉황",
+        "normalizedRouteStopName": "봉황",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0016:row-457",
+            "stationNumber": "0016",
+            "stationNameKo": "봉황"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:17",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "17",
+        "routeStopNameKo": "수로왕릉",
+        "normalizedRouteStopName": "수로왕릉",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0017:row-618",
+            "stationNumber": "0017",
+            "stationNameKo": "수로왕릉"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:18",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "18",
+        "routeStopNameKo": "박물관",
+        "normalizedRouteStopName": "박물관",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0018:row-404",
+            "stationNumber": "0018",
+            "stationNameKo": "박물관"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:19",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "19",
+        "routeStopNameKo": "연지공원",
+        "normalizedRouteStopName": "연지공원",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0019:row-763",
+            "stationNumber": "0019",
+            "stationNameKo": "연지공원"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:20",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "20",
+        "routeStopNameKo": "장신대",
+        "normalizedRouteStopName": "장신대",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0020:row-905",
+            "stationNumber": "0020",
+            "stationNameKo": "장신대"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:L48B1:21",
+        "lineNumber": "L48B1",
+        "sourceStationCode": "21",
+        "routeStopNameKo": "가야대",
+        "normalizedRouteStopName": "가야대",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:L48B1:0021:row-9",
+            "stationNumber": "0021",
+            "stationNameKo": "가야대"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I1103:1",
+        "lineNumber": "I1103",
+        "sourceStationCode": "319",
+        "routeStopNameKo": "지축",
+        "normalizedRouteStopName": "지축",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I1103:0319:row-967",
+            "stationNumber": "0319",
+            "stationNameKo": "지축"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I1103:2",
+        "lineNumber": "I1103",
+        "sourceStationCode": "320",
+        "routeStopNameKo": "구파발",
+        "normalizedRouteStopName": "구파발",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I1103:0320:row-140",
+            "stationNumber": "0320",
+            "stationNameKo": "구파발"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I1103:3",
+        "lineNumber": "I1103",
+        "sourceStationCode": "321",
+        "routeStopNameKo": "연신내",
+        "normalizedRouteStopName": "연신내",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I1103:0321:row-761",
+            "stationNumber": "0321",
+            "stationNameKo": "연신내"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I1103:4",
+        "lineNumber": "I1103",
+        "sourceStationCode": "322",
+        "routeStopNameKo": "불광",
+        "normalizedRouteStopName": "불광",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I1103:0322:row-484",
+            "stationNumber": "0322",
+            "stationNameKo": "불광"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I1103:5",
+        "lineNumber": "I1103",
+        "sourceStationCode": "323",
+        "routeStopNameKo": "녹번",
+        "normalizedRouteStopName": "녹번",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I1103:0323:row-214",
+            "stationNumber": "0323",
+            "stationNameKo": "녹번"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I1103:6",
+        "lineNumber": "I1103",
+        "sourceStationCode": "324",
+        "routeStopNameKo": "홍제",
+        "normalizedRouteStopName": "홍제",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I1103:0324:row-1081",
+            "stationNumber": "0324",
+            "stationNameKo": "홍제"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I1103:7",
+        "lineNumber": "I1103",
+        "sourceStationCode": "325",
+        "routeStopNameKo": "무악재",
+        "normalizedRouteStopName": "무악재",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I1103:0325:row-387",
+            "stationNumber": "0325",
+            "stationNameKo": "무악재"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I1103:8",
+        "lineNumber": "I1103",
+        "sourceStationCode": "326",
+        "routeStopNameKo": "독립문",
+        "normalizedRouteStopName": "독립문",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I1103:0326:row-289",
+            "stationNumber": "0326",
+            "stationNameKo": "독립문"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I1103:9",
+        "lineNumber": "I1103",
+        "sourceStationCode": "327",
+        "routeStopNameKo": "경복궁(정부서울청사)",
+        "normalizedRouteStopName": "경복궁",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I1103:0327:row-65",
+            "stationNumber": "0327",
+            "stationNameKo": "경복궁(정부서울청사)"
+          }
+        ]
+      },
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:I1103:10",
+        "lineNumber": "I1103",
+        "sourceStationCode": "328",
+        "routeStopNameKo": "안국",
+        "normalizedRouteStopName": "안국",
+        "nameBasedMatches": [
+          {
+            "stationCandidateId": "candidate:kric:urban-rail-station:I1103:0328:row-711",
+            "stationNumber": "0328",
+            "stationNameKo": "안국"
+          }
+        ]
+      }
+    ],
+    "missingMatches": [
+      {
+        "stopCandidateId": "candidate:kric:urban-rail-route-stop:S1122:4",
+        "lineNumber": "S1122",
+        "sourceStationCode": "234-4",
+        "routeStopNameKo": "까치산",
+        "reason": "no-station-number-match"
+      }
+    ],
+    "ambiguousExactMatches": [
+      {
+        "stop": {
+          "candidateId": "candidate:kric:urban-rail-route-stop:I4108:28",
+          "sourceId": "kric_urban_rail_xlsx_20260228",
+          "sourcePointer": {
+            "file": "전체_도시철도노선정보_20260228.xlsx",
+            "sheet": "표준데이터 노선(전체)",
+            "rowNumber": 43,
+            "rawField": "정거장구성"
+          },
+          "normalized": {
+            "lineNumber": "I4108",
+            "lineNameKo": "경의·중앙선",
+            "sequence": 28,
+            "sourceStationCode": "1201",
+            "stationNameKo": "중랑역"
+          },
+          "rawToken": "1201-중랑역",
+          "parseDiagnostics": []
+        },
+        "matches": [
+          {
+            "candidateId": "candidate:kric:urban-rail-station:I4108:1201:row-949",
+            "sourceId": "kric_urban_rail_xlsx_20260228",
+            "sourcePointer": {
+              "file": "전체_도시철도역사정보_20260228.xlsx",
+              "sheet": "표준데이터 역사",
+              "rowNumber": 949
+            },
+            "raw": {
+              "역번호": {
+                "rawValue": 1201,
+                "rawText": "1201"
+              },
+              "역사명": {
+                "rawValue": "중랑역",
+                "rawText": "중랑역"
+              },
+              "노선번호": {
+                "rawValue": "I4108",
+                "rawText": "I4108"
+              },
+              "노선명": {
+                "rawValue": "경의중앙선",
+                "rawText": "경의중앙선"
+              },
+              "영문역사명": {
+                "rawValue": "Jungnang",
+                "rawText": "Jungnang"
+              },
+              "한자역사명": {
+                "rawValue": "中 浪",
+                "rawText": "中 浪"
+              },
+              "환승역구분": {
+                "rawValue": "환승역",
+                "rawText": "환승역"
+              },
+              "환승노선번호": {
+                "rawValue": "I41K2",
+                "rawText": "I41K2"
+              },
+              "환승노선명": {
+                "rawValue": "경춘선",
+                "rawText": "경춘선"
+              },
+              "역위도": {
+                "rawValue": 37.594948,
+                "rawText": "37.594948"
+              },
+              "역경도": {
+                "rawValue": 127.076152,
+                "rawText": "127.076152"
+              },
+              "운영기관명": {
+                "rawValue": "한국철도공사",
+                "rawText": "한국철도공사"
+              },
+              "역사도로명주소": {
+                "rawValue": "서울특별시 중랑구 중랑역로 9",
+                "rawText": "서울특별시 중랑구 중랑역로 9"
+              },
+              "역사전화번호": {
+                "rawValue": "1588-7788",
+                "rawText": "1588-7788"
+              },
+              "데이터기준일자": {
+                "rawValue": "2025-04-08",
+                "rawText": "2025-04-08"
+              }
+            },
+            "normalized": {
+              "stationNumber": "1201",
+              "stationNameKo": "중랑역",
+              "lineNumber": "I4108",
+              "lineNameKo": "경의중앙선",
+              "stationNameEn": "Jungnang",
+              "latitude": 37.594948,
+              "longitude": 127.076152,
+              "operatorNameKo": "한국철도공사"
+            },
+            "parseDiagnostics": []
+          },
+          {
+            "candidateId": "candidate:kric:urban-rail-station:I4108:1201:row-950",
+            "sourceId": "kric_urban_rail_xlsx_20260228",
+            "sourcePointer": {
+              "file": "전체_도시철도역사정보_20260228.xlsx",
+              "sheet": "표준데이터 역사",
+              "rowNumber": 950
+            },
+            "raw": {
+              "역번호": {
+                "rawValue": 1201,
+                "rawText": "1201"
+              },
+              "역사명": {
+                "rawValue": "중랑역",
+                "rawText": "중랑역"
+              },
+              "노선번호": {
+                "rawValue": "I4108",
+                "rawText": "I4108"
+              },
+              "노선명": {
+                "rawValue": "경춘선",
+                "rawText": "경춘선"
+              },
+              "영문역사명": {
+                "rawValue": "Jungnang",
+                "rawText": "Jungnang"
+              },
+              "한자역사명": {
+                "rawValue": "中 浪",
+                "rawText": "中 浪"
+              },
+              "환승역구분": {
+                "rawValue": "환승역",
+                "rawText": "환승역"
+              },
+              "환승노선번호": {
+                "rawValue": "I41K2",
+                "rawText": "I41K2"
+              },
+              "환승노선명": {
+                "rawValue": "경의중앙선",
+                "rawText": "경의중앙선"
+              },
+              "역위도": {
+                "rawValue": 37.594948,
+                "rawText": "37.594948"
+              },
+              "역경도": {
+                "rawValue": 127.076152,
+                "rawText": "127.076152"
+              },
+              "운영기관명": {
+                "rawValue": "한국철도공사",
+                "rawText": "한국철도공사"
+              },
+              "역사도로명주소": {
+                "rawValue": "서울특별시 중랑구 중랑역로 9",
+                "rawText": "서울특별시 중랑구 중랑역로 9"
+              },
+              "역사전화번호": {
+                "rawValue": "1588-7788",
+                "rawText": "1588-7788"
+              },
+              "데이터기준일자": {
+                "rawValue": 46022,
+                "rawText": "46022"
+              }
+            },
+            "normalized": {
+              "stationNumber": "1201",
+              "stationNameKo": "중랑역",
+              "lineNumber": "I4108",
+              "lineNameKo": "경춘선",
+              "stationNameEn": "Jungnang",
+              "latitude": 37.594948,
+              "longitude": 127.076152,
+              "operatorNameKo": "한국철도공사"
+            },
+            "parseDiagnostics": []
+          }
+        ]
+      },
+      {
+        "stop": {
+          "candidateId": "candidate:kric:urban-rail-route-stop:I4108:29",
+          "sourceId": "kric_urban_rail_xlsx_20260228",
+          "sourcePointer": {
+            "file": "전체_도시철도노선정보_20260228.xlsx",
+            "sheet": "표준데이터 노선(전체)",
+            "rowNumber": 43,
+            "rawField": "정거장구성"
+          },
+          "normalized": {
+            "lineNumber": "I4108",
+            "lineNameKo": "경의·중앙선",
+            "sequence": 29,
+            "sourceStationCode": "1202",
+            "stationNameKo": "상봉역"
+          },
+          "rawToken": "1202-상봉역",
+          "parseDiagnostics": []
+        },
+        "matches": [
+          {
+            "candidateId": "candidate:kric:urban-rail-station:I4108:1202:row-521",
+            "sourceId": "kric_urban_rail_xlsx_20260228",
+            "sourcePointer": {
+              "file": "전체_도시철도역사정보_20260228.xlsx",
+              "sheet": "표준데이터 역사",
+              "rowNumber": 521
+            },
+            "raw": {
+              "역번호": {
+                "rawValue": 1202,
+                "rawText": "1202"
+              },
+              "역사명": {
+                "rawValue": "상봉역",
+                "rawText": "상봉역"
+              },
+              "노선번호": {
+                "rawValue": "I4108",
+                "rawText": "I4108"
+              },
+              "노선명": {
+                "rawValue": "경의중앙선",
+                "rawText": "경의중앙선"
+              },
+              "영문역사명": {
+                "rawValue": "Sangbong",
+                "rawText": "Sangbong"
+              },
+              "한자역사명": {
+                "rawValue": "上鳳",
+                "rawText": "上鳳"
+              },
+              "환승역구분": {
+                "rawValue": "환승역",
+                "rawText": "환승역"
+              },
+              "환승노선번호": {
+                "rawValue": "S1107, I41K2",
+                "rawText": "S1107, I41K2"
+              },
+              "환승노선명": {
+                "rawValue": "수도권 도시철도 7호선, 경춘선",
+                "rawText": "수도권 도시철도 7호선, 경춘선"
+              },
+              "역위도": {
+                "rawValue": 37.596754,
+                "rawText": "37.596754"
+              },
+              "역경도": {
+                "rawValue": 127.085553,
+                "rawText": "127.085553"
+              },
+              "운영기관명": {
+                "rawValue": "한국철도공사",
+                "rawText": "한국철도공사"
+              },
+              "역사도로명주소": {
+                "rawValue": "서울시 중랑구 망우로 297(상봉1동 100-9번지)",
+                "rawText": "서울시 중랑구 망우로 297(상봉1동 100-9번지)"
+              },
+              "역사전화번호": {
+                "rawValue": "1588-7788",
+                "rawText": "1588-7788"
+              },
+              "데이터기준일자": {
+                "rawValue": "2025-04-08",
+                "rawText": "2025-04-08"
+              }
+            },
+            "normalized": {
+              "stationNumber": "1202",
+              "stationNameKo": "상봉역",
+              "lineNumber": "I4108",
+              "lineNameKo": "경의중앙선",
+              "stationNameEn": "Sangbong",
+              "latitude": 37.596754,
+              "longitude": 127.085553,
+              "operatorNameKo": "한국철도공사"
+            },
+            "parseDiagnostics": []
+          },
+          {
+            "candidateId": "candidate:kric:urban-rail-station:I4108:1202:row-523",
+            "sourceId": "kric_urban_rail_xlsx_20260228",
+            "sourcePointer": {
+              "file": "전체_도시철도역사정보_20260228.xlsx",
+              "sheet": "표준데이터 역사",
+              "rowNumber": 523
+            },
+            "raw": {
+              "역번호": {
+                "rawValue": 1202,
+                "rawText": "1202"
+              },
+              "역사명": {
+                "rawValue": "상봉역",
+                "rawText": "상봉역"
+              },
+              "노선번호": {
+                "rawValue": "I4108",
+                "rawText": "I4108"
+              },
+              "노선명": {
+                "rawValue": "경춘선",
+                "rawText": "경춘선"
+              },
+              "영문역사명": {
+                "rawValue": "Sangbong",
+                "rawText": "Sangbong"
+              },
+              "한자역사명": {
+                "rawValue": "上鳳",
+                "rawText": "上鳳"
+              },
+              "환승역구분": {
+                "rawValue": "환승역",
+                "rawText": "환승역"
+              },
+              "환승노선번호": {
+                "rawValue": "S1107, I41K2",
+                "rawText": "S1107, I41K2"
+              },
+              "환승노선명": {
+                "rawValue": "수도권 도시철도 7호선, 경의중앙선",
+                "rawText": "수도권 도시철도 7호선, 경의중앙선"
+              },
+              "역위도": {
+                "rawValue": 37.595254,
+                "rawText": "37.595254"
+              },
+              "역경도": {
+                "rawValue": 127.085853,
+                "rawText": "127.085853"
+              },
+              "운영기관명": {
+                "rawValue": "한국철도공사",
+                "rawText": "한국철도공사"
+              },
+              "역사도로명주소": {
+                "rawValue": "서울시 중랑구 망우로 297(상봉1동 100-9번지)",
+                "rawText": "서울시 중랑구 망우로 297(상봉1동 100-9번지)"
+              },
+              "역사전화번호": {
+                "rawValue": "1588-7788",
+                "rawText": "1588-7788"
+              },
+              "데이터기준일자": {
+                "rawValue": 46022,
+                "rawText": "46022"
+              }
+            },
+            "normalized": {
+              "stationNumber": "1202",
+              "stationNameKo": "상봉역",
+              "lineNumber": "I4108",
+              "lineNameKo": "경춘선",
+              "stationNameEn": "Sangbong",
+              "latitude": 37.595254,
+              "longitude": 127.085853,
+              "operatorNameKo": "한국철도공사"
+            },
+            "parseDiagnostics": []
+          }
+        ]
+      },
+      {
+        "stop": {
+          "candidateId": "candidate:kric:urban-rail-route-stop:I1101:15",
+          "sourceId": "kric_urban_rail_xlsx_20260228",
+          "sourcePointer": {
+            "file": "전체_도시철도노선정보_20260228.xlsx",
+            "sheet": "표준데이터 노선(전체)",
+            "rowNumber": 45,
+            "rawField": "정거장구성"
+          },
+          "normalized": {
+            "lineNumber": "I1101",
+            "lineNameKo": "경인선",
+            "sequence": 15,
+            "sourceStationCode": "1809",
+            "stationNameKo": "주안역"
+          },
+          "rawToken": "1809-주안역",
+          "parseDiagnostics": []
+        },
+        "matches": [
+          {
+            "candidateId": "candidate:kric:urban-rail-station:I1101:1809:row-937",
+            "sourceId": "kric_urban_rail_xlsx_20260228",
+            "sourcePointer": {
+              "file": "전체_도시철도역사정보_20260228.xlsx",
+              "sheet": "표준데이터 역사",
+              "rowNumber": 937
+            },
+            "raw": {
+              "역번호": {
+                "rawValue": 1809,
+                "rawText": "1809"
+              },
+              "역사명": {
+                "rawValue": "주안역",
+                "rawText": "주안역"
+              },
+              "노선번호": {
+                "rawValue": "I1101",
+                "rawText": "I1101"
+              },
+              "노선명": {
+                "rawValue": "경인선",
+                "rawText": "경인선"
+              },
+              "영문역사명": {
+                "rawValue": "Juan",
+                "rawText": "Juan"
+              },
+              "한자역사명": {
+                "rawValue": "朱 安",
+                "rawText": "朱 安"
+              },
+              "환승역구분": {
+                "rawValue": "환승역",
+                "rawText": "환승역"
+              },
+              "환승노선번호": {
+                "rawValue": "S2802",
+                "rawText": "S2802"
+              },
+              "환승노선명": {
+                "rawValue": "인천지하철 2호선",
+                "rawText": "인천지하철 2호선"
+              },
+              "역위도": {
+                "rawValue": 37.465041,
+                "rawText": "37.465041"
+              },
+              "역경도": {
+                "rawValue": 126.680702,
+                "rawText": "126.680702"
+              },
+              "운영기관명": {
+                "rawValue": "한국철도공사",
+                "rawText": "한국철도공사"
+              },
+              "역사도로명주소": {
+                "rawValue": "인천시 남구 주안로 95-19",
+                "rawText": "인천시 남구 주안로 95-19"
+              },
+              "역사전화번호": {
+                "rawValue": "1588-7788",
+                "rawText": "1588-7788"
+              },
+              "데이터기준일자": {
+                "rawValue": "2025-04-08",
+                "rawText": "2025-04-08"
+              }
+            },
+            "normalized": {
+              "stationNumber": "1809",
+              "stationNameKo": "주안역",
+              "lineNumber": "I1101",
+              "lineNameKo": "경인선",
+              "stationNameEn": "Juan",
+              "latitude": 37.465041,
+              "longitude": 126.680702,
+              "operatorNameKo": "한국철도공사"
+            },
+            "parseDiagnostics": []
+          },
+          {
+            "candidateId": "candidate:kric:urban-rail-station:I1101:1809:row-940",
+            "sourceId": "kric_urban_rail_xlsx_20260228",
+            "sourcePointer": {
+              "file": "전체_도시철도역사정보_20260228.xlsx",
+              "sheet": "표준데이터 역사",
+              "rowNumber": 940
+            },
+            "raw": {
+              "역번호": {
+                "rawValue": 1809,
+                "rawText": "1809"
+              },
+              "역사명": {
+                "rawValue": "주안역",
+                "rawText": "주안역"
+              },
+              "노선번호": {
+                "rawValue": "I1101",
+                "rawText": "I1101"
+              },
+              "노선명": {
+                "rawValue": "경인선",
+                "rawText": "경인선"
+              },
+              "영문역사명": {
+                "rawValue": "Juan",
+                "rawText": "Juan"
+              },
+              "한자역사명": {
+                "rawValue": "朱 安",
+                "rawText": "朱 安"
+              },
+              "환승역구분": {
+                "rawValue": "환승역",
+                "rawText": "환승역"
+              },
+              "환승노선번호": {
+                "rawValue": "S2802",
+                "rawText": "S2802"
+              },
+              "환승노선명": {
+                "rawValue": "인천지하철 2호선",
+                "rawText": "인천지하철 2호선"
+              },
+              "역위도": {
+                "rawValue": 37.465041,
+                "rawText": "37.465041"
+              },
+              "역경도": {
+                "rawValue": 126.680702,
+                "rawText": "126.680702"
+              },
+              "운영기관명": {
+                "rawValue": "한국철도공사",
+                "rawText": "한국철도공사"
+              },
+              "역사도로명주소": {
+                "rawValue": "인천시 남구 주안로 95-19",
+                "rawText": "인천시 남구 주안로 95-19"
+              },
+              "역사전화번호": {
+                "rawValue": "1588-7788",
+                "rawText": "1588-7788"
+              },
+              "데이터기준일자": {
+                "rawValue": 46022,
+                "rawText": "46022"
+              }
+            },
+            "normalized": {
+              "stationNumber": "1809",
+              "stationNameKo": "주안역",
+              "lineNumber": "I1101",
+              "lineNameKo": "경인선",
+              "stationNameEn": "Juan",
+              "latitude": 37.465041,
+              "longitude": 126.680702,
+              "operatorNameKo": "한국철도공사"
+            },
+            "parseDiagnostics": []
+          }
+        ]
+      }
+    ]
+  }
+}
