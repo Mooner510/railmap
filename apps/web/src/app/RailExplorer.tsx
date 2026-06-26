@@ -8,6 +8,7 @@ import {
   formatNumber,
   getFirstStop,
   getLastStop,
+  type CanonicalBranch,
   type CanonicalBundle,
   type CanonicalLine,
 } from "./railExplorerModel";
@@ -35,12 +36,34 @@ interface LineListProps {
   onSelectLine: (lineKey: string) => void;
 }
 
+interface StationServingBranch {
+  branchId: string;
+  canonicalLineId: string;
+  lineNameKo: string;
+  sourceLineNumber: string;
+  sourceLineName: string;
+  colorHex: string;
+  role: string;
+  sequence: number;
+  routeStopCount: number;
+  firstStopName: string;
+  lastStopName: string;
+}
+
 interface SelectedLinePanelProps {
   selectedLine: CanonicalLine | null;
   selectedBranchId: string | null;
-  selectedBranch: CanonicalLine["branches"][number] | null;
+  selectedBranch: CanonicalBranch | null;
   onSelectBranch: (branchId: string) => void;
   onClearBranch: () => void;
+}
+
+interface SelectedStationPanelProps {
+  station: RailMapStation;
+  servingBranches: StationServingBranch[];
+  onSelectServingBranch: (branch: StationServingBranch) => void;
+  onClear: () => void;
+  compact?: boolean;
 }
 
 export default function RailExplorer({ bundle, mapStations, mapBranches }: RailExplorerProps) {
@@ -53,6 +76,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLineKey, setSelectedLineKey] = useState<string | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const [isHydratedFromUrl, setIsHydratedFromUrl] = useState(false);
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
 
@@ -63,11 +87,13 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     const q = params.get("q");
     const line = params.get("line");
     const branch = params.get("branch");
+    const station = params.get("station");
 
     if (area) setSelectedArea(area);
     if (q) setSearchQuery(q);
     if (line) setSelectedLineKey(line);
     if (branch) setSelectedBranchId(branch);
+    if (station) setSelectedStationId(station);
 
     setIsHydratedFromUrl(true);
   }, []);
@@ -81,12 +107,13 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     if (searchQuery.trim()) params.set("q", searchQuery.trim());
     if (selectedLineKey) params.set("line", selectedLineKey);
     if (selectedBranchId) params.set("branch", selectedBranchId);
+    if (selectedStationId) params.set("station", selectedStationId);
 
     const query = params.toString();
     const nextUrl = query ? `${window.location.pathname}?${query}` : window.location.pathname;
 
     window.history.replaceState(null, "", nextUrl);
-  }, [isHydratedFromUrl, searchQuery, selectedArea, selectedBranchId, selectedLineKey]);
+  }, [isHydratedFromUrl, searchQuery, selectedArea, selectedBranchId, selectedLineKey, selectedStationId]);
 
   const sortedLines = useMemo(
     () =>
@@ -133,6 +160,33 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     return selectedLine.branches.find((branch) => branch.id === selectedBranchId) ?? null;
   }, [selectedBranchId, selectedLine]);
 
+  const selectedStation = useMemo(
+    () => mapStations.find((station) => station.id === selectedStationId) ?? null,
+    [mapStations, selectedStationId],
+  );
+
+  const selectedStationServingBranches = useMemo<StationServingBranch[]>(() => {
+    if (!selectedStationId) return [];
+
+    return mapBranches.flatMap((branch) =>
+      branch.routeStops
+        .filter((stop) => stop.station?.id === selectedStationId)
+        .map((stop) => ({
+          branchId: branch.id,
+          canonicalLineId: branch.canonicalLineId,
+          lineNameKo: branch.canonicalLineNameKo,
+          sourceLineNumber: branch.sourceLineNumber,
+          sourceLineName: branch.sourceLineName,
+          colorHex: branch.colorHex,
+          role: branch.role,
+          sequence: stop.sequence,
+          routeStopCount: branch.routeStops.length,
+          firstStopName: branch.routeStops[0]?.displayNameKo ?? "-",
+          lastStopName: branch.routeStops[branch.routeStops.length - 1]?.displayNameKo ?? "-",
+        })),
+    );
+  }, [mapBranches, selectedStationId]);
+
   useEffect(() => {
     if (!selectedLineKey) return;
     if (bundle.lines.some((line) => line.canonicalKey === selectedLineKey)) return;
@@ -147,6 +201,13 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
     setSelectedBranchId(null);
   }, [selectedBranchId, selectedLine]);
+
+  useEffect(() => {
+    if (!selectedStationId) return;
+    if (mapStations.some((station) => station.id === selectedStationId)) return;
+
+    setSelectedStationId(null);
+  }, [mapStations, selectedStationId]);
 
   const visibleLineKeys = useMemo(
     () => new Set(filteredLines.map((line) => line.canonicalKey)),
@@ -186,23 +247,42 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setSearchQuery("");
     setSelectedLineKey(null);
     setSelectedBranchId(null);
+    setSelectedStationId(null);
   };
 
   const selectArea = (area: string) => {
     setSelectedArea(area);
     setSelectedLineKey(null);
     setSelectedBranchId(null);
+    setSelectedStationId(null);
   };
 
   const search = (query: string) => {
     setSearchQuery(query);
     setSelectedLineKey(null);
     setSelectedBranchId(null);
+    setSelectedStationId(null);
   };
 
   const selectLine = (lineKey: string) => {
     setSelectedLineKey(lineKey);
     setSelectedBranchId(null);
+    setSelectedStationId(null);
+  };
+
+  const selectMapBranch = (branch: RailMapBranch) => {
+    setSelectedLineKey(branch.canonicalLineId);
+    setSelectedBranchId(branch.id);
+    setSelectedStationId(null);
+  };
+
+  const selectServingBranch = (branch: StationServingBranch) => {
+    setSelectedLineKey(branch.canonicalLineId);
+    setSelectedBranchId(branch.branchId);
+  };
+
+  const selectMapStation = (station: RailMapStation) => {
+    setSelectedStationId(station.id);
   };
 
   const copyUrl = async () => {
@@ -242,18 +322,37 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
       </aside>
 
       <div className="relative h-full min-h-0 min-w-0 overflow-hidden">
-        <RailMap className="absolute inset-0 h-full min-h-[100dvh] w-full" stations={visibleMapStations} branches={visibleMapBranches} />
+        <RailMap
+          className="absolute inset-0 h-full min-h-[100dvh] w-full"
+          stations={visibleMapStations}
+          branches={visibleMapBranches}
+          selectedBranchId={selectedBranchId}
+          selectedStationId={selectedStationId}
+          onSelectBranch={selectMapBranch}
+          onSelectStation={selectMapStation}
+        />
 
-        {selectedLine ? (
+        {selectedLine || selectedStation ? (
           <div className="pointer-events-none absolute right-2 top-2 z-10 hidden w-[280px] lg:block">
-            <div className="pointer-events-auto max-h-[calc(100dvh-16px)] overflow-y-auto border border-slate-200 bg-white/95 shadow-sm shadow-slate-950/10 backdrop-blur">
-              <SelectedLinePanel
-                selectedLine={selectedLine}
-                selectedBranchId={selectedBranchId}
-                selectedBranch={selectedBranch}
-                onSelectBranch={setSelectedBranchId}
-                onClearBranch={() => setSelectedBranchId(null)}
-              />
+            <div className="pointer-events-auto grid max-h-[calc(100dvh-16px)] gap-1.5 overflow-y-auto border border-slate-200 bg-white/95 p-1.5 shadow-sm shadow-slate-950/10 backdrop-blur">
+              {selectedStation ? (
+                <SelectedStationPanel
+                  station={selectedStation}
+                  servingBranches={selectedStationServingBranches}
+                  onSelectServingBranch={selectServingBranch}
+                  onClear={() => setSelectedStationId(null)}
+                />
+              ) : null}
+
+              {selectedLine ? (
+                <SelectedLinePanel
+                  selectedLine={selectedLine}
+                  selectedBranchId={selectedBranchId}
+                  selectedBranch={selectedBranch}
+                  onSelectBranch={setSelectedBranchId}
+                  onClearBranch={() => setSelectedBranchId(null)}
+                />
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -285,14 +384,26 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
             </div>
 
             <div className="max-h-[calc(54dvh-104px)] overflow-y-auto px-2.5 pb-4 pt-2">
-              <SelectedLinePanel
-                selectedLine={selectedLine}
-                selectedBranchId={selectedBranchId}
-                selectedBranch={selectedBranch}
-                onSelectBranch={setSelectedBranchId}
-                onClearBranch={() => setSelectedBranchId(null)}
-                compact
-              />
+              {selectedStation ? (
+                <SelectedStationPanel
+                  station={selectedStation}
+                  servingBranches={selectedStationServingBranches}
+                  onSelectServingBranch={selectServingBranch}
+                  onClear={() => setSelectedStationId(null)}
+                  compact
+                />
+              ) : null}
+
+              <div className={selectedStation ? "mt-1.5" : undefined}>
+                <SelectedLinePanel
+                  selectedLine={selectedLine}
+                  selectedBranchId={selectedBranchId}
+                  selectedBranch={selectedBranch}
+                  onSelectBranch={setSelectedBranchId}
+                  onClearBranch={() => setSelectedBranchId(null)}
+                  compact
+                />
+              </div>
 
               <div className="mt-1.5">
                 <LineList
@@ -474,6 +585,76 @@ function LineCard({ line, selected, onClick }: { line: CanonicalLine; selected: 
   );
 }
 
+function SelectedStationPanel({
+  station,
+  servingBranches,
+  onSelectServingBranch,
+  onClear,
+}: SelectedStationPanelProps) {
+  const uniqueLineCount = new Set(servingBranches.map((branch) => branch.canonicalLineId)).size;
+  const visibleBranches = servingBranches.slice(0, 8);
+
+  return (
+    <section className="border border-slate-200 bg-white p-2.5">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold tracking-wide text-amber-600 uppercase">선택 역</p>
+          <h2 className="mt-0.5 truncate text-sm font-bold text-slate-950">{station.nameKo}</h2>
+          <p className="mt-1 text-[11px] font-medium text-slate-500">
+            노선 {formatNumber(uniqueLineCount)}개 · 구간 {formatNumber(servingBranches.length)}개
+          </p>
+        </div>
+        <button
+          type="button"
+          className="rounded border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+          onClick={onClear}
+        >
+          닫기
+        </button>
+      </div>
+
+      <div className="mt-2 grid grid-cols-3 gap-1.5 text-xs">
+        <MetricMini label="노선" value={uniqueLineCount} />
+        <MetricMini label="구간" value={servingBranches.length} />
+        <MetricMini label="좌표" value={station.lat && station.lng ? `${station.lat.toFixed(3)}, ${station.lng.toFixed(3)}` : "-"} />
+      </div>
+
+      {servingBranches.length > 0 ? (
+        <div className="mt-2">
+          <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">정차 노선</p>
+          <div className="mt-1.5 grid gap-1.5">
+            {visibleBranches.map((branch) => (
+              <button
+                type="button"
+                key={`${branch.branchId}:${branch.sequence}`}
+                className="flex items-start gap-2 rounded border border-slate-200 bg-white px-2 py-1.5 text-left hover:border-sky-200 hover:bg-sky-50/70"
+                onClick={() => onSelectServingBranch(branch)}
+              >
+                <span
+                  className="mt-0.5 h-2.5 w-2.5 shrink-0 rounded-sm border border-white"
+                  style={{ backgroundColor: branch.colorHex }}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="truncate text-xs font-bold text-slate-900">{branch.lineNameKo}</span>
+                    <span className="shrink-0 text-[10px] font-semibold text-slate-400">{branch.sequence}번째</span>
+                  </span>
+                  <span className="mt-0.5 block truncate text-[11px] text-slate-500">
+                    {branch.sourceLineName} · {formatBranchRole(branch.role)} · {branch.firstStopName} → {branch.lastStopName}
+                  </span>
+                </span>
+              </button>
+            ))}
+          </div>
+          {servingBranches.length > visibleBranches.length ? (
+            <p className="mt-1 text-[11px] font-medium text-slate-400">외 {servingBranches.length - visibleBranches.length}개 구간</p>
+          ) : null}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function SelectedLinePanel({
   selectedLine,
   selectedBranchId,
@@ -518,6 +699,22 @@ function SelectedLinePanel({
         <MetricMini label="정차역" value={countRouteStops(selectedLine)} />
       </div>
 
+      {selectedBranch ? (
+        <div className="mt-2 border border-slate-200 bg-slate-50 px-2 py-1.5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold text-slate-900">{selectedBranch.sourceLineName}</p>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                {selectedBranch.origin ?? getFirstStop(selectedBranch)} → {selectedBranch.terminal ?? getLastStop(selectedBranch)}
+              </p>
+            </div>
+            <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+              {formatNumber(selectedBranch.routeStops.length)}역
+            </span>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mt-2">
         <p className="text-[11px] font-bold tracking-wide text-slate-400 uppercase">구간 선택</p>
         <div className="mt-1.5 flex gap-1.5 overflow-x-auto pb-0.5">
@@ -535,6 +732,8 @@ function SelectedLinePanel({
           ))}
         </div>
       </div>
+
+      {selectedBranch ? <RouteStopList branch={selectedBranch} compact={compact} /> : null}
 
       <BranchTable
         line={selectedLine}
@@ -570,6 +769,35 @@ function BranchChip({
     </button>
   );
 }
+
+function RouteStopList({ branch, compact = false }: { branch: CanonicalBranch; compact?: boolean }) {
+  const stops = compact ? branch.routeStops.slice(0, 12) : branch.routeStops.slice(0, 18);
+
+  return (
+    <div className="mt-2 border border-slate-200 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-100 px-2 py-1.5">
+        <p className="text-[11px] font-bold tracking-wide text-slate-400 uppercase">정차역</p>
+        <p className="text-[11px] font-semibold text-slate-500">
+          {formatNumber(branch.routeStops.length)}개
+        </p>
+      </div>
+      <ol className="max-h-40 overflow-y-auto px-2 py-1">
+        {stops.map((stop) => (
+          <li key={stop.id} className="flex items-center gap-2 py-0.5 text-[11px]">
+            <span className="w-5 shrink-0 text-right font-semibold text-slate-400">{stop.sequence}</span>
+            <span className="min-w-0 flex-1 truncate font-medium text-slate-700">{stop.displayNameKo}</span>
+          </li>
+        ))}
+      </ol>
+      {branch.routeStops.length > stops.length ? (
+        <p className="border-t border-slate-100 px-2 py-1 text-[11px] font-medium text-slate-400">
+          외 {formatNumber(branch.routeStops.length - stops.length)}개 역
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 
 function BranchTable({
   line,
