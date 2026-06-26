@@ -40,3 +40,5 @@ yarn-error.log*
 run.sh
 
 .artifacts
+
+railmap-*-patch.zip

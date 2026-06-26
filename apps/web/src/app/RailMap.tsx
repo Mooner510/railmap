@@ -35,6 +35,7 @@ interface RailMapProps {
   branches: RailMapBranch[];
   selectedBranchId?: string | null;
   selectedStationId?: string | null;
+  focusVersion?: number;
   onSelectBranch?: (branch: RailMapBranch) => void;
   onSelectStation?: (station: RailMapStation) => void;
   className?: string;
@@ -111,6 +112,7 @@ export default function RailMap({
   branches,
   selectedBranchId = null,
   selectedStationId = null,
+  focusVersion = 0,
   onSelectBranch,
   onSelectStation,
   className = "",
@@ -410,6 +412,39 @@ export default function RailMap({
       ]);
     }
   }, [selectedBranchId, mapReady]);
+
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || focusVersion === 0) return;
+
+    const selectedStation = validStations.find((station) => station.id === selectedStationId);
+
+    if (selectedStation) {
+      map.flyTo({
+        center: [selectedStation.lng, selectedStation.lat],
+        zoom: Math.max(map.getZoom(), 12.5),
+        duration: 250,
+      });
+      map.resize();
+      return;
+    }
+
+    if (visibleBranchStations.length === 0) return;
+
+    const bounds = new maplibregl.LngLatBounds();
+
+    for (const station of visibleBranchStations) {
+      bounds.extend([station.lng, station.lat]);
+    }
+
+    map.fitBounds(bounds, {
+      padding: getFitPadding(),
+      maxZoom: visibleBranchStations.length <= 6 ? 13 : 10.5,
+      duration: 250,
+    });
+    map.resize();
+  }, [focusVersion, mapReady, selectedStationId, validStations, visibleBranchStations]);
 
   useEffect(() => {
     const map = mapRef.current;
