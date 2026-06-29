@@ -88,41 +88,119 @@ function buildBranchFeatures(branches: RailMapBranch[]) {
 }
 
 
-function buildHighlightedRouteFeature(stations: RailMapStation[], stationIds: string[]) {
-  if (stationIds.length < 2) {
+function smoothCoordinateRange(coordinates: LngLatTuple[], startIndex: number, endIndex: number) {
+  if (coordinates.length < 2 || startIndex === endIndex) return [];
+
+  const start = Math.max(0, Math.min(startIndex, endIndex));
+  const end = Math.min(coordinates.length - 1, Math.max(startIndex, endIndex));
+
+  if (coordinates.length < 3) return coordinates.slice(start, end + 1);
+
+  const samplesPerSegment = 5;
+  const result: LngLatTuple[] = [];
+
+  for (let i = start; i < end; i += 1) {
+    const p0 = coordinates[Math.max(0, i - 1)] ?? coordinates[i];
+    const p1 = coordinates[i];
+    const p2 = coordinates[i + 1];
+    const p3 = coordinates[Math.min(coordinates.length - 1, i + 2)] ?? p2;
+
+    if (!p0 || !p1 || !p2 || !p3) continue;
+
+    if (i === start) result.push(p1);
+
+    for (let step = 1; step <= samplesPerSegment; step += 1) {
+      result.push(catmullRomPoint(p0, p1, p2, p3, step / samplesPerSegment));
+    }
+  }
+
+  return startIndex <= endIndex ? result : [...result].reverse();
+}
+
+function getBranchRouteSegmentCoordinates(branch: RailMapBranch, fromStationId: string, toStationId: string) {
+  const points = branch.routeStops
+    .map((stop) => {
+      const station = stop.station;
+      if (!isValidCoordinate(station)) return null;
+
+      return {
+        stationId: station.id,
+        coordinate: [station.lng, station.lat] as LngLatTuple,
+      };
+    })
+    .filter((point): point is { stationId: string; coordinate: LngLatTuple } => point !== null);
+
+  const fromIndex = points.findIndex((point) => point.stationId === fromStationId);
+  const toIndex = points.findIndex((point) => point.stationId === toStationId);
+
+  if (fromIndex < 0 || toIndex < 0) return [];
+
+  return smoothCoordinateRange(
+    points.map((point) => point.coordinate),
+    fromIndex,
+    toIndex,
+  );
+}
+
+function buildHighlightedRouteFeature(branches: RailMapBranch[], stationIds: string[], branchIds: string[]) {
+  if (stationIds.length < 2 || branchIds.length < 1) {
     return {
       type: "FeatureCollection" as const,
       features: [],
     };
   }
 
-  const stationIndex = new Map(stations.filter(isValidCoordinate).map((station) => [station.id, station]));
-  const coordinates = stationIds
-    .map((stationId) => stationIndex.get(stationId))
-    .filter(isValidCoordinate)
-    .map((station): LngLatTuple => [station.lng, station.lat]);
-
-  if (coordinates.length < 2) {
-    return {
-      type: "FeatureCollection" as const,
-      features: [],
+  const branchIndex = new Map(branches.map((branch) => [branch.id, branch]));
+  const features: Array<{
+    type: "Feature";
+    properties: {
+      id: string;
+      branchId: string;
+      colorHex: string;
     };
+    geometry: {
+      type: "LineString";
+      coordinates: LngLatTuple[];
+    };
+  }> = [];
+  let segmentStartIndex = 0;
+
+  for (let edgeIndex = 1; edgeIndex <= branchIds.length; edgeIndex += 1) {
+    const currentBranchId = branchIds[segmentStartIndex];
+    const nextBranchId = branchIds[edgeIndex];
+    const shouldCloseSegment = edgeIndex === branchIds.length || nextBranchId !== currentBranchId;
+
+    if (!shouldCloseSegment || !currentBranchId) continue;
+
+    const branch = branchIndex.get(currentBranchId);
+    const fromStationId = stationIds[segmentStartIndex];
+    const toStationId = stationIds[edgeIndex];
+
+    if (branch && fromStationId && toStationId) {
+      const coordinates = getBranchRouteSegmentCoordinates(branch, fromStationId, toStationId);
+
+      if (coordinates.length >= 2) {
+        features.push({
+          type: "Feature" as const,
+          properties: {
+            id: `route-result-${features.length + 1}`,
+            branchId: branch.id,
+            colorHex: branch.colorHex,
+          },
+          geometry: {
+            type: "LineString" as const,
+            coordinates,
+          },
+        });
+      }
+    }
+
+    segmentStartIndex = edgeIndex;
   }
 
   return {
     type: "FeatureCollection" as const,
-    features: [
-      {
-        type: "Feature" as const,
-        properties: {
-          id: "route-result",
-        },
-        geometry: {
-          type: "LineString" as const,
-          coordinates: smoothCoordinates(coordinates),
-        },
-      },
-    ],
+    features,
   };
 }
 
@@ -289,8 +367,8 @@ export default function RailMap({
   const validStations = useMemo(() => stations.filter(isValidCoordinate), [stations]);
   const branchFeatures = useMemo(() => buildBranchFeatures(showBranches ? branches : []), [branches, showBranches]);
   const highlightedRouteFeatures = useMemo(
-    () => buildHighlightedRouteFeature(stations, highlightedRouteStationIds),
-    [stations, highlightedRouteStationIds],
+    () => buildHighlightedRouteFeature(branches, highlightedRouteStationIds, highlightedRouteBranchIds),
+    [branches, highlightedRouteStationIds, highlightedRouteBranchIds],
   );
   const branchFeaturesRef = useRef(branchFeatures);
   const highlightedRouteFeaturesRef = useRef(highlightedRouteFeatures);
