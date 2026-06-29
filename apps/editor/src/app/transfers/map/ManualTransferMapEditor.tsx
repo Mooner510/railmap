@@ -1,7 +1,16 @@
 "use client";
 
-import maplibregl, { type GeoJSONSource, type Map as MapLibreMap, type Marker } from "maplibre-gl";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import maplibregl, {
+  type GeoJSONSource,
+  type Map as MapLibreMap,
+} from "maplibre-gl";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   makeTransferGroupId,
   makeTransferPairKey,
@@ -40,7 +49,9 @@ const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
   [134.3, 43.1],
 ];
 
-function isValidCoordinate(station: EditorStation | null | undefined): station is ValidEditorStation {
+function isValidCoordinate(
+  station: EditorStation | null | undefined,
+): station is ValidEditorStation {
   return (
     station !== null &&
     station !== undefined &&
@@ -51,7 +62,13 @@ function isValidCoordinate(station: EditorStation | null | undefined): station i
   );
 }
 
-function catmullRomPoint(p0: LngLatTuple, p1: LngLatTuple, p2: LngLatTuple, p3: LngLatTuple, t: number): LngLatTuple {
+function catmullRomPoint(
+  p0: LngLatTuple,
+  p1: LngLatTuple,
+  p2: LngLatTuple,
+  p3: LngLatTuple,
+  t: number,
+): LngLatTuple {
   const [p0Lng, p0Lat] = p0;
   const [p1Lng, p1Lat] = p1;
   const [p2Lng, p2Lat] = p2;
@@ -60,8 +77,16 @@ function catmullRomPoint(p0: LngLatTuple, p1: LngLatTuple, p2: LngLatTuple, p3: 
   const t3 = t2 * t;
 
   return [
-    0.5 * (2 * p1Lng + (-p0Lng + p2Lng) * t + (2 * p0Lng - 5 * p1Lng + 4 * p2Lng - p3Lng) * t2 + (-p0Lng + 3 * p1Lng - 3 * p2Lng + p3Lng) * t3),
-    0.5 * (2 * p1Lat + (-p0Lat + p2Lat) * t + (2 * p0Lat - 5 * p1Lat + 4 * p2Lat - p3Lat) * t2 + (-p0Lat + 3 * p1Lat - 3 * p2Lat + p3Lat) * t3),
+    0.5 *
+      (2 * p1Lng +
+        (-p0Lng + p2Lng) * t +
+        (2 * p0Lng - 5 * p1Lng + 4 * p2Lng - p3Lng) * t2 +
+        (-p0Lng + 3 * p1Lng - 3 * p2Lng + p3Lng) * t3),
+    0.5 *
+      (2 * p1Lat +
+        (-p0Lat + p2Lat) * t +
+        (2 * p0Lat - 5 * p1Lat + 4 * p2Lat - p3Lat) * t2 +
+        (-p0Lat + 3 * p1Lat - 3 * p2Lat + p3Lat) * t3),
   ];
 }
 
@@ -111,28 +136,76 @@ function buildBranchFeatures(branches: TransferMapBranch[]) {
           },
         };
       })
-      .filter((feature): feature is NonNullable<typeof feature> => feature !== null),
+      .filter(
+        (feature): feature is NonNullable<typeof feature> => feature !== null,
+      ),
+  };
+}
+
+function buildStationFeatures(
+  stations: ValidEditorStation[],
+  selectedStationIdSet: Set<string>,
+  nonTransferStationIdSet: Set<string>,
+) {
+  return {
+    type: "FeatureCollection" as const,
+    features: stations.map((station) => {
+      const selected = selectedStationIdSet.has(station.id);
+      const nonTransfer = nonTransferStationIdSet.has(station.id);
+      return {
+        type: "Feature" as const,
+        properties: {
+          id: station.id,
+          nameKo: station.nameKo ?? "역",
+          lineNameKo: station.lineNameKo ?? "",
+          stationNumber: station.stationNumber ?? "",
+          colorHex: station.colorHex ?? "#64748b",
+          selected,
+          nonTransfer,
+        },
+        geometry: {
+          type: "Point" as const,
+          coordinates: [station.lng, station.lat] as LngLatTuple,
+        },
+      };
+    }),
   };
 }
 
 function getStationBaseName(nameKo: string) {
   const withoutParentheses = nameKo.replace(/\([^)]*\)/g, "").trim();
-  return withoutParentheses.endsWith("역") ? withoutParentheses.slice(0, -1) : withoutParentheses;
+  return withoutParentheses.endsWith("역")
+    ? withoutParentheses.slice(0, -1)
+    : withoutParentheses;
 }
 
 function getSuggestedGroupName(stations: EditorStation[]) {
   if (stations.length === 0) return "새 환승 그룹";
-  const baseNames = [...new Set(stations.map((station) => getStationBaseName(station.nameKo)).filter(Boolean))];
+  const baseNames = [
+    ...new Set(
+      stations
+        .map((station) => getStationBaseName(station.nameKo))
+        .filter(Boolean),
+    ),
+  ];
   if (baseNames.length === 1) return `${baseNames[0]}역`;
-  return baseNames.map((name) => `${name}${name.endsWith("역") ? "" : "역"}`).join(" · ");
+  return baseNames
+    .map((name) => `${name}${name.endsWith("역") ? "" : "역"}`)
+    .join(" · ");
 }
 
-function createPairMinutes(stationIds: string[], previous: Record<string, number | null> = {}) {
+function createPairMinutes(
+  stationIds: string[],
+  previous: Record<string, number | null> = {},
+) {
   const result: Record<string, number | null> = {};
 
   for (let row = 0; row < stationIds.length - 1; row += 1) {
     for (let column = row + 1; column < stationIds.length; column += 1) {
-      const pairKey = makeTransferPairKey(stationIds[row] ?? "", stationIds[column] ?? "");
+      const pairKey = makeTransferPairKey(
+        stationIds[row] ?? "",
+        stationIds[column] ?? "",
+      );
       result[pairKey] = previous[pairKey] ?? null;
     }
   }
@@ -162,11 +235,22 @@ function getFitPadding() {
   return { top: 72, right: 420, bottom: 72, left: 48 };
 }
 
-function PersistMessage({ saveState, message }: { saveState: SaveState; message: string | null }) {
+function PersistMessage({
+  saveState,
+  message,
+}: {
+  saveState: SaveState;
+  message: string | null;
+}) {
   if (!message) return null;
 
   return (
-    <div className={saveState === "error" ? "map-editor-toast error" : "map-editor-toast"} role="status">
+    <div
+      className={
+        saveState === "error" ? "map-editor-toast error" : "map-editor-toast"
+      }
+      role="status"
+    >
       {message}
     </div>
   );
@@ -183,31 +267,70 @@ export default function ManualTransferMapEditor({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const markersRef = useRef<Marker[]>([]);
   const selectionBoxRef = useRef<HTMLDivElement | null>(null);
-  const selectionDragRef = useRef<{ startX: number; startY: number; active: boolean } | null>(null);
+  const selectionDragRef = useRef<{
+    startX: number;
+    startY: number;
+    active: boolean;
+  } | null>(null);
   const stationsRef = useRef<ValidEditorStation[]>([]);
   const nonTransferRef = useRef<Set<string>>(new Set());
   const selectedIdsRef = useRef<Set<string>>(new Set());
   const [mapReady, setMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [zoomLevel, setZoomLevel] = useState(0);
-  const [groups, setGroups] = useState<ManualTransferGroup[]>(initialOverlays.manualTransferGroups ?? []);
-  const [nonTransferStationIds, setNonTransferStationIds] = useState<string[]>(initialOverlays.nonTransferStationIds ?? []);
+  const [groups, setGroups] = useState<ManualTransferGroup[]>(
+    initialOverlays.manualTransferGroups ?? [],
+  );
+  const [nonTransferStationIds, setNonTransferStationIds] = useState<string[]>(
+    initialOverlays.nonTransferStationIds ?? [],
+  );
   const [selectedStationIds, setSelectedStationIds] = useState<string[]>([]);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [groupModalOpen, setGroupModalOpen] = useState(false);
 
-  const branchFeatures = useMemo(() => buildBranchFeatures(branches), [branches]);
-  const validStations = useMemo(() => stations.filter(isValidCoordinate), [stations]);
-  const stationById = useMemo(() => new Map(stations.map((station) => [station.id, station])), [stations]);
-  const selectedStationIdSet = useMemo(() => new Set(selectedStationIds), [selectedStationIds]);
-  const nonTransferStationIdSet = useMemo(() => new Set(nonTransferStationIds), [nonTransferStationIds]);
+  const branchFeatures = useMemo(
+    () => buildBranchFeatures(branches),
+    [branches],
+  );
+  const validStations = useMemo(
+    () => stations.filter(isValidCoordinate),
+    [stations],
+  );
+  const stationById = useMemo(
+    () => new Map(stations.map((station) => [station.id, station])),
+    [stations],
+  );
+  const selectedStationIdSet = useMemo(
+    () => new Set(selectedStationIds),
+    [selectedStationIds],
+  );
+  const nonTransferStationIdSet = useMemo(
+    () => new Set(nonTransferStationIds),
+    [nonTransferStationIds],
+  );
+  const stationFeatures = useMemo(
+    () =>
+      buildStationFeatures(
+        validStations,
+        selectedStationIdSet,
+        nonTransferStationIdSet,
+      ),
+    [nonTransferStationIdSet, selectedStationIdSet, validStations],
+  );
+  const stationFeaturesRef = useRef(stationFeatures);
+
+  useEffect(() => {
+    stationFeaturesRef.current = stationFeatures;
+  }, [stationFeatures]);
   const selectedStations = selectedStationIds
     .map((stationId) => stationById.get(stationId))
     .filter((station): station is EditorStation => station !== undefined);
-  const allSelectedAreTransferable = selectedStationIds.length > 0 && selectedStationIds.every((stationId) => !nonTransferStationIdSet.has(stationId));
+  const allSelectedAreTransferable =
+    selectedStationIds.length > 0 &&
+    selectedStationIds.every(
+      (stationId) => !nonTransferStationIdSet.has(stationId),
+    );
 
   useEffect(() => {
     stationsRef.current = validStations;
@@ -221,8 +344,14 @@ export default function ManualTransferMapEditor({
     selectedIdsRef.current = selectedStationIdSet;
   }, [selectedStationIdSet]);
 
-  const persist = async (nextGroups: ManualTransferGroup[], nextNonTransferStationIds: string[], successMessage: string) => {
-    const uniqueNonTransferStationIds = [...new Set(nextNonTransferStationIds)].filter(Boolean);
+  const persist = async (
+    nextGroups: ManualTransferGroup[],
+    nextNonTransferStationIds: string[],
+    successMessage: string,
+  ) => {
+    const uniqueNonTransferStationIds = [
+      ...new Set(nextNonTransferStationIds),
+    ].filter(Boolean);
     setSaveState("saving");
     setMessage("저장 중입니다.");
 
@@ -249,7 +378,9 @@ export default function ManualTransferMapEditor({
       window.setTimeout(() => setMessage(null), 2200);
     } catch (error) {
       setSaveState("error");
-      setMessage(error instanceof Error ? error.message : "저장에 실패했습니다.");
+      setMessage(
+        error instanceof Error ? error.message : "저장에 실패했습니다.",
+      );
     }
   };
 
@@ -281,8 +412,17 @@ export default function ManualTransferMapEditor({
             },
           },
           layers: [
-            { id: "background", type: "background", paint: { "background-color": "#eef3f8" } },
-            { id: "osm", type: "raster", source: "osm", paint: { "raster-opacity": 0.82 } },
+            {
+              id: "background",
+              type: "background",
+              paint: { "background-color": "#eef3f8" },
+            },
+            {
+              id: "osm",
+              type: "raster",
+              source: "osm",
+              paint: { "raster-opacity": 0.82 },
+            },
           ],
         },
       });
@@ -290,10 +430,14 @@ export default function ManualTransferMapEditor({
       mapRef.current = map;
       map.dragRotate.disable();
       map.touchZoomRotate.disableRotation();
-      map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
-      map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
-
-      const updateZoom = () => setZoomLevel(map.getZoom());
+      map.addControl(
+        new maplibregl.NavigationControl({ visualizePitch: false }),
+        "top-right",
+      );
+      map.addControl(
+        new maplibregl.AttributionControl({ compact: true }),
+        "bottom-right",
+      );
 
       map.on("error", (event) => {
         const error = (event as { error?: unknown }).error;
@@ -303,8 +447,6 @@ export default function ManualTransferMapEditor({
       map.on("load", () => {
         setMapReady(true);
         setMapError(null);
-        updateZoom();
-
         map.addSource("manual-map-lines", {
           type: "geojson",
           data: branchFeatures,
@@ -334,18 +476,149 @@ export default function ManualTransferMapEditor({
           layout: { "line-cap": "round", "line-join": "round" },
         });
 
+        map.addSource("manual-map-stations", {
+          type: "geojson",
+          data: stationFeaturesRef.current,
+        });
+
+        map.addLayer({
+          id: "manual-map-stations-casing",
+          type: "circle",
+          source: "manual-map-stations",
+          paint: {
+            "circle-color": "#ffffff",
+            "circle-radius": [
+              "case",
+              ["==", ["get", "selected"], true],
+              7.6,
+              5.8,
+            ],
+            "circle-opacity": [
+              "case",
+              ["==", ["get", "nonTransfer"], true],
+              0.34,
+              0.96,
+            ],
+          },
+        });
+
+        map.addLayer({
+          id: "manual-map-stations-dot",
+          type: "circle",
+          source: "manual-map-stations",
+          paint: {
+            "circle-color": ["coalesce", ["get", "colorHex"], "#64748b"],
+            "circle-radius": [
+              "case",
+              ["==", ["get", "selected"], true],
+              5.4,
+              3.9,
+            ],
+            "circle-stroke-color": [
+              "case",
+              ["==", ["get", "selected"], true],
+              "#111827",
+              "#ffffff",
+            ],
+            "circle-stroke-width": [
+              "case",
+              ["==", ["get", "selected"], true],
+              2.2,
+              1.2,
+            ],
+            "circle-opacity": [
+              "case",
+              ["==", ["get", "nonTransfer"], true],
+              0.28,
+              0.96,
+            ],
+          },
+        });
+
+        map.addLayer({
+          id: "manual-map-station-labels",
+          type: "symbol",
+          source: "manual-map-stations",
+          minzoom: 12,
+          layout: {
+            "text-field": ["get", "nameKo"],
+            "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
+            "text-size": 11,
+            "text-offset": [0, -1.15],
+            "text-anchor": "bottom",
+            "text-allow-overlap": false,
+            "text-ignore-placement": false,
+          },
+          paint: {
+            "text-color": "#0f172a",
+            "text-halo-color": "#ffffff",
+            "text-halo-width": 1.4,
+            "text-opacity": [
+              "case",
+              ["==", ["get", "nonTransfer"], true],
+              0.42,
+              1,
+            ],
+          },
+        });
+
+        map.addLayer({
+          id: "manual-map-station-labels-selected",
+          type: "symbol",
+          source: "manual-map-stations",
+          filter: ["==", ["get", "selected"], true],
+          layout: {
+            "text-field": ["get", "nameKo"],
+            "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
+            "text-size": 12,
+            "text-offset": [0, -1.35],
+            "text-anchor": "bottom",
+            "text-allow-overlap": true,
+            "text-ignore-placement": true,
+          },
+          paint: {
+            "text-color": "#0f172a",
+            "text-halo-color": "#ffffff",
+            "text-halo-width": 1.6,
+          },
+        });
+
+        map.on("mouseenter", "manual-map-stations-dot", () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+
+        map.on("mouseleave", "manual-map-stations-dot", () => {
+          map.getCanvas().style.cursor = "";
+        });
+
+        map.on("click", "manual-map-stations-dot", (event) => {
+          const feature = event.features?.[0];
+          const props = feature?.properties as
+            Record<string, unknown> | undefined;
+          const stationId = String(props?.id ?? "");
+          if (!stationId) return;
+
+          setSelectedStationIds((previous) => {
+            if (previous.includes(stationId))
+              return previous.filter((id) => id !== stationId);
+            return [...previous, stationId];
+          });
+        });
+
         if (stationsRef.current.length > 0) {
           const bounds = new maplibregl.LngLatBounds();
-          for (const station of stationsRef.current) bounds.extend([station.lng, station.lat]);
-          map.fitBounds(bounds, { padding: getFitPadding(), maxZoom: 10.5, duration: 180 });
+          for (const station of stationsRef.current)
+            bounds.extend([station.lng, station.lat]);
+          map.fitBounds(bounds, {
+            padding: getFitPadding(),
+            maxZoom: 10.5,
+            duration: 180,
+          });
         }
 
         map.resize();
         resizeTimer = window.setTimeout(() => map.resize(), 80);
       });
-
-      map.on("zoom", updateZoom);
-      map.on("moveend", updateZoom);
 
       map.on("mousedown", (event) => {
         const originalEvent = event.originalEvent;
@@ -389,7 +662,8 @@ export default function ManualTransferMapEditor({
 
         selectionDragRef.current = null;
         map.dragPan.enable();
-        if (selectionBoxRef.current) selectionBoxRef.current.style.display = "none";
+        if (selectionBoxRef.current)
+          selectionBoxRef.current.style.display = "none";
 
         const left = Math.min(drag.startX, event.point.x);
         const right = Math.max(drag.startX, event.point.x);
@@ -400,11 +674,18 @@ export default function ManualTransferMapEditor({
 
         const selected = stationsRef.current.filter((station) => {
           const point = map.project([station.lng, station.lat]);
-          return point.x >= left && point.x <= right && point.y >= top && point.y <= bottom;
+          return (
+            point.x >= left &&
+            point.x <= right &&
+            point.y >= top &&
+            point.y <= bottom
+          );
         });
 
         const selectedIds = selected.map((station) => station.id);
-        setSelectedStationIds((previous) => [...new Set([...previous, ...selectedIds])]);
+        setSelectedStationIds((previous) => [
+          ...new Set([...previous, ...selectedIds]),
+        ]);
       });
     } catch (error) {
       setMapError(getMapErrorMessage(error));
@@ -412,8 +693,6 @@ export default function ManualTransferMapEditor({
 
     return () => {
       if (resizeTimer) window.clearTimeout(resizeTimer);
-      markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current = [];
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -423,7 +702,8 @@ export default function ManualTransferMapEditor({
     const map = mapRef.current;
     if (!map || !mapReady) return;
 
-    const source = map.getSource("manual-map-lines") as GeoJSONSource | undefined;
+    const source = map.getSource("manual-map-lines") as
+      GeoJSONSource | undefined;
     source?.setData(branchFeatures);
   }, [branchFeatures, mapReady]);
 
@@ -431,69 +711,46 @@ export default function ManualTransferMapEditor({
     const map = mapRef.current;
     if (!map || !mapReady) return;
 
-    markersRef.current.forEach((marker) => marker.remove());
-    markersRef.current = [];
-
-    for (const station of validStations) {
-      const selected = selectedStationIdSet.has(station.id);
-      const nonTransfer = nonTransferStationIdSet.has(station.id);
-      const color = station.colorHex ?? "#64748b";
-      const labelVisible = zoomLevel >= 12 || selected;
-      const labelBelow = getHash(station.id) % 3 === 0;
-
-      const element = document.createElement("button");
-      element.type = "button";
-      element.className = [
-        "rail-station-marker",
-        labelVisible ? "show-label" : "",
-        selected ? "selected" : "",
-        nonTransfer ? "non-transfer" : "",
-      ].filter(Boolean).join(" ");
-      element.setAttribute("aria-label", station.nameKo);
-
-      const label = document.createElement("span");
-      label.className = labelBelow ? "rail-station-label below" : "rail-station-label";
-      label.textContent = station.nameKo;
-      element.appendChild(label);
-
-      const dot = document.createElement("span");
-      dot.className = "rail-station-dot";
-      dot.style.backgroundColor = color;
-      dot.style.setProperty("--line-color", color);
-      element.appendChild(dot);
-
-      element.addEventListener("click", (event) => {
-        event.stopPropagation();
-        setSelectedStationIds((previous) => {
-          if (previous.includes(station.id)) return previous.filter((stationId) => stationId !== station.id);
-          return [...previous, station.id];
-        });
-      });
-
-      const marker = new maplibregl.Marker({ element })
-        .setLngLat([station.lng, station.lat])
-        .addTo(map);
-
-      markersRef.current.push(marker);
-    }
-  }, [mapReady, nonTransferStationIdSet, selectedStationIdSet, validStations, zoomLevel]);
+    const source = map.getSource("manual-map-stations") as
+      GeoJSONSource | undefined;
+    source?.setData(stationFeatures);
+  }, [mapReady, stationFeatures]);
 
   const setSelectedAsNonTransfer = async () => {
     if (selectedStationIds.length === 0) return;
-    const nextNonTransferStationIds = [...new Set([...nonTransferStationIds, ...selectedStationIds])];
-    await persist(groups, nextNonTransferStationIds, `${selectedStationIds.length}개 역을 미환승역으로 설정했습니다.`);
+    const nextNonTransferStationIds = [
+      ...new Set([...nonTransferStationIds, ...selectedStationIds]),
+    ];
+    await persist(
+      groups,
+      nextNonTransferStationIds,
+      `${selectedStationIds.length}개 역을 미환승역으로 설정했습니다.`,
+    );
   };
 
   const setSelectedAsTransferable = async () => {
     if (selectedStationIds.length === 0) return;
     const selectedSet = new Set(selectedStationIds);
-    const nextNonTransferStationIds = nonTransferStationIds.filter((stationId) => !selectedSet.has(stationId));
-    await persist(groups, nextNonTransferStationIds, `${selectedStationIds.length}개 역을 환승 가능역으로 설정했습니다.`);
+    const nextNonTransferStationIds = nonTransferStationIds.filter(
+      (stationId) => !selectedSet.has(stationId),
+    );
+    await persist(
+      groups,
+      nextNonTransferStationIds,
+      `${selectedStationIds.length}개 역을 환승 가능역으로 설정했습니다.`,
+    );
   };
 
   const saveGroup = async (group: ManualTransferGroup) => {
-    const nextGroups = [group, ...groups.filter((item) => item.id !== group.id)];
-    await persist(nextGroups, nonTransferStationIds, "수동 환승 그룹을 저장했습니다.");
+    const nextGroups = [
+      group,
+      ...groups.filter((item) => item.id !== group.id),
+    ];
+    await persist(
+      nextGroups,
+      nonTransferStationIds,
+      "수동 환승 그룹을 저장했습니다.",
+    );
     setGroupModalOpen(false);
     setSelectedStationIds([]);
   };
@@ -504,7 +761,9 @@ export default function ManualTransferMapEditor({
       <div ref={selectionBoxRef} className="map-selection-box" />
 
       <header className="map-editor-header-panel">
-        <a href="/" className="compact-back-link">← 홈</a>
+        <a href="/" className="compact-back-link">
+          ← 홈
+        </a>
         <div>
           <p className="eyebrow">Transfer Map Editor</p>
           <h1>수동 환승 그룹 맵 에디터</h1>
@@ -518,41 +777,92 @@ export default function ManualTransferMapEditor({
             <p className="eyebrow">Selection</p>
             <h2>{selectedStationIds.length}개 역 선택됨</h2>
           </div>
-          <button type="button" className="ghost-button" onClick={() => setSelectedStationIds([])}>해제</button>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setSelectedStationIds([])}
+          >
+            해제
+          </button>
         </div>
 
         <p className="map-editor-help">
-          Windows는 <strong>Ctrl</strong>, Mac은 <strong>Cmd</strong>를 누른 상태로 드래그하면 영역 안의 역을 선택합니다. 역 점을 직접 클릭해도 선택/해제됩니다.
+          Windows는 <strong>Ctrl</strong>, Mac은 <strong>Cmd</strong>를 누른
+          상태로 드래그하면 영역 안의 역을 선택합니다. 역 점을 직접 클릭해도
+          선택/해제됩니다.
         </p>
 
         <div className="map-editor-selected-list fixed-inner-scroll">
-          {selectedStations.length === 0 ? <p className="empty-box compact-empty">선택된 역이 없습니다.</p> : null}
+          {selectedStations.length === 0 ? (
+            <p className="empty-box compact-empty">선택된 역이 없습니다.</p>
+          ) : null}
           {selectedStations.map((station) => {
             const nonTransfer = nonTransferStationIdSet.has(station.id);
             return (
-              <div key={station.id} className={nonTransfer ? "selected-station-card compact-selected-station-card map-selected-card non-transfer" : "selected-station-card compact-selected-station-card map-selected-card"}>
-                <span className="station-order" style={station.colorHex ? { backgroundColor: station.colorHex } as CSSProperties : undefined} />
+              <div
+                key={station.id}
+                className={
+                  nonTransfer
+                    ? "selected-station-card compact-selected-station-card map-selected-card non-transfer"
+                    : "selected-station-card compact-selected-station-card map-selected-card"
+                }
+              >
+                <span
+                  className="station-order"
+                  style={
+                    station.colorHex
+                      ? ({ backgroundColor: station.colorHex } as CSSProperties)
+                      : undefined
+                  }
+                />
                 <div className="selected-station-main">
                   <strong>{station.nameKo}</strong>
-                  <span>{formatStationSubLabel(station)}{nonTransfer ? " · 미환승역" : ""}</span>
+                  <span>
+                    {formatStationSubLabel(station)}
+                    {nonTransfer ? " · 미환승역" : ""}
+                  </span>
                 </div>
-                <button type="button" className="icon-button" onClick={() => setSelectedStationIds((previous) => previous.filter((id) => id !== station.id))}>삭제</button>
+                <button
+                  type="button"
+                  className="icon-button"
+                  onClick={() =>
+                    setSelectedStationIds((previous) =>
+                      previous.filter((id) => id !== station.id),
+                    )
+                  }
+                >
+                  삭제
+                </button>
               </div>
             );
           })}
         </div>
 
         <div className="map-editor-action-grid">
-          <button type="button" className="secondary-button" disabled={selectedStationIds.length === 0 || saveState === "saving"} onClick={() => void setSelectedAsNonTransfer()}>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={selectedStationIds.length === 0 || saveState === "saving"}
+            onClick={() => void setSelectedAsNonTransfer()}
+          >
             미환승역으로 설정
           </button>
-          <button type="button" className="secondary-button" disabled={selectedStationIds.length === 0 || saveState === "saving"} onClick={() => void setSelectedAsTransferable()}>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={selectedStationIds.length === 0 || saveState === "saving"}
+            onClick={() => void setSelectedAsTransferable()}
+          >
             환승 가능역으로 설정
           </button>
           <button
             type="button"
             className="primary-button map-editor-wide-action"
-            disabled={!allSelectedAreTransferable || selectedStationIds.length < 2 || saveState === "saving"}
+            disabled={
+              !allSelectedAreTransferable ||
+              selectedStationIds.length < 2 ||
+              saveState === "saving"
+            }
             onClick={() => setGroupModalOpen(true)}
           >
             환승 그룹 생성
@@ -560,7 +870,9 @@ export default function ManualTransferMapEditor({
         </div>
 
         {!allSelectedAreTransferable && selectedStationIds.length > 0 ? (
-          <p className="map-editor-warning">미환승역이 포함되어 있어 환승 그룹을 만들 수 없습니다.</p>
+          <p className="map-editor-warning">
+            미환승역이 포함되어 있어 환승 그룹을 만들 수 없습니다.
+          </p>
         ) : null}
       </aside>
 
@@ -573,7 +885,9 @@ export default function ManualTransferMapEditor({
         </div>
       ) : null}
 
-      {!mapReady && !mapError ? <div className="map-editor-loading">지도를 불러오는 중입니다.</div> : null}
+      {!mapReady && !mapError ? (
+        <div className="map-editor-loading">지도를 불러오는 중입니다.</div>
+      ) : null}
 
       {groupModalOpen ? (
         <TransferGroupMapModal
@@ -598,11 +912,19 @@ function TransferGroupMapModal({
   onSave: (group: ManualTransferGroup) => void;
   saving: boolean;
 }) {
-  const suggestedGroupName = useMemo(() => getSuggestedGroupName(stations), [stations]);
-  const stationIds = useMemo(() => stations.map((station) => station.id), [stations]);
+  const suggestedGroupName = useMemo(
+    () => getSuggestedGroupName(stations),
+    [stations],
+  );
+  const stationIds = useMemo(
+    () => stations.map((station) => station.id),
+    [stations],
+  );
   const [groupName, setGroupName] = useState(suggestedGroupName);
   const [note, setNote] = useState("");
-  const [pairMinutes, setPairMinutes] = useState<Record<string, number | null>>(() => createPairMinutes(stationIds));
+  const [pairMinutes, setPairMinutes] = useState<Record<string, number | null>>(
+    () => createPairMinutes(stationIds),
+  );
 
   useEffect(() => {
     setGroupName(suggestedGroupName);
@@ -612,7 +934,10 @@ function TransferGroupMapModal({
   const updatePairMinutes = (pairKey: string, value: string) => {
     setPairMinutes((previous) => ({
       ...previous,
-      [pairKey]: value.trim() === "" ? null : Math.max(0, Math.round(Number(value) || 0)),
+      [pairKey]:
+        value.trim() === ""
+          ? null
+          : Math.max(0, Math.round(Number(value) || 0)),
     }));
   };
 
@@ -637,7 +962,9 @@ function TransferGroupMapModal({
             <p className="eyebrow">New Transfer Group</p>
             <h2>선택한 역으로 환승 그룹 생성</h2>
           </div>
-          <button type="button" className="ghost-button" onClick={onCancel}>닫기</button>
+          <button type="button" className="ghost-button" onClick={onCancel}>
+            닫기
+          </button>
         </header>
 
         <div className="map-group-modal-body fixed-inner-scroll">
@@ -645,20 +972,40 @@ function TransferGroupMapModal({
             <label className="input-label">
               그룹 이름
               <div className="group-name-row">
-                <input className="text-input" value={groupName} onChange={(event) => setGroupName(event.target.value)} />
-                <button type="button" className="inline-soft-button" onClick={() => setGroupName(suggestedGroupName)}>자동</button>
+                <input
+                  className="text-input"
+                  value={groupName}
+                  onChange={(event) => setGroupName(event.target.value)}
+                />
+                <button
+                  type="button"
+                  className="inline-soft-button"
+                  onClick={() => setGroupName(suggestedGroupName)}
+                >
+                  자동
+                </button>
               </div>
-              <span className="input-hint">추천 이름: {suggestedGroupName}</span>
+              <span className="input-hint">
+                추천 이름: {suggestedGroupName}
+              </span>
             </label>
             <label className="input-label">
               메모
-              <input className="text-input" placeholder="검증 근거 또는 설명" value={note} onChange={(event) => setNote(event.target.value)} />
+              <input
+                className="text-input"
+                placeholder="검증 근거 또는 설명"
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+              />
             </label>
           </div>
 
           <div className="selected-station-list compact-selected-list">
             {stations.map((station, index) => (
-              <div key={station.id} className="selected-station-card compact-selected-station-card">
+              <div
+                key={station.id}
+                className="selected-station-card compact-selected-station-card"
+              >
                 <span className="station-order">{index + 1}</span>
                 <div className="selected-station-main">
                   <strong>{station.nameKo}</strong>
@@ -680,7 +1027,9 @@ function TransferGroupMapModal({
             <table className="transfer-time-matrix">
               <thead>
                 <tr>
-                  <th scope="col" className="matrix-corner">역간 시간</th>
+                  <th scope="col" className="matrix-corner">
+                    역간 시간
+                  </th>
                   {stations.map((station) => (
                     <th key={station.id} scope="col">
                       <span>{station.nameKo}</span>
@@ -697,14 +1046,28 @@ function TransferGroupMapModal({
                       <small>{rowStation.lineNameKo}</small>
                     </th>
                     {stations.map((columnStation, columnIndex) => {
-                      if (rowIndex === columnIndex) return <td key={columnStation.id} className="matrix-diagonal">-</td>;
+                      if (rowIndex === columnIndex)
+                        return (
+                          <td
+                            key={columnStation.id}
+                            className="matrix-diagonal"
+                          >
+                            -
+                          </td>
+                        );
 
-                      const pairKey = makeTransferPairKey(rowStation.id, columnStation.id);
+                      const pairKey = makeTransferPairKey(
+                        rowStation.id,
+                        columnStation.id,
+                      );
                       const value = pairMinutes[pairKey];
 
                       if (rowIndex < columnIndex) {
                         return (
-                          <td key={columnStation.id} className="matrix-editable-cell">
+                          <td
+                            key={columnStation.id}
+                            className="matrix-editable-cell"
+                          >
                             <label>
                               <input
                                 type="number"
@@ -713,7 +1076,9 @@ function TransferGroupMapModal({
                                 value={value ?? ""}
                                 placeholder="분"
                                 aria-label={`${rowStation.nameKo}에서 ${columnStation.nameKo} 환승 시간`}
-                                onChange={(event) => updatePairMinutes(pairKey, event.target.value)}
+                                onChange={(event) =>
+                                  updatePairMinutes(pairKey, event.target.value)
+                                }
                               />
                               <span>분</span>
                             </label>
@@ -722,8 +1087,15 @@ function TransferGroupMapModal({
                       }
 
                       return (
-                        <td key={columnStation.id} className="matrix-mirrored-cell">
-                          {value === null || value === undefined ? <span className="muted-value">-</span> : <span>{value}분</span>}
+                        <td
+                          key={columnStation.id}
+                          className="matrix-mirrored-cell"
+                        >
+                          {value === null || value === undefined ? (
+                            <span className="muted-value">-</span>
+                          ) : (
+                            <span>{value}분</span>
+                          )}
                         </td>
                       );
                     })}
@@ -737,8 +1109,15 @@ function TransferGroupMapModal({
         <footer className="map-picker-footer">
           <p>저장하면 모달만 닫히고 맵 에디터에 그대로 머무릅니다.</p>
           <div className="map-picker-actions">
-            <button type="button" className="ghost-button" onClick={onCancel}>취소</button>
-            <button type="button" className="primary-button" disabled={saving || stations.length < 2} onClick={handleSave}>
+            <button type="button" className="ghost-button" onClick={onCancel}>
+              취소
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              disabled={saving || stations.length < 2}
+              onClick={handleSave}
+            >
               {saving ? "저장 중" : "저장"}
             </button>
           </div>
