@@ -1,13 +1,10 @@
-# Manual overlays
+# Manual Overlays
 
-공공 원본 데이터는 수정하지 않고, 사람이 보정한 데이터만 여기에 둔다.
+수동 보정 데이터는 공공 원본 데이터를 직접 수정하지 않고 이 파일에서 관리한다.
 
-## manual-overlays.json
+현재 지원 데이터:
 
-- `manualTransferEdges`: 실제 환승 가능하지만 원본 데이터에 없는 역-역 환승 연결
-- `stationOverrides`: 역 이름/좌표 등 수동 보정 예정
-- `branchOverrides`: 노선/구간 표시명 등 수동 보정 예정
-- `geometryOverrides`: 노선 선형 수동 보정 예정
+- `manualTransferEdges`: 역과 역 사이의 수동 환승 연결
 
-현재 viewer는 `apps/web/public/data/manual-overlays.json`을 읽어 `manualTransferEdges`를 경로 graph에 병합한다.
-local-editor는 이후 `data/manual/manual-overlays.json`을 편집하고 public 데이터로 동기화하는 방식으로 연결한다.
+웹 개발 서버에서 `/manual-transfer-editor`로 접속해 환승 edge를 추가, 수정, 삭제할 수 있다.
+변경 내용은 `apps/web/public/data/manual-overlays.json`과 `data/manual/manual-overlays.json`에 함께 저장된다.
