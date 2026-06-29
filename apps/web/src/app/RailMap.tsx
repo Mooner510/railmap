@@ -24,6 +24,7 @@ export interface RailMapBranch {
   role: string;
   sourceLineNumber: string;
   sourceLineName: string;
+  geometryOverrideCoordinates?: Array<[number, number]>;
   routeStops: Array<{
     id: string;
     sequence: number;
@@ -52,6 +53,18 @@ function isValidCoordinate(
 }
 
 function getBranchCoordinates(branch: RailMapBranch): LngLatTuple[] {
+  if (branch.geometryOverrideCoordinates && branch.geometryOverrideCoordinates.length >= 2) {
+    const overrideCoordinates = branch.geometryOverrideCoordinates
+      .map((coordinate): LngLatTuple | null => {
+        const [lng, lat] = coordinate;
+        if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+        return [lng, lat];
+      })
+      .filter((coordinate): coordinate is LngLatTuple => coordinate !== null);
+
+    if (overrideCoordinates.length >= 2) return smoothCoordinates(overrideCoordinates);
+  }
+
   const coordinates = branch.routeStops
     .map((stop) => stop.station)
     .filter(isValidCoordinate)

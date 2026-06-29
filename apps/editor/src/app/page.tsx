@@ -21,10 +21,10 @@ const editorCards = [
     status: "사용 가능",
   },
   {
-    href: "#",
+    href: "/geometry/map",
     title: "노선 선형",
-    description: "노선 중간 정점과 곡선을 직접 보정합니다.",
-    status: "준비 예정",
+    description: "전체화면 지도에서 노선 중간 정점과 곡선을 직접 보정합니다.",
+    status: "사용 가능",
   },
   {
     href: "#",

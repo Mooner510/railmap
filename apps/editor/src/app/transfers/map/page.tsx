@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import { getBundlePath, readManualOverlays } from "../../manualOverlayStore";
-import { normalizeSearchText, type EditorStation, type ManualStationOverride } from "../../editorModel";
+import { normalizeSearchText, type EditorStation, type ManualGeometryOverride, type ManualStationOverride } from "../../editorModel";
 import ManualTransferMapEditor, { type TransferMapBranch } from "./ManualTransferMapEditor";
 
 type CanonicalRouteStop = {
@@ -120,8 +120,13 @@ function applyStationOverrides(stations: EditorStation[], overrides: ManualStati
   });
 }
 
-function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[]): TransferMapBranch[] {
+function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geometryOverrides: ManualGeometryOverride[]): TransferMapBranch[] {
   const stationById = new Map(stations.map((station) => [station.id, station]));
+  const overrideByBranchId = new Map(
+    geometryOverrides
+      .filter((override) => override.enabled !== false && override.points.length >= 2)
+      .map((override) => [override.branchId, override]),
+  );
 
   return (bundle.lines ?? []).flatMap((line) =>
     (line.branches ?? []).map((branch) => ({
@@ -132,6 +137,9 @@ function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[]): Tran
       role: branch.role,
       sourceLineNumber: branch.sourceLineNumber,
       sourceLineName: branch.sourceLineName,
+      geometryOverrideCoordinates: overrideByBranchId.get(branch.id)?.points
+        .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
+        .map((point) => [point.lng, point.lat] as [number, number]),
       routeStops: branch.routeStops.map((stop) => {
         const stationId = getRouteStopStationId(stop);
         return {
@@ -166,7 +174,7 @@ async function readTransferMapData() {
 
   return {
     stations,
-    branches: toMapBranches(bundle, stations),
+    branches: toMapBranches(bundle, stations, overlays.geometryOverrides),
     overlays,
   };
 }

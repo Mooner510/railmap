@@ -27,6 +27,7 @@ export type TransferMapBranch = {
   role: string;
   sourceLineNumber: string;
   sourceLineName: string;
+  geometryOverrideCoordinates?: Array<[number, number]>;
   routeStops: Array<{
     id: string;
     sequence: number;
@@ -117,10 +118,19 @@ function buildBranchFeatures(branches: TransferMapBranch[]) {
     type: "FeatureCollection" as const,
     features: branches
       .map((branch) => {
-        const coordinates = branch.routeStops
-          .map((stop) => stop.station)
-          .filter(isValidCoordinate)
-          .map((station): LngLatTuple => [station.lng, station.lat]);
+        const overrideCoordinates = (branch.geometryOverrideCoordinates ?? [])
+          .map((coordinate): LngLatTuple | null => {
+            const [lng, lat] = coordinate;
+            if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+            return [lng, lat];
+          })
+          .filter((coordinate): coordinate is LngLatTuple => coordinate !== null);
+        const coordinates = overrideCoordinates.length >= 2
+          ? overrideCoordinates
+          : branch.routeStops
+              .map((stop) => stop.station)
+              .filter(isValidCoordinate)
+              .map((station): LngLatTuple => [station.lng, station.lat]);
 
         if (coordinates.length < 2) return null;
 
