@@ -4,6 +4,7 @@ export interface EditorStation {
   nameKo: string;
   lineNameKo: string;
   lineNumber?: string;
+  colorHex?: string | null;
   lat: number | null;
   lng: number | null;
 }
@@ -101,8 +102,6 @@ export function deriveTransferEdgesFromGroups(groups: ManualTransferGroup[]): Ma
   const edges: ManualTransferEdge[] = [];
 
   for (const group of groups) {
-    if (!group.enabled) continue;
-
     const stationIds = [...new Set(group.stationIds)].filter(Boolean);
     if (stationIds.length < 2) continue;
 
