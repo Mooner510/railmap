@@ -1,4 +1,7 @@
 {
   "schemaVersion": 1,
-  "manualTransferEdges": []
+  "manualTransferEdges": [],
+  "stationOverrides": [],
+  "branchOverrides": [],
+  "geometryOverrides": []
 }
