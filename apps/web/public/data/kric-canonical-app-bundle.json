@@ -18069,7 +18069,283 @@
       ]
     }
   ],
-  "manualTransferEdges": [],
+  "manualTransferEdges": [
+    {
+      "id": "transfer:seoul:line1-line4",
+      "fromStationId": "candidate:kric:urban-rail-station:I4101:0133:row-554",
+      "toStationId": "candidate:kric:urban-rail-station:I1104:0426:row-555",
+      "labelKo": "서울역 환승",
+      "transferMinutes": 5,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:seoul:line1-gyeongui",
+      "fromStationId": "candidate:kric:urban-rail-station:I4101:0133:row-554",
+      "toStationId": "candidate:kric:urban-rail-station:I4108:1251:row-557",
+      "labelKo": "서울역 환승",
+      "transferMinutes": 6,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:seoul:line1-airport",
+      "fromStationId": "candidate:kric:urban-rail-station:I4101:0133:row-554",
+      "toStationId": "candidate:kric:urban-rail-station:I28A1:A01:row-556",
+      "labelKo": "서울역 환승",
+      "transferMinutes": 6,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:seoul:line4-airport",
+      "fromStationId": "candidate:kric:urban-rail-station:I1104:0426:row-555",
+      "toStationId": "candidate:kric:urban-rail-station:I28A1:A01:row-556",
+      "labelKo": "서울역 환승",
+      "transferMinutes": 6,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gongdeok:line5-line6",
+      "fromStationId": "candidate:kric:urban-rail-station:S1105:0529:row-92",
+      "toStationId": "candidate:kric:urban-rail-station:S1106:0626:row-93",
+      "labelKo": "공덕역 환승",
+      "transferMinutes": 4,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gongdeok:line5-gyeongui",
+      "fromStationId": "candidate:kric:urban-rail-station:S1105:0529:row-92",
+      "toStationId": "candidate:kric:urban-rail-station:I4108:1262:row-95",
+      "labelKo": "공덕역 환승",
+      "transferMinutes": 5,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gongdeok:line5-airport",
+      "fromStationId": "candidate:kric:urban-rail-station:S1105:0529:row-92",
+      "toStationId": "candidate:kric:urban-rail-station:I28A1:A02:row-94",
+      "labelKo": "공덕역 환승",
+      "transferMinutes": 5,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gongdeok:line6-gyeongui",
+      "fromStationId": "candidate:kric:urban-rail-station:S1106:0626:row-93",
+      "toStationId": "candidate:kric:urban-rail-station:I4108:1262:row-95",
+      "labelKo": "공덕역 환승",
+      "transferMinutes": 5,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gongdeok:line6-airport",
+      "fromStationId": "candidate:kric:urban-rail-station:S1106:0626:row-93",
+      "toStationId": "candidate:kric:urban-rail-station:I28A1:A02:row-94",
+      "labelKo": "공덕역 환승",
+      "transferMinutes": 5,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gongdeok:gyeongui-airport",
+      "fromStationId": "candidate:kric:urban-rail-station:I4108:1262:row-95",
+      "toStationId": "candidate:kric:urban-rail-station:I28A1:A02:row-94",
+      "labelKo": "공덕역 환승",
+      "transferMinutes": 3,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:hongik:line2-gyeongui",
+      "fromStationId": "candidate:kric:urban-rail-station:S1102:0239:row-1078",
+      "toStationId": "candidate:kric:urban-rail-station:I4108:1264:row-1080",
+      "labelKo": "홍대입구역 환승",
+      "transferMinutes": 5,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:hongik:line2-airport",
+      "fromStationId": "candidate:kric:urban-rail-station:S1102:0239:row-1078",
+      "toStationId": "candidate:kric:urban-rail-station:I28A1:A03:row-1079",
+      "labelKo": "홍대입구역 환승",
+      "transferMinutes": 5,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:hongik:gyeongui-airport",
+      "fromStationId": "candidate:kric:urban-rail-station:I4108:1264:row-1080",
+      "toStationId": "candidate:kric:urban-rail-station:I28A1:A03:row-1079",
+      "labelKo": "홍대입구역 환승",
+      "transferMinutes": 3,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gimpo:line5-line9",
+      "fromStationId": "candidate:kric:urban-rail-station:S1105:0512:row-173",
+      "toStationId": "candidate:kric:urban-rail-station:S1109:4102:row-174",
+      "labelKo": "김포공항역 환승",
+      "transferMinutes": 4,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gimpo:line5-airport",
+      "fromStationId": "candidate:kric:urban-rail-station:S1105:0512:row-173",
+      "toStationId": "candidate:kric:urban-rail-station:I28A1:A05:row-175",
+      "labelKo": "김포공항역 환승",
+      "transferMinutes": 5,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gimpo:line5-gold",
+      "fromStationId": "candidate:kric:urban-rail-station:S1105:0512:row-173",
+      "toStationId": "candidate:kric:urban-rail-station:L41G1:G109:row-176",
+      "labelKo": "김포공항역 환승",
+      "transferMinutes": 5,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gimpo:line5-seohae",
+      "fromStationId": "candidate:kric:urban-rail-station:S1105:0512:row-173",
+      "toStationId": "candidate:kric:urban-rail-station:I41WS:1980:row-177",
+      "labelKo": "김포공항역 환승",
+      "transferMinutes": 6,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gimpo:line9-airport",
+      "fromStationId": "candidate:kric:urban-rail-station:S1109:4102:row-174",
+      "toStationId": "candidate:kric:urban-rail-station:I28A1:A05:row-175",
+      "labelKo": "김포공항역 환승",
+      "transferMinutes": 4,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gimpo:line9-gold",
+      "fromStationId": "candidate:kric:urban-rail-station:S1109:4102:row-174",
+      "toStationId": "candidate:kric:urban-rail-station:L41G1:G109:row-176",
+      "labelKo": "김포공항역 환승",
+      "transferMinutes": 4,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gimpo:line9-seohae",
+      "fromStationId": "candidate:kric:urban-rail-station:S1109:4102:row-174",
+      "toStationId": "candidate:kric:urban-rail-station:I41WS:1980:row-177",
+      "labelKo": "김포공항역 환승",
+      "transferMinutes": 5,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gimpo:airport-gold",
+      "fromStationId": "candidate:kric:urban-rail-station:I28A1:A05:row-175",
+      "toStationId": "candidate:kric:urban-rail-station:L41G1:G109:row-176",
+      "labelKo": "김포공항역 환승",
+      "transferMinutes": 4,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gimpo:airport-seohae",
+      "fromStationId": "candidate:kric:urban-rail-station:I28A1:A05:row-175",
+      "toStationId": "candidate:kric:urban-rail-station:I41WS:1980:row-177",
+      "labelKo": "김포공항역 환승",
+      "transferMinutes": 5,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:gimpo:gold-seohae",
+      "fromStationId": "candidate:kric:urban-rail-station:L41G1:G109:row-176",
+      "toStationId": "candidate:kric:urban-rail-station:I41WS:1980:row-177",
+      "labelKo": "김포공항역 환승",
+      "transferMinutes": 5,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:sindorim:line2-gyeongbu",
+      "fromStationId": "candidate:kric:urban-rail-station:S1102:0234:row-668",
+      "toStationId": "candidate:kric:urban-rail-station:I4101:1007:row-667",
+      "labelKo": "신도림역 환승",
+      "transferMinutes": 3,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    },
+    {
+      "id": "transfer:wangsimni:line2-line5",
+      "fromStationId": "candidate:kric:urban-rail-station:S1102:0208:row-801",
+      "toStationId": "candidate:kric:urban-rail-station:S1105:0540:row-802",
+      "labelKo": "왕십리역 환승",
+      "transferMinutes": 4,
+      "bidirectional": true,
+      "enabled": true,
+      "source": "manual",
+      "note": "실제 환승 가능하지만 KRIC 정차역 매칭만으로 연결되지 않는 역 간 수동 환승 edge입니다."
+    }
+  ],
   "stations": [
     {
       "id": "candidate:kric:urban-rail-station:I41K5:1501:row-1032",
