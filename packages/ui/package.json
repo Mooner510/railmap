@@ -3,7 +3,19 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
-    "./*": "./src/*.tsx"
+    "./button": "./src/button.tsx",
+    "./input": "./src/input.tsx",
+    "./badge": "./src/badge.tsx",
+    "./panel": "./src/panel.tsx",
+    "./dialog": "./src/dialog.tsx",
+    "./tabs": "./src/tabs.tsx",
+    "./toast": "./src/toast.tsx",
+    "./layout": "./src/layout.tsx",
+    "./hooks": "./src/hooks.ts",
+    "./utils": "./src/utils.ts",
+    "./slot": "./src/slot.tsx",
+    "./card": "./src/card.tsx",
+    "./code": "./src/code.tsx"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
@@ -21,6 +33,10 @@
   },
   "dependencies": {
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.6.0",
+    "class-variance-authority": "^0.7.1",
+    "lucide-react": "^1.22.0"
   }
 }
