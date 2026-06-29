@@ -338,29 +338,67 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
             <span className="helper-pill">항상 양방향</span>
           </div>
 
-          <div className="transfer-timetable">
-            {pairs.length === 0 ? <p className="empty-box compact-empty">역을 2개 이상 추가하면 시간표가 생성됩니다.</p> : null}
-            {pairs.map((pair) => (
-              <div key={pair.key} className="time-row">
-                <div className="time-route">
-                  <strong>{pair.from.nameKo}</strong>
-                  <span>↔</span>
-                  <strong>{pair.to.nameKo}</strong>
-                  <small>{pair.from.lineNameKo} / {pair.to.lineNameKo}</small>
-                </div>
-                <label className="time-input-label">
-                  <input
-                    type="number"
-                    min="0"
-                    className="time-input"
-                    value={pairMinutes[pair.key] ?? ""}
-                    placeholder="분"
-                    onChange={(event) => updatePairMinutes(pair.key, event.target.value)}
-                  />
-                  <span>분</span>
-                </label>
-              </div>
-            ))}
+          <div className="transfer-time-matrix-wrap">
+            {selectedStations.length < 2 ? (
+              <p className="empty-box compact-empty">역을 2개 이상 추가하면 시간표가 생성됩니다.</p>
+            ) : (
+              <table className="transfer-time-matrix">
+                <thead>
+                  <tr>
+                    <th scope="col" className="matrix-corner">역간 시간</th>
+                    {selectedStations.map((station) => (
+                      <th key={station.id} scope="col">
+                        <span>{station.nameKo}</span>
+                        <small>{station.lineNameKo}</small>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedStations.map((rowStation, rowIndex) => (
+                    <tr key={rowStation.id}>
+                      <th scope="row">
+                        <span>{rowStation.nameKo}</span>
+                        <small>{rowStation.lineNameKo}</small>
+                      </th>
+                      {selectedStations.map((columnStation, columnIndex) => {
+                        if (rowIndex === columnIndex) {
+                          return <td key={columnStation.id} className="matrix-diagonal">-</td>;
+                        }
+
+                        const pairKey = makeTransferPairKey(rowStation.id, columnStation.id);
+                        const value = pairMinutes[pairKey];
+
+                        if (rowIndex < columnIndex) {
+                          return (
+                            <td key={columnStation.id} className="matrix-editable-cell">
+                              <label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  className="matrix-time-input"
+                                  value={value ?? ""}
+                                  placeholder="분"
+                                  aria-label={`${rowStation.nameKo}에서 ${columnStation.nameKo} 환승 시간`}
+                                  onChange={(event) => updatePairMinutes(pairKey, event.target.value)}
+                                />
+                                <span>분</span>
+                              </label>
+                            </td>
+                          );
+                        }
+
+                        return (
+                          <td key={columnStation.id} className="matrix-mirrored-cell">
+                            {value === null || value === undefined ? <span className="muted-value">-</span> : <span>{value}분</span>}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
 
           <div className="action-row sticky-actions">
