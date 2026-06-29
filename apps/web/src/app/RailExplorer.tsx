@@ -1412,60 +1412,147 @@ function RouteResultSummary({
 }) {
   const originName = stationById.get(result.stationIds[0] ?? "")?.nameKo ?? "출발";
   const destinationName = stationById.get(result.stationIds[result.stationIds.length - 1] ?? "")?.nameKo ?? "도착";
-  const routeStationNames = result.stationIds
-    .map((stationId) => stationById.get(stationId)?.nameKo)
-    .filter((name): name is string => Boolean(name));
 
-  const segments: Array<{ branchId: string; lineNameKo: string; colorHex: string; stationCount: number }> = [];
+  const segments: Array<{
+    branchId: string;
+    lineNameKo: string;
+    sourceLineName: string;
+    colorHex: string;
+    fromStationId: string;
+    toStationId: string;
+    edgeCount: number;
+  }> = [];
 
-  for (const edge of result.edges) {
+  for (let index = 0; index < result.edges.length; index += 1) {
+    const edge = result.edges[index];
+    if (!edge) continue;
+
+    const fromStationId = result.stationIds[index];
+    const toStationId = result.stationIds[index + 1];
+    if (!fromStationId || !toStationId) continue;
+
     const last = segments[segments.length - 1];
 
     if (last && last.branchId === edge.branchId) {
-      last.stationCount += 1;
+      last.toStationId = toStationId;
+      last.edgeCount += 1;
     } else {
       segments.push({
         branchId: edge.branchId,
         lineNameKo: edge.lineNameKo,
+        sourceLineName: edge.sourceLineName,
         colorHex: edge.colorHex,
-        stationCount: 1,
+        fromStationId,
+        toStationId,
+        edgeCount: 1,
       });
     }
   }
 
   return (
-    <div className="mt-2 min-w-0 rounded border border-emerald-200 bg-emerald-50 px-2 py-1.5">
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <p className="shrink-0 text-[10px] font-bold tracking-wide text-emerald-700 uppercase">검색 결과</p>
-        <p className="min-w-0 truncate text-[10px] font-semibold text-emerald-700">
-          {formatNumber(result.stationIds.length)}역 · 환승 {formatNumber(result.transferCount)}회
+    <div className="mt-2 min-w-0 overflow-hidden border border-emerald-200 bg-white">
+      <div className="border-b border-emerald-100 bg-emerald-50 px-2.5 py-2">
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <p className="text-[10px] font-bold tracking-wide text-emerald-700 uppercase">경로 결과</p>
+          <p className="shrink-0 text-[10px] font-semibold text-emerald-700">
+            {formatNumber(result.stationIds.length)}역 · 환승 {formatNumber(result.transferCount)}회
+          </p>
+        </div>
+        <p className="mt-1 line-clamp-2 break-words text-xs font-bold leading-4 text-slate-950">
+          {originName} → {destinationName}
         </p>
       </div>
 
-      <p className="mt-1 truncate text-xs font-bold text-slate-900">
-        {originName} → {destinationName}
-      </p>
+      <div className="grid min-w-0 gap-0 px-2.5 py-2">
+        <RouteRoadmapEndpoint label="출발" stationName={originName} tone="origin" />
 
-      <div className="mt-1.5 grid min-w-0 gap-1">
-        {segments.slice(0, 4).map((segment, index) => (
-          <div key={`${segment.branchId}:${index}`} className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-slate-700">
-            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: segment.colorHex }} />
-            <span className="min-w-0 truncate">{segment.lineNameKo}</span>
-            <span className="shrink-0 text-[10px] font-medium text-slate-400">{formatNumber(segment.stationCount + 1)}역</span>
-          </div>
-        ))}
-        {segments.length > 4 ? (
-          <p className="text-[10px] font-semibold text-slate-400">외 {formatNumber(segments.length - 4)}개 구간</p>
-        ) : null}
+        {segments.map((segment, index) => {
+          const fromName = stationById.get(segment.fromStationId)?.nameKo ?? "이전 역";
+          const toName = stationById.get(segment.toStationId)?.nameKo ?? "다음 역";
+          const isTransfer = index > 0;
+
+          return (
+            <div key={`${segment.branchId}:${index}:${segment.fromStationId}:${segment.toStationId}`} className="min-w-0">
+              {isTransfer ? <RouteTransferStep stationName={fromName} /> : null}
+              <RouteRoadmapSegment
+                colorHex={segment.colorHex}
+                lineName={segment.lineNameKo}
+                sourceLineName={segment.sourceLineName}
+                fromStationName={fromName}
+                toStationName={toName}
+                stationCount={segment.edgeCount + 1}
+              />
+            </div>
+          );
+        })}
+
+        <RouteRoadmapEndpoint label="도착" stationName={destinationName} tone="destination" />
       </div>
+    </div>
+  );
+}
 
-      {routeStationNames.length > 2 ? (
-        <p className="mt-1.5 line-clamp-3 break-words text-[10px] font-medium leading-4 text-slate-500">
-          {routeStationNames.slice(0, 10).join(" → ")}{routeStationNames.length > 10 ? " → ..." : ""}
+function RouteRoadmapEndpoint({
+  label,
+  stationName,
+  tone,
+}: {
+  label: string;
+  stationName: string;
+  tone: "origin" | "destination";
+}) {
+  const dotClass = tone === "origin" ? "bg-sky-500" : "bg-amber-500";
+  const labelClass = tone === "origin" ? "text-sky-600" : "text-amber-600";
+
+  return (
+    <div className="flex min-w-0 items-center gap-2 py-1">
+      <span className={`h-3 w-3 shrink-0 rounded-full ${dotClass}`} />
+      <div className="min-w-0">
+        <p className={`text-[10px] font-bold ${labelClass}`}>{label}</p>
+        <p className="truncate text-xs font-bold text-slate-950">{stationName}</p>
+      </div>
+    </div>
+  );
+}
+
+function RouteTransferStep({ stationName }: { stationName: string }) {
+  return (
+    <div className="ml-1.5 flex min-w-0 items-center gap-2 border-l-2 border-dashed border-slate-300 py-1.5 pl-3">
+      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">환승</span>
+      <p className="min-w-0 truncate text-[11px] font-semibold text-slate-600">{stationName}</p>
+    </div>
+  );
+}
+
+function RouteRoadmapSegment({
+  colorHex,
+  lineName,
+  sourceLineName,
+  fromStationName,
+  toStationName,
+  stationCount,
+}: {
+  colorHex: string;
+  lineName: string;
+  sourceLineName: string;
+  fromStationName: string;
+  toStationName: string;
+  stationCount: number;
+}) {
+  const lineLabel = sourceLineName && sourceLineName !== lineName ? `${lineName} · ${sourceLineName}` : lineName;
+
+  return (
+    <div className="ml-1.5 min-w-0 border-l-2 py-1.5 pl-3" style={{ borderColor: colorHex }}>
+      <div className="min-w-0 border border-slate-200 bg-slate-50 px-2 py-1.5">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colorHex }} />
+          <p className="min-w-0 truncate text-xs font-bold text-slate-900">{lineLabel}</p>
+        </div>
+        <p className="mt-1 break-words text-[11px] font-medium leading-4 text-slate-600">
+          {fromStationName} → {toStationName}
         </p>
-      ) : null}
-
-      <p className="mt-1 text-[10px] font-semibold text-emerald-700">지도에 경로가 강조 표시됩니다.</p>
+        <p className="mt-0.5 text-[10px] font-semibold text-slate-400">{formatNumber(stationCount)}개 역 이동</p>
+      </div>
     </div>
   );
 }
