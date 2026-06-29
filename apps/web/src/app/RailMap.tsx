@@ -292,7 +292,17 @@ export default function RailMap({
     () => buildHighlightedRouteFeature(stations, highlightedRouteStationIds),
     [stations, highlightedRouteStationIds],
   );
+  const branchFeaturesRef = useRef(branchFeatures);
+  const highlightedRouteFeaturesRef = useRef(highlightedRouteFeatures);
   const highlightedRouteStationIdSet = useMemo(() => new Set(highlightedRouteStationIds), [highlightedRouteStationIds]);
+
+  useEffect(() => {
+    branchFeaturesRef.current = branchFeatures;
+  }, [branchFeatures]);
+
+  useEffect(() => {
+    highlightedRouteFeaturesRef.current = highlightedRouteFeatures;
+  }, [highlightedRouteFeatures]);
   const selectedBranch = useMemo(
     () => branches.find((branch) => branch.id === selectedBranchId) ?? null,
     [branches, selectedBranchId],
@@ -419,18 +429,12 @@ export default function RailMap({
 
           map.addSource("branch-preview-lines", {
             type: "geojson",
-            data: {
-              type: "FeatureCollection",
-              features: [],
-            },
+            data: branchFeaturesRef.current,
           });
 
           map.addSource("route-result-lines", {
             type: "geojson",
-            data: {
-              type: "FeatureCollection",
-              features: [],
-            },
+            data: highlightedRouteFeaturesRef.current,
           });
 
           map.addLayer({
@@ -608,45 +612,22 @@ export default function RailMap({
 
     const updateSource = () => {
       const source = map.getSource("branch-preview-lines") as GeoJSONSource | undefined;
-
-      if (!source) return false;
-
+      if (!source) return;
       source.setData(branchFeatures);
-      return true;
     };
 
-    const runUpdate = () => {
-      window.requestAnimationFrame(() => {
-        updateSource();
-      });
-    };
-
-    if (map.isStyleLoaded()) {
-      runUpdate();
-      map.once("idle", runUpdate);
-    } else {
-      map.once("load", runUpdate);
-    }
+    updateSource();
   }, [branchFeatures, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !mapReady) return;
 
-    const updateSource = () => {
-      const source = map.getSource("route-result-lines") as GeoJSONSource | undefined;
+    const source = map.getSource("route-result-lines") as GeoJSONSource | undefined;
+    if (!source) return;
 
-      if (!source) return;
-
-      source.setData(highlightedRouteFeatures);
-    };
-
-    if (map.isStyleLoaded()) {
-      updateSource();
-    } else {
-      map.once("load", updateSource);
-    }
-  }, [highlightedRouteFeatures]);
+    source.setData(highlightedRouteFeatures);
+  }, [highlightedRouteFeatures, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;

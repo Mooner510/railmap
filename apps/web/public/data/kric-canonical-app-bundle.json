@@ -16,7 +16,7 @@
   "counts": {
     "canonicalLines": 34,
     "branches": 43,
-    "stations": 1002,
+    "stations": 1003,
     "routeStops": 1017,
     "skippedRouteStops": 0,
     "missingCanonicalLines": 1
@@ -10527,15 +10527,17 @@
               "sourceLineName": "분당선",
               "role": "branch",
               "sequence": 23,
-              "stationId": "candidate:kric:urban-rail-station:S2702:0224:row-942",
+              "stationId": "candidate:kric:urban-rail-station:I4105:1862:row-943",
               "sourceStationCode": "1862",
               "displayNameKo": "죽전역",
-              "matchStatus": "name-based",
-              "confidence": "low",
+              "matchStatus": "manual-override",
+              "confidence": "manual-override",
               "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:23",
               "diagnostics": [
                 "matched-by-global-normalized-name",
-                "ambiguous-name-match-resolved-by-first-global-candidate"
+                "ambiguous-name-match-resolved-by-first-global-candidate",
+                "manual-override:suwon-bundang-jukjeon-station",
+                "fix-ambiguous-jukjeon-name-match"
               ]
             },
             {
@@ -30091,6 +30093,18 @@
       "lng": 127.314581,
       "operatorNameKo": "대전교통공사",
       "sourceCandidateId": "candidate:kric:urban-rail-station:S3001:0122:row-407"
+    },
+    {
+      "id": "candidate:kric:urban-rail-station:I4105:1862:row-943",
+      "stationNumber": "1862",
+      "nameKo": "죽전역",
+      "nameEn": "Jukjeon",
+      "lineNumber": "I4105",
+      "lineNameKo": "분당선",
+      "lat": 37.324583,
+      "lng": 127.107417,
+      "operatorNameKo": "한국철도공사",
+      "sourceCandidateId": "candidate:kric:urban-rail-station:I4105:1862:row-943"
     }
   ],
   "routeStops": [
