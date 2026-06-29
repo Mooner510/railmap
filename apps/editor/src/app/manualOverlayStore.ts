@@ -80,7 +80,7 @@ function normalizeTransferGroup(value: unknown, index: number): ManualTransferGr
     nameKo,
     stationIds,
     transferMinutesByPair: normalizeMinutesByPair(group.transferMinutesByPair, stationIds),
-    enabled: group.enabled !== false,
+    enabled: true,
     source: asString(group.source) ?? "editor",
     note: asNullableString(group.note),
   };

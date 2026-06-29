@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import {
   makeTransferGroupId,
   makeTransferPairKey,
@@ -85,7 +85,6 @@ function fingerprintGroups(groups: ManualTransferGroup[], nonTransferStationIds:
       nameKo: group.nameKo,
       stationIds: group.stationIds,
       transferMinutesByPair: group.transferMinutesByPair,
-      enabled: group.enabled,
       note: group.note ?? null,
     }))
     .sort((a, b) => a.id.localeCompare(b.id));
@@ -107,7 +106,6 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
   const [groupName, setGroupName] = useState("새 환승 그룹");
   const [groupNameTouched, setGroupNameTouched] = useState(false);
   const [note, setNote] = useState("");
-  const [enabled, setEnabled] = useState(true);
   const [selectedStationIds, setSelectedStationIds] = useState<string[]>([]);
   const [pairMinutes, setPairMinutes] = useState<Record<string, number | null>>({});
   const [stationQuery, setStationQuery] = useState("");
@@ -236,7 +234,6 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
     setGroupName("새 환승 그룹");
     setGroupNameTouched(false);
     setNote("");
-    setEnabled(true);
     setSelectedStationIds([]);
     setPairMinutes({});
     setStationQuery("");
@@ -249,7 +246,6 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
     setGroupName(group.nameKo);
     setGroupNameTouched(true);
     setNote(group.note ?? "");
-    setEnabled(group.enabled);
     setSelectedStationIds(group.stationIds);
     setPairMinutes(createEmptyPairMinutes(group.stationIds, group.transferMinutesByPair));
     setStationQuery("");
@@ -294,15 +290,21 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
       nameKo,
       stationIds: selectedStationIds,
       transferMinutesByPair: createEmptyPairMinutes(selectedStationIds, pairMinutes),
-      enabled,
+      enabled: true,
       source: "editor",
       note: note.trim() || null,
     };
     const nextGroups = [nextGroup, ...groups.filter((group) => group.id !== id)];
     const nextNonTransferStationIds = nonTransferStationIds.filter((stationId) => !selectedStationIds.includes(stationId));
 
-    setEditingGroupId(id);
-    await persistEditorState(nextGroups, nextNonTransferStationIds, editingGroupId ? "그룹 수정사항을 저장했습니다." : "새 환승 그룹을 추가하고 저장했습니다.");
+    const wasEditing = Boolean(editingGroupId);
+    await persistEditorState(nextGroups, nextNonTransferStationIds, wasEditing ? "그룹 수정사항을 저장했습니다." : "새 환승 그룹을 추가하고 저장했습니다.");
+
+    if (!wasEditing) {
+      resetForm();
+    } else {
+      setEditingGroupId(id);
+    }
   };
 
   const deleteGroup = async (groupId: string) => {
@@ -311,10 +313,6 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
     await persistGroups(nextGroups, "환승 그룹을 삭제하고 저장했습니다.");
   };
 
-  const toggleGroup = async (groupId: string) => {
-    const nextGroups = groups.map((group) => (group.id === groupId ? { ...group, enabled: !group.enabled } : group));
-    await persistGroups(nextGroups, "그룹 활성화 상태를 저장했습니다.");
-  };
 
   return (
     <div className="transfer-editor-shell compact-transfer-editor">
@@ -351,7 +349,6 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
                 active={editingGroupId === group.id}
                 stations={group.stationIds.map((stationId) => stationById.get(stationId)).filter((station): station is EditorStation => station !== undefined)}
                 onEdit={() => loadGroup(group)}
-                onToggle={() => void toggleGroup(group.id)}
                 onDelete={() => void deleteGroup(group.id)}
               />
             ))}
@@ -390,15 +387,35 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
                 <div key={station.id} className={isNonTransferStation ? "station-search-item non-transfer-search-item" : "station-search-item"}>
                   <button type="button" className="station-search-main-button" onClick={() => addStation(station)} disabled={isNonTransferStation}>
                     <span className="station-search-name">{highlightMatch(station.nameKo, stationQuery)}</span>
-                    <span className="station-search-meta">{highlightMatch(station.lineNameKo, stationQuery)} · {station.stationNumber}</span>
+                    <span className="station-search-meta">
+                      <span
+                        className="line-color-label"
+                        style={station.colorHex ? { "--line-color": station.colorHex } as CSSProperties : undefined}
+                      >
+                        {highlightMatch(station.lineNameKo, stationQuery)}
+                      </span>
+                      <span>{station.stationNumber}</span>
+                    </span>
                   </button>
                   {isNonTransferStation ? (
-                    <button type="button" className="secondary-button compact-station-action" onClick={() => void restoreTransferStation(station.id)}>
-                      환승역으로 전환
+                    <button
+                      type="button"
+                      className="icon-only-action restore-action"
+                      title="환승역으로 전환"
+                      aria-label={`${station.nameKo} 환승역으로 전환`}
+                      onClick={() => void restoreTransferStation(station.id)}
+                    >
+                      ↩
                     </button>
                   ) : (
-                    <button type="button" className="ghost-button compact-station-action" onClick={() => void addNonTransferStation(station)}>
-                      미환승역으로 추가
+                    <button
+                      type="button"
+                      className="icon-only-action exclude-action"
+                      title="미환승역으로 추가"
+                      aria-label={`${station.nameKo} 미환승역으로 추가`}
+                      onClick={() => void addNonTransferStation(station)}
+                    >
+                      ⊘
                     </button>
                   )}
                 </div>
@@ -536,12 +553,9 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
           </div>
 
           <div className="action-row sticky-actions compact-sticky-actions">
-            <label className="toggle-row">
-              <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
-              그룹 활성화
-            </label>
+            <p className="auto-save-hint">목록에 있으면 활성 환승 그룹으로 사용됩니다. 삭제하면 비활성 처리됩니다.</p>
             <button type="button" className="primary-button" disabled={saveState === "saving"} onClick={() => void upsertGroup()}>
-              {saveState === "saving" ? "저장 중" : editingGroupId ? "변경사항 저장" : "환승 그룹 추가"}
+              {saveState === "saving" ? "저장 중" : editingGroupId ? "수정 반영" : "환승 그룹 추가"}
             </button>
           </div>
 
@@ -557,14 +571,12 @@ function TransferGroupCard({
   stations,
   active,
   onEdit,
-  onToggle,
   onDelete,
 }: {
   group: ManualTransferGroup;
   stations: EditorStation[];
   active: boolean;
   onEdit: () => void;
-  onToggle: () => void;
   onDelete: () => void;
 }) {
   return (
@@ -572,9 +584,8 @@ function TransferGroupCard({
       <div className="group-card-top">
         <div>
           <p className="group-title">{group.nameKo}</p>
-          <p className="group-meta">{stations.length}개 역 · {group.enabled ? "활성" : "비활성"}</p>
+          <p className="group-meta">{stations.length}개 역 · viewer 반영 대상</p>
         </div>
-        <span className={group.enabled ? "status-pill" : "status-pill off"}>{group.enabled ? "ON" : "OFF"}</span>
       </div>
       <div className="group-station-chips">
         {stations.map((station) => (
@@ -584,7 +595,6 @@ function TransferGroupCard({
       {group.note ? <p className="group-note">{group.note}</p> : null}
       <div className="edge-actions">
         <button type="button" className="secondary-button" onClick={onEdit}>편집</button>
-        <button type="button" className="secondary-button" onClick={onToggle}>{group.enabled ? "비활성" : "활성"}</button>
         <button type="button" className="danger-button" onClick={onDelete}>삭제</button>
       </div>
     </div>

@@ -117,8 +117,6 @@ function deriveTransferEdgesFromGroups(groups: ManualTransferGroup[]): ManualTra
   const edges: ManualTransferEdge[] = [];
 
   for (const group of groups) {
-    if (!group.enabled) continue;
-
     const stationIds = [...new Set(group.stationIds)].filter(Boolean);
     if (stationIds.length < 2) continue;
 
