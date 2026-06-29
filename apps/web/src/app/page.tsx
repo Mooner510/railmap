@@ -59,6 +59,17 @@ interface CanonicalStation {
 }
 
 
+
+interface ManualTransferGroup {
+  id: string;
+  nameKo: string;
+  stationIds: string[];
+  transferMinutesByPair?: Record<string, number | null>;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 interface ManualTransferEdge {
   id: string;
   fromStationId: string;
@@ -93,7 +104,47 @@ interface CanonicalBundle {
 
 interface ManualOverlays {
   schemaVersion: 1;
+  manualTransferGroups: ManualTransferGroup[];
   manualTransferEdges: ManualTransferEdge[];
+}
+
+function makeTransferPairKey(stationIdA: string, stationIdB: string) {
+  return [stationIdA, stationIdB].slice().sort().join("<->");
+}
+
+function deriveTransferEdgesFromGroups(groups: ManualTransferGroup[]): ManualTransferEdge[] {
+  const edges: ManualTransferEdge[] = [];
+
+  for (const group of groups) {
+    if (!group.enabled) continue;
+
+    const stationIds = [...new Set(group.stationIds)].filter(Boolean);
+    if (stationIds.length < 2) continue;
+
+    for (let i = 0; i < stationIds.length - 1; i += 1) {
+      for (let j = i + 1; j < stationIds.length; j += 1) {
+        const fromStationId = stationIds[i];
+        const toStationId = stationIds[j];
+        if (!fromStationId || !toStationId || fromStationId === toStationId) continue;
+
+        const pairKey = makeTransferPairKey(fromStationId, toStationId);
+
+        edges.push({
+          id: `${group.id}:${pairKey}`,
+          fromStationId,
+          toStationId,
+          labelKo: group.nameKo || "수동 환승",
+          transferMinutes: group.transferMinutesByPair?.[pairKey] ?? null,
+          bidirectional: true,
+          enabled: true,
+          source: "editor-group",
+          note: group.note ?? null,
+        });
+      }
+    }
+  }
+
+  return edges;
 }
 
 function readManualOverlays(): ManualOverlays {
@@ -107,14 +158,21 @@ function readManualOverlays(): ManualOverlays {
 
     const parsed = JSON.parse(fs.readFileSync(candidate, "utf8")) as Partial<ManualOverlays>;
 
+    const manualTransferGroups = Array.isArray(parsed.manualTransferGroups) ? parsed.manualTransferGroups : [];
+    const legacyEdges = Array.isArray(parsed.manualTransferEdges)
+      ? parsed.manualTransferEdges.filter((edge) => edge.source !== "editor-group")
+      : [];
+
     return {
       schemaVersion: 1,
-      manualTransferEdges: Array.isArray(parsed.manualTransferEdges) ? parsed.manualTransferEdges : [],
+      manualTransferGroups,
+      manualTransferEdges: [...legacyEdges, ...deriveTransferEdgesFromGroups(manualTransferGroups)],
     };
   }
 
   return {
     schemaVersion: 1,
+    manualTransferGroups: [],
     manualTransferEdges: [],
   };
 }

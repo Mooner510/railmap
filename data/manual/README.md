@@ -1,27 +1,16 @@
-# Manual Overlays
+# Manual overlays
 
-수동 보정 데이터는 공공 원본 데이터를 직접 수정하지 않고 `data/manual/manual-overlays.json`에서 관리한다.
+공공 데이터 원본을 직접 수정하지 않고, 사람이 보정한 데이터를 별도로 저장하는 영역입니다.
 
-현재 구조:
+## manual-overlays.json
 
-- `manualTransferEdges`: 역과 역 사이의 수동 환승 연결
-- `stationOverrides`: 역 이름/좌표/표시 여부 수동 보정
-- `branchOverrides`: 노선 구간 표시 정보 수동 보정
-- `geometryOverrides`: 노선 선형 수동 보정
+### manualTransferGroups
 
-운영 규칙:
+수동 환승은 개별 A-B edge가 아니라 `환승 그룹`으로 관리합니다.
 
-- `apps/web`은 읽기 전용 viewer다.
-- 수동 데이터 수정은 `apps/editor`에서 한다.
-- `apps/editor`는 저장 시 `data/manual/manual-overlays.json`과 `apps/web/public/data/manual-overlays.json`을 함께 갱신한다.
-- `apps/web/public/data/manual-overlays.json`은 viewer 개발 서버에서 즉시 확인하기 위한 배포용 복사본이다.
+- `stationIds`: 같은 환승 그룹에 포함된 역 목록입니다.
+- 같은 그룹 안의 역들은 항상 서로 양방향 환승 가능합니다.
+- `transferMinutesByPair`: 역 쌍별 환승 시간입니다. key는 station id를 정렬한 뒤 `<->`로 연결합니다.
+- editor에서 저장하면 viewer는 이 그룹을 경로 탐색용 transfer edge로 변환해서 사용합니다.
 
-수동 환승 편집:
-
-1. `pnpm --filter editor dev`
-2. `http://localhost:3001/transfers` 접속
-3. 출발 환승 역과 도착 환승 역 선택
-4. 환승 시간, 표시 이름, 메모 입력
-5. `환승 edge 추가`
-6. `manual-overlays.json 저장`
-7. viewer 새로고침 후 경로 검색 확인
+샘플 데이터는 넣지 않습니다. 실제 보정은 `apps/editor`의 `/transfers`에서 추가합니다.

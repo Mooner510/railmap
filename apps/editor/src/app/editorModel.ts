@@ -8,6 +8,16 @@ export interface EditorStation {
   lng: number | null;
 }
 
+export interface ManualTransferGroup {
+  id: string;
+  nameKo: string;
+  stationIds: string[];
+  transferMinutesByPair: Record<string, number | null>;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 export interface ManualTransferEdge {
   id: string;
   fromStationId: string;
@@ -52,6 +62,7 @@ export interface ManualGeometryOverride {
 
 export interface ManualOverlayBundle {
   schemaVersion: 1;
+  manualTransferGroups: ManualTransferGroup[];
   manualTransferEdges: ManualTransferEdge[];
   stationOverrides: ManualStationOverride[];
   branchOverrides: ManualBranchOverride[];
@@ -64,6 +75,7 @@ export interface CanonicalBundle {
 
 export const EMPTY_MANUAL_OVERLAY_BUNDLE: ManualOverlayBundle = {
   schemaVersion: 1,
+  manualTransferGroups: [],
   manualTransferEdges: [],
   stationOverrides: [],
   branchOverrides: [],
@@ -74,6 +86,47 @@ export function normalizeSearchText(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, "");
 }
 
-export function makeTransferId(fromStationId: string, toStationId: string) {
-  return `manual-transfer:${fromStationId}:${toStationId}`;
+export function makeTransferGroupId(nameKo: string, stationIds: string[]) {
+  const slug = normalizeSearchText(nameKo || "transfer") || "transfer";
+  return `manual-transfer-group:${slug}:${stationIds.slice().sort().join(":")}`;
+}
+
+export function makeTransferPairKey(stationIdA: string, stationIdB: string) {
+  return [stationIdA, stationIdB].slice().sort().join("<->");
+}
+
+export function deriveTransferEdgesFromGroups(groups: ManualTransferGroup[]): ManualTransferEdge[] {
+  const edges: ManualTransferEdge[] = [];
+
+  for (const group of groups) {
+    if (!group.enabled) continue;
+
+    const stationIds = [...new Set(group.stationIds)].filter(Boolean);
+    if (stationIds.length < 2) continue;
+
+    for (let i = 0; i < stationIds.length - 1; i += 1) {
+      for (let j = i + 1; j < stationIds.length; j += 1) {
+        const fromStationId = stationIds[i];
+        const toStationId = stationIds[j];
+        if (!fromStationId || !toStationId || fromStationId === toStationId) continue;
+
+        const pairKey = makeTransferPairKey(fromStationId, toStationId);
+        const transferMinutes = group.transferMinutesByPair[pairKey] ?? null;
+
+        edges.push({
+          id: `${group.id}:${pairKey}`,
+          fromStationId,
+          toStationId,
+          labelKo: group.nameKo || "수동 환승",
+          transferMinutes,
+          bidirectional: true,
+          enabled: true,
+          source: "editor-group",
+          note: group.note ?? null,
+        });
+      }
+    }
+  }
+
+  return edges;
 }

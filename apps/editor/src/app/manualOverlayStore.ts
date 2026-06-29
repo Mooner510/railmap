@@ -2,8 +2,11 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   EMPTY_MANUAL_OVERLAY_BUNDLE,
+  deriveTransferEdgesFromGroups,
+  makeTransferPairKey,
   type ManualOverlayBundle,
   type ManualTransferEdge,
+  type ManualTransferGroup,
 } from "./editorModel";
 
 function projectRoot() {
@@ -46,7 +49,44 @@ function asNullableNumber(value: unknown): number | null {
   return Number.isFinite(numberValue) ? Math.max(0, Math.round(numberValue)) : null;
 }
 
-function normalizeTransferEdge(value: unknown, index: number): ManualTransferEdge | null {
+function normalizeMinutesByPair(value: unknown, stationIds: string[]): Record<string, number | null> {
+  const result: Record<string, number | null> = {};
+  const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+
+  for (let i = 0; i < stationIds.length - 1; i += 1) {
+    for (let j = i + 1; j < stationIds.length; j += 1) {
+      const pairKey = makeTransferPairKey(stationIds[i] ?? "", stationIds[j] ?? "");
+      result[pairKey] = asNullableNumber(source[pairKey]);
+    }
+  }
+
+  return result;
+}
+
+function normalizeTransferGroup(value: unknown, index: number): ManualTransferGroup | null {
+  if (!value || typeof value !== "object") return null;
+
+  const group = value as Record<string, unknown>;
+  const stationIds = Array.isArray(group.stationIds)
+    ? [...new Set(group.stationIds.map(asString).filter((id): id is string => id !== null))]
+    : [];
+
+  if (stationIds.length < 2) return null;
+
+  const nameKo = asString(group.nameKo) ?? `수동 환승 그룹 ${index + 1}`;
+
+  return {
+    id: asString(group.id) ?? `manual-transfer-group:${index + 1}`,
+    nameKo,
+    stationIds,
+    transferMinutesByPair: normalizeMinutesByPair(group.transferMinutesByPair, stationIds),
+    enabled: group.enabled !== false,
+    source: asString(group.source) ?? "editor",
+    note: asNullableString(group.note),
+  };
+}
+
+function normalizeLegacyTransferEdge(value: unknown, index: number): ManualTransferEdge | null {
   if (!value || typeof value !== "object") return null;
 
   const edge = value as Record<string, unknown>;
@@ -61,9 +101,9 @@ function normalizeTransferEdge(value: unknown, index: number): ManualTransferEdg
     toStationId,
     labelKo: asNullableString(edge.labelKo),
     transferMinutes: asNullableNumber(edge.transferMinutes),
-    bidirectional: edge.bidirectional !== false,
+    bidirectional: true,
     enabled: edge.enabled !== false,
-    source: asString(edge.source) ?? "editor",
+    source: asString(edge.source) ?? "manual",
     note: asNullableString(edge.note),
   };
 }
@@ -72,14 +112,21 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
   if (!value || typeof value !== "object") return EMPTY_MANUAL_OVERLAY_BUNDLE;
 
   const data = value as Partial<ManualOverlayBundle>;
+  const manualTransferGroups = Array.isArray(data.manualTransferGroups)
+    ? data.manualTransferGroups
+        .map((group, index) => normalizeTransferGroup(group, index))
+        .filter((group): group is ManualTransferGroup => group !== null)
+    : [];
+  const legacyEdges = Array.isArray(data.manualTransferEdges)
+    ? data.manualTransferEdges
+        .map((edge, index) => normalizeLegacyTransferEdge(edge, index))
+        .filter((edge): edge is ManualTransferEdge => edge !== null && edge.source !== "editor-group")
+    : [];
 
   return {
     schemaVersion: 1,
-    manualTransferEdges: Array.isArray(data.manualTransferEdges)
-      ? data.manualTransferEdges
-          .map((edge, index) => normalizeTransferEdge(edge, index))
-          .filter((edge): edge is ManualTransferEdge => edge !== null)
-      : [],
+    manualTransferGroups,
+    manualTransferEdges: [...legacyEdges, ...deriveTransferEdgesFromGroups(manualTransferGroups)],
     stationOverrides: Array.isArray(data.stationOverrides) ? data.stationOverrides : [],
     branchOverrides: Array.isArray(data.branchOverrides) ? data.branchOverrides : [],
     geometryOverrides: Array.isArray(data.geometryOverrides) ? data.geometryOverrides : [],
@@ -97,7 +144,11 @@ export async function readManualOverlays(): Promise<ManualOverlayBundle> {
 
 export async function writeManualOverlays(overlays: ManualOverlayBundle) {
   const normalized = normalizeManualOverlays(overlays);
-  const body = `${JSON.stringify(normalized, null, 2)}\n`;
+  const persisted: ManualOverlayBundle = {
+    ...normalized,
+    manualTransferEdges: [],
+  };
+  const body = `${JSON.stringify(persisted, null, 2)}\n`;
 
   for (const filePath of getManualOverlayPaths()) {
     await fs.mkdir(path.dirname(filePath), { recursive: true });
