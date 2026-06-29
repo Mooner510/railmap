@@ -38,7 +38,9 @@
     }
   ],
   "manualTransferEdges": [],
-  "nonTransferStationIds": [],
+  "nonTransferStationIds": [
+    "candidate:kric:urban-rail-station:S1105:0524:row-772"
+  ],
   "stationOverrides": [],
   "branchOverrides": [],
   "geometryOverrides": []
