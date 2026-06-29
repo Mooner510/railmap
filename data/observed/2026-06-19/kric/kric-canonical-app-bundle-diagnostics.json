@@ -1,7 +1,7 @@
 {
   "diagnosticsId": "kric-canonical-app-bundle-diagnostics",
   "acquiredDate": "2026-06-19",
-  "generatedAt": "2026-06-29T10:09:12.002Z",
+  "generatedAt": "2026-06-29T11:28:35.115Z",
   "sourceBundle": "data/generated/2026-06-19/app-bundle/kric-canonical-app-bundle.json",
   "policy": {
     "lowConfidenceMeaning": "Route stop was matched by fallback logic, usually global normalized station name rather than exact same-line station code.",
@@ -13,10 +13,10 @@
   "counts": {
     "canonicalLines": 34,
     "branches": 43,
-    "stations": 972,
-    "routeStops": 973,
-    "skippedRouteStops": 44,
-    "lowConfidenceRouteStops": 0,
+    "stations": 1015,
+    "routeStops": 1017,
+    "skippedRouteStops": 0,
+    "lowConfidenceRouteStops": 44,
     "missingCanonicalLines": 1
   },
   "missingCanonicalLines": [
@@ -130,10 +130,10 @@
       "lnCd": "1",
       "mreaWideCd": "01",
       "branchCount": 4,
-      "routeStopCount": 96,
-      "lowConfidenceCount": 0,
+      "routeStopCount": 104,
+      "lowConfidenceCount": 8,
       "firstStation": "청량리(서울시립대입구)",
-      "lastStation": "두정역",
+      "lastStation": "신창(순천향대)역",
       "sourceLineNumbers": [
         "I4101",
         "I4102",
@@ -141,10 +141,11 @@
       ],
       "confidenceSummary": {
         "medium": 13,
-        "high": 83
+        "high": 83,
+        "low": 8
       },
       "matchStatusSummary": {
-        "name-based": 12,
+        "name-based": 20,
         "exact": 84
       }
     },
@@ -154,10 +155,10 @@
       "lnCd": "2",
       "mreaWideCd": "01",
       "branchCount": 3,
-      "routeStopCount": 50,
-      "lowConfidenceCount": 0,
+      "routeStopCount": 51,
+      "lowConfidenceCount": 1,
       "firstStation": "시청",
-      "lastStation": "신정네거리",
+      "lastStation": "까치산",
       "sourceLineNumbers": [
         "S1102",
         "S1121",
@@ -165,10 +166,11 @@
       ],
       "confidenceSummary": {
         "medium": 43,
-        "high": 7
+        "high": 7,
+        "low": 1
       },
       "matchStatusSummary": {
-        "name-based": 43,
+        "name-based": 44,
         "normalized-code": 7
       }
     },
@@ -328,18 +330,20 @@
       "lnCd": "K1",
       "mreaWideCd": "01",
       "branchCount": 2,
-      "routeStopCount": 18,
-      "lowConfidenceCount": 0,
+      "routeStopCount": 53,
+      "lowConfidenceCount": 35,
       "firstStation": "고색역",
-      "lastStation": "인천역",
+      "lastStation": "수원역",
       "sourceLineNumbers": [
         "I28K1"
       ],
       "confidenceSummary": {
-        "high": 18
+        "high": 18,
+        "low": 35
       },
       "matchStatusSummary": {
-        "exact": 18
+        "exact": 18,
+        "name-based": 35
       }
     },
     {
@@ -914,16 +918,17 @@
       "sourceLineName": "경부선",
       "origin": "서울",
       "terminal": "신창",
-      "routeStopCount": 38,
-      "lowConfidenceCount": 0,
+      "routeStopCount": 46,
+      "lowConfidenceCount": 8,
       "firstStation": "서울역",
-      "lastStation": "두정역",
+      "lastStation": "신창(순천향대)역",
       "confidenceSummary": {
         "medium": 1,
-        "high": 37
+        "high": 37,
+        "low": 8
       },
       "matchStatusSummary": {
-        "name-based": 1,
+        "name-based": 9,
         "exact": 37
       }
     },
@@ -982,15 +987,17 @@
       "sourceLineName": "수도권 도시철도 2호선",
       "origin": "신도림",
       "terminal": "까치산",
-      "routeStopCount": 3,
-      "lowConfidenceCount": 0,
+      "routeStopCount": 4,
+      "lowConfidenceCount": 1,
       "firstStation": "도림천",
-      "lastStation": "신정네거리",
+      "lastStation": "까치산",
       "confidenceSummary": {
-        "high": 3
+        "high": 3,
+        "low": 1
       },
       "matchStatusSummary": {
-        "normalized-code": 3
+        "normalized-code": 3,
+        "name-based": 1
       }
     },
     {
@@ -1248,12 +1255,16 @@
       "sourceLineName": "분당선",
       "origin": "왕십리",
       "terminal": "수원",
-      "routeStopCount": 0,
-      "lowConfidenceCount": 0,
-      "firstStation": null,
-      "lastStation": null,
-      "confidenceSummary": {},
-      "matchStatusSummary": {}
+      "routeStopCount": 35,
+      "lowConfidenceCount": 35,
+      "firstStation": "서울숲역",
+      "lastStation": "수원역",
+      "confidenceSummary": {
+        "low": 35
+      },
+      "matchStatusSummary": {
+        "name-based": 35
+      }
     },
     {
       "canonicalKey": "01:D1",
@@ -1674,623 +1685,711 @@
       }
     }
   ],
-  "lowConfidenceRouteStops": [],
-  "skippedRouteStops": [
+  "lowConfidenceRouteStops": [
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I4101:39",
-      "canonicalLineId": "01:1",
+      "canonicalKey": "01:1",
+      "canonicalName": "1호선",
       "branchId": "01:1:branch:I4101:경부선:3",
+      "role": "branch",
       "sourceLineNumber": "I4101",
       "sourceLineName": "경부선",
-      "sourceStationCode": "1728",
-      "stationNameKo": "천안역",
       "sequence": 39,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1728",
+      "displayNameKo": "천안역",
+      "stationId": "candidate:kric:urban-rail-station:I4401:1728:row-979",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I4101:39"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I4101:40",
-      "canonicalLineId": "01:1",
+      "canonicalKey": "01:1",
+      "canonicalName": "1호선",
       "branchId": "01:1:branch:I4101:경부선:3",
+      "role": "branch",
       "sourceLineNumber": "I4101",
       "sourceLineName": "경부선",
-      "sourceStationCode": "1401",
-      "stationNameKo": "봉명역",
       "sequence": 40,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1401",
+      "displayNameKo": "봉명역",
+      "stationId": "candidate:kric:urban-rail-station:I4401:1401:row-453",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I4101:40"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I4101:41",
-      "canonicalLineId": "01:1",
+      "canonicalKey": "01:1",
+      "canonicalName": "1호선",
       "branchId": "01:1:branch:I4101:경부선:3",
+      "role": "branch",
       "sourceLineNumber": "I4101",
       "sourceLineName": "경부선",
-      "sourceStationCode": "1402",
-      "stationNameKo": "쌍용(나사렛대)역",
       "sequence": 41,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1402",
+      "displayNameKo": "쌍용(나사렛대)역",
+      "stationId": "candidate:kric:urban-rail-station:I4401:1402:row-702",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I4101:41"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I4101:42",
-      "canonicalLineId": "01:1",
+      "canonicalKey": "01:1",
+      "canonicalName": "1호선",
       "branchId": "01:1:branch:I4101:경부선:3",
+      "role": "branch",
       "sourceLineNumber": "I4101",
       "sourceLineName": "경부선",
-      "sourceStationCode": "1403",
-      "stationNameKo": "아산역",
       "sequence": 42,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1403",
+      "displayNameKo": "아산역",
+      "stationId": "candidate:kric:urban-rail-station:I4401:1403:row-705",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I4101:42"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I4101:43",
-      "canonicalLineId": "01:1",
+      "canonicalKey": "01:1",
+      "canonicalName": "1호선",
       "branchId": "01:1:branch:I4101:경부선:3",
+      "role": "branch",
       "sourceLineNumber": "I4101",
       "sourceLineName": "경부선",
-      "sourceStationCode": "1404",
-      "stationNameKo": "탕정역",
       "sequence": 43,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1404",
+      "displayNameKo": "탕정역",
+      "stationId": "candidate:kric:urban-rail-station:I4401:1404:row-1020",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I4101:43"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I4101:44",
-      "canonicalLineId": "01:1",
+      "canonicalKey": "01:1",
+      "canonicalName": "1호선",
       "branchId": "01:1:branch:I4101:경부선:3",
+      "role": "branch",
       "sourceLineNumber": "I4101",
       "sourceLineName": "경부선",
-      "sourceStationCode": "1405",
-      "stationNameKo": "배방역",
       "sequence": 44,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1405",
+      "displayNameKo": "배방역",
+      "stationId": "candidate:kric:urban-rail-station:I4401:1405:row-421",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I4101:44"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I4101:45",
-      "canonicalLineId": "01:1",
+      "canonicalKey": "01:1",
+      "canonicalName": "1호선",
       "branchId": "01:1:branch:I4101:경부선:3",
+      "role": "branch",
       "sourceLineNumber": "I4101",
       "sourceLineName": "경부선",
-      "sourceStationCode": "1407",
-      "stationNameKo": "온양온천역",
       "sequence": 45,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1407",
+      "displayNameKo": "온양온천역",
+      "stationId": "candidate:kric:urban-rail-station:I4401:1407:row-795",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I4101:45"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I4101:46",
-      "canonicalLineId": "01:1",
+      "canonicalKey": "01:1",
+      "canonicalName": "1호선",
       "branchId": "01:1:branch:I4101:경부선:3",
+      "role": "branch",
       "sourceLineNumber": "I4101",
       "sourceLineName": "경부선",
-      "sourceStationCode": "1408",
-      "stationNameKo": "신창(순천향대)역",
       "sequence": 46,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1408",
+      "displayNameKo": "신창(순천향대)역",
+      "stationId": "candidate:kric:urban-rail-station:I4401:1408:row-689",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I4101:46"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:S1122:4",
-      "canonicalLineId": "01:2",
+      "canonicalKey": "01:2",
+      "canonicalName": "2호선",
       "branchId": "01:2:branch:S1122:수도권 도시철도 2호선:2",
+      "role": "branch",
       "sourceLineNumber": "S1122",
       "sourceLineName": "수도권 도시철도 2호선",
+      "sequence": 4,
       "sourceStationCode": "234-4",
-      "stationNameKo": "까치산",
-      "sequence": 4,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "displayNameKo": "까치산",
+      "stationId": "candidate:kric:urban-rail-station:S1105:0518:row-180",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:S1122:4"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:1",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1847",
-      "stationNameKo": "서울숲역",
       "sequence": 1,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1847",
+      "displayNameKo": "서울숲역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1847:row-553",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:1"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:2",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1848",
-      "stationNameKo": "압구정로데오역",
       "sequence": 2,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1848",
+      "displayNameKo": "압구정로데오역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1848:row-723",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:2"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:3",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1849",
-      "stationNameKo": "강남구청역",
       "sequence": 3,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1849",
+      "displayNameKo": "강남구청역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1849:row-30",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:3"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:4",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1850",
-      "stationNameKo": "선정릉역",
       "sequence": 4,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1850",
+      "displayNameKo": "선정릉역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1850:row-580",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:4"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:5",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1023",
-      "stationNameKo": "선릉역",
       "sequence": 5,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1023",
+      "displayNameKo": "선릉역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1023:row-575",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:5"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:6",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1024",
-      "stationNameKo": "한티역",
       "sequence": 6,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1024",
+      "displayNameKo": "한티역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1024:row-1065",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:6"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:7",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1025",
-      "stationNameKo": "도곡역",
       "sequence": 7,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1025",
+      "displayNameKo": "도곡역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1025:row-279",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:7"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:8",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1026",
-      "stationNameKo": "구룡역",
       "sequence": 8,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1026",
+      "displayNameKo": "구룡역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1026:row-127",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:8"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:9",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1027",
-      "stationNameKo": "개포동역",
       "sequence": 9,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1027",
+      "displayNameKo": "개포동역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1027:row-44",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:9"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:10",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1028",
-      "stationNameKo": "대모산입구역",
       "sequence": 10,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1028",
+      "displayNameKo": "대모산입구역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1028:row-253",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:10"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:11",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1030",
-      "stationNameKo": "수서역",
       "sequence": 11,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1030",
+      "displayNameKo": "수서역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1030:row-622",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:11"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:12",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1031",
-      "stationNameKo": "복정역",
       "sequence": 12,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1031",
+      "displayNameKo": "복정역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1031:row-452",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:12"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:13",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1851",
-      "stationNameKo": "가천대역",
       "sequence": 13,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1851",
+      "displayNameKo": "가천대역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1851:row-16",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:13"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:14",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1852",
-      "stationNameKo": "태평역",
       "sequence": 14,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1852",
+      "displayNameKo": "태평역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1852:row-1024",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:14"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:15",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1853",
-      "stationNameKo": "모란역",
       "sequence": 15,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1853",
+      "displayNameKo": "모란역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1853:row-382",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:15"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:16",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1854",
-      "stationNameKo": "야탑역",
       "sequence": 16,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1854",
+      "displayNameKo": "야탑역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1854:row-727",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:16"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:17",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1860",
-      "stationNameKo": "이매역",
       "sequence": 17,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1860",
+      "displayNameKo": "이매역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1860:row-864",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:17"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:18",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1855",
-      "stationNameKo": "서현역",
       "sequence": 18,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1855",
+      "displayNameKo": "서현역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1855:row-562",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:18"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:19",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1856",
-      "stationNameKo": "수내역",
       "sequence": 19,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1856",
+      "displayNameKo": "수내역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1856:row-616",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:19"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:20",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1857",
-      "stationNameKo": "정자역",
       "sequence": 20,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1857",
+      "displayNameKo": "정자역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1857:row-922",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:20"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:21",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1858",
-      "stationNameKo": "미금역",
       "sequence": 21,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1858",
+      "displayNameKo": "미금역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1858:row-397",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:21"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:22",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1859",
-      "stationNameKo": "오리역",
       "sequence": 22,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1859",
+      "displayNameKo": "오리역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1859:row-782",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:22"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:23",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1862",
-      "stationNameKo": "죽전역",
       "sequence": 23,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1862",
+      "displayNameKo": "죽전역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1862:row-943",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:23"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:24",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1861",
-      "stationNameKo": "보정역",
       "sequence": 24,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1861",
+      "displayNameKo": "보정역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1861:row-449",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:24"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:25",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1863",
-      "stationNameKo": "구성역",
       "sequence": 25,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1863",
+      "displayNameKo": "구성역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1863:row-135",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:25"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:26",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1864",
-      "stationNameKo": "신갈역",
       "sequence": 26,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1864",
+      "displayNameKo": "신갈역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1864:row-652",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:26"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:27",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1865",
-      "stationNameKo": "기흥역",
       "sequence": 27,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1865",
+      "displayNameKo": "기흥역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1865:row-167",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:27"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:28",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1866",
-      "stationNameKo": "상갈역",
       "sequence": 28,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1866",
+      "displayNameKo": "상갈역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1866:row-515",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:28"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:29",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1867",
-      "stationNameKo": "청명역",
       "sequence": 29,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1867",
+      "displayNameKo": "청명역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1867:row-994",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:29"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:30",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1868",
-      "stationNameKo": "영통역",
       "sequence": 30,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1868",
+      "displayNameKo": "영통역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1868:row-775",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:30"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:31",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1869",
-      "stationNameKo": "망포역",
       "sequence": 31,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1869",
+      "displayNameKo": "망포역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1869:row-363",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:31"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:32",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1870",
-      "stationNameKo": "매탄권선역",
       "sequence": 32,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1870",
+      "displayNameKo": "매탄권선역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1870:row-368",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:32"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:33",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1871",
-      "stationNameKo": "수원시청역",
       "sequence": 33,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1871",
+      "displayNameKo": "수원시청역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1871:row-633",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:33"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:34",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1872",
-      "stationNameKo": "매교역",
       "sequence": 34,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1872",
+      "displayNameKo": "매교역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1872:row-364",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; matched-by-normalized-name",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:34"
     },
     {
-      "stopCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:35",
-      "canonicalLineId": "01:K1",
+      "canonicalKey": "01:K1",
+      "canonicalName": "수인분당선",
       "branchId": "01:K1:branch:I28K1:분당선:1",
+      "role": "branch",
       "sourceLineNumber": "I28K1",
       "sourceLineName": "분당선",
-      "sourceStationCode": "1846",
-      "stationNameKo": "수원역",
       "sequence": 35,
-      "reason": "missing:none",
-      "diagnostics": [
-        "no-station-candidate-match"
-      ]
+      "sourceStationCode": "1846",
+      "displayNameKo": "수원역",
+      "stationId": "candidate:kric:urban-rail-station:I4105:1846:row-632",
+      "matchStatus": "name-based",
+      "confidence": "low",
+      "diagnostics": "matched-by-global-normalized-name; ambiguous-name-match-resolved-by-related-source-line",
+      "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:35"
     }
-  ]
+  ],
+  "skippedRouteStops": []
 }

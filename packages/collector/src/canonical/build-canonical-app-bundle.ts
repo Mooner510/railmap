@@ -245,6 +245,77 @@ function makeLineSourceKey(lineNumber: string, lineName: string): string {
   return `${normalizeKey(lineNumber)}\u0000${normalizeKey(lineName)}`;
 }
 
+
+type StationLineAliasRow = {
+  routeStopLineNumber: string;
+  routeStopLineName: string;
+  stationLineNumber: string;
+  stationLineName: string;
+  note: string;
+};
+
+function parseStationLineAliases(csv: string): StationLineAliasRow[] {
+  const rows = csv.trim().split(/\r?\n/);
+  const [, ...body] = rows;
+
+  return body
+    .map((row) => {
+      const [
+        routeStopLineNumber,
+        routeStopLineName,
+        stationLineNumber,
+        stationLineName,
+        note = "",
+      ] = row.split(",");
+
+      return {
+        routeStopLineNumber: normalizeKey(routeStopLineNumber),
+        routeStopLineName: normalizeKey(routeStopLineName),
+        stationLineNumber: normalizeKey(stationLineNumber),
+        stationLineName: normalizeKey(stationLineName),
+        note: normalizeKey(note),
+      };
+    })
+    .filter((row) => row.routeStopLineNumber && row.stationLineNumber);
+}
+
+function getMatchesForLineNumbers(
+  index: Map<string, JsonRecord[]>,
+  lineNumbers: Set<string>,
+  value: string,
+): JsonRecord[] {
+  const matches: JsonRecord[] = [];
+  const seen = new Set<string>();
+
+  for (const lineNumber of lineNumbers) {
+    const key = `${normalizeKey(lineNumber)}:${normalizeKey(value)}`;
+    for (const item of index.get(key) ?? []) {
+      const id = normalizeKey(item.candidateId);
+      if (id && seen.has(id)) continue;
+      if (id) seen.add(id);
+      matches.push(item);
+    }
+  }
+
+  return matches;
+}
+
+function addStationLineAliases(
+  stop: JsonRecord,
+  relatedLineNumbers: Set<string>,
+  stationLineAliasesByRouteStopKey: Map<string, StationLineAliasRow[]>,
+): Set<string> {
+  const result = new Set(relatedLineNumbers);
+  result.add(getLineNumber(stop));
+
+  const aliasKey = makeLineSourceKey(getLineNumber(stop), getLineName(stop));
+  for (const alias of stationLineAliasesByRouteStopKey.get(aliasKey) ?? []) {
+    result.add(alias.stationLineNumber);
+  }
+
+  return result;
+}
+
 function buildStationMatcher(stations: JsonRecord[]) {
   const byLineCode = groupBy(
     stations,
@@ -329,6 +400,7 @@ function buildStationMatcher(stations: JsonRecord[]) {
 
   return function matchStation(stop: JsonRecord, relatedLineNumbers: Set<string>): MatchResult {
     const lineNumber = getLineNumber(stop);
+    const candidateLineNumbers = new Set([lineNumber, ...relatedLineNumbers]);
     const sourceStationCode = getSourceStationCode(stop);
     const normalizedCode = normalizeStationCode(sourceStationCode);
     const stopName = normalizeStationName(getRouteStopName(stop));
@@ -385,9 +457,16 @@ function buildStationMatcher(stations: JsonRecord[]) {
       };
     }
 
-    // NOTE:
-    // 전국 동일 역명 fallback은 잘못된 역(예: 죽전, 대곡 등)을 서로 연결할 수 있으므로 사용하지 않는다.
-    // 같은 노선 내에서만 이름 기반 매칭을 허용한다.
+    const globalNameMatches = byGlobalName.get(stopName) ?? [];
+    if (globalNameMatches.length > 0) {
+      const resolved = resolveCandidates(globalNameMatches, stop, relatedLineNumbers);
+      return {
+        ...resolved,
+        status: "name-based",
+        confidence: resolved.confidence === "none" ? "none" : "low",
+        diagnostics: ["matched-by-global-normalized-name", ...resolved.diagnostics],
+      };
+    }
 
     return {
       station: null,
@@ -426,6 +505,15 @@ export function buildKricCanonicalAppBundle() {
         mreaWideCd: normalizeKey(mreaWideCd),
       };
     });
+
+  const stationLineAliasPath = path.join(repoRoot, "data", "manual", "kric-station-line-aliases.csv");
+  const stationLineAliases = fs.existsSync(stationLineAliasPath)
+    ? parseStationLineAliases(fs.readFileSync(stationLineAliasPath, "utf8"))
+    : [];
+  const stationLineAliasesByRouteStopKey = groupBy(
+    stationLineAliases,
+    (row) => makeLineSourceKey(row.routeStopLineNumber, row.routeStopLineName),
+  );
 
   const lines = readJsonl<JsonRecord>(path.join(collectedDir, "kric-urban-rail-lines.candidate.jsonl"));
   const stations = readJsonl<JsonRecord>(path.join(collectedDir, "kric-urban-rail-stations.candidate.jsonl"));
@@ -484,7 +572,12 @@ export function buildKricCanonicalAppBundle() {
       const branchRouteStops: JsonRecord[] = [];
 
       for (const stop of stops) {
-        const matched = matchStation(stop, relatedLineNumbers);
+        const effectiveRelatedLineNumbers = addStationLineAliases(
+          stop,
+          relatedLineNumbers,
+          stationLineAliasesByRouteStopKey,
+        );
+        const matched = matchStation(stop, effectiveRelatedLineNumbers);
 
         if (!matched.station) {
           skippedRouteStops.push({
