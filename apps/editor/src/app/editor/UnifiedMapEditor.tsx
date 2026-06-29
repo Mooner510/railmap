@@ -12,7 +12,7 @@ import { TabButton, TabList } from "@repo/ui/tabs";
 import { Toast, type ToastTone } from "@repo/ui/toast";
 import { cn } from "@repo/ui/utils";
 import { ChevronRight, Command, Layers3, MapPin, MousePointer2, Route, Search, Settings2, Waypoints, X } from "lucide-react";
-import maplibregl, { type GeoJSONSource, type Map as MapLibreMap, type MapLayerMouseEvent, type StyleSpecification } from "maplibre-gl";
+import maplibregl, { type GeoJSONSource, type Map as MapLibreMap, type StyleSpecification } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import type { EditorStation, ManualOverlayBundle, ManualStationOverride, ManualTransferGroup } from "../editorModel";
 import { EMPTY_MANUAL_OVERLAY_BUNDLE, normalizeSearchText } from "../editorModel";
@@ -26,7 +26,7 @@ type Selection =
   | { type: "multiStation"; ids: string[] };
 
 type SidebarTab = "search" | "layers" | "transfers" | "geometry" | "validation" | "history";
-type ToolMode = "move" | "select" | "box" | "geometry";
+type ToolMode = "select" | "box" | "geometry";
 type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
 
@@ -46,11 +46,10 @@ const layerOptions: Array<{ key: keyof typeof defaultLayers; label: string; Icon
   { key: "nonTransfer", label: "미환승역 상태", Icon: Waypoints },
 ];
 
-const toolOptions: Array<{ mode: ToolMode; label: string; Icon: IconComponent }> = [
-  { mode: "move", label: "이동", Icon: MousePointer2 },
-  { mode: "select", label: "선택", Icon: MapPin },
-  { mode: "box", label: "박스", Icon: Waypoints },
-  { mode: "geometry", label: "선형", Icon: Route },
+const toolOptions: Array<{ mode: ToolMode; label: string; description: string; Icon: IconComponent }> = [
+  { mode: "select", label: "선택", description: "역을 우선 선택하고, 역이 없으면 노선선을 선택", Icon: MousePointer2 },
+  { mode: "box", label: "박스 선택", description: "드래그한 영역 안의 역을 여러 개 선택", Icon: Waypoints },
+  { mode: "geometry", label: "선형 편집", description: "선형 보정 전용 모드", Icon: Route },
 ];
 
 const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
@@ -242,6 +241,42 @@ function formatStationSubLabel(station: EditorStation) {
   return `${station.lineNameKo} · ${station.stationNumber}`;
 }
 
+function stationSearchRank(station: EditorStation, normalizedQuery: string) {
+  if (!normalizedQuery) return 0;
+  const name = normalizeSearchText(station.nameKo);
+  const lineName = normalizeSearchText(station.lineNameKo);
+  const stationNumber = normalizeSearchText(station.stationNumber);
+
+  if (name.startsWith(normalizedQuery)) return 0;
+  if (name.includes(normalizedQuery)) return 1;
+  if (lineName.includes(normalizedQuery)) return 2;
+  if (stationNumber.includes(normalizedQuery)) return 3;
+  return Number.POSITIVE_INFINITY;
+}
+
+function searchStations(stations: EditorStation[], query: string, limit: number) {
+  const normalized = normalizeSearchText(query);
+  if (!normalized) return stations.slice(0, limit);
+
+  return stations
+    .map((station) => ({ station, rank: stationSearchRank(station, normalized) }))
+    .filter((entry) => Number.isFinite(entry.rank))
+    .sort((a, b) => {
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      const nameCompare = a.station.nameKo.localeCompare(b.station.nameKo, "ko-KR");
+      if (nameCompare !== 0) return nameCompare;
+      return a.station.lineNameKo.localeCompare(b.station.lineNameKo, "ko-KR");
+    })
+    .slice(0, limit)
+    .map((entry) => entry.station);
+}
+
+function firstFeatureId(features: Array<{ layer: { id: string }; properties?: Record<string, unknown> | null }>, layerIds: string[]) {
+  const feature = features.find((candidate) => layerIds.includes(candidate.layer.id));
+  const id = feature?.properties?.id;
+  return typeof id === "string" ? id : undefined;
+}
+
 function selectionLabel(selection: Selection) {
   if (selection.type === "none") return "선택 없음";
   if (selection.type === "multiStation") return `${selection.ids.length}개 역 선택`;
@@ -278,12 +313,15 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
   const cursorFrameRef = useRef<number | null>(null);
   const pendingCursorLngLatRef = useRef<{ lng: number; lat: number } | null>(null);
   const selectionBoxStartRef = useRef<{ x: number; y: number } | null>(null);
+  const selectStationFromMapRef = useRef<(stationId: string) => void>(() => undefined);
+  const selectBranchFromMapRef = useRef<(branchId: string) => void>(() => undefined);
+  const toolModeRef = useRef<ToolMode>("select");
   const [data, setData] = useState<UnifiedEditorData>(initialData ?? EMPTY_UNIFIED_EDITOR_DATA);
   const [dataLoading, setDataLoading] = useState(!initialData);
   const [overlays, setOverlays] = useState((initialData ?? EMPTY_UNIFIED_EDITOR_DATA).overlays);
   const [selection, setSelection] = useState<Selection>({ type: "none" });
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("search");
-  const [toolMode, setToolMode] = useState<ToolMode>("move");
+  const [toolMode, setToolMode] = useState<ToolMode>("select");
   const [query, setQuery] = useState("");
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
@@ -307,19 +345,11 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
   }, [groupById, selection]);
   const selectedBranchId = selection.type === "branch" ? selection.id : null;
   const nonTransferIds = useMemo(() => new Set(overlays.nonTransferStationIds), [overlays.nonTransferStationIds]);
-  const filteredStations = useMemo(() => {
-    const normalized = normalizeSearchText(query);
-    if (!normalized) return data.stations.slice(0, 60);
-    return data.stations
-      .filter((station) => normalizeSearchText(`${station.nameKo} ${station.lineNameKo} ${station.stationNumber}`).includes(normalized))
-      .slice(0, 80);
-  }, [data.stations, query]);
+  const filteredStations = useMemo(() => searchStations(data.stations, query, query.trim() ? 80 : 60), [data.stations, query]);
 
   const commandResults = useMemo(() => {
     const normalized = normalizeSearchText(commandQuery);
-    const stations = data.stations
-      .filter((station) => !normalized || normalizeSearchText(`${station.nameKo} ${station.lineNameKo} ${station.stationNumber}`).includes(normalized))
-      .slice(0, 8)
+    const stations = searchStations(data.stations, commandQuery, normalized ? 12 : 8)
       .map((station) => ({ type: "station" as const, id: station.id, title: station.nameKo, subtitle: formatStationSubLabel(station) }));
     const branches = data.branches
       .filter((branch) => !normalized || normalizeSearchText(`${branch.canonicalLineNameKo} ${branch.sourceLineName} ${branch.sourceLineNumber}`).includes(normalized))
@@ -362,6 +392,18 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
     const firstStationId = groupById.get(groupId)?.stationIds[0];
     if (firstStationId) focusStation(firstStationId);
   }, [focusStation, groupById]);
+
+  useEffect(() => {
+    selectStationFromMapRef.current = (stationId) => selectStation(stationId, false);
+  }, [selectStation]);
+
+  useEffect(() => {
+    selectBranchFromMapRef.current = selectBranch;
+  }, [selectBranch]);
+
+  useEffect(() => {
+    toolModeRef.current = toolMode;
+  }, [toolMode]);
 
   useEffect(() => {
     if (initialData) return;
@@ -463,7 +505,40 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
           "circle-radius": ["case", ["boolean", ["get", "selected"], false], 7, 4.5],
           "circle-stroke-color": ["case", ["boolean", ["get", "selected"], false], "#111827", "#ffffff"],
           "circle-stroke-width": ["case", ["boolean", ["get", "selected"], false], 3, 1.5],
-          "circle-opacity": ["case", ["boolean", ["get", "nonTransfer"], false], 0.25, 0.94],
+          "circle-opacity": 0.96,
+        },
+      });
+
+
+
+      map.addLayer({
+        id: "railmap-stations-hit",
+        type: "circle",
+        source: "railmap-stations",
+        paint: {
+          "circle-radius": 12,
+          "circle-color": "#000000",
+          "circle-opacity": 0.01,
+          "circle-stroke-width": 0,
+        },
+      });
+
+      map.addLayer({
+        id: "railmap-non-transfer-x",
+        type: "symbol",
+        source: "railmap-stations",
+        filter: ["==", ["get", "nonTransfer"], true],
+        layout: {
+          "text-field": "×",
+          "text-size": 12,
+          "text-font": ["Open Sans Regular"],
+          "text-allow-overlap": true,
+          "text-ignore-placement": true,
+        },
+        paint: {
+          "text-color": "#ffffff",
+          "text-halo-color": "#0f172a",
+          "text-halo-width": 0.7,
         },
       });
 
@@ -472,6 +547,7 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
         type: "symbol",
         source: "railmap-stations",
         minzoom: 11,
+        filter: ["!=", ["get", "selected"], true],
         layout: {
           "text-field": ["get", "nameKo"],
           "text-size": 12,
@@ -485,7 +561,7 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
           "text-color": "#0f172a",
           "text-halo-color": "#ffffff",
           "text-halo-width": 1.5,
-          "text-opacity": ["case", ["boolean", ["get", "selected"], false], 1, ["case", ["boolean", ["get", "nonTransfer"], false], 0.35, 0.92]],
+          "text-opacity": 0.92,
         },
       });
 
@@ -515,6 +591,15 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
 
     map.on("mousemove", (event) => {
       pendingCursorLngLatRef.current = { lng: event.lngLat.lng, lat: event.lngLat.lat };
+
+      if (!selectionBoxStartRef.current) {
+        const queryLayers = ["railmap-stations-hit", "railmap-stations-circle", "railmap-selected-branches-line", "railmap-branches-line"].filter((layerId) => map.getLayer(layerId));
+        const features = queryLayers.length > 0 ? map.queryRenderedFeatures(event.point, { layers: queryLayers }) : [];
+        const hasStation = Boolean(firstFeatureId(features, ["railmap-stations-hit", "railmap-stations-circle"]));
+        const hasBranch = Boolean(firstFeatureId(features, ["railmap-selected-branches-line", "railmap-branches-line"]));
+        map.getCanvas().style.cursor = hasStation ? "pointer" : hasBranch ? "crosshair" : "grab";
+      }
+
       if (cursorFrameRef.current !== null) return;
       cursorFrameRef.current = window.requestAnimationFrame(() => {
         cursorFrameRef.current = null;
@@ -523,36 +608,36 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
     });
     map.on("zoomend", () => setZoom(map.getZoom()));
 
-    map.on("click", "railmap-stations-circle", (event: MapLayerMouseEvent) => {
-      const feature = event.features?.[0];
-      const stationId = feature?.properties?.id as string | undefined;
-      if (stationId) selectStation(stationId, false);
-    });
+    map.on("click", (event) => {
+      const queryLayers = ["railmap-stations-hit", "railmap-stations-circle", "railmap-selected-branches-line", "railmap-branches-line"].filter((layerId) => map.getLayer(layerId));
+      const features = queryLayers.length > 0 ? map.queryRenderedFeatures(event.point, { layers: queryLayers }) : [];
+      const stationId = firstFeatureId(features, ["railmap-stations-hit", "railmap-stations-circle"]);
+      if (stationId) {
+        selectStationFromMapRef.current(stationId);
+        return;
+      }
 
-    const handleBranchClick = (event: MapLayerMouseEvent) => {
-      const feature = event.features?.[0];
-      const branchId = feature?.properties?.id as string | undefined;
-      if (branchId) selectBranch(branchId);
-    };
-    map.on("click", "railmap-branches-line", handleBranchClick);
-    map.on("click", "railmap-selected-branches-line", handleBranchClick);
+      const branchId = firstFeatureId(features, ["railmap-selected-branches-line", "railmap-branches-line"]);
+      if (branchId) selectBranchFromMapRef.current(branchId);
+    });
 
     map.on("contextmenu", (event) => {
       event.preventDefault();
-      const features = map.queryRenderedFeatures(event.point, { layers: ["railmap-stations-circle", "railmap-selected-branches-line", "railmap-branches-line"] });
-      const feature = features[0];
+      const queryLayers = ["railmap-stations-hit", "railmap-stations-circle", "railmap-selected-branches-line", "railmap-branches-line"].filter((layerId) => map.getLayer(layerId));
+      const features = queryLayers.length > 0 ? map.queryRenderedFeatures(event.point, { layers: queryLayers }) : [];
       setContextMenu({
         x: event.point.x,
         y: event.point.y,
-        stationId: feature?.layer.id === "railmap-stations-circle" ? feature.properties?.id : undefined,
-        branchId: feature?.layer.id === "railmap-branches-line" || feature?.layer.id === "railmap-selected-branches-line" ? feature.properties?.id : undefined,
+        stationId: firstFeatureId(features, ["railmap-stations-hit", "railmap-stations-circle"]),
+        branchId: firstFeatureId(features, ["railmap-selected-branches-line", "railmap-branches-line"]),
       });
     });
 
     map.on("mousedown", (event) => {
       const original = event.originalEvent as MouseEvent;
-      if (!(original.metaKey || original.ctrlKey) && toolMode !== "box") return;
+      if (!(original.metaKey || original.ctrlKey) && toolModeRef.current !== "box") return;
       original.preventDefault();
+      map.getCanvas().style.cursor = "crosshair";
       map.dragPan.disable();
       selectionBoxStartRef.current = { x: event.point.x, y: event.point.y };
       setSelectionBox({ left: event.point.x, top: event.point.y, width: 0, height: 0 });
@@ -573,15 +658,16 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
         [Math.min(start.x, event.point.x), Math.min(start.y, event.point.y)],
         [Math.max(start.x, event.point.x), Math.max(start.y, event.point.y)],
       ] as [[number, number], [number, number]];
-      const selected = map.queryRenderedFeatures(box, { layers: ["railmap-stations-circle"] })
+      const selected = map.queryRenderedFeatures(box, { layers: ["railmap-stations-hit", "railmap-stations-circle"] })
         .map((feature) => feature.properties?.id as string | undefined)
         .filter((id): id is string => Boolean(id));
       const ids = [...new Set(selected)];
-      if (ids.length === 1) selectStation(ids[0] ?? "", false);
+      if (ids.length === 1) selectStationFromMapRef.current(ids[0] ?? "");
       if (ids.length > 1) setSelection({ type: "multiStation", ids });
       selectionBoxStartRef.current = null;
       setSelectionBox(null);
       map.dragPan.enable();
+      map.getCanvas().style.cursor = "grab";
     });
 
     return () => {
@@ -687,8 +773,8 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
           <PanelHeader>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">Railmap</p>
-                <h1 className="mt-1 text-lg font-black tracking-[-0.03em]">통합 맵 에디터</h1>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Railmap</p>
+                <h1 className="mt-1 text-lg font-semibold tracking-[-0.03em]">통합 맵 에디터</h1>
               </div>
               <Button size="icon" variant="outline" onClick={() => setCommandOpen(true)} aria-label="명령 팔레트 열기">
                 <Command className="size-4" />
@@ -726,9 +812,9 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
                     >
                       <div className="flex items-center gap-2">
                         <span className="size-2.5 rounded-full" style={{ backgroundColor: station.colorHex ?? "#64748b" }} />
-                        <strong className="truncate text-sm font-black">{station.nameKo}</strong>
+                        <strong className="truncate text-sm font-semibold">{station.nameKo}</strong>
                       </div>
-                      <p className="mt-1 truncate text-xs font-bold text-slate-500">{formatStationSubLabel(station)}</p>
+                      <p className="mt-1 truncate text-xs font-medium text-slate-500">{formatStationSubLabel(station)}</p>
                     </button>
                   ))}
                 </div>
@@ -738,7 +824,7 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
             {sidebarTab === "layers" ? (
               <div className="grid gap-2">
                 {layerOptions.map(({ key, label, Icon }) => (
-                  <label key={String(key)} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm font-black">
+                  <label key={String(key)} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm font-semibold">
                     <input
                       type="checkbox"
                       checked={layers[key]}
@@ -755,8 +841,8 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
               <div className="grid gap-2">
                 {overlays.manualTransferGroups.map((group) => (
                   <button key={group.id} type="button" className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50" onClick={() => selectTransferGroup(group.id)}>
-                    <strong className="text-sm font-black">{group.nameKo}</strong>
-                    <p className="mt-1 text-xs font-bold text-slate-500">{group.stationIds.length}개 역 · {group.note || "메모 없음"}</p>
+                    <strong className="text-sm font-semibold">{group.nameKo}</strong>
+                    <p className="mt-1 text-xs font-medium text-slate-500">{group.stationIds.length}개 역 · {group.note || "메모 없음"}</p>
                   </button>
                 ))}
               </div>
@@ -768,9 +854,9 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
                   <button key={branch.id} type="button" className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50" onClick={() => selectBranch(branch.id)}>
                     <div className="flex items-center gap-2">
                       <span className="h-1.5 w-8 rounded-full" style={{ backgroundColor: branch.colorHex }} />
-                      <strong className="truncate text-sm font-black">{branch.canonicalLineNameKo}</strong>
+                      <strong className="truncate text-sm font-semibold">{branch.canonicalLineNameKo}</strong>
                     </div>
-                    <p className="mt-1 truncate text-xs font-bold text-slate-500">{branch.sourceLineName} · {branch.routeStopCount} stops</p>
+                    <p className="mt-1 truncate text-xs font-medium text-slate-500">{branch.sourceLineName} · {branch.routeStopCount} stops</p>
                   </button>
                 ))}
               </div>
@@ -789,12 +875,13 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
             {dataLoading ? <Badge className="bg-white/90 text-slate-700">데이터 로딩 중</Badge> : null}
           </div>
           <div className="absolute left-1/2 top-4 flex -translate-x-1/2 gap-2 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
-            {toolOptions.map(({ mode, label, Icon }) => (
+            {toolOptions.map(({ mode, label, description, Icon }) => (
               <button
                 key={mode}
                 type="button"
-                className={cn("flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-black text-slate-500", toolMode === mode ? "bg-blue-600 text-white" : "hover:bg-slate-100")}
+                className={cn("flex items-center gap-1 rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-500", toolMode === mode ? "bg-blue-600 text-white" : "hover:bg-slate-100")}
                 onClick={() => setToolMode(mode)}
+                title={description}
               >
                 <Icon className="size-4" />
                 {label}
@@ -802,7 +889,7 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
             ))}
           </div>
           {selectionBox ? <div className="pointer-events-none absolute border-2 border-blue-500 bg-blue-500/15" style={selectionBox} /> : null}
-          <div className="absolute bottom-3 right-3 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-bold text-slate-600 shadow-lg backdrop-blur">
+          <div className="absolute bottom-3 right-3 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium text-slate-600 shadow-lg backdrop-blur">
             {cursorLngLat ? `${cursorLngLat.lng.toFixed(6)}, ${cursorLngLat.lat.toFixed(6)}` : "좌표 없음"}
           </div>
           {contextMenu ? (
@@ -820,8 +907,8 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
 
         <Panel className="flex min-h-0 flex-col overflow-hidden">
           <PanelHeader>
-            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">Inspector</p>
-            <h2 className="mt-1 text-lg font-black tracking-[-0.03em]">{selectionLabel(selection)}</h2>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Inspector</p>
+            <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">{selectionLabel(selection)}</h2>
           </PanelHeader>
           <PanelBody className="min-h-0 flex-1 overflow-y-auto">
             {selectedStation && stationDraft ? (
@@ -836,21 +923,22 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
             ) : null}
             {selectedBranch ? <BranchInspector branch={selectedBranch} /> : null}
             {selectedGroup ? <TransferGroupInspector group={selectedGroup} stationById={stationById} /> : null}
-            {multiStationIds.length > 0 ? <MultiStationInspector ids={multiStationIds} stationById={stationById} onSetNonTransfer={(enabled) => void setStationsNonTransfer(multiStationIds, enabled)} /> : null}
+            {multiStationIds.length > 0 ? <MultiStationInspector ids={multiStationIds} stationById={stationById} nonTransferIds={nonTransferIds} onSetNonTransfer={(enabled) => void setStationsNonTransfer(multiStationIds, enabled)} /> : null}
             {selection.type === "none" ? <Placeholder title="객체를 선택하세요" description="지도에서 역/노선선을 클릭하거나 Cmd/Ctrl+K로 검색하세요." /> : null}
           </PanelBody>
         </Panel>
       </InspectorGrid>
 
-      <Dialog open={commandOpen} className="max-w-xl">
-        <div className="border-b border-slate-200 p-4">
+      <Dialog open={commandOpen} className="flex h-[520px] max-w-xl flex-col">
+        <div className="shrink-0 border-b border-slate-200 p-3">
           <div className="flex items-center gap-3">
             <Command className="size-5 text-slate-400" />
             <Input autoFocus placeholder="역, 노선, 환승 그룹 검색" value={commandQuery} onChange={(event) => setCommandQuery(event.target.value)} />
             <Button variant="ghost" size="icon" onClick={() => setCommandOpen(false)}><X className="size-4" /></Button>
           </div>
         </div>
-        <div className="max-h-[52dvh] overflow-y-auto p-2">
+        <div className="min-h-0 flex-1 overflow-y-auto p-2">
+          {commandResults.length === 0 ? <p className="px-3 py-8 text-center text-xs font-normal text-slate-400">검색 결과가 없습니다.</p> : null}
           {commandResults.map((item) => (
             <button
               key={`${item.type}:${item.id}`}
@@ -864,8 +952,8 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
               }}
             >
               <span>
-                <strong className="block text-sm font-black">{item.title}</strong>
-                <span className="text-xs font-bold text-slate-500">{item.subtitle}</span>
+                <strong className="block text-sm font-semibold">{item.title}</strong>
+                <span className="text-xs font-medium text-slate-500">{item.subtitle}</span>
               </span>
               <ChevronRight className="size-4 text-slate-400" />
             </button>
@@ -881,8 +969,8 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
 function Placeholder({ title, description }: { title: string; description: string }) {
   return (
     <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
-      <strong className="text-sm font-black text-slate-700">{title}</strong>
-      <p className="mt-2 text-xs font-bold leading-5 text-slate-500">{description}</p>
+      <strong className="text-sm font-semibold text-slate-700">{title}</strong>
+      <p className="mt-2 text-xs font-medium leading-5 text-slate-500">{description}</p>
     </div>
   );
 }
@@ -890,7 +978,7 @@ function Placeholder({ title, description }: { title: string; description: strin
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="grid gap-1.5">
-      <span className="text-xs font-black text-slate-500">{label}</span>
+      <span className="text-xs font-semibold text-slate-500">{label}</span>
       {children}
     </label>
   );
@@ -909,10 +997,10 @@ function StationInspector({ station, draft, nonTransfer, onChange, onSave, onSet
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
         <div className="flex items-center gap-2">
           <span className="size-3 rounded-full" style={{ backgroundColor: station.colorHex ?? "#64748b" }} />
-          <strong className="text-base font-black">{station.nameKo}</strong>
+          <strong className="text-base font-semibold">{station.nameKo}</strong>
         </div>
-        <p className="mt-1 text-xs font-bold text-slate-500">{formatStationSubLabel(station)}</p>
-        <p className="mt-2 break-all text-[11px] font-bold text-slate-400">{station.id}</p>
+        <p className="mt-1 text-xs font-medium text-slate-500">{formatStationSubLabel(station)}</p>
+        <p className="mt-2 break-all text-[11px] font-medium text-slate-400">{station.id}</p>
       </div>
       <Field label="표시명 보정">
         <Input value={draft.nameKo ?? ""} onChange={(event) => onChange({ ...draft, nameKo: event.target.value })} />
@@ -941,8 +1029,8 @@ function BranchInspector({ branch }: { branch: EditorMapBranch }) {
     <div className="grid gap-3">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
         <span className="block h-2 w-16 rounded-full" style={{ backgroundColor: branch.colorHex }} />
-        <h3 className="mt-3 text-base font-black">{branch.canonicalLineNameKo}</h3>
-        <p className="mt-1 text-xs font-bold text-slate-500">{branch.sourceLineName} · {branch.role}</p>
+        <h3 className="mt-3 text-base font-semibold">{branch.canonicalLineNameKo}</h3>
+        <p className="mt-1 text-xs font-medium text-slate-500">{branch.sourceLineName} · {branch.role}</p>
       </div>
       <InfoRow label="Branch ID" value={branch.id} />
       <InfoRow label="기점" value={branch.origin ?? "-"} />
@@ -957,8 +1045,8 @@ function TransferGroupInspector({ group, stationById }: { group: ManualTransferG
   return (
     <div className="grid gap-3">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-        <h3 className="text-base font-black">{group.nameKo}</h3>
-        <p className="mt-1 text-xs font-bold text-slate-500">{group.stationIds.length}개 역 · {group.note || "메모 없음"}</p>
+        <h3 className="text-base font-semibold">{group.nameKo}</h3>
+        <p className="mt-1 text-xs font-medium text-slate-500">{group.stationIds.length}개 역 · {group.note || "메모 없음"}</p>
       </div>
       <div className="grid gap-2">
         {group.stationIds.map((stationId) => {
@@ -971,21 +1059,24 @@ function TransferGroupInspector({ group, stationById }: { group: ManualTransferG
   );
 }
 
-function MultiStationInspector({ ids, stationById, onSetNonTransfer }: { ids: string[]; stationById: Map<string, EditorStation>; onSetNonTransfer: (enabled: boolean) => void }) {
+function MultiStationInspector({ ids, stationById, nonTransferIds, onSetNonTransfer }: { ids: string[]; stationById: Map<string, EditorStation>; nonTransferIds: Set<string>; onSetNonTransfer: (enabled: boolean) => void }) {
+  const allNonTransfer = ids.length > 0 && ids.every((id) => nonTransferIds.has(id));
+  const allTransfer = ids.length > 0 && ids.every((id) => !nonTransferIds.has(id));
+
   return (
     <div className="grid gap-3">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-        <h3 className="text-base font-black">{ids.length}개 역 선택</h3>
-        <p className="mt-1 text-xs font-bold text-slate-500">선택한 역에 일괄 작업을 적용합니다.</p>
+        <h3 className="text-base font-semibold">{ids.length}개 역 선택</h3>
+        <p className="mt-1 text-xs font-normal text-slate-500">선택한 역에 일괄 작업을 적용합니다.</p>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline" onClick={() => onSetNonTransfer(true)}>미환승역</Button>
-        <Button variant="outline" onClick={() => onSetNonTransfer(false)}>환승 가능역</Button>
+        {!allNonTransfer ? <Button variant="outline" onClick={() => onSetNonTransfer(true)}>미환승역</Button> : null}
+        {!allTransfer ? <Button variant="outline" onClick={() => onSetNonTransfer(false)}>환승 가능역</Button> : null}
       </div>
       <div className="max-h-72 overflow-y-auto rounded-3xl border border-slate-200 p-2">
         {ids.map((id) => {
           const station = stationById.get(id);
-          return <p key={id} className="rounded-2xl px-3 py-2 text-xs font-bold text-slate-600">{station ? `${station.nameKo} · ${station.lineNameKo}` : id}</p>;
+          return <p key={id} className="rounded-2xl px-3 py-2 text-xs font-medium text-slate-600">{station ? `${station.nameKo} · ${station.lineNameKo}` : id}</p>;
         })}
       </div>
     </div>
@@ -995,8 +1086,8 @@ function MultiStationInspector({ ids, stationById, onSetNonTransfer }: { ids: st
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3">
-      <p className="text-[11px] font-black text-slate-400">{label}</p>
-      <p className="mt-1 break-all text-sm font-bold text-slate-700">{value}</p>
+      <p className="text-[11px] font-semibold text-slate-400">{label}</p>
+      <p className="mt-1 break-all text-sm font-medium text-slate-700">{value}</p>
     </div>
   );
 }
@@ -1017,14 +1108,14 @@ function ContextMenu({ state, stationById, branchById, onClose, onSelectStation,
     <div className="absolute z-40 min-w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-2xl" style={{ left: state.x, top: state.y }}>
       {station ? (
         <>
-          <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-black hover:bg-blue-50" onClick={() => onSelectStation(station.id)}>역 선택: {station.nameKo}</button>
-          <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-black hover:bg-blue-50" onClick={() => onSetNonTransfer(station.id, true)}>미환승역으로 설정</button>
-          <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-black hover:bg-blue-50" onClick={() => onSetNonTransfer(station.id, false)}>환승 가능역으로 설정</button>
+          <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50" onClick={() => onSelectStation(station.id)}>역 선택: {station.nameKo}</button>
+          <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50" onClick={() => onSetNonTransfer(station.id, true)}>미환승역으로 설정</button>
+          <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50" onClick={() => onSetNonTransfer(station.id, false)}>환승 가능역으로 설정</button>
         </>
       ) : null}
-      {branch ? <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-black hover:bg-blue-50" onClick={() => onSelectBranch(branch.id)}>노선 선택: {branch.canonicalLineNameKo}</button> : null}
-      {!station && !branch ? <p className="px-3 py-2 text-xs font-bold text-slate-400">선택 가능한 객체 없음</p> : null}
-      <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-black text-slate-500 hover:bg-slate-100" onClick={onClose}>닫기</button>
+      {branch ? <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50" onClick={() => onSelectBranch(branch.id)}>노선 선택: {branch.canonicalLineNameKo}</button> : null}
+      {!station && !branch ? <p className="px-3 py-2 text-xs font-medium text-slate-400">선택 가능한 객체 없음</p> : null}
+      <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-500 hover:bg-slate-100" onClick={onClose}>닫기</button>
     </div>
   );
 }
