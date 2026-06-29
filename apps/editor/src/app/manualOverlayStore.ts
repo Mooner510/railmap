@@ -50,6 +50,12 @@ function asNullableNumber(value: unknown): number | null {
   return Number.isFinite(numberValue) ? Math.max(0, Math.round(numberValue)) : null;
 }
 
+function asNullableCoordinateNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
+}
+
 function normalizeMinutesByPair(value: unknown, stationIds: string[]): Record<string, number | null> {
   const result: Record<string, number | null> = {};
   const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -98,8 +104,8 @@ function normalizeStationOverride(value: unknown): ManualStationOverride | null 
   return {
     stationId,
     nameKo: asNullableString(override.nameKo) ?? undefined,
-    lat: asNullableNumber(override.lat),
-    lng: asNullableNumber(override.lng),
+    lat: asNullableCoordinateNumber(override.lat),
+    lng: asNullableCoordinateNumber(override.lng),
     enabled: override.enabled !== false,
     note: asNullableString(override.note),
   };

@@ -295,6 +295,14 @@ function toLngLatTuple(point: number[]): LngLatTuple | null {
   return [lng, lat];
 }
 
+function getHash(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) | 0;
+  }
+  return Math.abs(hash);
+}
+
 function smoothCoordinates(coordinates: number[][]): LngLatTuple[] {
   const points = coordinates
     .map(toLngLatTuple)
@@ -343,6 +351,7 @@ export default function RailMap({
   const markersRef = useRef<Marker[]>([]);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(0);
   const branchesRef = useRef(branches);
   const onSelectBranchRef = useRef(onSelectBranch);
   const onSelectStationRef = useRef(onSelectStation);
@@ -496,6 +505,10 @@ export default function RailMap({
         map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
         map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-right");
 
+        const updateZoom = () => setZoomLevel(map.getZoom());
+        map.on("zoom", updateZoom);
+        map.on("moveend", updateZoom);
+
         map.on("error", (event) => {
           const error = (event as { error?: unknown }).error;
           if (error) setMapError(getMapErrorMessage(error));
@@ -504,6 +517,7 @@ export default function RailMap({
         map.on("load", () => {
           setMapReady(true);
           setMapError(null);
+          updateZoom();
 
           map.addSource("branch-preview-lines", {
             type: "geojson",
@@ -814,21 +828,25 @@ export default function RailMap({
       const isRouteStation = highlightedRouteStationIdSet.has(station.id);
       const color = stationColorIndex.get(station.id) ?? "#64748b";
 
+      const labelVisible = zoomLevel >= 12 || isSelected || isRouteStation;
+      const labelBelow = getHash(station.id) % 3 === 0;
+
       const element = document.createElement("button");
       element.type = "button";
-      element.className = "flex h-7 w-7 items-center justify-center rounded-full";
+      element.className = ["rail-station-marker", labelVisible ? "show-label" : "", isSelected ? "selected" : ""]
+        .filter(Boolean)
+        .join(" ");
       element.setAttribute("aria-label", station.nameKo ?? "역");
 
+      const label = document.createElement("span");
+      label.className = labelBelow ? "rail-station-label below" : "rail-station-label";
+      label.textContent = station.nameKo ?? "역";
+      element.appendChild(label);
+
       const dot = document.createElement("span");
-      dot.className = isSelected
-        ? "block h-4 w-4 rounded-full border-2 border-white shadow-lg ring-2 transition-transform duration-150 ease-out hover:scale-125"
-        : isRouteStation
-          ? "block h-3 w-3 rounded-full border-2 border-white shadow-md ring-2 transition-transform duration-150 ease-out hover:scale-125"
-          : selectedBranchStationIds.has(station.id)
-            ? "block h-2.5 w-2.5 rounded-full border border-white shadow-sm transition-transform duration-150 ease-out hover:scale-125"
-            : "block h-2 w-2 rounded-full border border-white shadow-sm opacity-90 transition-transform duration-150 ease-out hover:scale-125";
+      dot.className = isSelected || isRouteStation ? "rail-station-dot emphasized" : "rail-station-dot";
       dot.style.backgroundColor = color;
-      dot.style.setProperty("--tw-ring-color", color);
+      dot.style.setProperty("--line-color", color);
       element.appendChild(dot);
       const popup = new maplibregl.Popup({
         offset: 12,
@@ -855,7 +873,7 @@ export default function RailMap({
 
       markersRef.current.push(marker);
     }
-  }, [validStations, visibleBranchStations, selectedBranchStationIds, selectedStationId, highlightedRouteStationIdSet, mapReady, showStations, stationColorIndex]);
+  }, [validStations, visibleBranchStations, selectedBranchStationIds, selectedStationId, highlightedRouteStationIdSet, mapReady, showStations, stationColorIndex, zoomLevel]);
 
   return (
     <div className={`relative h-full min-h-[100dvh] w-full min-w-0 overflow-hidden bg-slate-100 ${className}`}>

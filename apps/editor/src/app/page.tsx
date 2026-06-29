@@ -9,6 +9,12 @@ const editorCards = [
     status: "사용 가능",
   },
   {
+    href: "/transfers/map",
+    title: "수동 환승 맵 에디터",
+    description: "전체화면 지도에서 영역 선택으로 미환승역과 수동 환승 그룹을 빠르게 편집합니다.",
+    status: "사용 가능",
+  },
+  {
     href: "/stations",
     title: "역 보정",
     description: "역 이름과 좌표를 수동 보정하고 viewer에 반영합니다.",

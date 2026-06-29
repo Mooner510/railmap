@@ -25,3 +25,65 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+/* 11.0 station labels on map markers */
+.rail-station-marker {
+  position: relative;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.rail-station-dot {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid #ffffff;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgb(15 23 42 / 0.24), 0 0 0 2px color-mix(in srgb, var(--line-color, #64748b) 16%, transparent);
+  transition: 120ms ease;
+}
+
+.rail-station-dot.emphasized,
+.rail-station-marker:hover .rail-station-dot,
+.rail-station-marker.selected .rail-station-dot {
+  width: 14px;
+  height: 14px;
+  box-shadow: 0 5px 14px rgb(15 23 42 / 0.28), 0 0 0 3px color-mix(in srgb, var(--line-color, #64748b) 22%, transparent);
+}
+
+.rail-station-label {
+  position: absolute;
+  left: 50%;
+  bottom: 25px;
+  display: none;
+  max-width: 128px;
+  transform: translateX(-50%);
+  border: 1px solid rgb(226 232 240 / 0.92);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 4px 12px rgb(15 23 42 / 0.14);
+  color: #0f172a;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 0 #ffffff;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.rail-station-label.below {
+  top: 25px;
+  bottom: auto;
+}
+
+.rail-station-marker.show-label .rail-station-label,
+.rail-station-marker.selected .rail-station-label {
+  display: block;
+}
