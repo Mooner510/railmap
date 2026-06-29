@@ -18069,6 +18069,7 @@
       ]
     }
   ],
+  "manualTransferEdges": [],
   "stations": [
     {
       "id": "candidate:kric:urban-rail-station:I41K5:1501:row-1032",

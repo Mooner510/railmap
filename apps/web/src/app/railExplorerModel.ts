@@ -38,6 +38,19 @@ export interface CanonicalLine {
   sourceLineNumbers: string[];
 }
 
+
+export interface ManualTransferEdge {
+  id: string;
+  fromStationId: string;
+  toStationId: string;
+  labelKo?: string | null;
+  transferMinutes?: number | null;
+  bidirectional?: boolean;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 export interface CanonicalBundle {
   bundleId: string;
   acquiredDate: string;
@@ -51,6 +64,7 @@ export interface CanonicalBundle {
     missingCanonicalLines: number;
   };
   lines: CanonicalLine[];
+  manualTransferEdges?: ManualTransferEdge[];
   missingCanonicalLines: string[];
 }
 

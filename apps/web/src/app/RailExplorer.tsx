@@ -13,6 +13,7 @@ import {
   type CanonicalBranch,
   type CanonicalBundle,
   type CanonicalLine,
+  type ManualTransferEdge,
 } from "./railExplorerModel";
 
 interface RailExplorerProps {
@@ -30,6 +31,7 @@ const MAX_LINE_SEARCH_RESULTS = 8;
 const MAX_STATION_SEARCH_RESULTS = 12;
 const SAME_LINE_BRANCH_CHANGE_PENALTY = 4;
 const ROUTE_TRANSFER_PENALTY = 28;
+const MANUAL_TRANSFER_PENALTY = 18;
 
 interface FilterControlsProps {
   areaCodes: string[];
@@ -84,6 +86,8 @@ interface RouteGraphEdge {
   lineNameKo: string;
   sourceLineName: string;
   colorHex: string;
+  kind: "ride" | "manual-transfer";
+  transferMinutes?: number | null;
 }
 
 interface RouteSearchResult {
@@ -305,7 +309,10 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     [mapStations, routeDestinationStationId],
   );
 
-  const routeGraph = useMemo(() => buildRouteGraph(bundle.lines), [bundle.lines]);
+  const routeGraph = useMemo(
+    () => buildRouteGraph(bundle.lines, bundle.manualTransferEdges ?? []),
+    [bundle.lines, bundle.manualTransferEdges],
+  );
   const stationById = useMemo(() => new Map(mapStations.map((station) => [station.id, station])), [mapStations]);
 
   const routeResultStationIds = useMemo(
@@ -1324,7 +1331,10 @@ function LineCard({ line, selected, onClick }: { line: CanonicalLine; selected: 
   );
 }
 
-function buildRouteGraph(lines: CanonicalLine[]): Map<string, RouteGraphEdge[]> {
+function buildRouteGraph(
+  lines: CanonicalLine[],
+  manualTransferEdges: ManualTransferEdge[] = [],
+): Map<string, RouteGraphEdge[]> {
   const graph = new Map<string, RouteGraphEdge[]>();
 
   const addEdge = (fromStationId: string, edge: RouteGraphEdge) => {
@@ -1346,11 +1356,33 @@ function buildRouteGraph(lines: CanonicalLine[]): Map<string, RouteGraphEdge[]> 
           lineNameKo: line.nameKo,
           sourceLineName: branch.sourceLineName,
           colorHex: line.colorHex,
+          kind: "ride",
         };
 
         addEdge(current.stationId, { ...edge, toStationId: next.stationId });
         addEdge(next.stationId, { ...edge, toStationId: current.stationId });
       }
+    }
+  }
+
+
+  for (const transfer of manualTransferEdges) {
+    if (!transfer.enabled) continue;
+    if (!transfer.fromStationId || !transfer.toStationId || transfer.fromStationId === transfer.toStationId) continue;
+
+    const baseEdge: Omit<RouteGraphEdge, "toStationId"> = {
+      branchId: `manual-transfer:${transfer.id}`,
+      lineNameKo: transfer.labelKo ?? "환승",
+      sourceLineName: "수동 환승",
+      colorHex: "#64748b",
+      kind: "manual-transfer",
+      transferMinutes: transfer.transferMinutes ?? null,
+    };
+
+    addEdge(transfer.fromStationId, { ...baseEdge, toStationId: transfer.toStationId });
+
+    if (transfer.bidirectional !== false) {
+      addEdge(transfer.toStationId, { ...baseEdge, toStationId: transfer.fromStationId });
     }
   }
 
@@ -1403,14 +1435,21 @@ function findRoute(
     }
 
     for (const edge of graph.get(current.stationId) ?? []) {
-      const isTransfer = Boolean(current.previousBranchId && current.previousBranchId !== edge.branchId);
-      const transferPenalty = !isTransfer
-        ? 0
-        : current.previousLineNameKo === edge.lineNameKo
-          ? SAME_LINE_BRANCH_CHANGE_PENALTY
-          : ROUTE_TRANSFER_PENALTY;
-      const nextScore = current.score + 1 + transferPenalty;
-      const nextKey = makeRouteStateKey(edge.toStationId, edge.branchId);
+      const isManualTransfer = edge.kind === "manual-transfer";
+      const isTransfer = Boolean(
+        isManualTransfer || (current.previousBranchId && current.previousBranchId !== edge.branchId),
+      );
+      const transferPenalty = isManualTransfer
+        ? MANUAL_TRANSFER_PENALTY
+        : !isTransfer
+          ? 0
+          : current.previousLineNameKo === edge.lineNameKo
+            ? SAME_LINE_BRANCH_CHANGE_PENALTY
+            : ROUTE_TRANSFER_PENALTY;
+      const nextScore = current.score + (isManualTransfer ? 0.2 : 1) + transferPenalty;
+      const nextPreviousBranchId = isManualTransfer ? null : edge.branchId;
+      const nextPreviousLineNameKo = isManualTransfer ? null : edge.lineNameKo;
+      const nextKey = makeRouteStateKey(edge.toStationId, nextPreviousBranchId);
 
       if (nextScore >= (bestScore.get(nextKey) ?? Number.POSITIVE_INFINITY)) continue;
 
@@ -1418,8 +1457,8 @@ function findRoute(
       previous.set(nextKey, { previousKey: currentKey, stationId: current.stationId, edge });
       open.push({
         stationId: edge.toStationId,
-        previousBranchId: edge.branchId,
-        previousLineNameKo: edge.lineNameKo,
+        previousBranchId: nextPreviousBranchId,
+        previousLineNameKo: nextPreviousLineNameKo,
         score: nextScore,
         stopCount: current.stopCount + 1,
         transferCount: current.transferCount + (isTransfer ? 1 : 0),
@@ -1443,9 +1482,15 @@ function findRoute(
   }
 
   let transferCount = 0;
-  let previousBranchId = edges[0]?.branchId ?? null;
+  let previousBranchId: string | null = null;
 
-  for (const edge of edges.slice(1)) {
+  for (const edge of edges) {
+    if (edge.kind === "manual-transfer") {
+      transferCount += 1;
+      previousBranchId = null;
+      continue;
+    }
+
     if (previousBranchId && edge.branchId !== previousBranchId) transferCount += 1;
     previousBranchId = edge.branchId;
   }
@@ -1475,6 +1520,8 @@ function RouteResultSummary({
     fromStationId: string;
     toStationId: string;
     edgeCount: number;
+    kind: RouteGraphEdge["kind"];
+    transferMinutes?: number | null;
   }> = [];
 
   for (let index = 0; index < result.edges.length; index += 1) {
@@ -1487,7 +1534,7 @@ function RouteResultSummary({
 
     const last = segments[segments.length - 1];
 
-    if (last && last.branchId === edge.branchId) {
+    if (last && last.branchId === edge.branchId && edge.kind === "ride") {
       last.toStationId = toStationId;
       last.edgeCount += 1;
     } else {
@@ -1499,6 +1546,8 @@ function RouteResultSummary({
         fromStationId,
         toStationId,
         edgeCount: 1,
+        kind: edge.kind,
+        transferMinutes: edge.transferMinutes ?? null,
       });
     }
   }
@@ -1523,6 +1572,17 @@ function RouteResultSummary({
           const toName = stationById.get(segment.toStationId)?.nameKo ?? "다음 역";
           const isTransfer = index > 0;
 
+          if (segment.kind === "manual-transfer") {
+            return (
+              <RouteTransferConnection
+                key={`${segment.branchId}:${index}:${segment.fromStationId}:${segment.toStationId}`}
+                fromStationName={fromName}
+                toStationName={toName}
+                transferMinutes={segment.transferMinutes}
+              />
+            );
+          }
+
           return (
             <div key={`${segment.branchId}:${index}:${segment.fromStationId}:${segment.toStationId}`} className="min-w-0">
               {isTransfer ? <RouteTransferStep stationName={fromName} /> : null}
@@ -1538,6 +1598,30 @@ function RouteResultSummary({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function RouteTransferConnection({
+  fromStationName,
+  toStationName,
+  transferMinutes,
+}: {
+  fromStationName: string;
+  toStationName: string;
+  transferMinutes?: number | null;
+}) {
+  return (
+    <div className="min-w-0 rounded border border-dashed border-slate-300 bg-slate-50 px-2 py-1.5">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white">환승</span>
+        <p className="min-w-0 break-words text-[11px] font-bold leading-4 text-slate-700">
+          {fromStationName === toStationName ? `${fromStationName}에서 갈아타기` : `${fromStationName} → ${toStationName} 이동`}
+        </p>
+      </div>
+      {typeof transferMinutes === "number" ? (
+        <p className="mt-1 text-[10px] font-semibold text-slate-500">약 {formatNumber(transferMinutes)}분 환승</p>
+      ) : null}
     </div>
   );
 }
