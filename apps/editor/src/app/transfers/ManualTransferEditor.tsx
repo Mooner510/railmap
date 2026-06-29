@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   makeTransferGroupId,
   makeTransferPairKey,
@@ -18,6 +18,50 @@ interface ManualTransferEditorProps {
 function getStationLabel(station: EditorStation | null | undefined) {
   if (!station) return "역을 선택하세요";
   return `${station.nameKo} · ${station.lineNameKo} · ${station.stationNumber}`;
+}
+
+
+function getStationBaseName(nameKo: string) {
+  const withoutParentheses = nameKo.replace(/\([^)]*\)/g, "").trim();
+  return withoutParentheses.endsWith("역") ? withoutParentheses.slice(0, -1) : withoutParentheses;
+}
+
+function getSuggestedGroupName(stations: EditorStation[]) {
+  if (stations.length === 0) return "새 환승 그룹";
+
+  const baseNames = [...new Set(stations.map((station) => getStationBaseName(station.nameKo)).filter(Boolean))];
+  if (baseNames.length === 1) return `${baseNames[0]}역`;
+
+  return baseNames.map((name) => `${name}${name.endsWith("역") ? "" : "역"}`).join(" · ");
+}
+
+function getStationSearchRank(station: EditorStation, query: string) {
+  if (!query) return 0;
+
+  const stationName = normalizeSearchText(station.nameKo);
+  const stationBaseName = normalizeSearchText(getStationBaseName(station.nameKo));
+  const lineName = normalizeSearchText(station.lineNameKo);
+
+  if (stationName.startsWith(query) || stationBaseName.startsWith(query)) return 0;
+  if (stationName.includes(query) || stationBaseName.includes(query)) return 1;
+  if (lineName.includes(query)) return 2;
+  return null;
+}
+
+function highlightMatch(text: string, rawQuery: string): ReactNode {
+  const query = rawQuery.trim();
+  if (!query) return text;
+
+  const index = text.toLowerCase().indexOf(query.toLowerCase());
+  if (index < 0) return text;
+
+  return (
+    <>
+      {text.slice(0, index)}
+      <mark className="search-highlight">{text.slice(index, index + query.length)}</mark>
+      {text.slice(index + query.length)}
+    </>
+  );
 }
 
 function createEmptyPairMinutes(stationIds: string[], previous: Record<string, number | null> = {}) {
@@ -38,6 +82,7 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
   const [groups, setGroups] = useState<ManualTransferGroup[]>(initialOverlays.manualTransferGroups ?? []);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("새 환승 그룹");
+  const [groupNameTouched, setGroupNameTouched] = useState(false);
   const [note, setNote] = useState("");
   const [enabled, setEnabled] = useState(true);
   const [selectedStationIds, setSelectedStationIds] = useState<string[]>([]);
@@ -49,17 +94,32 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
   const selectedStations = selectedStationIds
     .map((stationId) => stationById.get(stationId))
     .filter((station): station is EditorStation => station !== undefined);
+  const suggestedGroupName = useMemo(() => getSuggestedGroupName(selectedStations), [selectedStations]);
   const normalizedQuery = normalizeSearchText(stationQuery);
   const searchResults = useMemo(() => {
-    const candidates = normalizedQuery
-      ? stations.filter((station) => {
-          const haystack = normalizeSearchText(`${station.nameKo} ${station.stationNumber} ${station.lineNameKo}`);
-          return haystack.includes(normalizedQuery);
-        })
-      : stations;
+    const selectedIdSet = new Set(selectedStationIds);
 
-    return candidates.filter((station) => !selectedStationIds.includes(station.id)).slice(0, 18);
+    return stations
+      .map((station) => ({ station, rank: getStationSearchRank(station, normalizedQuery) }))
+      .filter((item) => !selectedIdSet.has(item.station.id) && (!normalizedQuery || item.rank !== null))
+      .sort((a, b) => {
+        const rankA = a.rank ?? 0;
+        const rankB = b.rank ?? 0;
+        if (rankA !== rankB) return rankA - rankB;
+
+        const nameCompare = a.station.nameKo.localeCompare(b.station.nameKo, "ko");
+        if (nameCompare !== 0) return nameCompare;
+
+        return a.station.lineNameKo.localeCompare(b.station.lineNameKo, "ko");
+      })
+      .slice(0, 18)
+      .map((item) => item.station);
   }, [normalizedQuery, selectedStationIds, stations]);
+
+  useEffect(() => {
+    if (groupNameTouched) return;
+    setGroupName(suggestedGroupName);
+  }, [groupNameTouched, suggestedGroupName]);
 
   const pairs = useMemo(() => {
     const result: Array<{ key: string; from: EditorStation; to: EditorStation }> = [];
@@ -79,6 +139,7 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
   const resetForm = () => {
     setEditingGroupId(null);
     setGroupName("새 환승 그룹");
+    setGroupNameTouched(false);
     setNote("");
     setEnabled(true);
     setSelectedStationIds([]);
@@ -90,6 +151,7 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
   const loadGroup = (group: ManualTransferGroup) => {
     setEditingGroupId(group.id);
     setGroupName(group.nameKo);
+    setGroupNameTouched(true);
     setNote(group.note ?? "");
     setEnabled(group.enabled);
     setSelectedStationIds(group.stationIds);
@@ -200,15 +262,15 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
           </div>
           <input
             className="search-input"
-            placeholder="역명, 역번호, 노선명 검색"
+            placeholder="역명 또는 노선명 검색"
             value={stationQuery}
             onChange={(event) => setStationQuery(event.target.value)}
           />
           <div className="station-search-list">
             {searchResults.map((station) => (
               <button key={station.id} type="button" className="station-search-item" onClick={() => addStation(station)}>
-                <span className="station-search-name">{station.nameKo}</span>
-                <span className="station-search-meta">{station.lineNameKo} · {station.stationNumber}</span>
+                <span className="station-search-name">{highlightMatch(station.nameKo, stationQuery)}</span>
+                <span className="station-search-meta">{highlightMatch(station.lineNameKo, stationQuery)} · {station.stationNumber}</span>
               </button>
             ))}
           </div>
@@ -226,7 +288,27 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
           <div className="group-form-grid">
             <label className="input-label">
               그룹 이름
-              <input className="text-input" value={groupName} onChange={(event) => setGroupName(event.target.value)} />
+              <div className="group-name-row">
+                <input
+                  className="text-input"
+                  value={groupName}
+                  onChange={(event) => {
+                    setGroupNameTouched(true);
+                    setGroupName(event.target.value);
+                  }}
+                />
+                <button
+                  type="button"
+                  className="inline-soft-button"
+                  onClick={() => {
+                    setGroupNameTouched(false);
+                    setGroupName(suggestedGroupName);
+                  }}
+                >
+                  자동
+                </button>
+              </div>
+              <span className="input-hint">추천 이름: {suggestedGroupName}</span>
             </label>
             <label className="input-label">
               메모
