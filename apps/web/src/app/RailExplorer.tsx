@@ -107,6 +107,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const [routeOriginStationId, setRouteOriginStationId] = useState<string | null>(null);
   const [routeDestinationStationId, setRouteDestinationStationId] = useState<string | null>(null);
+  const [routeSearchMessage, setRouteSearchMessage] = useState<string | null>(null);
   const [isHydratedFromUrl, setIsHydratedFromUrl] = useState(false);
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
   const [mapFocusVersion, setMapFocusVersion] = useState(0);
@@ -410,6 +411,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setSelectedStationId(null);
     setRouteOriginStationId(null);
     setRouteDestinationStationId(null);
+    setRouteSearchMessage(null);
   };
 
   const clearSelection = () => {
@@ -431,7 +433,40 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
       setRouteDestinationStationId(stationId);
     }
 
+    setRouteSearchMessage(null);
     setSelectedStationId(stationId);
+    setMobilePanelMode("selected");
+  };
+
+  const clearRoutePoint = (role: RoutePointRole) => {
+    if (role === "origin") {
+      setRouteOriginStationId(null);
+    } else {
+      setRouteDestinationStationId(null);
+    }
+
+    setRouteSearchMessage(null);
+  };
+
+  const swapRoutePoints = () => {
+    setRouteOriginStationId(routeDestinationStationId);
+    setRouteDestinationStationId(routeOriginStationId);
+    setRouteSearchMessage(null);
+    setMobilePanelMode("selected");
+  };
+
+  const submitRouteSearch = () => {
+    if (!routeOriginStationId || !routeDestinationStationId) {
+      setRouteSearchMessage("출발역과 도착역을 모두 지정해 주세요.");
+      return;
+    }
+
+    if (routeOriginStationId === routeDestinationStationId) {
+      setRouteSearchMessage("출발역과 도착역이 같습니다. 다른 역을 선택해 주세요.");
+      return;
+    }
+
+    setRouteSearchMessage("경로 계산은 다음 단계에서 연결합니다.");
     setMobilePanelMode("selected");
   };
 
@@ -588,7 +623,15 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
           <div className="pointer-events-none absolute right-2 top-2 z-10 hidden w-[280px] lg:block">
             <div className="pointer-events-auto grid max-h-[calc(100dvh-16px)] gap-1.5 overflow-y-auto border border-slate-200 bg-white/95 p-1.5 shadow-sm shadow-slate-950/10 backdrop-blur">
               {routeOriginStation || routeDestinationStation ? (
-                <RouteDraftCard originStation={routeOriginStation} destinationStation={routeDestinationStation} />
+                <RouteDraftCard
+                  originStation={routeOriginStation}
+                  destinationStation={routeDestinationStation}
+                  message={routeSearchMessage}
+                  onClearOrigin={() => clearRoutePoint("origin")}
+                  onClearDestination={() => clearRoutePoint("destination")}
+                  onSwap={swapRoutePoints}
+                  onSubmit={submitRouteSearch}
+                />
               ) : null}
 
               {selectedStation ? (
@@ -670,7 +713,16 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
               {mobilePanelMode === "selected" ? (
                 <div className="grid gap-1.5">
                   {routeOriginStation || routeDestinationStation ? (
-                    <RouteDraftCard originStation={routeOriginStation} destinationStation={routeDestinationStation} compact />
+                    <RouteDraftCard
+                      originStation={routeOriginStation}
+                      destinationStation={routeDestinationStation}
+                      message={routeSearchMessage}
+                      onClearOrigin={() => clearRoutePoint("origin")}
+                      onClearDestination={() => clearRoutePoint("destination")}
+                      onSwap={swapRoutePoints}
+                      onSubmit={submitRouteSearch}
+                      compact
+                    />
                   ) : null}
 
                   {selectedStation ? (
@@ -1176,37 +1228,104 @@ function LineCard({ line, selected, onClick }: { line: CanonicalLine; selected: 
 function RouteDraftCard({
   originStation,
   destinationStation,
+  message,
+  onClearOrigin,
+  onClearDestination,
+  onSwap,
+  onSubmit,
   compact = false,
 }: {
   originStation: RailMapStation | null;
   destinationStation: RailMapStation | null;
+  message: string | null;
+  onClearOrigin: () => void;
+  onClearDestination: () => void;
+  onSwap: () => void;
+  onSubmit: () => void;
   compact?: boolean;
 }) {
+  const hasBothStations = Boolean(originStation && destinationStation);
+  const isSameStation = Boolean(
+    originStation && destinationStation && originStation.id === destinationStation.id,
+  );
+  const canSubmit = hasBothStations && !isSameStation;
+  const statusText = isSameStation
+    ? "출발역과 도착역이 같습니다."
+    : message ?? "출발역과 도착역을 지정해 주세요.";
+
   return (
     <section className={compact ? "border border-slate-200 bg-slate-50 p-2" : "border border-slate-200 bg-slate-50 p-2.5"}>
       <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">경로 선택</p>
-          <p className="mt-0.5 text-[11px] font-medium text-slate-500">
-            출발/도착 역을 지정했습니다. 실제 경로 검색은 다음 단계에서 연결합니다.
-          </p>
+        <div className="min-w-0">
+          <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">경로 검색</p>
+          <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500">{statusText}</p>
         </div>
-        <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
-          준비 중
-        </span>
+        <button
+          type="button"
+          className="h-6 shrink-0 rounded border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-600 transition duration-150 ease-out hover:bg-slate-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+          onClick={onSwap}
+          disabled={!originStation && !destinationStation}
+        >
+          전환
+        </button>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-1.5">
-        <div className="rounded border border-sky-100 bg-white px-2 py-1.5">
-          <p className="text-[10px] font-bold text-sky-600">출발</p>
-          <p className="mt-0.5 truncate text-xs font-bold text-slate-900">{originStation?.nameKo ?? "미지정"}</p>
-        </div>
-        <div className="rounded border border-amber-100 bg-white px-2 py-1.5">
-          <p className="text-[10px] font-bold text-amber-600">도착</p>
-          <p className="mt-0.5 truncate text-xs font-bold text-slate-900">{destinationStation?.nameKo ?? "미지정"}</p>
-        </div>
+      <div className="mt-2 grid gap-1.5">
+        <RoutePointSlot
+          label="출발"
+          accent="sky"
+          station={originStation}
+          onClear={onClearOrigin}
+        />
+        <RoutePointSlot
+          label="도착"
+          accent="amber"
+          station={destinationStation}
+          onClear={onClearDestination}
+        />
       </div>
+
+      <button
+        type="button"
+        className="mt-2 h-8 w-full rounded bg-slate-950 px-3 text-xs font-bold text-white transition duration-150 ease-out hover:bg-slate-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300"
+        disabled={!canSubmit}
+        onClick={onSubmit}
+      >
+        경로 검색
+      </button>
     </section>
+  );
+}
+
+function RoutePointSlot({
+  label,
+  accent,
+  station,
+  onClear,
+}: {
+  label: string;
+  accent: "sky" | "amber";
+  station: RailMapStation | null;
+  onClear: () => void;
+}) {
+  const labelClass = accent === "sky" ? "text-sky-600" : "text-amber-600";
+
+  return (
+    <div className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-white px-2 py-1.5">
+      <div className="min-w-0">
+        <p className={`text-[10px] font-bold ${labelClass}`}>{label}</p>
+        <p className="mt-0.5 truncate text-xs font-bold text-slate-900">{station?.nameKo ?? "미지정"}</p>
+      </div>
+      {station ? (
+        <button
+          type="button"
+          className="h-6 shrink-0 rounded px-1.5 text-[10px] font-semibold text-slate-400 transition duration-150 ease-out hover:bg-slate-100 hover:text-slate-700 active:scale-[0.99]"
+          onClick={onClear}
+        >
+          삭제
+        </button>
+      ) : null}
+    </div>
   );
 }
 
