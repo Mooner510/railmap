@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "manualTransferGroups": [],
   "manualTransferEdges": [],
   "stationOverrides": [],
   "branchOverrides": [],

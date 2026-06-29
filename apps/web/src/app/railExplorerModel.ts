@@ -39,6 +39,17 @@ export interface CanonicalLine {
 }
 
 
+
+export interface ManualTransferGroup {
+  id: string;
+  nameKo: string;
+  stationIds: string[];
+  transferMinutesByPair: Record<string, number | null>;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 export interface ManualTransferEdge {
   id: string;
   fromStationId: string;
@@ -83,6 +94,7 @@ export interface ManualGeometryOverride {
 
 export interface ManualOverlayBundle {
   schemaVersion: 1;
+  manualTransferGroups: ManualTransferGroup[];
   manualTransferEdges: ManualTransferEdge[];
   stationOverrides: ManualStationOverride[];
   branchOverrides: ManualBranchOverride[];
@@ -97,6 +109,7 @@ export interface ManualOverlayValidationIssue {
 
 export const EMPTY_MANUAL_OVERLAY_BUNDLE: ManualOverlayBundle = {
   schemaVersion: 1,
+  manualTransferGroups: [],
   manualTransferEdges: [],
   stationOverrides: [],
   branchOverrides: [],

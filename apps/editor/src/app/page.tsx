@@ -4,8 +4,8 @@ import { readManualOverlays } from "./manualOverlayStore";
 const editorCards = [
   {
     href: "/transfers",
-    title: "수동 환승",
-    description: "공공 데이터에 없는 환승 edge를 추가, 삭제, 비활성화합니다.",
+    title: "수동 환승 그룹",
+    description: "환승 가능한 역들을 하나의 그룹으로 묶고, 역간 환승 시간을 시간표처럼 관리합니다.",
     status: "사용 가능",
   },
   {
@@ -43,16 +43,16 @@ export default async function Home() {
 
       <section className="editor-summary-grid" aria-label="manual overlay summary">
         <div className="summary-card">
-          <span>수동 환승</span>
+          <span>환승 그룹</span>
+          <strong>{overlays.manualTransferGroups.length}</strong>
+        </div>
+        <div className="summary-card">
+          <span>환승 edge</span>
           <strong>{overlays.manualTransferEdges.length}</strong>
         </div>
         <div className="summary-card">
           <span>역 보정</span>
           <strong>{overlays.stationOverrides.length}</strong>
-        </div>
-        <div className="summary-card">
-          <span>노선 보정</span>
-          <strong>{overlays.branchOverrides.length}</strong>
         </div>
         <div className="summary-card">
           <span>선형 보정</span>

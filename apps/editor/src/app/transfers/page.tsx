@@ -11,7 +11,9 @@ async function readStations(): Promise<EditorStation[]> {
   return [...bundle.stations].sort((a, b) => {
     const nameCompare = a.nameKo.localeCompare(b.nameKo, "ko-KR");
     if (nameCompare !== 0) return nameCompare;
-    return a.lineNameKo.localeCompare(b.lineNameKo, "ko-KR");
+    const lineCompare = a.lineNameKo.localeCompare(b.lineNameKo, "ko-KR");
+    if (lineCompare !== 0) return lineCompare;
+    return a.stationNumber.localeCompare(b.stationNumber, "ko-KR");
   });
 }
 
@@ -19,13 +21,9 @@ export default async function TransfersPage() {
   const [stations, overlays] = await Promise.all([readStations(), readManualOverlays()]);
 
   return (
-    <main className="editor-page-shell">
-      <div className="editor-two-column">
-        <section className="editor-panel">
-          <Link href="/" className="back-link">← 에디터 홈</Link>
-          <ManualTransferEditor stations={stations} initialOverlays={overlays} />
-        </section>
-      </div>
+    <main className="editor-page-shell wide-shell">
+      <Link href="/" className="back-link">← 에디터 홈</Link>
+      <ManualTransferEditor stations={stations} initialOverlays={overlays} />
     </main>
   );
 }
