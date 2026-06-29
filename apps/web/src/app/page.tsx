@@ -106,6 +106,7 @@ interface ManualOverlays {
   schemaVersion: 1;
   manualTransferGroups: ManualTransferGroup[];
   manualTransferEdges: ManualTransferEdge[];
+  nonTransferStationIds?: string[];
 }
 
 function makeTransferPairKey(stationIdA: string, stationIdB: string) {
@@ -167,6 +168,7 @@ function readManualOverlays(): ManualOverlays {
       schemaVersion: 1,
       manualTransferGroups,
       manualTransferEdges: [...legacyEdges, ...deriveTransferEdgesFromGroups(manualTransferGroups)],
+      nonTransferStationIds: Array.isArray(parsed.nonTransferStationIds) ? parsed.nonTransferStationIds : [],
     };
   }
 
@@ -174,6 +176,7 @@ function readManualOverlays(): ManualOverlays {
     schemaVersion: 1,
     manualTransferGroups: [],
     manualTransferEdges: [],
+    nonTransferStationIds: [],
   };
 }
 

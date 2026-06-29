@@ -123,10 +123,15 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
         .filter((edge): edge is ManualTransferEdge => edge !== null && edge.source !== "editor-group")
     : [];
 
+  const nonTransferStationIds = Array.isArray((data as { nonTransferStationIds?: unknown }).nonTransferStationIds)
+    ? [...new Set((data as { nonTransferStationIds: unknown[] }).nonTransferStationIds.map(asString).filter((id): id is string => id !== null))]
+    : [];
+
   return {
     schemaVersion: 1,
     manualTransferGroups,
     manualTransferEdges: [...legacyEdges, ...deriveTransferEdgesFromGroups(manualTransferGroups)],
+    nonTransferStationIds,
     stationOverrides: Array.isArray(data.stationOverrides) ? data.stationOverrides : [],
     branchOverrides: Array.isArray(data.branchOverrides) ? data.branchOverrides : [],
     geometryOverrides: Array.isArray(data.geometryOverrides) ? data.geometryOverrides : [],
