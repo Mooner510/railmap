@@ -64,6 +64,7 @@ export interface ManualOverlayBundle {
   schemaVersion: 1;
   manualTransferGroups: ManualTransferGroup[];
   manualTransferEdges: ManualTransferEdge[];
+  nonTransferStationIds: string[];
   stationOverrides: ManualStationOverride[];
   branchOverrides: ManualBranchOverride[];
   geometryOverrides: ManualGeometryOverride[];
@@ -77,6 +78,7 @@ export const EMPTY_MANUAL_OVERLAY_BUNDLE: ManualOverlayBundle = {
   schemaVersion: 1,
   manualTransferGroups: [],
   manualTransferEdges: [],
+  nonTransferStationIds: [],
   stationOverrides: [],
   branchOverrides: [],
   geometryOverrides: [],

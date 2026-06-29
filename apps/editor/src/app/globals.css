@@ -481,3 +481,64 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
     grid-column: 1 / -1;
   }
 }
+
+/* 10.8 non-transfer station management */
+.station-filter-stack {
+  display: grid;
+  gap: 2px;
+  flex-shrink: 0;
+  margin-top: 8px;
+}
+
+.station-filter-stack .filter-checkbox-row {
+  margin-top: 0;
+}
+
+.muted-count {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.station-search-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.station-search-main-button {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.station-search-main-button:disabled {
+  cursor: default;
+}
+
+.compact-station-action {
+  min-height: 30px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.non-transfer-search-item {
+  border-color: #fed7aa;
+  background: #fff7ed;
+}
+
+.non-transfer-search-item .station-search-name {
+  color: #9a3412;
+}
+
+.non-transfer-search-item .station-search-meta {
+  color: #c2410c;
+}

@@ -4,5 +4,6 @@
   "manualTransferEdges": [],
   "stationOverrides": [],
   "branchOverrides": [],
-  "geometryOverrides": []
+  "geometryOverrides": [],
+  "nonTransferStationIds": []
 }

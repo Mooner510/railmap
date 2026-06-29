@@ -78,8 +78,8 @@ function createEmptyPairMinutes(stationIds: string[], previous: Record<string, n
   return result;
 }
 
-function fingerprintGroups(groups: ManualTransferGroup[]) {
-  const comparable = groups
+function fingerprintGroups(groups: ManualTransferGroup[], nonTransferStationIds: string[] = []) {
+  const comparableGroups = groups
     .map((group) => ({
       id: group.id,
       nameKo: group.nameKo,
@@ -90,14 +90,19 @@ function fingerprintGroups(groups: ManualTransferGroup[]) {
     }))
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  return JSON.stringify(comparable);
+  return JSON.stringify({
+    groups: comparableGroups,
+    nonTransferStationIds: [...new Set(nonTransferStationIds)].sort(),
+  });
 }
 
 export default function ManualTransferEditor({ stations, initialOverlays }: ManualTransferEditorProps) {
   const initialGroups = initialOverlays.manualTransferGroups ?? [];
+  const initialNonTransferStationIds = initialOverlays.nonTransferStationIds ?? [];
   const stationById = useMemo(() => new Map(stations.map((station) => [station.id, station])), [stations]);
   const [groups, setGroups] = useState<ManualTransferGroup[]>(initialGroups);
-  const [savedFingerprint, setSavedFingerprint] = useState(() => fingerprintGroups(initialGroups));
+  const [nonTransferStationIds, setNonTransferStationIds] = useState<string[]>(initialNonTransferStationIds);
+  const [savedFingerprint, setSavedFingerprint] = useState(() => fingerprintGroups(initialGroups, initialNonTransferStationIds));
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [groupName, setGroupName] = useState("새 환승 그룹");
   const [groupNameTouched, setGroupNameTouched] = useState(false);
@@ -107,6 +112,7 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
   const [pairMinutes, setPairMinutes] = useState<Record<string, number | null>>({});
   const [stationQuery, setStationQuery] = useState("");
   const [hideMappedStations, setHideMappedStations] = useState(true);
+  const [showOnlyNonTransferStations, setShowOnlyNonTransferStations] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -115,7 +121,7 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
     .filter((station): station is EditorStation => station !== undefined);
   const suggestedGroupName = useMemo(() => getSuggestedGroupName(selectedStations), [selectedStations]);
   const normalizedQuery = normalizeSearchText(stationQuery);
-  const currentFingerprint = useMemo(() => fingerprintGroups(groups), [groups]);
+  const currentFingerprint = useMemo(() => fingerprintGroups(groups, nonTransferStationIds), [groups, nonTransferStationIds]);
   const hasPendingChanges = currentFingerprint !== savedFingerprint;
   const editingGroup = editingGroupId ? groups.find((group) => group.id === editingGroupId) ?? null : null;
 
@@ -129,14 +135,23 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
 
     return ids;
   }, [editingGroupId, groups]);
+  const selectedStationIdSet = useMemo(() => new Set(selectedStationIds), [selectedStationIds]);
+  const nonTransferStationIdSet = useMemo(() => new Set(nonTransferStationIds), [nonTransferStationIds]);
+  const nonTransferStationCount = nonTransferStationIds.length;
 
   const searchResults = useMemo(() => {
-    const selectedIdSet = new Set(selectedStationIds);
-
     return stations
       .map((station) => ({ station, rank: getStationSearchRank(station, normalizedQuery) }))
       .filter((item) => {
-        if (selectedIdSet.has(item.station.id)) return false;
+        if (selectedStationIdSet.has(item.station.id)) return false;
+
+        const isNonTransferStation = nonTransferStationIdSet.has(item.station.id);
+        if (showOnlyNonTransferStations) {
+          if (!isNonTransferStation) return false;
+        } else if (isNonTransferStation) {
+          return false;
+        }
+
         if (hideMappedStations && mappedStationIds.has(item.station.id)) return false;
         return !normalizedQuery || item.rank !== null;
       })
@@ -152,15 +167,21 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
       })
       .slice(0, 40)
       .map((item) => item.station);
-  }, [hideMappedStations, mappedStationIds, normalizedQuery, selectedStationIds, stations]);
+  }, [hideMappedStations, mappedStationIds, nonTransferStationIdSet, normalizedQuery, selectedStationIdSet, showOnlyNonTransferStations, stations]);
 
   useEffect(() => {
     if (groupNameTouched) return;
     setGroupName(suggestedGroupName);
   }, [groupNameTouched, suggestedGroupName]);
 
-  const persistGroups = async (nextGroups: ManualTransferGroup[], successMessage: string) => {
+  const persistEditorState = async (
+    nextGroups: ManualTransferGroup[],
+    nextNonTransferStationIds: string[],
+    successMessage: string,
+  ) => {
+    const uniqueNonTransferStationIds = [...new Set(nextNonTransferStationIds)].filter(Boolean);
     setGroups(nextGroups);
+    setNonTransferStationIds(uniqueNonTransferStationIds);
     setSaveState("saving");
     setMessage("저장 중입니다.");
 
@@ -173,6 +194,7 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
           schemaVersion: 1,
           manualTransferGroups: nextGroups,
           manualTransferEdges: [],
+          nonTransferStationIds: uniqueNonTransferStationIds,
         }),
       });
 
@@ -180,14 +202,33 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
 
       const saved = (await response.json()) as ManualOverlayBundle;
       const savedGroups = saved.manualTransferGroups ?? [];
+      const savedNonTransferStationIds = saved.nonTransferStationIds ?? [];
       setGroups(savedGroups);
-      setSavedFingerprint(fingerprintGroups(savedGroups));
+      setNonTransferStationIds(savedNonTransferStationIds);
+      setSavedFingerprint(fingerprintGroups(savedGroups, savedNonTransferStationIds));
       setSaveState("saved");
       setMessage(successMessage);
     } catch (error) {
       setSaveState("error");
       setMessage(error instanceof Error ? error.message : "저장에 실패했습니다.");
     }
+  };
+
+  const persistGroups = async (nextGroups: ManualTransferGroup[], successMessage: string) => {
+    await persistEditorState(nextGroups, nonTransferStationIds, successMessage);
+  };
+
+  const addNonTransferStation = async (station: EditorStation) => {
+    if (nonTransferStationIdSet.has(station.id)) return;
+
+    const nextNonTransferStationIds = [...nonTransferStationIds, station.id];
+    await persistEditorState(groups, nextNonTransferStationIds, `${station.nameKo}을(를) 미환승역으로 등록했습니다.`);
+  };
+
+  const restoreTransferStation = async (stationId: string) => {
+    const station = stationById.get(stationId);
+    const nextNonTransferStationIds = nonTransferStationIds.filter((id) => id !== stationId);
+    await persistEditorState(groups, nextNonTransferStationIds, `${station?.nameKo ?? "선택한 역"}을(를) 환승역 후보로 전환했습니다.`);
   };
 
   const resetForm = () => {
@@ -258,9 +299,10 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
       note: note.trim() || null,
     };
     const nextGroups = [nextGroup, ...groups.filter((group) => group.id !== id)];
+    const nextNonTransferStationIds = nonTransferStationIds.filter((stationId) => !selectedStationIds.includes(stationId));
 
     setEditingGroupId(id);
-    await persistGroups(nextGroups, editingGroupId ? "그룹 수정사항을 저장했습니다." : "새 환승 그룹을 추가하고 저장했습니다.");
+    await persistEditorState(nextGroups, nextNonTransferStationIds, editingGroupId ? "그룹 수정사항을 저장했습니다." : "새 환승 그룹을 추가하고 저장했습니다.");
   };
 
   const deleteGroup = async (groupId: string) => {
@@ -330,17 +372,38 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
             value={stationQuery}
             onChange={(event) => setStationQuery(event.target.value)}
           />
-          <label className="filter-checkbox-row">
-            <input type="checkbox" checked={hideMappedStations} onChange={(event) => setHideMappedStations(event.target.checked)} />
-            이미 1개 이상 매핑된 역 제외
-          </label>
+          <div className="station-filter-stack">
+            <label className="filter-checkbox-row">
+              <input type="checkbox" checked={hideMappedStations} onChange={(event) => setHideMappedStations(event.target.checked)} />
+              이미 1개 이상 매핑된 역 제외
+            </label>
+            <label className="filter-checkbox-row">
+              <input type="checkbox" checked={showOnlyNonTransferStations} onChange={(event) => setShowOnlyNonTransferStations(event.target.checked)} />
+              미환승역만 보기 <span className="muted-count">{nonTransferStationCount}개</span>
+            </label>
+          </div>
           <div className="station-search-list fixed-inner-scroll">
-            {searchResults.map((station) => (
-              <button key={station.id} type="button" className="station-search-item" onClick={() => addStation(station)}>
-                <span className="station-search-name">{highlightMatch(station.nameKo, stationQuery)}</span>
-                <span className="station-search-meta">{highlightMatch(station.lineNameKo, stationQuery)} · {station.stationNumber}</span>
-              </button>
-            ))}
+            {searchResults.map((station) => {
+              const isNonTransferStation = nonTransferStationIdSet.has(station.id);
+
+              return (
+                <div key={station.id} className={isNonTransferStation ? "station-search-item non-transfer-search-item" : "station-search-item"}>
+                  <button type="button" className="station-search-main-button" onClick={() => addStation(station)} disabled={isNonTransferStation}>
+                    <span className="station-search-name">{highlightMatch(station.nameKo, stationQuery)}</span>
+                    <span className="station-search-meta">{highlightMatch(station.lineNameKo, stationQuery)} · {station.stationNumber}</span>
+                  </button>
+                  {isNonTransferStation ? (
+                    <button type="button" className="secondary-button compact-station-action" onClick={() => void restoreTransferStation(station.id)}>
+                      환승역으로 전환
+                    </button>
+                  ) : (
+                    <button type="button" className="ghost-button compact-station-action" onClick={() => void addNonTransferStation(station)}>
+                      미환승역으로 추가
+                    </button>
+                  )}
+                </div>
+              );
+            })}
             {searchResults.length === 0 ? <p className="empty-box compact-empty">조건에 맞는 역이 없습니다.</p> : null}
           </div>
         </section>
