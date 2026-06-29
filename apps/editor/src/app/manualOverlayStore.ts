@@ -5,6 +5,8 @@ import {
   deriveTransferEdgesFromGroups,
   makeTransferPairKey,
   type ManualOverlayBundle,
+  type ManualGeometryOverride,
+  type ManualGeometryOverridePoint,
   type ManualStationOverride,
   type ManualTransferEdge,
   type ManualTransferGroup,
@@ -111,6 +113,47 @@ function normalizeStationOverride(value: unknown): ManualStationOverride | null 
   };
 }
 
+
+function normalizeGeometryPoint(value: unknown): ManualGeometryOverridePoint | null {
+  if (!value || typeof value !== "object") return null;
+
+  const point = value as Record<string, unknown>;
+  const lng = asNullableCoordinateNumber(point.lng);
+  const lat = asNullableCoordinateNumber(point.lat);
+  if (lng === null || lat === null) return null;
+
+  const kind = point.kind === "station" ? "station" : "control";
+  const stationId = asString(point.stationId);
+
+  return {
+    lng,
+    lat,
+    kind,
+    stationId: stationId ?? undefined,
+  };
+}
+
+function normalizeGeometryOverride(value: unknown): ManualGeometryOverride | null {
+  if (!value || typeof value !== "object") return null;
+
+  const override = value as Record<string, unknown>;
+  const branchId = asString(override.branchId);
+  if (!branchId) return null;
+
+  const points = Array.isArray(override.points)
+    ? override.points.map(normalizeGeometryPoint).filter((point): point is ManualGeometryOverridePoint => point !== null)
+    : [];
+
+  if (points.length < 2) return null;
+
+  return {
+    branchId,
+    points,
+    enabled: override.enabled !== false,
+    note: asNullableString(override.note),
+  };
+}
+
 function normalizeLegacyTransferEdge(value: unknown, index: number): ManualTransferEdge | null {
   if (!value || typeof value !== "object") return null;
 
@@ -161,7 +204,9 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
       ? data.stationOverrides.map(normalizeStationOverride).filter((override): override is ManualStationOverride => override !== null)
       : [],
     branchOverrides: Array.isArray(data.branchOverrides) ? data.branchOverrides : [],
-    geometryOverrides: Array.isArray(data.geometryOverrides) ? data.geometryOverrides : [],
+    geometryOverrides: Array.isArray(data.geometryOverrides)
+      ? data.geometryOverrides.map(normalizeGeometryOverride).filter((override): override is ManualGeometryOverride => override !== null)
+      : [],
   };
 }
 

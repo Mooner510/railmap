@@ -69,6 +69,20 @@ interface ManualStationOverride {
 
 
 
+interface ManualGeometryOverridePoint {
+  lng: number;
+  lat: number;
+  kind: "station" | "control";
+  stationId?: string;
+}
+
+interface ManualGeometryOverride {
+  branchId: string;
+  points: ManualGeometryOverridePoint[];
+  enabled: boolean;
+  note?: string | null;
+}
+
 interface ManualTransferGroup {
   id: string;
   nameKo: string;
@@ -117,6 +131,7 @@ interface ManualOverlays {
   manualTransferEdges: ManualTransferEdge[];
   nonTransferStationIds?: string[];
   stationOverrides: ManualStationOverride[];
+  geometryOverrides: ManualGeometryOverride[];
 }
 
 function makeTransferPairKey(stationIdA: string, stationIdB: string) {
@@ -178,6 +193,7 @@ function readManualOverlays(): ManualOverlays {
       manualTransferEdges: [...legacyEdges, ...deriveTransferEdgesFromGroups(manualTransferGroups)],
       nonTransferStationIds: Array.isArray(parsed.nonTransferStationIds) ? parsed.nonTransferStationIds : [],
       stationOverrides: Array.isArray(parsed.stationOverrides) ? parsed.stationOverrides : [],
+      geometryOverrides: Array.isArray(parsed.geometryOverrides) ? parsed.geometryOverrides : [],
     };
   }
 
@@ -187,6 +203,7 @@ function readManualOverlays(): ManualOverlays {
     manualTransferEdges: [],
     nonTransferStationIds: [],
     stationOverrides: [],
+    geometryOverrides: [],
   };
 }
 
@@ -241,7 +258,7 @@ function toMapStations(stations: CanonicalStation[]): RailMapStation[] {
   }));
 }
 
-function toMapBranches(bundle: CanonicalBundle): RailMapBranch[] {
+function toMapBranches(bundle: CanonicalBundle, geometryOverrides: ManualGeometryOverride[]): RailMapBranch[] {
   const stationById = new Map(
     bundle.stations.map((station) => [
       station.id,
@@ -254,36 +271,50 @@ function toMapBranches(bundle: CanonicalBundle): RailMapBranch[] {
       } satisfies RailMapStation,
     ]),
   );
+  const overrideByBranchId = new Map(
+    geometryOverrides
+      .filter((override) => override.enabled !== false && override.points.length >= 2)
+      .map((override) => [override.branchId, override]),
+  );
 
   return bundle.lines.flatMap((line) =>
-    line.branches.map((branch) => ({
-      id: branch.id,
-      canonicalLineId: line.canonicalKey,
-      canonicalLineNameKo: line.nameKo,
-      colorHex: line.colorHex,
-      role: branch.role,
-      sourceLineNumber: branch.sourceLineNumber,
-      sourceLineName: branch.sourceLineName,
-      routeStops: branch.routeStops.map((stop) => ({
-        id: stop.id,
-        sequence: stop.sequence,
-        displayNameKo: stop.displayNameKo,
-        station: stationById.get(stop.stationId) ?? null,
-        confidence: stop.confidence,
-      })),
-    })),
+    line.branches.map((branch) => {
+      const override = overrideByBranchId.get(branch.id);
+
+      return {
+        id: branch.id,
+        canonicalLineId: line.canonicalKey,
+        canonicalLineNameKo: line.nameKo,
+        colorHex: line.colorHex,
+        role: branch.role,
+        sourceLineNumber: branch.sourceLineNumber,
+        sourceLineName: branch.sourceLineName,
+        geometryOverrideCoordinates: override?.points
+          .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
+          .map((point) => [point.lng, point.lat] as [number, number]),
+        routeStops: branch.routeStops.map((stop) => ({
+          id: stop.id,
+          sequence: stop.sequence,
+          displayNameKo: stop.displayNameKo,
+          station: stationById.get(stop.stationId) ?? null,
+          confidence: stop.confidence,
+        })),
+      };
+    }),
   );
 }
 
+
 export default function Home() {
   const bundle = readBundle();
+  const manualOverlays = readManualOverlays();
 
   return (
     <main className="h-[100dvh] overflow-hidden bg-slate-950 text-slate-950">
       <RailExplorer
         bundle={bundle}
         mapStations={toMapStations(bundle.stations)}
-        mapBranches={toMapBranches(bundle)}
+        mapBranches={toMapBranches(bundle, manualOverlays.geometryOverrides)}
       />
     </main>
   );

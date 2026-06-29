@@ -1,7 +1,12 @@
 import fs from "node:fs/promises";
 import { getBundlePath, readManualOverlays } from "../../manualOverlayStore";
-import { normalizeSearchText, type EditorStation, type ManualGeometryOverride, type ManualStationOverride } from "../../editorModel";
-import ManualTransferMapEditor, { type TransferMapBranch } from "./ManualTransferMapEditor";
+import {
+  normalizeSearchText,
+  type EditorStation,
+  type ManualGeometryOverride,
+  type ManualStationOverride,
+} from "../../editorModel";
+import ManualGeometryMapEditor, { type GeometryMapBranch } from "./ManualGeometryMapEditor";
 
 type CanonicalRouteStop = {
   id: string;
@@ -17,6 +22,8 @@ type CanonicalBranch = {
   role: string;
   sourceLineNumber: string;
   sourceLineName: string;
+  origin?: string | null;
+  terminal?: string | null;
   routeStops: CanonicalRouteStop[];
 };
 
@@ -120,13 +127,67 @@ function applyStationOverrides(stations: EditorStation[], overrides: ManualStati
   });
 }
 
-function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geometryOverrides: ManualGeometryOverride[]): TransferMapBranch[] {
+function toGeometryPoints(
+  branch: CanonicalBranch,
+  stationById: Map<string, EditorStation>,
+  override: ManualGeometryOverride | undefined,
+): GeometryMapBranch["geometryPoints"] {
+  if (override?.enabled !== false && Array.isArray(override?.points) && override.points.length >= 2) {
+    return override.points
+      .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
+      .map((point) => ({
+        lng: point.lng,
+        lat: point.lat,
+        kind: point.kind === "station" ? "station" : "control",
+        stationId: point.stationId,
+      }));
+  }
+
+  return branch.routeStops
+    .map((stop) => {
+      const stationId = getRouteStopStationId(stop);
+      const station = stationId ? stationById.get(stationId) : null;
+      if (!station || typeof station.lng !== "number" || typeof station.lat !== "number") return null;
+      if (!Number.isFinite(station.lng) || !Number.isFinite(station.lat)) return null;
+
+      return {
+        lng: station.lng,
+        lat: station.lat,
+        kind: "station" as const,
+        stationId: station.id,
+      };
+    })
+    .filter((point): point is NonNullable<typeof point> => point !== null);
+}
+
+function toSourceGeometryPoints(
+  branch: CanonicalBranch,
+  stationById: Map<string, EditorStation>,
+): GeometryMapBranch["geometryPoints"] {
+  return branch.routeStops
+    .map((stop) => {
+      const stationId = getRouteStopStationId(stop);
+      const station = stationId ? stationById.get(stationId) : null;
+      if (!station || typeof station.lng !== "number" || typeof station.lat !== "number") return null;
+      if (!Number.isFinite(station.lng) || !Number.isFinite(station.lat)) return null;
+
+      return {
+        lng: station.lng,
+        lat: station.lat,
+        kind: "station" as const,
+        stationId: station.id,
+      };
+    })
+    .filter((point): point is NonNullable<typeof point> => point !== null);
+}
+
+function toMapBranches(
+  bundle: CanonicalBundle,
+  stations: EditorStation[],
+  geometryOverrides: ManualGeometryOverride[],
+): GeometryMapBranch[] {
   const stationById = new Map(stations.map((station) => [station.id, station]));
-  const overrideByBranchId = new Map(
-    geometryOverrides
-      .filter((override) => override.enabled !== false && override.points.length >= 2)
-      .map((override) => [override.branchId, override]),
-  );
+  const overrideByBranchId = new Map(geometryOverrides.map((override) => [override.branchId, override]));
 
   return (bundle.lines ?? []).flatMap((line) =>
     (line.branches ?? []).map((branch) => ({
@@ -137,24 +198,15 @@ function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geome
       role: branch.role,
       sourceLineNumber: branch.sourceLineNumber,
       sourceLineName: branch.sourceLineName,
-      geometryOverrideCoordinates: overrideByBranchId.get(branch.id)?.points
-        .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
-        .map((point) => [point.lng, point.lat] as [number, number]),
-      routeStops: branch.routeStops.map((stop) => {
-        const stationId = getRouteStopStationId(stop);
-        return {
-          id: stop.id,
-          sequence: stop.sequence,
-          displayNameKo: stop.displayNameKo,
-          station: stationId ? stationById.get(stationId) ?? null : null,
-          confidence: stop.confidence ?? "none",
-        };
-      }),
+      origin: branch.origin ?? null,
+      terminal: branch.terminal ?? null,
+      sourceGeometryPoints: toSourceGeometryPoints(branch, stationById),
+      geometryPoints: toGeometryPoints(branch, stationById, overrideByBranchId.get(branch.id)),
     })),
   );
 }
 
-async function readTransferMapData() {
+async function readGeometryMapData() {
   const body = await fs.readFile(getBundlePath(), "utf8");
   const bundle = JSON.parse(body) as CanonicalBundle;
   const overlays = await readManualOverlays();
@@ -179,12 +231,12 @@ async function readTransferMapData() {
   };
 }
 
-export default async function TransferMapPage() {
-  const { stations, branches, overlays } = await readTransferMapData();
+export default async function GeometryMapPage() {
+  const { branches, overlays } = await readGeometryMapData();
 
   return (
-    <main className="map-editor-page-shell">
-      <ManualTransferMapEditor stations={stations} branches={branches} initialOverlays={overlays} />
+    <main className="geometry-editor-page-shell">
+      <ManualGeometryMapEditor branches={branches} initialOverlays={overlays} />
     </main>
   );
 }
