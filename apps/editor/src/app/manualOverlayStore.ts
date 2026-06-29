@@ -5,6 +5,7 @@ import {
   deriveTransferEdgesFromGroups,
   makeTransferPairKey,
   type ManualOverlayBundle,
+  type ManualStationOverride,
   type ManualTransferEdge,
   type ManualTransferGroup,
 } from "./editorModel";
@@ -86,6 +87,24 @@ function normalizeTransferGroup(value: unknown, index: number): ManualTransferGr
   };
 }
 
+
+function normalizeStationOverride(value: unknown): ManualStationOverride | null {
+  if (!value || typeof value !== "object") return null;
+
+  const override = value as Record<string, unknown>;
+  const stationId = asString(override.stationId);
+  if (!stationId) return null;
+
+  return {
+    stationId,
+    nameKo: asNullableString(override.nameKo) ?? undefined,
+    lat: asNullableNumber(override.lat),
+    lng: asNullableNumber(override.lng),
+    enabled: override.enabled !== false,
+    note: asNullableString(override.note),
+  };
+}
+
 function normalizeLegacyTransferEdge(value: unknown, index: number): ManualTransferEdge | null {
   if (!value || typeof value !== "object") return null;
 
@@ -132,7 +151,9 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
     manualTransferGroups,
     manualTransferEdges: [...legacyEdges, ...deriveTransferEdgesFromGroups(manualTransferGroups)],
     nonTransferStationIds,
-    stationOverrides: Array.isArray(data.stationOverrides) ? data.stationOverrides : [],
+    stationOverrides: Array.isArray(data.stationOverrides)
+      ? data.stationOverrides.map(normalizeStationOverride).filter((override): override is ManualStationOverride => override !== null)
+      : [],
     branchOverrides: Array.isArray(data.branchOverrides) ? data.branchOverrides : [],
     geometryOverrides: Array.isArray(data.geometryOverrides) ? data.geometryOverrides : [],
   };
