@@ -724,7 +724,7 @@ export default function RailMap({
       duration: 280,
     });
     map.resize();
-  }, [highlightedRouteStationIds, mapReady, validStations]);
+  }, [focusVersion, highlightedRouteStationIds, mapReady, validStations]);
 
   useEffect(() => {
     const map = mapRef.current;

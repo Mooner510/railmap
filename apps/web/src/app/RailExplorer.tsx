@@ -406,11 +406,16 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     () =>
       mapBranches.filter((branch) => {
         if (!visibleLineKeys.has(branch.canonicalLineId)) return false;
+
+        if (routeSearchResult) {
+          return routeSearchResult.edges.some((edge) => edge.branchId === branch.id);
+        }
+
         if (selectedBranch) return branch.id === selectedBranch.id;
         if (selectedLine) return branch.canonicalLineId === selectedLine.canonicalKey;
         return true;
       }),
-    [mapBranches, selectedBranch, selectedLine, visibleLineKeys],
+    [mapBranches, routeSearchResult, selectedBranch, selectedLine, visibleLineKeys],
   );
 
   const visibleStationIds = useMemo(() => {
@@ -422,8 +427,12 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
       }
     }
 
+    for (const stationId of routeSearchResult?.stationIds ?? []) {
+      ids.add(stationId);
+    }
+
     return ids;
-  }, [visibleMapBranches]);
+  }, [routeSearchResult, visibleMapBranches]);
 
   const visibleMapStations = useMemo(
     () => mapStations.filter((station) => visibleStationIds.has(station.id)),
@@ -463,6 +472,8 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
     setRouteSearchMessage(null);
     setRouteSearchResult(null);
+    setSelectedLineKey(null);
+    setSelectedBranchId(null);
     setSelectedStationId(stationId);
     setMobilePanelMode("selected");
   };
@@ -490,27 +501,37 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     if (!routeOriginStationId || !routeDestinationStationId) {
       setRouteSearchResult(null);
       setRouteSearchMessage("출발역과 도착역을 모두 지정해 주세요.");
+      setMobilePanelMode("selected");
+      setMapFocusVersion((version) => version + 1);
       return;
     }
 
     if (routeOriginStationId === routeDestinationStationId) {
       setRouteSearchResult(null);
       setRouteSearchMessage("출발역과 도착역이 같습니다. 다른 역을 선택해 주세요.");
+      setMobilePanelMode("selected");
+      setMapFocusVersion((version) => version + 1);
       return;
     }
 
     const result = findRoute(routeGraph, routeOriginStationId, routeDestinationStationId);
 
+    setSelectedLineKey(null);
+    setSelectedBranchId(null);
+
     if (!result) {
       setRouteSearchResult(null);
-      setRouteSearchMessage("현재 데이터로 연결 가능한 경로를 찾지 못했습니다.");
+      setRouteSearchMessage("경로를 찾지 못했습니다. 현재 정적 노선 데이터에서 두 역을 연결할 수 없습니다.");
       setMobilePanelMode("selected");
+      setMapFocusVersion((version) => version + 1);
       return;
     }
 
+    setSelectedStationId(null);
     setRouteSearchResult(result);
-    setRouteSearchMessage("정적 노선 그래프 기준 경로입니다.");
+    setRouteSearchMessage(null);
     setMobilePanelMode("selected");
+    setMapFocusVersion((version) => version + 1);
   };
 
   const focusSelection = () => {
@@ -564,30 +585,16 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   };
 
   const selectMapStation = (station: RailMapStation) => {
-    const firstServingBranch = mapBranches.find((branch) =>
-      branch.routeStops.some((stop) => stop.station?.id === station.id),
-    );
-
-    if (firstServingBranch && !selectedLineKey) {
-      setSelectedLineKey(firstServingBranch.canonicalLineId);
-      setSelectedBranchId(firstServingBranch.id);
-    }
-
+    setSelectedLineKey(null);
+    setSelectedBranchId(null);
     setSelectedStationId(station.id);
     setIsSearchResultsOpen(false);
     setMobilePanelMode("selected");
   };
 
   const selectStationFromSearch = (stationId: string) => {
-    const firstServingBranch = mapBranches.find((branch) =>
-      branch.routeStops.some((stop) => stop.station?.id === stationId),
-    );
-
-    if (firstServingBranch) {
-      setSelectedLineKey(firstServingBranch.canonicalLineId);
-      setSelectedBranchId(firstServingBranch.id);
-    }
-
+    setSelectedLineKey(null);
+    setSelectedBranchId(null);
     setSelectedStationId(stationId);
     setIsSearchResultsOpen(false);
     setMapFocusVersion((version) => version + 1);
@@ -665,8 +672,8 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
         />
 
         {selectedLine || selectedStation ? (
-          <div className="pointer-events-none absolute right-2 top-2 z-10 hidden w-[260px] max-w-[calc(100vw-24px)] lg:block">
-            <div className="pointer-events-auto grid min-w-0 max-h-[calc(100dvh-16px)] gap-1.5 overflow-x-hidden overflow-y-auto border border-slate-200 bg-white/95 p-1.5 shadow-sm shadow-slate-950/10 backdrop-blur">
+          <div className="pointer-events-none absolute right-3 top-3 z-10 hidden w-[280px] max-w-[calc(100vw-24px)] lg:block">
+            <div className="pointer-events-auto grid min-w-0 w-full max-w-full max-h-[calc(100dvh-24px)] gap-1.5 overflow-x-hidden overflow-y-auto [overflow-wrap:anywhere] border border-slate-200 bg-white/95 p-1.5 shadow-sm shadow-slate-950/10 backdrop-blur">
               {routeOriginStation || routeDestinationStation ? (
                 <RouteDraftCard
                   originStation={routeOriginStation}
@@ -1412,7 +1419,7 @@ function RouteResultSummary({
       </div>
 
       {routeStationNames.length > 2 ? (
-        <p className="mt-1.5 line-clamp-2 text-[10px] font-medium leading-4 text-slate-500">
+        <p className="mt-1.5 line-clamp-3 break-words text-[10px] font-medium leading-4 text-slate-500">
           {routeStationNames.slice(0, 10).join(" → ")}{routeStationNames.length > 10 ? " → ..." : ""}
         </p>
       ) : null}
@@ -1455,11 +1462,11 @@ function RouteDraftCard({
     : message ?? "출발역과 도착역을 지정해 주세요.";
 
   return (
-    <section className={compact ? "min-w-0 border border-slate-200 bg-slate-50 p-2" : "min-w-0 border border-slate-200 bg-slate-50 p-2.5"}>
+    <section className={compact ? "min-w-0 overflow-hidden border border-slate-200 bg-slate-50 p-2" : "min-w-0 overflow-hidden border border-slate-200 bg-slate-50 p-2.5"}>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">경로 검색</p>
-          <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500">{statusText}</p>
+          <p className="mt-0.5 line-clamp-2 break-words text-[11px] font-medium leading-4 text-slate-500">{statusText}</p>
         </div>
         <button
           type="button"
