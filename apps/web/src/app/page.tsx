@@ -1,12 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import RailExplorer from "./RailExplorer";
-import {
-  createManualOverlaySummary,
-  type ManualDataOverlay,
-  type ManualOverlaySummary,
-  type ManualTransferEdge,
-} from "./railExplorerModel";
 import { type RailMapBranch, type RailMapStation } from "./RailMap";
 
 type MatchConfidence = "high" | "medium" | "low" | "none" | string;
@@ -65,6 +59,26 @@ interface CanonicalStation {
 }
 
 
+interface ManualTransferEdge {
+  id: string;
+  fromStationId: string;
+  toStationId: string;
+  labelKo?: string | null;
+  transferMinutes?: number | null;
+  bidirectional?: boolean;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
+interface ManualOverlayBundle {
+  schemaVersion: 1;
+  manualTransferEdges?: ManualTransferEdge[];
+  stationOverrides?: unknown[];
+  branchOverrides?: unknown[];
+  geometryOverrides?: unknown[];
+}
+
 interface CanonicalBundle {
   bundleId: string;
   acquiredDate: string;
@@ -79,37 +93,10 @@ interface CanonicalBundle {
   };
   lines: CanonicalLine[];
   manualTransferEdges?: ManualTransferEdge[];
-  manualOverlay?: ManualOverlaySummary;
   stations: CanonicalStation[];
   routeStops: CanonicalRouteStop[];
   skippedRouteStops: unknown[];
   missingCanonicalLines: string[];
-}
-
-function createEmptyManualOverlay(): ManualDataOverlay {
-  return {
-    schemaVersion: 1,
-    stationOverrides: [],
-    branchOverrides: [],
-    transferEdges: [],
-    geometryOverrides: [],
-  };
-}
-
-function readManualOverlay(): ManualDataOverlay {
-  const overlayPath = path.join(process.cwd(), "public/data/manual-overlays.json");
-
-  if (!fs.existsSync(overlayPath)) return createEmptyManualOverlay();
-
-  const overlay = JSON.parse(fs.readFileSync(overlayPath, "utf8")) as Partial<ManualDataOverlay>;
-
-  return {
-    schemaVersion: 1,
-    stationOverrides: overlay.stationOverrides ?? [],
-    branchOverrides: overlay.branchOverrides ?? [],
-    transferEdges: overlay.transferEdges ?? [],
-    geometryOverrides: overlay.geometryOverrides ?? [],
-  };
 }
 
 function readBundle(): CanonicalBundle {
@@ -118,16 +105,34 @@ function readBundle(): CanonicalBundle {
     "public/data/kric-canonical-app-bundle.json",
   );
 
-  const bundle = JSON.parse(fs.readFileSync(bundlePath, "utf8")) as CanonicalBundle;
-  const manualOverlay = readManualOverlay();
+  return JSON.parse(fs.readFileSync(bundlePath, "utf8")) as CanonicalBundle;
+}
+
+function readManualOverlays(): ManualOverlayBundle {
+  const overlaysPath = path.join(process.cwd(), "public/data/manual-overlays.json");
+
+  if (!fs.existsSync(overlaysPath)) {
+    return { schemaVersion: 1, manualTransferEdges: [] };
+  }
+
+  return JSON.parse(fs.readFileSync(overlaysPath, "utf8")) as ManualOverlayBundle;
+}
+
+function mergeManualOverlays(bundle: CanonicalBundle, overlays: ManualOverlayBundle): CanonicalBundle {
+  const stationIds = new Set(bundle.stations.map((station) => station.id));
+  const manualTransferEdges = [
+    ...(bundle.manualTransferEdges ?? []),
+    ...(overlays.manualTransferEdges ?? []),
+  ].filter((edge, index, edges) => {
+    if (!edge.id || !edge.fromStationId || !edge.toStationId) return false;
+    if (!stationIds.has(edge.fromStationId) || !stationIds.has(edge.toStationId)) return false;
+
+    return edges.findIndex((candidate) => candidate.id === edge.id) === index;
+  });
 
   return {
     ...bundle,
-    manualTransferEdges: [
-      ...(bundle.manualTransferEdges ?? []),
-      ...manualOverlay.transferEdges,
-    ],
-    manualOverlay: createManualOverlaySummary(manualOverlay),
+    manualTransferEdges,
   };
 }
 
@@ -176,7 +181,7 @@ function toMapBranches(bundle: CanonicalBundle): RailMapBranch[] {
 }
 
 export default function Home() {
-  const bundle = readBundle();
+  const bundle = mergeManualOverlays(readBundle(), readManualOverlays());
 
   return (
     <main className="h-[100dvh] overflow-hidden bg-slate-950 text-slate-950">
