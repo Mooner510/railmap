@@ -1,102 +1,93 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
-import styles from "./page.module.css";
+import Link from "next/link";
+import { readManualOverlays } from "./manualOverlayStore";
 
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
-};
+const editorCards = [
+  {
+    href: "/transfers",
+    title: "수동 환승",
+    description: "공공 데이터에 없는 환승 edge를 추가, 삭제, 비활성화합니다.",
+    status: "사용 가능",
+  },
+  {
+    href: "#",
+    title: "역 보정",
+    description: "역 이름, 좌표, 표시 여부를 수동 보정합니다.",
+    status: "준비 예정",
+  },
+  {
+    href: "#",
+    title: "노선 선형",
+    description: "노선 중간 정점과 곡선을 직접 보정합니다.",
+    status: "준비 예정",
+  },
+  {
+    href: "#",
+    title: "검증",
+    description: "잘못된 좌표, 끊긴 route stop, 누락 환승을 점검합니다.",
+    status: "준비 예정",
+  },
+];
 
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+export default async function Home() {
+  const overlays = await readManualOverlays();
 
   return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
-};
+    <main className="editor-page-shell">
+      <section className="editor-hero">
+        <p className="eyebrow">Railmap Local Editor</p>
+        <h1>수동 데이터 편집기</h1>
+        <p>
+          Viewer는 읽기 전용으로 유지하고, 수동 환승·역 보정·노선 선형 보정은 이 로컬 에디터에서 관리합니다.
+        </p>
+      </section>
 
-export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/docs/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.dev/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+      <section className="editor-summary-grid" aria-label="manual overlay summary">
+        <div className="summary-card">
+          <span>수동 환승</span>
+          <strong>{overlays.manualTransferEdges.length}</strong>
         </div>
-        <Button appName="docs" className={styles.secondary}>
-          Open alert
-        </Button>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.dev?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.dev →
-        </a>
-      </footer>
-    </div>
+        <div className="summary-card">
+          <span>역 보정</span>
+          <strong>{overlays.stationOverrides.length}</strong>
+        </div>
+        <div className="summary-card">
+          <span>노선 보정</span>
+          <strong>{overlays.branchOverrides.length}</strong>
+        </div>
+        <div className="summary-card">
+          <span>선형 보정</span>
+          <strong>{overlays.geometryOverrides.length}</strong>
+        </div>
+      </section>
+
+      <section className="editor-card-grid" aria-label="editor navigation">
+        {editorCards.map((card) => {
+          const disabled = card.href === "#";
+
+          if (disabled) {
+            return (
+              <div key={card.title} className="editor-card disabled-card">
+                <div>
+                  <p className="card-status">{card.status}</p>
+                  <h2>{card.title}</h2>
+                  <p>{card.description}</p>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <Link key={card.title} href={card.href} className="editor-card">
+              <div>
+                <p className="card-status">{card.status}</p>
+                <h2>{card.title}</h2>
+                <p>{card.description}</p>
+              </div>
+              <span className="card-link">열기</span>
+            </Link>
+          );
+        })}
+      </section>
+    </main>
   );
 }
