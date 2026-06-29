@@ -25,6 +25,19 @@ export function getManualOverlayPaths() {
   ];
 }
 
+export function getManualOverlaySplitPaths() {
+  const root = projectRoot();
+  const manualRoot = path.join(root, "data/manual");
+
+  return {
+    index: path.join(manualRoot, "index.json"),
+    stations: path.join(manualRoot, "stations.json"),
+    transfers: path.join(manualRoot, "transfers.json"),
+    geometry: path.join(manualRoot, "geometry.json"),
+    settings: path.join(manualRoot, "settings.json"),
+  };
+}
+
 export function getBundlePath() {
   return path.join(projectRoot(), "apps/web/public/data/kric-canonical-app-bundle.json");
 }
@@ -219,6 +232,46 @@ export async function readManualOverlays(): Promise<ManualOverlayBundle> {
   return EMPTY_MANUAL_OVERLAY_BUNDLE;
 }
 
+async function writeManualOverlaySplitFiles(overlays: ManualOverlayBundle) {
+  const paths = getManualOverlaySplitPaths();
+  const writeJson = async (filePath: string, value: unknown) => {
+    await fs.mkdir(path.dirname(filePath), { recursive: true });
+    await fs.writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  };
+
+  await Promise.all([
+    writeJson(paths.index, {
+      schemaVersion: overlays.schemaVersion,
+      files: {
+        stations: "stations.json",
+        transfers: "transfers.json",
+        geometry: "geometry.json",
+        settings: "settings.json",
+      },
+      updatedAt: new Date().toISOString(),
+    }),
+    writeJson(paths.stations, {
+      schemaVersion: overlays.schemaVersion,
+      stationOverrides: overlays.stationOverrides,
+      nonTransferStationIds: overlays.nonTransferStationIds,
+    }),
+    writeJson(paths.transfers, {
+      schemaVersion: overlays.schemaVersion,
+      manualTransferGroups: overlays.manualTransferGroups,
+      manualTransferEdges: [],
+    }),
+    writeJson(paths.geometry, {
+      schemaVersion: overlays.schemaVersion,
+      branchOverrides: overlays.branchOverrides,
+      geometryOverrides: overlays.geometryOverrides,
+    }),
+    writeJson(paths.settings, {
+      schemaVersion: overlays.schemaVersion,
+      editor: { autosave: false, unifiedEditor: true },
+    }),
+  ]);
+}
+
 export async function writeManualOverlays(overlays: ManualOverlayBundle) {
   const normalized = normalizeManualOverlays(overlays);
   const persisted: ManualOverlayBundle = {
@@ -231,6 +284,8 @@ export async function writeManualOverlays(overlays: ManualOverlayBundle) {
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     await fs.writeFile(filePath, body, "utf8");
   }
+
+  await writeManualOverlaySplitFiles(persisted);
 
   return normalized;
 }

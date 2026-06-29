@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "files": {
+    "stations": "stations.json",
+    "transfers": "transfers.json",
+    "geometry": "geometry.json",
+    "settings": "settings.json"
+  },
+  "updatedAt": null
+}

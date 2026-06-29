@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "manualTransferGroups": [
+    {
+      "id": "manual-transfer-group:노량진역:candidate:kric:urban-rail-station:I4101:1004:row-207:candidate:kric:urban-rail-station:S1109:4117:row-208",
+      "nameKo": "노량진역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1109:4117:row-208",
+        "candidate:kric:urban-rail-station:I4101:1004:row-207"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4101:1004:row-207<->candidate:kric:urban-rail-station:S1109:4117:row-208": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    },
+    {
+      "id": "manual-transfer-group:서울역:candidate:kric:urban-rail-station:I1104:0426:row-555:candidate:kric:urban-rail-station:I28A1:A01:row-556:candidate:kric:urban-rail-station:I4101:0133:row-554:candidate:kric:urban-rail-station:I4108:1251:row-557",
+      "nameKo": "서울역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A01:row-556",
+        "candidate:kric:urban-rail-station:I4101:0133:row-554",
+        "candidate:kric:urban-rail-station:I1104:0426:row-555",
+        "candidate:kric:urban-rail-station:I4108:1251:row-557"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I28A1:A01:row-556<->candidate:kric:urban-rail-station:I4101:0133:row-554": 7,
+        "candidate:kric:urban-rail-station:I1104:0426:row-555<->candidate:kric:urban-rail-station:I28A1:A01:row-556": 9,
+        "candidate:kric:urban-rail-station:I28A1:A01:row-556<->candidate:kric:urban-rail-station:I4108:1251:row-557": 12,
+        "candidate:kric:urban-rail-station:I1104:0426:row-555<->candidate:kric:urban-rail-station:I4101:0133:row-554": 4,
+        "candidate:kric:urban-rail-station:I4101:0133:row-554<->candidate:kric:urban-rail-station:I4108:1251:row-557": 6,
+        "candidate:kric:urban-rail-station:I1104:0426:row-555<->candidate:kric:urban-rail-station:I4108:1251:row-557": 8
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    }
+  ],
+  "manualTransferEdges": []
+}
