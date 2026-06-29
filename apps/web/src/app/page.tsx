@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import RailExplorer from "./RailExplorer";
+import {
+  createManualOverlaySummary,
+  type ManualDataOverlay,
+  type ManualOverlaySummary,
+  type ManualTransferEdge,
+} from "./railExplorerModel";
 import { type RailMapBranch, type RailMapStation } from "./RailMap";
 
 type MatchConfidence = "high" | "medium" | "low" | "none" | string;
@@ -59,18 +65,6 @@ interface CanonicalStation {
 }
 
 
-interface ManualTransferEdge {
-  id: string;
-  fromStationId: string;
-  toStationId: string;
-  labelKo?: string | null;
-  transferMinutes?: number | null;
-  bidirectional?: boolean;
-  enabled: boolean;
-  source?: "manual" | "editor" | string;
-  note?: string | null;
-}
-
 interface CanonicalBundle {
   bundleId: string;
   acquiredDate: string;
@@ -85,10 +79,37 @@ interface CanonicalBundle {
   };
   lines: CanonicalLine[];
   manualTransferEdges?: ManualTransferEdge[];
+  manualOverlay?: ManualOverlaySummary;
   stations: CanonicalStation[];
   routeStops: CanonicalRouteStop[];
   skippedRouteStops: unknown[];
   missingCanonicalLines: string[];
+}
+
+function createEmptyManualOverlay(): ManualDataOverlay {
+  return {
+    schemaVersion: 1,
+    stationOverrides: [],
+    branchOverrides: [],
+    transferEdges: [],
+    geometryOverrides: [],
+  };
+}
+
+function readManualOverlay(): ManualDataOverlay {
+  const overlayPath = path.join(process.cwd(), "public/data/manual-overlays.json");
+
+  if (!fs.existsSync(overlayPath)) return createEmptyManualOverlay();
+
+  const overlay = JSON.parse(fs.readFileSync(overlayPath, "utf8")) as Partial<ManualDataOverlay>;
+
+  return {
+    schemaVersion: 1,
+    stationOverrides: overlay.stationOverrides ?? [],
+    branchOverrides: overlay.branchOverrides ?? [],
+    transferEdges: overlay.transferEdges ?? [],
+    geometryOverrides: overlay.geometryOverrides ?? [],
+  };
 }
 
 function readBundle(): CanonicalBundle {
@@ -97,7 +118,17 @@ function readBundle(): CanonicalBundle {
     "public/data/kric-canonical-app-bundle.json",
   );
 
-  return JSON.parse(fs.readFileSync(bundlePath, "utf8")) as CanonicalBundle;
+  const bundle = JSON.parse(fs.readFileSync(bundlePath, "utf8")) as CanonicalBundle;
+  const manualOverlay = readManualOverlay();
+
+  return {
+    ...bundle,
+    manualTransferEdges: [
+      ...(bundle.manualTransferEdges ?? []),
+      ...manualOverlay.transferEdges,
+    ],
+    manualOverlay: createManualOverlaySummary(manualOverlay),
+  };
 }
 
 function toMapStations(stations: CanonicalStation[]): RailMapStation[] {
