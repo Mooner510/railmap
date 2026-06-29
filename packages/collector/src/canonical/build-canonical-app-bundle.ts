@@ -385,16 +385,9 @@ function buildStationMatcher(stations: JsonRecord[]) {
       };
     }
 
-    const globalNameMatches = byGlobalName.get(stopName) ?? [];
-    if (globalNameMatches.length > 0) {
-      const resolved = resolveCandidates(globalNameMatches, stop, relatedLineNumbers);
-      return {
-        ...resolved,
-        status: "name-based",
-        confidence: resolved.confidence === "none" ? "none" : "low",
-        diagnostics: ["matched-by-global-normalized-name", ...resolved.diagnostics],
-      };
-    }
+    // NOTE:
+    // 전국 동일 역명 fallback은 잘못된 역(예: 죽전, 대곡 등)을 서로 연결할 수 있으므로 사용하지 않는다.
+    // 같은 노선 내에서만 이름 기반 매칭을 허용한다.
 
     return {
       station: null,
