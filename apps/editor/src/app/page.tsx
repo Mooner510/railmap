@@ -9,10 +9,10 @@ const editorCards = [
     status: "사용 가능",
   },
   {
-    href: "#",
+    href: "/stations",
     title: "역 보정",
-    description: "역 이름, 좌표, 표시 여부를 수동 보정합니다.",
-    status: "준비 예정",
+    description: "역 이름과 좌표를 수동 보정하고 viewer에 반영합니다.",
+    status: "사용 가능",
   },
   {
     href: "#",

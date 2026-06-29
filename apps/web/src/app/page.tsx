@@ -58,6 +58,15 @@ interface CanonicalStation {
   sourceCandidateId: string;
 }
 
+interface ManualStationOverride {
+  stationId: string;
+  nameKo?: string;
+  lat?: number | null;
+  lng?: number | null;
+  enabled: boolean;
+  note?: string | null;
+}
+
 
 
 interface ManualTransferGroup {
@@ -107,6 +116,7 @@ interface ManualOverlays {
   manualTransferGroups: ManualTransferGroup[];
   manualTransferEdges: ManualTransferEdge[];
   nonTransferStationIds?: string[];
+  stationOverrides: ManualStationOverride[];
 }
 
 function makeTransferPairKey(stationIdA: string, stationIdB: string) {
@@ -167,6 +177,7 @@ function readManualOverlays(): ManualOverlays {
       manualTransferGroups,
       manualTransferEdges: [...legacyEdges, ...deriveTransferEdgesFromGroups(manualTransferGroups)],
       nonTransferStationIds: Array.isArray(parsed.nonTransferStationIds) ? parsed.nonTransferStationIds : [],
+      stationOverrides: Array.isArray(parsed.stationOverrides) ? parsed.stationOverrides : [],
     };
   }
 
@@ -175,7 +186,28 @@ function readManualOverlays(): ManualOverlays {
     manualTransferGroups: [],
     manualTransferEdges: [],
     nonTransferStationIds: [],
+    stationOverrides: [],
   };
+}
+
+function applyStationOverrides(stations: CanonicalStation[], overrides: ManualStationOverride[]): CanonicalStation[] {
+  const overrideByStationId = new Map(
+    overrides
+      .filter((override) => override.enabled !== false)
+      .map((override) => [override.stationId, override]),
+  );
+
+  return stations.map((station) => {
+    const override = overrideByStationId.get(station.id);
+    if (!override) return station;
+
+    return {
+      ...station,
+      nameKo: override.nameKo?.trim() || station.nameKo,
+      lat: typeof override.lat === "number" && Number.isFinite(override.lat) ? override.lat : station.lat,
+      lng: typeof override.lng === "number" && Number.isFinite(override.lng) ? override.lng : station.lng,
+    };
+  });
 }
 
 function readBundle(): CanonicalBundle {
@@ -187,8 +219,11 @@ function readBundle(): CanonicalBundle {
   const bundle = JSON.parse(fs.readFileSync(bundlePath, "utf8")) as CanonicalBundle;
   const manualOverlays = readManualOverlays();
 
+  const stations = applyStationOverrides(bundle.stations, manualOverlays.stationOverrides);
+
   return {
     ...bundle,
+    stations,
     manualTransferEdges: [
       ...(bundle.manualTransferEdges ?? []),
       ...manualOverlays.manualTransferEdges,
