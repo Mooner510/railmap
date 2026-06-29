@@ -604,22 +604,25 @@ export default function RailMap({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !mapReady) return;
 
     const updateSource = () => {
       const source = map.getSource("branch-preview-lines") as GeoJSONSource | undefined;
 
-      if (!source) return;
+      if (!source) return false;
 
       source.setData(branchFeatures);
+      return true;
     };
 
     if (map.isStyleLoaded()) {
-      updateSource();
+      if (!updateSource()) {
+        map.once("idle", updateSource);
+      }
     } else {
       map.once("load", updateSource);
     }
-  }, [branchFeatures]);
+  }, [branchFeatures, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;
