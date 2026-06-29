@@ -106,6 +106,7 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
   const [selectedStationIds, setSelectedStationIds] = useState<string[]>([]);
   const [pairMinutes, setPairMinutes] = useState<Record<string, number | null>>({});
   const [stationQuery, setStationQuery] = useState("");
+  const [hideMappedStations, setHideMappedStations] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -118,12 +119,27 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
   const hasPendingChanges = currentFingerprint !== savedFingerprint;
   const editingGroup = editingGroupId ? groups.find((group) => group.id === editingGroupId) ?? null : null;
 
+  const mappedStationIds = useMemo(() => {
+    const ids = new Set<string>();
+
+    for (const group of groups) {
+      if (group.id === editingGroupId) continue;
+      for (const stationId of group.stationIds) ids.add(stationId);
+    }
+
+    return ids;
+  }, [editingGroupId, groups]);
+
   const searchResults = useMemo(() => {
     const selectedIdSet = new Set(selectedStationIds);
 
     return stations
       .map((station) => ({ station, rank: getStationSearchRank(station, normalizedQuery) }))
-      .filter((item) => !selectedIdSet.has(item.station.id) && (!normalizedQuery || item.rank !== null))
+      .filter((item) => {
+        if (selectedIdSet.has(item.station.id)) return false;
+        if (hideMappedStations && mappedStationIds.has(item.station.id)) return false;
+        return !normalizedQuery || item.rank !== null;
+      })
       .sort((a, b) => {
         const rankA = a.rank ?? 0;
         const rankB = b.rank ?? 0;
@@ -134,14 +150,45 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
 
         return a.station.lineNameKo.localeCompare(b.station.lineNameKo, "ko");
       })
-      .slice(0, 18)
+      .slice(0, 40)
       .map((item) => item.station);
-  }, [normalizedQuery, selectedStationIds, stations]);
+  }, [hideMappedStations, mappedStationIds, normalizedQuery, selectedStationIds, stations]);
 
   useEffect(() => {
     if (groupNameTouched) return;
     setGroupName(suggestedGroupName);
   }, [groupNameTouched, suggestedGroupName]);
+
+  const persistGroups = async (nextGroups: ManualTransferGroup[], successMessage: string) => {
+    setGroups(nextGroups);
+    setSaveState("saving");
+    setMessage("저장 중입니다.");
+
+    try {
+      const response = await fetch("/api/manual-overlays", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...initialOverlays,
+          schemaVersion: 1,
+          manualTransferGroups: nextGroups,
+          manualTransferEdges: [],
+        }),
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      const saved = (await response.json()) as ManualOverlayBundle;
+      const savedGroups = saved.manualTransferGroups ?? [];
+      setGroups(savedGroups);
+      setSavedFingerprint(fingerprintGroups(savedGroups));
+      setSaveState("saved");
+      setMessage(successMessage);
+    } catch (error) {
+      setSaveState("error");
+      setMessage(error instanceof Error ? error.message : "저장에 실패했습니다.");
+    }
+  };
 
   const resetForm = () => {
     setEditingGroupId(null);
@@ -166,7 +213,7 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
     setPairMinutes(createEmptyPairMinutes(group.stationIds, group.transferMinutesByPair));
     setStationQuery("");
     setSaveState("idle");
-    setMessage("환승 그룹을 편집 중입니다. 변경 후 '그룹 목록에 반영'을 눌러주세요.");
+    setMessage("환승 그룹을 편집 중입니다. 변경사항 저장을 누르면 즉시 파일에 반영됩니다.");
   };
 
   const addStation = (station: EditorStation) => {
@@ -193,7 +240,7 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
     }));
   };
 
-  const upsertGroup = () => {
+  const upsertGroup = async () => {
     if (selectedStationIds.length < 2) {
       setMessage("환승 그룹에는 최소 2개 역이 필요합니다.");
       return;
@@ -210,98 +257,50 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
       source: "editor",
       note: note.trim() || null,
     };
+    const nextGroups = [nextGroup, ...groups.filter((group) => group.id !== id)];
 
-    setGroups((previous) => [nextGroup, ...previous.filter((group) => group.id !== id)]);
     setEditingGroupId(id);
-    setSaveState("idle");
-    setMessage("그룹 목록에 반영되었습니다. 저장을 눌러야 manual-overlays.json에 기록됩니다.");
+    await persistGroups(nextGroups, editingGroupId ? "그룹 수정사항을 저장했습니다." : "새 환승 그룹을 추가하고 저장했습니다.");
   };
 
-  const deleteGroup = (groupId: string) => {
-    setGroups((previous) => previous.filter((group) => group.id !== groupId));
+  const deleteGroup = async (groupId: string) => {
+    const nextGroups = groups.filter((group) => group.id !== groupId);
     if (editingGroupId === groupId) resetForm();
-    setSaveState("idle");
-    setMessage("그룹을 삭제 대기 상태로 변경했습니다. 저장을 눌러야 파일에 반영됩니다.");
+    await persistGroups(nextGroups, "환승 그룹을 삭제하고 저장했습니다.");
   };
 
-  const toggleGroup = (groupId: string) => {
-    setGroups((previous) => previous.map((group) => (group.id === groupId ? { ...group, enabled: !group.enabled } : group)));
-    setSaveState("idle");
-    setMessage("그룹 활성화 상태를 변경했습니다. 저장을 눌러야 파일에 반영됩니다.");
-  };
-
-  const save = async () => {
-    setSaveState("saving");
-    setMessage(null);
-
-    try {
-      const response = await fetch("/api/manual-overlays", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...initialOverlays,
-          schemaVersion: 1,
-          manualTransferGroups: groups,
-          manualTransferEdges: [],
-        }),
-      });
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const saved = (await response.json()) as ManualOverlayBundle;
-      const savedGroups = saved.manualTransferGroups ?? [];
-      setGroups(savedGroups);
-      setSavedFingerprint(fingerprintGroups(savedGroups));
-      setSaveState("saved");
-      setMessage("manual-overlays.json에 저장되었습니다. viewer는 새로고침 후 반영됩니다.");
-    } catch (error) {
-      setSaveState("error");
-      setMessage(error instanceof Error ? error.message : "저장에 실패했습니다.");
-    }
+  const toggleGroup = async (groupId: string) => {
+    const nextGroups = groups.map((group) => (group.id === groupId ? { ...group, enabled: !group.enabled } : group));
+    await persistGroups(nextGroups, "그룹 활성화 상태를 저장했습니다.");
   };
 
   return (
-    <div className="transfer-editor-shell">
-      <section className="editor-hero compact">
-        <div>
-          <p className="eyebrow">Transfer Group Editor</p>
+    <div className="transfer-editor-shell compact-transfer-editor">
+      <section className="transfer-editor-header">
+        <a href="/" className="back-link compact-back-link">← 홈</a>
+        <div className="transfer-header-title">
+          <p className="eyebrow">Transfer Groups</p>
           <h1>수동 환승 그룹</h1>
-          <p>
-            같은 그룹 안의 역들은 서로 환승 가능한 역으로 처리됩니다. 저장된 그룹을 선택해 수정하거나, 새 그룹을 작성할 수 있습니다.
-          </p>
         </div>
-        <div className="hero-stat-row">
-          <div className="hero-stat">
-            <span>그룹</span>
-            <strong>{groups.length}</strong>
-          </div>
-          <div className={hasPendingChanges ? "hero-stat warning" : "hero-stat"}>
-            <span>상태</span>
-            <strong>{hasPendingChanges ? "수정" : "저장"}</strong>
-          </div>
+        <div className="transfer-header-meta">
+          <span>{groups.length}개 그룹</span>
+          <span className={hasPendingChanges ? "pending-pill" : "helper-pill"}>{saveState === "saving" ? "저장 중" : hasPendingChanges ? "수정 중" : "저장됨"}</span>
         </div>
       </section>
 
-      <div className="transfer-workspace managed-transfer-workspace">
-        <section className="editor-panel soft-panel">
-          <div className="section-title-row">
+      <div className="transfer-workspace managed-transfer-workspace no-page-scroll-workspace">
+        <section className="editor-panel soft-panel scroll-panel group-management-panel">
+          <div className="section-title-row compact-section-title">
             <div>
               <p className="eyebrow">Groups</p>
-              <h2>저장된 환승 그룹</h2>
+              <h2>저장된 그룹</h2>
             </div>
-            {hasPendingChanges ? <span className="pending-pill">저장 필요</span> : <span className="helper-pill">동기화됨</span>}
-          </div>
-
-          <div className="group-toolbar">
             <button type="button" className="primary-button compact-button" onClick={resetForm}>
-              새 그룹 작성
-            </button>
-            <button type="button" className="secondary-button compact-button" disabled={!hasPendingChanges || saveState === "saving"} onClick={save}>
-              {saveState === "saving" ? "저장 중" : "전체 저장"}
+              새 그룹
             </button>
           </div>
 
-          <div className="group-list managed-group-list">
+          <div className="group-list managed-group-list fixed-inner-scroll">
             {groups.length === 0 ? <p className="empty-box compact-empty">저장된 환승 그룹이 없습니다.</p> : null}
             {groups.map((group) => (
               <TransferGroupCard
@@ -310,20 +309,20 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
                 active={editingGroupId === group.id}
                 stations={group.stationIds.map((stationId) => stationById.get(stationId)).filter((station): station is EditorStation => station !== undefined)}
                 onEdit={() => loadGroup(group)}
-                onToggle={() => toggleGroup(group.id)}
-                onDelete={() => deleteGroup(group.id)}
+                onToggle={() => void toggleGroup(group.id)}
+                onDelete={() => void deleteGroup(group.id)}
               />
             ))}
           </div>
         </section>
 
-        <section className="editor-panel soft-panel">
-          <div className="section-title-row">
+        <section className="editor-panel soft-panel scroll-panel station-search-panel">
+          <div className="section-title-row compact-section-title">
             <div>
-              <p className="eyebrow">Station Search</p>
+              <p className="eyebrow">Stations</p>
               <h2>전체 역 목록</h2>
             </div>
-            <span className="helper-pill">검색 후 추가</span>
+            <span className="helper-pill">{searchResults.length}개</span>
           </div>
           <input
             className="search-input"
@@ -331,18 +330,23 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
             value={stationQuery}
             onChange={(event) => setStationQuery(event.target.value)}
           />
-          <div className="station-search-list">
+          <label className="filter-checkbox-row">
+            <input type="checkbox" checked={hideMappedStations} onChange={(event) => setHideMappedStations(event.target.checked)} />
+            이미 1개 이상 매핑된 역 제외
+          </label>
+          <div className="station-search-list fixed-inner-scroll">
             {searchResults.map((station) => (
               <button key={station.id} type="button" className="station-search-item" onClick={() => addStation(station)}>
                 <span className="station-search-name">{highlightMatch(station.nameKo, stationQuery)}</span>
                 <span className="station-search-meta">{highlightMatch(station.lineNameKo, stationQuery)} · {station.stationNumber}</span>
               </button>
             ))}
+            {searchResults.length === 0 ? <p className="empty-box compact-empty">조건에 맞는 역이 없습니다.</p> : null}
           </div>
         </section>
 
-        <section className="editor-panel soft-panel main-editor-panel">
-          <div className="section-title-row">
+        <section className="editor-panel soft-panel main-editor-panel scroll-panel current-transfer-panel">
+          <div className="section-title-row compact-section-title">
             <div>
               <p className="eyebrow">{editingGroup ? "Editing" : "New Group"}</p>
               <h2>{editingGroup ? editingGroup.nameKo : "이번 환승 목록"}</h2>
@@ -350,136 +354,135 @@ export default function ManualTransferEditor({ stations, initialOverlays }: Manu
             <button type="button" className="ghost-button" onClick={resetForm}>초기화</button>
           </div>
 
-          <div className="group-form-grid">
-            <label className="input-label">
-              그룹 이름
-              <div className="group-name-row">
-                <input
-                  className="text-input"
-                  value={groupName}
-                  onChange={(event) => {
-                    setGroupNameTouched(true);
-                    setGroupName(event.target.value);
-                  }}
-                />
-                <button
-                  type="button"
-                  className="inline-soft-button"
-                  onClick={() => {
-                    setGroupNameTouched(false);
-                    setGroupName(suggestedGroupName);
-                  }}
-                >
-                  자동
-                </button>
-              </div>
-              <span className="input-hint">추천 이름: {suggestedGroupName}</span>
-            </label>
-            <label className="input-label">
-              메모
-              <input className="text-input" placeholder="검증 근거 또는 설명" value={note} onChange={(event) => setNote(event.target.value)} />
-            </label>
-          </div>
-
-          <div className="selected-station-list">
-            {selectedStations.length === 0 ? <p className="empty-box compact-empty">왼쪽 역 목록에서 환승 가능한 역을 추가하세요.</p> : null}
-            {selectedStations.map((station, index) => (
-              <div key={station.id} className="selected-station-card">
-                <span className="station-order">{index + 1}</span>
-                <div className="selected-station-main">
-                  <strong>{station.nameKo}</strong>
-                  <span>{station.lineNameKo} · {station.stationNumber}</span>
+          <div className="main-editor-scroll fixed-inner-scroll">
+            <div className="group-form-grid compact-form-grid">
+              <label className="input-label">
+                그룹 이름
+                <div className="group-name-row">
+                  <input
+                    className="text-input"
+                    value={groupName}
+                    onChange={(event) => {
+                      setGroupNameTouched(true);
+                      setGroupName(event.target.value);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="inline-soft-button"
+                    onClick={() => {
+                      setGroupNameTouched(false);
+                      setGroupName(suggestedGroupName);
+                    }}
+                  >
+                    자동
+                  </button>
                 </div>
-                <button type="button" className="icon-button" onClick={() => removeStation(station.id)}>삭제</button>
-              </div>
-            ))}
-          </div>
-
-          <div className="section-title-row timetable-title">
-            <div>
-              <p className="eyebrow">Timetable</p>
-              <h2>역간 환승 시간표</h2>
+                <span className="input-hint">추천 이름: {suggestedGroupName}</span>
+              </label>
+              <label className="input-label">
+                메모
+                <input className="text-input" placeholder="검증 근거 또는 설명" value={note} onChange={(event) => setNote(event.target.value)} />
+              </label>
             </div>
-            <span className="helper-pill">항상 양방향</span>
-          </div>
 
-          <div className="transfer-time-matrix-wrap">
-            {selectedStations.length < 2 ? (
-              <p className="empty-box compact-empty">역을 2개 이상 추가하면 시간표가 생성됩니다.</p>
-            ) : (
-              <table className="transfer-time-matrix">
-                <thead>
-                  <tr>
-                    <th scope="col" className="matrix-corner">역간 시간</th>
-                    {selectedStations.map((station) => (
-                      <th key={station.id} scope="col">
-                        <span>{station.nameKo}</span>
-                        <small>{station.lineNameKo}</small>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedStations.map((rowStation, rowIndex) => (
-                    <tr key={rowStation.id}>
-                      <th scope="row">
-                        <span>{rowStation.nameKo}</span>
-                        <small>{rowStation.lineNameKo}</small>
-                      </th>
-                      {selectedStations.map((columnStation, columnIndex) => {
-                        if (rowIndex === columnIndex) {
-                          return <td key={columnStation.id} className="matrix-diagonal">-</td>;
-                        }
+            <div className="selected-station-list compact-selected-list">
+              {selectedStations.length === 0 ? <p className="empty-box compact-empty">왼쪽 역 목록에서 환승 가능한 역을 추가하세요.</p> : null}
+              {selectedStations.map((station, index) => (
+                <div key={station.id} className="selected-station-card compact-selected-station-card">
+                  <span className="station-order">{index + 1}</span>
+                  <div className="selected-station-main">
+                    <strong>{station.nameKo}</strong>
+                    <span>{station.lineNameKo} · {station.stationNumber}</span>
+                  </div>
+                  <button type="button" className="icon-button" onClick={() => removeStation(station.id)}>삭제</button>
+                </div>
+              ))}
+            </div>
 
-                        const pairKey = makeTransferPairKey(rowStation.id, columnStation.id);
-                        const value = pairMinutes[pairKey];
+            <div className="section-title-row timetable-title compact-section-title">
+              <div>
+                <p className="eyebrow">Timetable</p>
+                <h2>역간 환승 시간표</h2>
+              </div>
+              <span className="helper-pill">양방향</span>
+            </div>
 
-                        if (rowIndex < columnIndex) {
+            <div className="transfer-time-matrix-wrap">
+              {selectedStations.length < 2 ? (
+                <p className="empty-box compact-empty">역을 2개 이상 추가하면 시간표가 생성됩니다.</p>
+              ) : (
+                <table className="transfer-time-matrix">
+                  <thead>
+                    <tr>
+                      <th scope="col" className="matrix-corner">역간 시간</th>
+                      {selectedStations.map((station) => (
+                        <th key={station.id} scope="col">
+                          <span>{station.nameKo}</span>
+                          <small>{station.lineNameKo}</small>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedStations.map((rowStation, rowIndex) => (
+                      <tr key={rowStation.id}>
+                        <th scope="row">
+                          <span>{rowStation.nameKo}</span>
+                          <small>{rowStation.lineNameKo}</small>
+                        </th>
+                        {selectedStations.map((columnStation, columnIndex) => {
+                          if (rowIndex === columnIndex) {
+                            return <td key={columnStation.id} className="matrix-diagonal">-</td>;
+                          }
+
+                          const pairKey = makeTransferPairKey(rowStation.id, columnStation.id);
+                          const value = pairMinutes[pairKey];
+
+                          if (rowIndex < columnIndex) {
+                            return (
+                              <td key={columnStation.id} className="matrix-editable-cell">
+                                <label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    className="matrix-time-input"
+                                    value={value ?? ""}
+                                    placeholder="분"
+                                    aria-label={`${rowStation.nameKo}에서 ${columnStation.nameKo} 환승 시간`}
+                                    onChange={(event) => updatePairMinutes(pairKey, event.target.value)}
+                                  />
+                                  <span>분</span>
+                                </label>
+                              </td>
+                            );
+                          }
+
                           return (
-                            <td key={columnStation.id} className="matrix-editable-cell">
-                              <label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  className="matrix-time-input"
-                                  value={value ?? ""}
-                                  placeholder="분"
-                                  aria-label={`${rowStation.nameKo}에서 ${columnStation.nameKo} 환승 시간`}
-                                  onChange={(event) => updatePairMinutes(pairKey, event.target.value)}
-                                />
-                                <span>분</span>
-                              </label>
+                            <td key={columnStation.id} className="matrix-mirrored-cell">
+                              {value === null || value === undefined ? <span className="muted-value">-</span> : <span>{value}분</span>}
                             </td>
                           );
-                        }
-
-                        return (
-                          <td key={columnStation.id} className="matrix-mirrored-cell">
-                            {value === null || value === undefined ? <span className="muted-value">-</span> : <span>{value}분</span>}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
 
-          <div className="action-row sticky-actions">
+          <div className="action-row sticky-actions compact-sticky-actions">
             <label className="toggle-row">
               <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} />
               그룹 활성화
             </label>
-            <button type="button" className="secondary-button" onClick={upsertGroup}>
-              {editingGroupId ? "수정 반영" : "그룹 목록에 반영"}
-            </button>
-            <button type="button" className="primary-button" disabled={!hasPendingChanges || saveState === "saving"} onClick={save}>
-              {saveState === "saving" ? "저장 중" : "manual-overlays.json 저장"}
+            <button type="button" className="primary-button" disabled={saveState === "saving"} onClick={() => void upsertGroup()}>
+              {saveState === "saving" ? "저장 중" : editingGroupId ? "변경사항 저장" : "환승 그룹 추가"}
             </button>
           </div>
 
-          {message ? <p className="message-box">{message}</p> : null}
+          {message ? <p className="message-box compact-message-box">{message}</p> : null}
         </section>
       </div>
     </div>

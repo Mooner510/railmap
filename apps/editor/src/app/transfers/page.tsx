@@ -1,5 +1,4 @@
 import fs from "node:fs/promises";
-import Link from "next/link";
 import { getBundlePath, readManualOverlays } from "../manualOverlayStore";
 import { type CanonicalBundle, type EditorStation } from "../editorModel";
 import ManualTransferEditor from "./ManualTransferEditor";
@@ -21,8 +20,7 @@ export default async function TransfersPage() {
   const [stations, overlays] = await Promise.all([readStations(), readManualOverlays()]);
 
   return (
-    <main className="editor-page-shell wide-shell">
-      <Link href="/" className="back-link">← 에디터 홈</Link>
+    <main className="editor-page-shell wide-shell transfer-editor-page">
       <ManualTransferEditor stations={stations} initialOverlays={overlays} />
     </main>
   );
