@@ -51,8 +51,8 @@ export default async function Home() {
     <main className="min-h-dvh bg-slate-50 px-6 py-8 text-slate-950">
       <section className="mx-auto max-w-6xl rounded-[28px] border border-slate-200 bg-white/95 p-7 shadow-[0_12px_30px_rgb(15_23_42_/_0.08)] backdrop-blur-xl">
         <Badge>Railmap Local Editor</Badge>
-        <h1 className="mt-4 text-3xl font-black tracking-[-0.04em]">수동 데이터 편집기</h1>
-        <p className="mt-3 max-w-3xl text-sm font-bold leading-7 text-slate-500">
+        <h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em]">수동 데이터 편집기</h1>
+        <p className="mt-2 max-w-3xl text-sm font-normal leading-7 text-slate-500">
           v12부터 통합 맵 에디터를 중심으로 전환합니다. 기존 페이지는 안전한 fallback으로 유지합니다.
         </p>
         <Button asChild className="mt-5">
@@ -60,14 +60,14 @@ export default async function Home() {
         </Button>
       </section>
 
-      <section className="mx-auto mt-4 grid max-w-6xl grid-cols-2 gap-3 lg:grid-cols-4" aria-label="manual overlay summary">
+      <section className="mx-auto mt-2 grid max-w-6xl grid-cols-2 gap-3 lg:grid-cols-4" aria-label="manual overlay summary">
         <SummaryCard label="환승 그룹" value={overlays.manualTransferGroups.length} />
         <SummaryCard label="환승 edge" value={overlays.manualTransferEdges.length} />
         <SummaryCard label="역 보정" value={overlays.stationOverrides.length} />
         <SummaryCard label="선형 보정" value={overlays.geometryOverrides.length} />
       </section>
 
-      <section className="mx-auto mt-4 grid max-w-6xl grid-cols-1 gap-3 md:grid-cols-2" aria-label="editor navigation">
+      <section className="mx-auto mt-2 grid max-w-6xl grid-cols-1 gap-3 md:grid-cols-2" aria-label="editor navigation">
         {editorCards.map((card) => {
           const disabled = card.href === "#";
           const content = (
@@ -75,10 +75,10 @@ export default async function Home() {
               <div className="flex min-h-40 flex-col justify-between p-5">
                 <div>
                   <Badge className={card.primary ? "bg-blue-600 text-white" : undefined}>{card.status}</Badge>
-                  <h2 className="mt-3 text-xl font-black tracking-[-0.03em]">{card.title}</h2>
-                  <p className="mt-2 text-sm font-bold leading-6 text-slate-500">{card.description}</p>
+                  <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">{card.title}</h2>
+                  <p className="mt-2 text-sm font-normal leading-6 text-slate-500">{card.description}</p>
                 </div>
-                {!disabled ? <span className="mt-4 text-sm font-black text-blue-600">열기</span> : null}
+                {!disabled ? <span className="mt-2 text-sm font-semibold text-blue-600">열기</span> : null}
               </div>
             </Panel>
           );
@@ -94,8 +94,8 @@ function SummaryCard({ label, value }: { label: string; value: number }) {
   return (
     <Panel>
       <div className="p-4">
-        <span className="text-xs font-black text-slate-500">{label}</span>
-        <strong className="mt-1 block text-2xl font-black">{value}</strong>
+        <span className="text-xs font-semibold text-slate-500">{label}</span>
+        <strong className="mt-1 block text-2xl font-semibold">{value}</strong>
       </div>
     </Panel>
   );

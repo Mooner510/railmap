@@ -323,10 +323,14 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
     });
 
     mapRef.current = map;
+    const resizeObserver = new ResizeObserver(() => map.resize());
+    resizeObserver.observe(mapContainerRef.current);
+    window.requestAnimationFrame(() => map.resize());
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "bottom-right");
     map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
 
     map.on("load", () => {
+      map.resize();
       map.addSource("railmap-branches", { type: "geojson", data: branchFeatures });
       map.addSource("railmap-stations", { type: "geojson", data: stationFeatures });
 
@@ -462,6 +466,7 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
     });
 
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
     };
@@ -529,16 +534,16 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
       <InspectorGrid>
         <Panel className="flex min-h-0 flex-col overflow-hidden">
           <PanelHeader>
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-2.5">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">Railmap</p>
-                <h1 className="mt-1 text-lg font-black tracking-[-0.03em]">통합 맵 에디터</h1>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Railmap</p>
+                <h1 className="mt-1 text-xs font-semibold tracking-[-0.03em]">통합 맵 에디터</h1>
               </div>
               <Button size="icon" variant="outline" onClick={() => setCommandOpen(true)} aria-label="명령 팔레트 열기">
                 <Command className="size-4" />
               </Button>
             </div>
-            <TabList className="mt-4 grid grid-cols-3">
+            <TabList className="mt-2 grid grid-cols-3">
               <TabButton active={sidebarTab === "search"} onClick={() => setSidebarTab("search")}>검색</TabButton>
               <TabButton active={sidebarTab === "layers"} onClick={() => setSidebarTab("layers")}>레이어</TabButton>
               <TabButton active={sidebarTab === "transfers"} onClick={() => setSidebarTab("transfers")}>환승</TabButton>
@@ -552,7 +557,7 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
 
           <PanelBody className="min-h-0 flex-1 overflow-y-auto">
             {sidebarTab === "search" ? (
-              <div className="grid gap-3">
+              <div className="grid gap-2.5">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
                   <Input className="pl-9" placeholder="역명, 노선명, 역번호 검색" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -563,16 +568,16 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
                       key={station.id}
                       type="button"
                       className={cn(
-                        "rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50",
+                        "rounded-xl border border-slate-200 bg-white p-2.5 text-left transition hover:border-blue-200 hover:bg-blue-50",
                         selectedStationIds.has(station.id) ? "border-blue-300 bg-blue-50" : null,
                       )}
                       onClick={() => selectStation(station.id)}
                     >
                       <div className="flex items-center gap-2">
                         <span className="size-2.5 rounded-full" style={{ backgroundColor: station.colorHex ?? "#64748b" }} />
-                        <strong className="truncate text-sm font-black">{station.nameKo}</strong>
+                        <strong className="truncate text-xs font-semibold">{station.nameKo}</strong>
                       </div>
-                      <p className="mt-1 truncate text-xs font-bold text-slate-500">{formatStationSubLabel(station)}</p>
+                      <p className="mt-1 truncate text-xs font-normal text-slate-500">{formatStationSubLabel(station)}</p>
                     </button>
                   ))}
                 </div>
@@ -582,7 +587,7 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
             {sidebarTab === "layers" ? (
               <div className="grid gap-2">
                 {layerOptions.map(({ key, label, Icon }) => (
-                  <label key={String(key)} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm font-black">
+                  <label key={String(key)} className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 text-xs font-semibold">
                     <input
                       type="checkbox"
                       checked={layers[key]}
@@ -598,9 +603,9 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
             {sidebarTab === "transfers" ? (
               <div className="grid gap-2">
                 {overlays.manualTransferGroups.map((group) => (
-                  <button key={group.id} type="button" className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50" onClick={() => selectTransferGroup(group.id)}>
-                    <strong className="text-sm font-black">{group.nameKo}</strong>
-                    <p className="mt-1 text-xs font-bold text-slate-500">{group.stationIds.length}개 역 · {group.note || "메모 없음"}</p>
+                  <button key={group.id} type="button" className="rounded-xl border border-slate-200 bg-white p-2.5 text-left hover:bg-blue-50" onClick={() => selectTransferGroup(group.id)}>
+                    <strong className="text-xs font-semibold">{group.nameKo}</strong>
+                    <p className="mt-1 text-xs font-normal text-slate-500">{group.stationIds.length}개 역 · {group.note || "메모 없음"}</p>
                   </button>
                 ))}
               </div>
@@ -609,12 +614,12 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
             {sidebarTab === "geometry" ? (
               <div className="grid gap-2">
                 {data.branches.slice(0, 200).map((branch) => (
-                  <button key={branch.id} type="button" className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50" onClick={() => selectBranch(branch.id)}>
+                  <button key={branch.id} type="button" className="rounded-xl border border-slate-200 bg-white p-2.5 text-left hover:bg-blue-50" onClick={() => selectBranch(branch.id)}>
                     <div className="flex items-center gap-2">
                       <span className="h-1.5 w-8 rounded-full" style={{ backgroundColor: branch.colorHex }} />
-                      <strong className="truncate text-sm font-black">{branch.canonicalLineNameKo}</strong>
+                      <strong className="truncate text-xs font-semibold">{branch.canonicalLineNameKo}</strong>
                     </div>
-                    <p className="mt-1 truncate text-xs font-bold text-slate-500">{branch.sourceLineName} · {branch.routeStops.length} stops</p>
+                    <p className="mt-1 truncate text-xs font-normal text-slate-500">{branch.sourceLineName} · {branch.routeStops.length} stops</p>
                   </button>
                 ))}
               </div>
@@ -625,18 +630,18 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
           </PanelBody>
         </Panel>
 
-        <main className="relative min-h-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-xl">
-          <div ref={mapContainerRef} className="absolute inset-0" />
-          <div className="pointer-events-none absolute left-4 top-4 flex flex-wrap gap-2">
+        <main className="relative h-full min-h-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+          <div ref={mapContainerRef} className="absolute inset-0 h-full w-full" />
+          <div className="pointer-events-none absolute left-3 top-2.5 flex flex-wrap gap-1.5">
             <Badge className="bg-white/90 text-slate-700">{selectionLabel(selection)}</Badge>
             <Badge className="bg-white/90 text-slate-700">Zoom {zoom.toFixed(1)}</Badge>
           </div>
-          <div className="absolute left-1/2 top-4 flex -translate-x-1/2 gap-2 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
+          <div className="absolute left-1/2 top-2.5 flex -translate-x-1/2 gap-1 rounded-xl border border-slate-200 bg-white/95 p-0.5 shadow-md backdrop-blur">
             {toolOptions.map(({ mode, label, Icon }) => (
               <button
                 key={mode}
                 type="button"
-                className={cn("flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-black text-slate-500", toolMode === mode ? "bg-blue-600 text-white" : "hover:bg-slate-100")}
+                className={cn("flex items-center gap-1 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-500", toolMode === mode ? "bg-blue-600 text-white" : "hover:bg-slate-100")}
                 onClick={() => setToolMode(mode)}
               >
                 <Icon className="size-4" />
@@ -645,7 +650,7 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
             ))}
           </div>
           {selectionBox ? <div className="pointer-events-none absolute border-2 border-blue-500 bg-blue-500/15" style={selectionBox} /> : null}
-          <div className="absolute bottom-3 right-3 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-bold text-slate-600 shadow-lg backdrop-blur">
+          <div className="absolute bottom-2 right-2 rounded-xl border border-slate-200 bg-white/95 px-2 py-1.5 text-[11px] font-normal text-slate-600 shadow-md backdrop-blur">
             {cursorLngLat ? `${cursorLngLat.lng.toFixed(6)}, ${cursorLngLat.lat.toFixed(6)}` : "좌표 없음"}
           </div>
           {contextMenu ? (
@@ -663,8 +668,8 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
 
         <Panel className="flex min-h-0 flex-col overflow-hidden">
           <PanelHeader>
-            <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">Inspector</p>
-            <h2 className="mt-1 text-lg font-black tracking-[-0.03em]">{selectionLabel(selection)}</h2>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Inspector</p>
+            <h2 className="mt-1 text-xs font-semibold tracking-[-0.03em]">{selectionLabel(selection)}</h2>
           </PanelHeader>
           <PanelBody className="min-h-0 flex-1 overflow-y-auto">
             {selectedStation && stationDraft ? (
@@ -686,8 +691,8 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
       </InspectorGrid>
 
       <Dialog open={commandOpen} className="max-w-xl">
-        <div className="border-b border-slate-200 p-4">
-          <div className="flex items-center gap-3">
+        <div className="border-b border-slate-200 p-2.5">
+          <div className="flex items-center gap-2.5">
             <Command className="size-5 text-slate-400" />
             <Input autoFocus placeholder="역, 노선, 환승 그룹 검색" value={commandQuery} onChange={(event) => setCommandQuery(event.target.value)} />
             <Button variant="ghost" size="icon" onClick={() => setCommandOpen(false)}><X className="size-4" /></Button>
@@ -698,7 +703,7 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
             <button
               key={`${item.type}:${item.id}`}
               type="button"
-              className="flex w-full items-center justify-between rounded-2xl px-3 py-3 text-left hover:bg-blue-50"
+              className="flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-left hover:bg-blue-50"
               onClick={() => {
                 if (item.type === "station") selectStation(item.id);
                 if (item.type === "branch") selectBranch(item.id);
@@ -707,8 +712,8 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
               }}
             >
               <span>
-                <strong className="block text-sm font-black">{item.title}</strong>
-                <span className="text-xs font-bold text-slate-500">{item.subtitle}</span>
+                <strong className="block text-xs font-semibold">{item.title}</strong>
+                <span className="text-xs font-normal text-slate-500">{item.subtitle}</span>
               </span>
               <ChevronRight className="size-4 text-slate-400" />
             </button>
@@ -723,9 +728,9 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
 
 function Placeholder({ title, description }: { title: string; description: string }) {
   return (
-    <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
-      <strong className="text-sm font-black text-slate-700">{title}</strong>
-      <p className="mt-2 text-xs font-bold leading-5 text-slate-500">{description}</p>
+    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-2.5 text-center">
+      <strong className="text-xs font-semibold text-slate-700">{title}</strong>
+      <p className="mt-2 text-xs font-normal leading-5 text-slate-500">{description}</p>
     </div>
   );
 }
@@ -733,7 +738,7 @@ function Placeholder({ title, description }: { title: string; description: strin
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="grid gap-1.5">
-      <span className="text-xs font-black text-slate-500">{label}</span>
+      <span className="text-xs font-semibold text-slate-500">{label}</span>
       {children}
     </label>
   );
@@ -748,14 +753,14 @@ function StationInspector({ station, draft, nonTransfer, onChange, onSave, onSet
   onSetNonTransfer: (enabled: boolean) => void;
 }) {
   return (
-    <div className="grid gap-4">
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+    <div className="grid gap-2.5">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
         <div className="flex items-center gap-2">
           <span className="size-3 rounded-full" style={{ backgroundColor: station.colorHex ?? "#64748b" }} />
-          <strong className="text-base font-black">{station.nameKo}</strong>
+          <strong className="text-xs font-semibold">{station.nameKo}</strong>
         </div>
-        <p className="mt-1 text-xs font-bold text-slate-500">{formatStationSubLabel(station)}</p>
-        <p className="mt-2 break-all text-[11px] font-bold text-slate-400">{station.id}</p>
+        <p className="mt-1 text-xs font-normal text-slate-500">{formatStationSubLabel(station)}</p>
+        <p className="mt-2 break-all text-[11px] font-normal text-slate-400">{station.id}</p>
       </div>
       <Field label="표시명 보정">
         <Input value={draft.nameKo ?? ""} onChange={(event) => onChange({ ...draft, nameKo: event.target.value })} />
@@ -781,11 +786,11 @@ function StationInspector({ station, draft, nonTransfer, onChange, onSave, onSet
 
 function BranchInspector({ branch }: { branch: EditorMapBranch }) {
   return (
-    <div className="grid gap-3">
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+    <div className="grid gap-2.5">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
         <span className="block h-2 w-16 rounded-full" style={{ backgroundColor: branch.colorHex }} />
-        <h3 className="mt-3 text-base font-black">{branch.canonicalLineNameKo}</h3>
-        <p className="mt-1 text-xs font-bold text-slate-500">{branch.sourceLineName} · {branch.role}</p>
+        <h3 className="mt-2 text-xs font-semibold">{branch.canonicalLineNameKo}</h3>
+        <p className="mt-1 text-xs font-normal text-slate-500">{branch.sourceLineName} · {branch.role}</p>
       </div>
       <InfoRow label="Branch ID" value={branch.id} />
       <InfoRow label="기점" value={branch.origin ?? "-"} />
@@ -798,10 +803,10 @@ function BranchInspector({ branch }: { branch: EditorMapBranch }) {
 
 function TransferGroupInspector({ group, stationById }: { group: ManualTransferGroup; stationById: Map<string, EditorStation> }) {
   return (
-    <div className="grid gap-3">
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-        <h3 className="text-base font-black">{group.nameKo}</h3>
-        <p className="mt-1 text-xs font-bold text-slate-500">{group.stationIds.length}개 역 · {group.note || "메모 없음"}</p>
+    <div className="grid gap-2.5">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+        <h3 className="text-xs font-semibold">{group.nameKo}</h3>
+        <p className="mt-1 text-xs font-normal text-slate-500">{group.stationIds.length}개 역 · {group.note || "메모 없음"}</p>
       </div>
       <div className="grid gap-2">
         {group.stationIds.map((stationId) => {
@@ -816,19 +821,19 @@ function TransferGroupInspector({ group, stationById }: { group: ManualTransferG
 
 function MultiStationInspector({ ids, stationById, onSetNonTransfer }: { ids: string[]; stationById: Map<string, EditorStation>; onSetNonTransfer: (enabled: boolean) => void }) {
   return (
-    <div className="grid gap-3">
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-        <h3 className="text-base font-black">{ids.length}개 역 선택</h3>
-        <p className="mt-1 text-xs font-bold text-slate-500">선택한 역에 일괄 작업을 적용합니다.</p>
+    <div className="grid gap-2.5">
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5">
+        <h3 className="text-xs font-semibold">{ids.length}개 역 선택</h3>
+        <p className="mt-1 text-xs font-normal text-slate-500">선택한 역에 일괄 작업을 적용합니다.</p>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Button variant="outline" onClick={() => onSetNonTransfer(true)}>미환승역</Button>
         <Button variant="outline" onClick={() => onSetNonTransfer(false)}>환승 가능역</Button>
       </div>
-      <div className="max-h-72 overflow-y-auto rounded-3xl border border-slate-200 p-2">
+      <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200 p-2">
         {ids.map((id) => {
           const station = stationById.get(id);
-          return <p key={id} className="rounded-2xl px-3 py-2 text-xs font-bold text-slate-600">{station ? `${station.nameKo} · ${station.lineNameKo}` : id}</p>;
+          return <p key={id} className="rounded-xl px-2.5 py-2 text-xs font-normal text-slate-600">{station ? `${station.nameKo} · ${station.lineNameKo}` : id}</p>;
         })}
       </div>
     </div>
@@ -837,9 +842,9 @@ function MultiStationInspector({ ids, stationById, onSetNonTransfer }: { ids: st
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3">
-      <p className="text-[11px] font-black text-slate-400">{label}</p>
-      <p className="mt-1 break-all text-sm font-bold text-slate-700">{value}</p>
+    <div className="rounded-xl border border-slate-200 bg-white p-2.5">
+      <p className="text-[11px] font-semibold text-slate-400">{label}</p>
+      <p className="mt-1 break-all text-xs font-normal text-slate-700">{value}</p>
     </div>
   );
 }
@@ -857,17 +862,17 @@ function ContextMenu({ state, stationById, branchById, onClose, onSelectStation,
   const branch = state.branchId ? branchById.get(state.branchId) : null;
 
   return (
-    <div className="absolute z-40 min-w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-2xl" style={{ left: state.x, top: state.y }}>
+    <div className="absolute z-40 min-w-48 overflow-hidden rounded-xl border border-slate-200 bg-white p-1 shadow-2xl" style={{ left: state.x, top: state.y }}>
       {station ? (
         <>
-          <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-black hover:bg-blue-50" onClick={() => onSelectStation(station.id)}>역 선택: {station.nameKo}</button>
-          <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-black hover:bg-blue-50" onClick={() => onSetNonTransfer(station.id, true)}>미환승역으로 설정</button>
-          <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-black hover:bg-blue-50" onClick={() => onSetNonTransfer(station.id, false)}>환승 가능역으로 설정</button>
+          <button type="button" className="block w-full rounded-xl px-2.5 py-2 text-left text-xs font-semibold hover:bg-blue-50" onClick={() => onSelectStation(station.id)}>역 선택: {station.nameKo}</button>
+          <button type="button" className="block w-full rounded-xl px-2.5 py-2 text-left text-xs font-semibold hover:bg-blue-50" onClick={() => onSetNonTransfer(station.id, true)}>미환승역으로 설정</button>
+          <button type="button" className="block w-full rounded-xl px-2.5 py-2 text-left text-xs font-semibold hover:bg-blue-50" onClick={() => onSetNonTransfer(station.id, false)}>환승 가능역으로 설정</button>
         </>
       ) : null}
-      {branch ? <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-black hover:bg-blue-50" onClick={() => onSelectBranch(branch.id)}>노선 선택: {branch.canonicalLineNameKo}</button> : null}
-      {!station && !branch ? <p className="px-3 py-2 text-xs font-bold text-slate-400">선택 가능한 객체 없음</p> : null}
-      <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-black text-slate-500 hover:bg-slate-100" onClick={onClose}>닫기</button>
+      {branch ? <button type="button" className="block w-full rounded-xl px-2.5 py-2 text-left text-xs font-semibold hover:bg-blue-50" onClick={() => onSelectBranch(branch.id)}>노선 선택: {branch.canonicalLineNameKo}</button> : null}
+      {!station && !branch ? <p className="px-2.5 py-2 text-xs font-normal text-slate-400">선택 가능한 객체 없음</p> : null}
+      <button type="button" className="block w-full rounded-xl px-2.5 py-2 text-left text-xs font-semibold text-slate-500 hover:bg-slate-100" onClick={onClose}>닫기</button>
     </div>
   );
 }
