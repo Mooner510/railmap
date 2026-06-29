@@ -52,9 +52,8 @@ export interface ManualTransferEdge {
 }
 
 export interface ManualStationOverride {
-  id: string;
   stationId: string;
-  nameKo?: string | null;
+  nameKo?: string;
   lat?: number | null;
   lng?: number | null;
   enabled: boolean;
@@ -62,51 +61,47 @@ export interface ManualStationOverride {
 }
 
 export interface ManualBranchOverride {
-  id: string;
   branchId: string;
-  displayNameKo?: string | null;
+  displayNameKo?: string;
   enabled: boolean;
   note?: string | null;
 }
 
-export interface ManualGeometryPoint {
+export interface ManualGeometryOverridePoint {
   lng: number;
   lat: number;
   kind: "station" | "control";
-  stationId?: string | null;
+  stationId?: string;
 }
 
 export interface ManualGeometryOverride {
-  id: string;
   branchId: string;
-  points: ManualGeometryPoint[];
+  points: ManualGeometryOverridePoint[];
   enabled: boolean;
   note?: string | null;
 }
 
-export interface ManualDataOverlay {
+export interface ManualOverlayBundle {
   schemaVersion: 1;
+  manualTransferEdges: ManualTransferEdge[];
   stationOverrides: ManualStationOverride[];
   branchOverrides: ManualBranchOverride[];
-  transferEdges: ManualTransferEdge[];
   geometryOverrides: ManualGeometryOverride[];
 }
 
-export interface ManualOverlaySummary {
-  stationOverrides: number;
-  branchOverrides: number;
-  transferEdges: number;
-  geometryOverrides: number;
+export interface ManualOverlayValidationIssue {
+  id: string;
+  type: "manual-transfer" | "station-override" | "branch-override" | "geometry-override";
+  message: string;
 }
 
-export function createManualOverlaySummary(overlay?: Partial<ManualDataOverlay> | null): ManualOverlaySummary {
-  return {
-    stationOverrides: overlay?.stationOverrides?.length ?? 0,
-    branchOverrides: overlay?.branchOverrides?.length ?? 0,
-    transferEdges: overlay?.transferEdges?.length ?? 0,
-    geometryOverrides: overlay?.geometryOverrides?.length ?? 0,
-  };
-}
+export const EMPTY_MANUAL_OVERLAY_BUNDLE: ManualOverlayBundle = {
+  schemaVersion: 1,
+  manualTransferEdges: [],
+  stationOverrides: [],
+  branchOverrides: [],
+  geometryOverrides: [],
+};
 
 export interface CanonicalBundle {
   bundleId: string;
@@ -122,7 +117,6 @@ export interface CanonicalBundle {
   };
   lines: CanonicalLine[];
   manualTransferEdges?: ManualTransferEdge[];
-  manualOverlay?: ManualOverlaySummary;
   missingCanonicalLines: string[];
 }
 
