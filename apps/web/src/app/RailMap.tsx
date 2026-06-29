@@ -615,12 +615,17 @@ export default function RailMap({
       return true;
     };
 
+    const runUpdate = () => {
+      window.requestAnimationFrame(() => {
+        updateSource();
+      });
+    };
+
     if (map.isStyleLoaded()) {
-      if (!updateSource()) {
-        map.once("idle", updateSource);
-      }
+      runUpdate();
+      map.once("idle", runUpdate);
     } else {
-      map.once("load", updateSource);
+      map.once("load", runUpdate);
     }
   }, [branchFeatures, mapReady]);
 
