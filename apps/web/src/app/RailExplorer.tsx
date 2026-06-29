@@ -28,6 +28,8 @@ type RoutePointRole = "origin" | "destination";
 const MIN_STATION_SEARCH_LENGTH = 1;
 const MAX_LINE_SEARCH_RESULTS = 8;
 const MAX_STATION_SEARCH_RESULTS = 12;
+const SAME_LINE_BRANCH_CHANGE_PENALTY = 4;
+const ROUTE_TRANSFER_PENALTY = 28;
 
 interface FilterControlsProps {
   areaCodes: string[];
@@ -1360,36 +1362,84 @@ function findRoute(
   originStationId: string,
   destinationStationId: string,
 ): RouteSearchResult | null {
-  const queue = [originStationId];
-  const visited = new Set([originStationId]);
-  const previous = new Map<string, { stationId: string; edge: RouteGraphEdge }>();
+  const originKey = makeRouteStateKey(originStationId, null);
+  const open: Array<{
+    stationId: string;
+    previousBranchId: string | null;
+    previousLineNameKo: string | null;
+    score: number;
+    stopCount: number;
+    transferCount: number;
+  }> = [
+    {
+      stationId: originStationId,
+      previousBranchId: null,
+      previousLineNameKo: null,
+      score: 0,
+      stopCount: 0,
+      transferCount: 0,
+    },
+  ];
+  const bestScore = new Map<string, number>([[originKey, 0]]);
+  const previous = new Map<string, { previousKey: string; stationId: string; edge: RouteGraphEdge }>();
+  let destinationKey: string | null = null;
 
-  for (let cursor = 0; cursor < queue.length; cursor += 1) {
-    const stationId = queue[cursor]!;
-    if (stationId === destinationStationId) break;
+  while (open.length > 0) {
+    open.sort((a, b) =>
+      a.score - b.score ||
+      a.transferCount - b.transferCount ||
+      a.stopCount - b.stopCount,
+    );
 
-    for (const edge of graph.get(stationId) ?? []) {
-      if (visited.has(edge.toStationId)) continue;
+    const current = open.shift();
+    if (!current) break;
 
-      visited.add(edge.toStationId);
-      previous.set(edge.toStationId, { stationId, edge });
-      queue.push(edge.toStationId);
+    const currentKey = makeRouteStateKey(current.stationId, current.previousBranchId);
+    if ((bestScore.get(currentKey) ?? Number.POSITIVE_INFINITY) < current.score) continue;
+
+    if (current.stationId === destinationStationId) {
+      destinationKey = currentKey;
+      break;
+    }
+
+    for (const edge of graph.get(current.stationId) ?? []) {
+      const isTransfer = Boolean(current.previousBranchId && current.previousBranchId !== edge.branchId);
+      const transferPenalty = !isTransfer
+        ? 0
+        : current.previousLineNameKo === edge.lineNameKo
+          ? SAME_LINE_BRANCH_CHANGE_PENALTY
+          : ROUTE_TRANSFER_PENALTY;
+      const nextScore = current.score + 1 + transferPenalty;
+      const nextKey = makeRouteStateKey(edge.toStationId, edge.branchId);
+
+      if (nextScore >= (bestScore.get(nextKey) ?? Number.POSITIVE_INFINITY)) continue;
+
+      bestScore.set(nextKey, nextScore);
+      previous.set(nextKey, { previousKey: currentKey, stationId: current.stationId, edge });
+      open.push({
+        stationId: edge.toStationId,
+        previousBranchId: edge.branchId,
+        previousLineNameKo: edge.lineNameKo,
+        score: nextScore,
+        stopCount: current.stopCount + 1,
+        transferCount: current.transferCount + (isTransfer ? 1 : 0),
+      });
     }
   }
 
-  if (!visited.has(destinationStationId)) return null;
+  if (!destinationKey) return null;
 
   const stationIds = [destinationStationId];
   const edges: RouteGraphEdge[] = [];
-  let currentStationId = destinationStationId;
+  let currentKey = destinationKey;
 
-  while (currentStationId !== originStationId) {
-    const item = previous.get(currentStationId);
+  while (currentKey !== originKey) {
+    const item = previous.get(currentKey);
     if (!item) return null;
 
     edges.unshift(item.edge);
     stationIds.unshift(item.stationId);
-    currentStationId = item.stationId;
+    currentKey = item.previousKey;
   }
 
   let transferCount = 0;
@@ -1401,6 +1451,10 @@ function findRoute(
   }
 
   return { stationIds, edges, transferCount };
+}
+
+function makeRouteStateKey(stationId: string, branchId: string | null) {
+  return `${stationId}::${branchId ?? "origin"}`;
 }
 
 function RouteResultSummary({
