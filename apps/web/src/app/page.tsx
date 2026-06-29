@@ -58,6 +58,19 @@ interface CanonicalStation {
   sourceCandidateId: string;
 }
 
+
+interface ManualTransferEdge {
+  id: string;
+  fromStationId: string;
+  toStationId: string;
+  labelKo?: string | null;
+  transferMinutes?: number | null;
+  bidirectional?: boolean;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 interface CanonicalBundle {
   bundleId: string;
   acquiredDate: string;
@@ -71,6 +84,7 @@ interface CanonicalBundle {
     missingCanonicalLines: number;
   };
   lines: CanonicalLine[];
+  manualTransferEdges?: ManualTransferEdge[];
   stations: CanonicalStation[];
   routeStops: CanonicalRouteStop[];
   skippedRouteStops: unknown[];
