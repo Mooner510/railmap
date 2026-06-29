@@ -403,19 +403,8 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   );
 
   const visibleMapBranches = useMemo(
-    () =>
-      mapBranches.filter((branch) => {
-        if (!visibleLineKeys.has(branch.canonicalLineId)) return false;
-
-        if (routeSearchResult) {
-          return routeSearchResult.edges.some((edge) => edge.branchId === branch.id);
-        }
-
-        if (selectedBranch) return branch.id === selectedBranch.id;
-        if (selectedLine) return branch.canonicalLineId === selectedLine.canonicalKey;
-        return true;
-      }),
-    [mapBranches, routeSearchResult, selectedBranch, selectedLine, visibleLineKeys],
+    () => mapBranches.filter((branch) => visibleLineKeys.has(branch.canonicalLineId)),
+    [mapBranches, visibleLineKeys],
   );
 
   const visibleStationIds = useMemo(() => {
