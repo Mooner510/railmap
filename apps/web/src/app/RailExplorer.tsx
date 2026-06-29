@@ -75,6 +75,20 @@ interface StationServingBranch {
   lastStopName: string;
 }
 
+interface RouteGraphEdge {
+  toStationId: string;
+  branchId: string;
+  lineNameKo: string;
+  sourceLineName: string;
+  colorHex: string;
+}
+
+interface RouteSearchResult {
+  stationIds: string[];
+  edges: RouteGraphEdge[];
+  transferCount: number;
+}
+
 interface SelectedLinePanelProps {
   selectedLine: CanonicalLine | null;
   selectedBranchId: string | null;
@@ -108,6 +122,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [routeOriginStationId, setRouteOriginStationId] = useState<string | null>(null);
   const [routeDestinationStationId, setRouteDestinationStationId] = useState<string | null>(null);
   const [routeSearchMessage, setRouteSearchMessage] = useState<string | null>(null);
+  const [routeSearchResult, setRouteSearchResult] = useState<RouteSearchResult | null>(null);
   const [isHydratedFromUrl, setIsHydratedFromUrl] = useState(false);
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
   const [mapFocusVersion, setMapFocusVersion] = useState(0);
@@ -286,6 +301,9 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     [mapStations, routeDestinationStationId],
   );
 
+  const routeGraph = useMemo(() => buildRouteGraph(bundle.lines), [bundle.lines]);
+  const stationById = useMemo(() => new Map(mapStations.map((station) => [station.id, station])), [mapStations]);
+
   const stationServingIndex = useMemo(() => {
     const index = new Map<string, StationServingBranch[]>();
 
@@ -434,6 +452,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     }
 
     setRouteSearchMessage(null);
+    setRouteSearchResult(null);
     setSelectedStationId(stationId);
     setMobilePanelMode("selected");
   };
@@ -446,27 +465,41 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     }
 
     setRouteSearchMessage(null);
+    setRouteSearchResult(null);
   };
 
   const swapRoutePoints = () => {
     setRouteOriginStationId(routeDestinationStationId);
     setRouteDestinationStationId(routeOriginStationId);
     setRouteSearchMessage(null);
+    setRouteSearchResult(null);
     setMobilePanelMode("selected");
   };
 
   const submitRouteSearch = () => {
     if (!routeOriginStationId || !routeDestinationStationId) {
+      setRouteSearchResult(null);
       setRouteSearchMessage("출발역과 도착역을 모두 지정해 주세요.");
       return;
     }
 
     if (routeOriginStationId === routeDestinationStationId) {
+      setRouteSearchResult(null);
       setRouteSearchMessage("출발역과 도착역이 같습니다. 다른 역을 선택해 주세요.");
       return;
     }
 
-    setRouteSearchMessage("경로 계산은 다음 단계에서 연결합니다.");
+    const result = findRoute(routeGraph, routeOriginStationId, routeDestinationStationId);
+
+    if (!result) {
+      setRouteSearchResult(null);
+      setRouteSearchMessage("현재 데이터로 연결 가능한 경로를 찾지 못했습니다.");
+      setMobilePanelMode("selected");
+      return;
+    }
+
+    setRouteSearchResult(result);
+    setRouteSearchMessage("정적 노선 그래프 기준 경로입니다.");
     setMobilePanelMode("selected");
   };
 
@@ -627,6 +660,8 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                   originStation={routeOriginStation}
                   destinationStation={routeDestinationStation}
                   message={routeSearchMessage}
+                  result={routeSearchResult}
+                  stationById={stationById}
                   onClearOrigin={() => clearRoutePoint("origin")}
                   onClearDestination={() => clearRoutePoint("destination")}
                   onSwap={swapRoutePoints}
@@ -717,6 +752,8 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
                       originStation={routeOriginStation}
                       destinationStation={routeDestinationStation}
                       message={routeSearchMessage}
+                      result={routeSearchResult}
+                      stationById={stationById}
                       onClearOrigin={() => clearRoutePoint("origin")}
                       onClearDestination={() => clearRoutePoint("destination")}
                       onSwap={swapRoutePoints}
@@ -1225,10 +1262,126 @@ function LineCard({ line, selected, onClick }: { line: CanonicalLine; selected: 
   );
 }
 
+function buildRouteGraph(lines: CanonicalLine[]): Map<string, RouteGraphEdge[]> {
+  const graph = new Map<string, RouteGraphEdge[]>();
+
+  const addEdge = (fromStationId: string, edge: RouteGraphEdge) => {
+    const edges = graph.get(fromStationId) ?? [];
+    edges.push(edge);
+    graph.set(fromStationId, edges);
+  };
+
+  for (const line of lines) {
+    for (const branch of line.branches) {
+      for (let index = 0; index < branch.routeStops.length - 1; index += 1) {
+        const current = branch.routeStops[index];
+        const next = branch.routeStops[index + 1];
+
+        if (!current?.stationId || !next?.stationId || current.stationId === next.stationId) continue;
+
+        const edge: Omit<RouteGraphEdge, "toStationId"> = {
+          branchId: branch.id,
+          lineNameKo: line.nameKo,
+          sourceLineName: branch.sourceLineName,
+          colorHex: line.colorHex,
+        };
+
+        addEdge(current.stationId, { ...edge, toStationId: next.stationId });
+        addEdge(next.stationId, { ...edge, toStationId: current.stationId });
+      }
+    }
+  }
+
+  return graph;
+}
+
+function findRoute(
+  graph: Map<string, RouteGraphEdge[]>,
+  originStationId: string,
+  destinationStationId: string,
+): RouteSearchResult | null {
+  const queue = [originStationId];
+  const visited = new Set([originStationId]);
+  const previous = new Map<string, { stationId: string; edge: RouteGraphEdge }>();
+
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const stationId = queue[cursor]!;
+    if (stationId === destinationStationId) break;
+
+    for (const edge of graph.get(stationId) ?? []) {
+      if (visited.has(edge.toStationId)) continue;
+
+      visited.add(edge.toStationId);
+      previous.set(edge.toStationId, { stationId, edge });
+      queue.push(edge.toStationId);
+    }
+  }
+
+  if (!visited.has(destinationStationId)) return null;
+
+  const stationIds = [destinationStationId];
+  const edges: RouteGraphEdge[] = [];
+  let currentStationId = destinationStationId;
+
+  while (currentStationId !== originStationId) {
+    const item = previous.get(currentStationId);
+    if (!item) return null;
+
+    edges.unshift(item.edge);
+    stationIds.unshift(item.stationId);
+    currentStationId = item.stationId;
+  }
+
+  let transferCount = 0;
+  let previousBranchId = edges[0]?.branchId ?? null;
+
+  for (const edge of edges.slice(1)) {
+    if (previousBranchId && edge.branchId !== previousBranchId) transferCount += 1;
+    previousBranchId = edge.branchId;
+  }
+
+  return { stationIds, edges, transferCount };
+}
+
+function RouteResultSummary({
+  result,
+  stationById,
+}: {
+  result: RouteSearchResult;
+  stationById: Map<string, RailMapStation>;
+}) {
+  const firstEdge = result.edges[0];
+  const lastEdge = result.edges[result.edges.length - 1];
+  const viaStations = result.stationIds
+    .slice(1, -1)
+    .map((stationId) => stationById.get(stationId)?.nameKo)
+    .filter(Boolean)
+    .slice(0, 3);
+
+  return (
+    <div className="mt-2 rounded border border-emerald-200 bg-emerald-50 px-2 py-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[10px] font-bold tracking-wide text-emerald-700 uppercase">정적 경로</p>
+        <p className="text-[10px] font-semibold text-emerald-700">
+          {formatNumber(result.stationIds.length)}역 · 환승 {formatNumber(result.transferCount)}회
+        </p>
+      </div>
+      <p className="mt-1 truncate text-[11px] font-semibold text-slate-700">
+        {firstEdge?.lineNameKo ?? "-"}{lastEdge && lastEdge.branchId !== firstEdge?.branchId ? ` → ${lastEdge.lineNameKo}` : ""}
+      </p>
+      {viaStations.length > 0 ? (
+        <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">경유: {viaStations.join(" · ")}</p>
+      ) : null}
+    </div>
+  );
+}
+
 function RouteDraftCard({
   originStation,
   destinationStation,
   message,
+  result,
+  stationById,
   onClearOrigin,
   onClearDestination,
   onSwap,
@@ -1238,6 +1391,8 @@ function RouteDraftCard({
   originStation: RailMapStation | null;
   destinationStation: RailMapStation | null;
   message: string | null;
+  result: RouteSearchResult | null;
+  stationById: Map<string, RailMapStation>;
   onClearOrigin: () => void;
   onClearDestination: () => void;
   onSwap: () => void;
@@ -1284,6 +1439,8 @@ function RouteDraftCard({
           onClear={onClearDestination}
         />
       </div>
+
+      {result ? <RouteResultSummary result={result} stationById={stationById} /> : null}
 
       <button
         type="button"
