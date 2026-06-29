@@ -304,6 +304,16 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const routeGraph = useMemo(() => buildRouteGraph(bundle.lines), [bundle.lines]);
   const stationById = useMemo(() => new Map(mapStations.map((station) => [station.id, station])), [mapStations]);
 
+  const routeResultStationIds = useMemo(
+    () => routeSearchResult?.stationIds ?? [],
+    [routeSearchResult],
+  );
+
+  const routeResultBranchIds = useMemo(
+    () => routeSearchResult?.edges.map((edge) => edge.branchId) ?? [],
+    [routeSearchResult],
+  );
+
   const stationServingIndex = useMemo(() => {
     const index = new Map<string, StationServingBranch[]>();
 
@@ -644,6 +654,8 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
           branches={visibleMapBranches}
           selectedBranchId={selectedBranchId}
           selectedStationId={selectedStationId}
+          highlightedRouteStationIds={routeResultStationIds}
+          highlightedRouteBranchIds={routeResultBranchIds}
           focusVersion={mapFocusVersion}
           showBranches={showMapLines}
           showStations={showMapStations}
@@ -653,8 +665,8 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
         />
 
         {selectedLine || selectedStation ? (
-          <div className="pointer-events-none absolute right-2 top-2 z-10 hidden w-[280px] lg:block">
-            <div className="pointer-events-auto grid max-h-[calc(100dvh-16px)] gap-1.5 overflow-y-auto border border-slate-200 bg-white/95 p-1.5 shadow-sm shadow-slate-950/10 backdrop-blur">
+          <div className="pointer-events-none absolute right-2 top-2 z-10 hidden w-[260px] max-w-[calc(100vw-24px)] lg:block">
+            <div className="pointer-events-auto grid min-w-0 max-h-[calc(100dvh-16px)] gap-1.5 overflow-x-hidden overflow-y-auto border border-slate-200 bg-white/95 p-1.5 shadow-sm shadow-slate-950/10 backdrop-blur">
               {routeOriginStation || routeDestinationStation ? (
                 <RouteDraftCard
                   originStation={routeOriginStation}
@@ -1350,28 +1362,62 @@ function RouteResultSummary({
   result: RouteSearchResult;
   stationById: Map<string, RailMapStation>;
 }) {
-  const firstEdge = result.edges[0];
-  const lastEdge = result.edges[result.edges.length - 1];
-  const viaStations = result.stationIds
-    .slice(1, -1)
+  const originName = stationById.get(result.stationIds[0] ?? "")?.nameKo ?? "출발";
+  const destinationName = stationById.get(result.stationIds[result.stationIds.length - 1] ?? "")?.nameKo ?? "도착";
+  const routeStationNames = result.stationIds
     .map((stationId) => stationById.get(stationId)?.nameKo)
-    .filter(Boolean)
-    .slice(0, 3);
+    .filter((name): name is string => Boolean(name));
+
+  const segments: Array<{ branchId: string; lineNameKo: string; colorHex: string; stationCount: number }> = [];
+
+  for (const edge of result.edges) {
+    const last = segments[segments.length - 1];
+
+    if (last && last.branchId === edge.branchId) {
+      last.stationCount += 1;
+    } else {
+      segments.push({
+        branchId: edge.branchId,
+        lineNameKo: edge.lineNameKo,
+        colorHex: edge.colorHex,
+        stationCount: 1,
+      });
+    }
+  }
 
   return (
-    <div className="mt-2 rounded border border-emerald-200 bg-emerald-50 px-2 py-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[10px] font-bold tracking-wide text-emerald-700 uppercase">정적 경로</p>
-        <p className="text-[10px] font-semibold text-emerald-700">
+    <div className="mt-2 min-w-0 rounded border border-emerald-200 bg-emerald-50 px-2 py-1.5">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <p className="shrink-0 text-[10px] font-bold tracking-wide text-emerald-700 uppercase">검색 결과</p>
+        <p className="min-w-0 truncate text-[10px] font-semibold text-emerald-700">
           {formatNumber(result.stationIds.length)}역 · 환승 {formatNumber(result.transferCount)}회
         </p>
       </div>
-      <p className="mt-1 truncate text-[11px] font-semibold text-slate-700">
-        {firstEdge?.lineNameKo ?? "-"}{lastEdge && lastEdge.branchId !== firstEdge?.branchId ? ` → ${lastEdge.lineNameKo}` : ""}
+
+      <p className="mt-1 truncate text-xs font-bold text-slate-900">
+        {originName} → {destinationName}
       </p>
-      {viaStations.length > 0 ? (
-        <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">경유: {viaStations.join(" · ")}</p>
+
+      <div className="mt-1.5 grid min-w-0 gap-1">
+        {segments.slice(0, 4).map((segment, index) => (
+          <div key={`${segment.branchId}:${index}`} className="flex min-w-0 items-center gap-1.5 text-[11px] font-semibold text-slate-700">
+            <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: segment.colorHex }} />
+            <span className="min-w-0 truncate">{segment.lineNameKo}</span>
+            <span className="shrink-0 text-[10px] font-medium text-slate-400">{formatNumber(segment.stationCount + 1)}역</span>
+          </div>
+        ))}
+        {segments.length > 4 ? (
+          <p className="text-[10px] font-semibold text-slate-400">외 {formatNumber(segments.length - 4)}개 구간</p>
+        ) : null}
+      </div>
+
+      {routeStationNames.length > 2 ? (
+        <p className="mt-1.5 line-clamp-2 text-[10px] font-medium leading-4 text-slate-500">
+          {routeStationNames.slice(0, 10).join(" → ")}{routeStationNames.length > 10 ? " → ..." : ""}
+        </p>
       ) : null}
+
+      <p className="mt-1 text-[10px] font-semibold text-emerald-700">지도에 경로가 강조 표시됩니다.</p>
     </div>
   );
 }
@@ -1409,7 +1455,7 @@ function RouteDraftCard({
     : message ?? "출발역과 도착역을 지정해 주세요.";
 
   return (
-    <section className={compact ? "border border-slate-200 bg-slate-50 p-2" : "border border-slate-200 bg-slate-50 p-2.5"}>
+    <section className={compact ? "min-w-0 border border-slate-200 bg-slate-50 p-2" : "min-w-0 border border-slate-200 bg-slate-50 p-2.5"}>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">경로 검색</p>
@@ -1468,7 +1514,7 @@ function RoutePointSlot({
   const labelClass = accent === "sky" ? "text-sky-600" : "text-amber-600";
 
   return (
-    <div className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-white px-2 py-1.5">
+    <div className="flex min-w-0 items-center justify-between gap-2 rounded border border-slate-200 bg-white px-2 py-1.5">
       <div className="min-w-0">
         <p className={`text-[10px] font-bold ${labelClass}`}>{label}</p>
         <p className="mt-0.5 truncate text-xs font-bold text-slate-900">{station?.nameKo ?? "미지정"}</p>
@@ -1518,7 +1564,7 @@ function SelectedStationPanel({
   const isDestination = routeDestinationStationId === station.id;
 
   return (
-    <section className="border border-slate-200 bg-white p-2.5 transition duration-150 ease-out">
+    <section className="min-w-0 overflow-hidden border border-slate-200 bg-white p-2.5 transition duration-150 ease-out">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] font-bold tracking-wide text-amber-600 uppercase">선택 역</p>
@@ -1598,7 +1644,7 @@ function SelectedStationPanel({
               <button
                 type="button"
                 key={`${branch.branchId}:${branch.sequence}`}
-                className="flex items-start gap-2 rounded border border-slate-200 bg-white px-2 py-1.5 text-left transition duration-150 ease-out hover:border-sky-200 hover:bg-sky-50/70 active:scale-[0.995]"
+                className="flex min-w-0 items-start gap-2 rounded border border-slate-200 bg-white px-2 py-1.5 text-left transition duration-150 ease-out hover:border-sky-200 hover:bg-sky-50/70 active:scale-[0.995]"
                 onClick={() => onSelectServingBranch(branch)}
               >
                 <span

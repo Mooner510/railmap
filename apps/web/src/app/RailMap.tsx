@@ -88,6 +88,45 @@ function buildBranchFeatures(branches: RailMapBranch[]) {
 }
 
 
+function buildHighlightedRouteFeature(stations: RailMapStation[], stationIds: string[]) {
+  if (stationIds.length < 2) {
+    return {
+      type: "FeatureCollection" as const,
+      features: [],
+    };
+  }
+
+  const stationIndex = new Map(stations.filter(isValidCoordinate).map((station) => [station.id, station]));
+  const coordinates = stationIds
+    .map((stationId) => stationIndex.get(stationId))
+    .filter(isValidCoordinate)
+    .map((station): LngLatTuple => [station.lng, station.lat]);
+
+  if (coordinates.length < 2) {
+    return {
+      type: "FeatureCollection" as const,
+      features: [],
+    };
+  }
+
+  return {
+    type: "FeatureCollection" as const,
+    features: [
+      {
+        type: "Feature" as const,
+        properties: {
+          id: "route-result",
+        },
+        geometry: {
+          type: "LineString" as const,
+          coordinates: smoothCoordinates(coordinates),
+        },
+      },
+    ],
+  };
+}
+
+
 function getMapErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
@@ -119,6 +158,8 @@ interface RailMapProps {
   branches: RailMapBranch[];
   selectedBranchId?: string | null;
   selectedStationId?: string | null;
+  highlightedRouteStationIds?: string[];
+  highlightedRouteBranchIds?: string[];
   focusVersion?: number;
   showBranches?: boolean;
   showStations?: boolean;
@@ -209,6 +250,8 @@ export default function RailMap({
   branches,
   selectedBranchId = null,
   selectedStationId = null,
+  highlightedRouteStationIds = [],
+  highlightedRouteBranchIds = [],
   focusVersion = 0,
   showBranches = true,
   showStations = true,
@@ -245,6 +288,11 @@ export default function RailMap({
 
   const validStations = useMemo(() => stations.filter(isValidCoordinate), [stations]);
   const branchFeatures = useMemo(() => buildBranchFeatures(showBranches ? branches : []), [branches, showBranches]);
+  const highlightedRouteFeatures = useMemo(
+    () => buildHighlightedRouteFeature(stations, highlightedRouteStationIds),
+    [stations, highlightedRouteStationIds],
+  );
+  const highlightedRouteStationIdSet = useMemo(() => new Set(highlightedRouteStationIds), [highlightedRouteStationIds]);
   const selectedBranch = useMemo(
     () => branches.find((branch) => branch.id === selectedBranchId) ?? null,
     [branches, selectedBranchId],
@@ -377,6 +425,14 @@ export default function RailMap({
             },
           });
 
+          map.addSource("route-result-lines", {
+            type: "geojson",
+            data: {
+              type: "FeatureCollection",
+              features: [],
+            },
+          });
+
           map.addLayer({
             id: "branch-preview-lines-casing",
             type: "line",
@@ -414,6 +470,36 @@ export default function RailMap({
             filter: ["==", ["get", "id"], ""],
             paint: {
               "line-color": ["coalesce", ["get", "colorHex"], "#0369a1"],
+              "line-width": 4.2,
+              "line-opacity": 0.96,
+            },
+            layout: {
+              "line-cap": "round",
+              "line-join": "round",
+            },
+          });
+
+          map.addLayer({
+            id: "route-result-lines-casing",
+            type: "line",
+            source: "route-result-lines",
+            paint: {
+              "line-color": "#ffffff",
+              "line-width": 7.2,
+              "line-opacity": 0.95,
+            },
+            layout: {
+              "line-cap": "round",
+              "line-join": "round",
+            },
+          });
+
+          map.addLayer({
+            id: "route-result-lines",
+            type: "line",
+            source: "route-result-lines",
+            paint: {
+              "line-color": "#10b981",
               "line-width": 4.2,
               "line-opacity": 0.96,
             },
@@ -537,6 +623,25 @@ export default function RailMap({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map) return;
+
+    const updateSource = () => {
+      const source = map.getSource("route-result-lines") as GeoJSONSource | undefined;
+
+      if (!source) return;
+
+      source.setData(highlightedRouteFeatures);
+    };
+
+    if (map.isStyleLoaded()) {
+      updateSource();
+    } else {
+      map.once("load", updateSource);
+    }
+  }, [highlightedRouteFeatures]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
     if (map.getLayer("branch-preview-lines-selected")) {
@@ -551,14 +656,18 @@ export default function RailMap({
       map.setPaintProperty(
         "branch-preview-lines",
         "line-opacity",
-        selectedBranchId ? ["case", ["==", ["get", "id"], selectedBranchId], 0.42, 0.2] : 0.76,
+        selectedBranchId
+          ? ["case", ["==", ["get", "id"], selectedBranchId], 0.42, 0.2]
+          : highlightedRouteBranchIds.length > 0
+            ? ["case", ["in", ["get", "id"], ["literal", highlightedRouteBranchIds]], 0.38, 0.16]
+            : 0.76,
       );
     }
 
     if (map.getLayer("branch-preview-lines-casing")) {
-      map.setPaintProperty("branch-preview-lines-casing", "line-opacity", selectedBranchId ? 0.48 : 0.88);
+      map.setPaintProperty("branch-preview-lines-casing", "line-opacity", selectedBranchId ? 0.48 : highlightedRouteBranchIds.length > 0 ? 0.32 : 0.88);
     }
-  }, [selectedBranchId, mapReady]);
+  }, [selectedBranchId, highlightedRouteBranchIds, mapReady]);
 
 
   useEffect(() => {
@@ -595,6 +704,30 @@ export default function RailMap({
 
   useEffect(() => {
     const map = mapRef.current;
+    if (!map || !mapReady || highlightedRouteStationIds.length < 2) return;
+
+    const stationIndex = new Map(validStations.map((station) => [station.id, station]));
+    const routeStations = highlightedRouteStationIds
+      .map((stationId) => stationIndex.get(stationId))
+      .filter(isValidCoordinate);
+
+    if (routeStations.length < 2) return;
+
+    const bounds = new maplibregl.LngLatBounds();
+    for (const station of routeStations) {
+      bounds.extend([station.lng, station.lat]);
+    }
+
+    map.fitBounds(bounds, {
+      padding: getFitPadding(),
+      maxZoom: routeStations.length <= 3 ? 13 : 11.5,
+      duration: 280,
+    });
+    map.resize();
+  }, [highlightedRouteStationIds, mapReady, validStations]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map || !mapReady) return;
 
     markersRef.current.forEach((marker) => marker.remove());
@@ -611,6 +744,7 @@ export default function RailMap({
 
     for (const station of markerStations) {
       const isSelected = selectedStationId === station.id;
+      const isRouteStation = highlightedRouteStationIdSet.has(station.id);
       const color = stationColorIndex.get(station.id) ?? "#64748b";
 
       const element = document.createElement("button");
@@ -621,9 +755,11 @@ export default function RailMap({
       const dot = document.createElement("span");
       dot.className = isSelected
         ? "block h-4 w-4 rounded-full border-2 border-white shadow-lg ring-2 transition-transform duration-150 ease-out hover:scale-125"
-        : selectedBranchStationIds.has(station.id)
-          ? "block h-2.5 w-2.5 rounded-full border border-white shadow-sm transition-transform duration-150 ease-out hover:scale-125"
-          : "block h-2 w-2 rounded-full border border-white shadow-sm opacity-90 transition-transform duration-150 ease-out hover:scale-125";
+        : isRouteStation
+          ? "block h-3 w-3 rounded-full border-2 border-white shadow-md ring-2 transition-transform duration-150 ease-out hover:scale-125"
+          : selectedBranchStationIds.has(station.id)
+            ? "block h-2.5 w-2.5 rounded-full border border-white shadow-sm transition-transform duration-150 ease-out hover:scale-125"
+            : "block h-2 w-2 rounded-full border border-white shadow-sm opacity-90 transition-transform duration-150 ease-out hover:scale-125";
       dot.style.backgroundColor = color;
       dot.style.setProperty("--tw-ring-color", color);
       element.appendChild(dot);
@@ -652,7 +788,7 @@ export default function RailMap({
 
       markersRef.current.push(marker);
     }
-  }, [validStations, visibleBranchStations, selectedBranchStationIds, selectedStationId, mapReady, showStations, stationColorIndex]);
+  }, [validStations, visibleBranchStations, selectedBranchStationIds, selectedStationId, highlightedRouteStationIdSet, mapReady, showStations, stationColorIndex]);
 
   return (
     <div className={`relative h-full min-h-[100dvh] w-full min-w-0 overflow-hidden bg-slate-100 ${className}`}>
