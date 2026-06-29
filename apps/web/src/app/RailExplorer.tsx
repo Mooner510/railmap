@@ -22,6 +22,7 @@ interface RailExplorerProps {
 }
 
 type MobilePanelMode = "search" | "selected" | "lines";
+type DesktopPanelMode = "search" | "lines";
 type RoutePointRole = "origin" | "destination";
 
 const MIN_STATION_SEARCH_LENGTH = 1;
@@ -129,6 +130,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   const [showMapLines, setShowMapLines] = useState(true);
   const [showMapStations, setShowMapStations] = useState(true);
   const [mobilePanelMode, setMobilePanelMode] = useState<MobilePanelMode>("search");
+  const [desktopPanelMode, setDesktopPanelMode] = useState<DesktopPanelMode>("search");
   const [isSearchResultsOpen, setIsSearchResultsOpen] = useState(false);
 
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -438,6 +440,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setRouteOriginStationId(null);
     setRouteDestinationStationId(null);
     setRouteSearchMessage(null);
+    setDesktopPanelMode("search");
   };
 
   const clearSelection = () => {
@@ -445,6 +448,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setSelectedBranchId(null);
     setSelectedStationId(null);
     setMobilePanelMode("lines");
+    setDesktopPanelMode("lines");
   };
 
   const clearSearch = () => {
@@ -461,8 +465,6 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
     setRouteSearchMessage(null);
     setRouteSearchResult(null);
-    setSelectedLineKey(null);
-    setSelectedBranchId(null);
     setSelectedStationId(stationId);
     setMobilePanelMode("selected");
   };
@@ -505,9 +507,6 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
 
     const result = findRoute(routeGraph, routeOriginStationId, routeDestinationStationId);
 
-    setSelectedLineKey(null);
-    setSelectedBranchId(null);
-
     if (!result) {
       setRouteSearchResult(null);
       setRouteSearchMessage("경로를 찾지 못했습니다. 현재 정적 노선 데이터에서 두 역을 연결할 수 없습니다.");
@@ -548,6 +547,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setSearchQuery(query);
     setIsSearchResultsOpen(Boolean(query.trim()));
     setMobilePanelMode(query.trim() ? "search" : "lines");
+    setDesktopPanelMode("search");
   };
 
   const selectLine = (lineKey: string) => {
@@ -556,6 +556,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
     setSelectedStationId(null);
     setIsSearchResultsOpen(false);
     setMobilePanelMode("selected");
+    setDesktopPanelMode("lines");
   };
 
   const selectMapBranch = (branch: RailMapBranch) => {
@@ -574,16 +575,12 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   };
 
   const selectMapStation = (station: RailMapStation) => {
-    setSelectedLineKey(null);
-    setSelectedBranchId(null);
     setSelectedStationId(station.id);
     setIsSearchResultsOpen(false);
     setMobilePanelMode("selected");
   };
 
   const selectStationFromSearch = (stationId: string) => {
-    setSelectedLineKey(null);
-    setSelectedBranchId(null);
     setSelectedStationId(stationId);
     setIsSearchResultsOpen(false);
     setMapFocusVersion((version) => version + 1);
@@ -606,41 +603,54 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
             visibleBranchCount={visibleMapBranches.length}
             visibleStationCount={visibleMapStations.length}
           />
-          <div className="mt-1.5">
-            <FilterControls
-              areaCodes={areaCodes}
-              selectedArea={selectedArea}
-              searchQuery={searchQuery}
-              copiedShareUrl={copiedShareUrl}
-              stationResults={stationSearchResults}
-              lineResults={lineSearchResults}
-              selectedStationId={selectedStationId}
-              selectedLineKey={selectedLineKey}
-              hasSelection={hasSelection}
-              showSearchResults={isSearchResultsOpen}
-              focusSelectionLabel={focusSelectionLabel}
-              showMapLines={showMapLines}
-              showMapStations={showMapStations}
-              onToggleMapLines={() => setShowMapLines((value) => !value)}
-              onToggleMapStations={() => setShowMapStations((value) => !value)}
-              onSelectArea={selectArea}
-              onSearch={search}
-              onClearSearch={clearSearch}
-              onSelectStation={selectStationFromSearch}
-              onSelectLine={selectLine}
-              onClearSelection={clearSelection}
-              onReset={resetFilters}
-              onFocusSelection={focusSelection}
-              onCopyUrl={copyUrl}
-            />
-          </div>
+          <DesktopPanelTabs
+            activeMode={desktopPanelMode}
+            resultCount={stationSearchResults.length + lineSearchResults.length}
+            lineCount={filteredLines.length}
+            onChange={setDesktopPanelMode}
+          />
         </div>
 
-        <LineList
-          lines={filteredLines}
-          selectedLineKey={selectedLineKey}
-          onSelectLine={selectLine}
-        />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          {desktopPanelMode === "search" ? (
+            <div className="h-full overflow-y-auto p-2">
+              <FilterControls
+                areaCodes={areaCodes}
+                selectedArea={selectedArea}
+                searchQuery={searchQuery}
+                copiedShareUrl={copiedShareUrl}
+                stationResults={stationSearchResults}
+                lineResults={lineSearchResults}
+                selectedStationId={selectedStationId}
+                selectedLineKey={selectedLineKey}
+                hasSelection={hasSelection}
+                showSearchResults={isSearchResultsOpen}
+                focusSelectionLabel={focusSelectionLabel}
+                showMapLines={showMapLines}
+                showMapStations={showMapStations}
+                onToggleMapLines={() => setShowMapLines((value) => !value)}
+                onToggleMapStations={() => setShowMapStations((value) => !value)}
+                onSelectArea={selectArea}
+                onSearch={search}
+                onClearSearch={clearSearch}
+                onSelectStation={selectStationFromSearch}
+                onSelectLine={selectLine}
+                onClearSelection={clearSelection}
+                onReset={resetFilters}
+                onFocusSelection={focusSelection}
+                onCopyUrl={copyUrl}
+              />
+            </div>
+          ) : null}
+
+          {desktopPanelMode === "lines" ? (
+            <LineList
+              lines={filteredLines}
+              selectedLineKey={selectedLineKey}
+              onSelectLine={selectLine}
+            />
+          ) : null}
+        </div>
       </aside>
 
       <div className="relative h-full min-h-0 min-w-0 overflow-hidden">
@@ -660,7 +670,7 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
           onClearStation={() => setSelectedStationId(null)}
         />
 
-        {selectedLine || selectedStation ? (
+        {selectedLine || selectedStation || routeOriginStation || routeDestinationStation ? (
           <div className="pointer-events-none absolute right-3 top-3 z-10 hidden w-[280px] max-w-[calc(100vw-24px)] lg:block">
             <div className="pointer-events-auto grid min-w-0 w-full max-w-full max-h-[calc(100dvh-24px)] gap-1.5 overflow-x-hidden overflow-y-auto [overflow-wrap:anywhere] border border-slate-200 bg-white/95 p-1.5 shadow-sm shadow-slate-950/10 backdrop-blur">
               {routeOriginStation || routeDestinationStation ? (
@@ -810,6 +820,48 @@ export default function RailExplorer({ bundle, mapStations, mapBranches }: RailE
   );
 }
 
+
+
+function DesktopPanelTabs({
+  activeMode,
+  resultCount,
+  lineCount,
+  onChange,
+}: {
+  activeMode: DesktopPanelMode;
+  resultCount: number;
+  lineCount: number;
+  onChange: (mode: DesktopPanelMode) => void;
+}) {
+  const items: Array<{ mode: DesktopPanelMode; label: string; badge?: number }> = [
+    { mode: "search", label: "검색", badge: resultCount || undefined },
+    { mode: "lines", label: "노선 목록", badge: lineCount },
+  ];
+
+  return (
+    <div className="mt-2 grid grid-cols-2 gap-1 rounded bg-slate-100 p-0.5">
+      {items.map((item) => {
+        const active = activeMode === item.mode;
+
+        return (
+          <button
+            key={item.mode}
+            type="button"
+            className={
+              active
+                ? "h-7 rounded bg-white px-2 text-[11px] font-bold text-slate-950 shadow-sm"
+                : "h-7 rounded px-2 text-[11px] font-semibold text-slate-500 hover:bg-white/70"
+            }
+            onClick={() => onChange(item.mode)}
+          >
+            {item.label}
+            {item.badge ? <span className="ml-1 text-[10px] text-slate-400">{formatNumber(item.badge)}</span> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
 
 function MobilePanelTabs({
   activeMode,
