@@ -15,7 +15,7 @@ import { ChevronRight, Command, Layers3, MapPin, MousePointer2, Route, Search, S
 import maplibregl, { type GeoJSONSource, type Map as MapLibreMap, type MapLayerMouseEvent, type StyleSpecification } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
 import type { EditorStation, ManualOverlayBundle, ManualStationOverride, ManualTransferGroup } from "../editorModel";
-import { normalizeSearchText } from "../editorModel";
+import { EMPTY_MANUAL_OVERLAY_BUNDLE, normalizeSearchText } from "../editorModel";
 import type { EditorMapBranch, UnifiedEditorData } from "../editorData";
 
 type Selection =
@@ -83,6 +83,93 @@ type RailFeatureCollection = {
 
 const EMPTY_FEATURE_COLLECTION: RailFeatureCollection = { type: "FeatureCollection", features: [] };
 
+const EMPTY_UNIFIED_EDITOR_DATA: UnifiedEditorData = {
+  stations: [],
+  branches: [],
+  lines: [],
+  overlays: EMPTY_MANUAL_OVERLAY_BUNDLE,
+};
+
+function yieldToMainThread() {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+}
+
+async function buildBranchFeaturesChunked(
+  branches: EditorMapBranch[],
+  visible: boolean,
+  isCancelled: () => boolean,
+): Promise<RailFeatureCollection | null> {
+  if (!visible) return EMPTY_FEATURE_COLLECTION;
+
+  const features: RailFeatureCollection["features"] = [];
+  const batchSize = 24;
+
+  for (let start = 0; start < branches.length; start += batchSize) {
+    if (isCancelled()) return null;
+
+    for (const branch of branches.slice(start, start + batchSize)) {
+      const coordinates = branchCoordinates(branch);
+      if (coordinates.length < 2) continue;
+
+      features.push({
+        type: "Feature",
+        properties: {
+          id: branch.id,
+          colorHex: branch.colorHex,
+          nameKo: branch.canonicalLineNameKo,
+        },
+        geometry: { type: "LineString", coordinates: optimizeCoordinates(coordinates) },
+      });
+    }
+
+    await yieldToMainThread();
+  }
+
+  return { type: "FeatureCollection", features };
+}
+
+async function buildStationFeaturesChunked(
+  stations: EditorStation[],
+  selectedIds: Set<string>,
+  nonTransferIds: Set<string>,
+  visible: boolean,
+  showNonTransferState: boolean,
+  isCancelled: () => boolean,
+): Promise<RailFeatureCollection | null> {
+  if (!visible) return EMPTY_FEATURE_COLLECTION;
+
+  const features: RailFeatureCollection["features"] = [];
+  const batchSize = 500;
+
+  for (let start = 0; start < stations.length; start += batchSize) {
+    if (isCancelled()) return null;
+
+    for (const station of stations.slice(start, start + batchSize)) {
+      if (!isValidStation(station)) continue;
+      const selected = selectedIds.has(station.id);
+      const nonTransfer = nonTransferIds.has(station.id);
+
+      features.push({
+        type: "Feature",
+        properties: {
+          id: station.id,
+          nameKo: station.nameKo,
+          lineNameKo: station.lineNameKo,
+          stationNumber: station.stationNumber,
+          colorHex: station.colorHex ?? "#64748b",
+          selected,
+          nonTransfer: showNonTransferState && nonTransfer,
+        },
+        geometry: { type: "Point", coordinates: [station.lng, station.lat] as LngLatTuple },
+      });
+    }
+
+    await yieldToMainThread();
+  }
+
+  return { type: "FeatureCollection", features };
+}
+
 function scheduleIdle(callback: () => void) {
   if (typeof window === "undefined") return 0;
   const requestIdle = (window as Window & { requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number }).requestIdleCallback;
@@ -147,58 +234,8 @@ function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
     .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat)) as LngLatTuple[];
   if (override.length >= 2) return override;
 
-  return branch.routeStops
-    .map((stop) => stop.station)
-    .filter((station): station is EditorStation & { lat: number; lng: number } => station !== null && isValidStation(station))
-    .map((station) => [station.lng, station.lat] as LngLatTuple);
-}
-
-function buildBranchFeatures(branches: EditorMapBranch[], visible: boolean) {
-  return {
-    type: "FeatureCollection" as const,
-    features: visible
-      ? branches
-          .map((branch) => {
-            const coordinates = branchCoordinates(branch);
-            if (coordinates.length < 2) return null;
-            return {
-              type: "Feature" as const,
-              properties: {
-                id: branch.id,
-                colorHex: branch.colorHex,
-                nameKo: branch.canonicalLineNameKo,
-              },
-              geometry: { type: "LineString" as const, coordinates: optimizeCoordinates(coordinates) },
-            };
-          })
-          .filter((feature): feature is NonNullable<typeof feature> => feature !== null)
-      : [],
-  };
-}
-
-function buildStationFeatures(stations: EditorStation[], selectedIds: Set<string>, nonTransferIds: Set<string>, visible: boolean, showNonTransferState: boolean) {
-  return {
-    type: "FeatureCollection" as const,
-    features: visible
-      ? stations.filter(isValidStation).map((station) => {
-          const selected = selectedIds.has(station.id);
-          const nonTransfer = nonTransferIds.has(station.id);
-          return {
-            type: "Feature" as const,
-            properties: {
-              id: station.id,
-              nameKo: station.nameKo,
-              lineNameKo: station.lineNameKo,
-              stationNumber: station.stationNumber,
-              colorHex: station.colorHex ?? "#64748b",
-              selected,
-              nonTransfer: showNonTransferState && nonTransfer,
-            },
-            geometry: { type: "Point" as const, coordinates: [station.lng, station.lat] as LngLatTuple },
-          };
-        })
-      : [],
-  };
+  return (branch.geometryCoordinates ?? [])
+    .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat)) as LngLatTuple[];
 }
 
 function formatStationSubLabel(station: EditorStation) {
@@ -235,13 +272,15 @@ async function saveOverlays(nextOverlays: ManualOverlayBundle) {
   return (await response.json()) as ManualOverlayBundle;
 }
 
-export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) {
+export default function UnifiedMapEditor({ data: initialData }: { data?: UnifiedEditorData }) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const cursorFrameRef = useRef<number | null>(null);
   const pendingCursorLngLatRef = useRef<{ lng: number; lat: number } | null>(null);
   const selectionBoxStartRef = useRef<{ x: number; y: number } | null>(null);
-  const [overlays, setOverlays] = useState(data.overlays);
+  const [data, setData] = useState<UnifiedEditorData>(initialData ?? EMPTY_UNIFIED_EDITOR_DATA);
+  const [dataLoading, setDataLoading] = useState(!initialData);
+  const [overlays, setOverlays] = useState((initialData ?? EMPTY_UNIFIED_EDITOR_DATA).overlays);
   const [selection, setSelection] = useState<Selection>({ type: "none" });
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("search");
   const [toolMode, setToolMode] = useState<ToolMode>("move");
@@ -268,9 +307,6 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
   }, [groupById, selection]);
   const selectedBranchId = selection.type === "branch" ? selection.id : null;
   const nonTransferIds = useMemo(() => new Set(overlays.nonTransferStationIds), [overlays.nonTransferStationIds]);
-  const stationFeatures = useMemo(() => mapLoaded ? buildStationFeatures(data.stations, selectedStationIds, nonTransferIds, layers.stations, layers.nonTransfer) : EMPTY_FEATURE_COLLECTION, [data.stations, layers.nonTransfer, layers.stations, mapLoaded, nonTransferIds, selectedStationIds]);
-  const branchFeatures = useMemo(() => mapLoaded ? buildBranchFeatures(data.branches, layers.lines) : EMPTY_FEATURE_COLLECTION, [data.branches, layers.lines, mapLoaded]);
-
   const filteredStations = useMemo(() => {
     const normalized = normalizeSearchText(query);
     if (!normalized) return data.stations.slice(0, 60);
@@ -326,6 +362,33 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
     const firstStationId = groupById.get(groupId)?.stationIds[0];
     if (firstStationId) focusStation(firstStationId);
   }, [focusStation, groupById]);
+
+  useEffect(() => {
+    if (initialData) return;
+
+    let cancelled = false;
+
+    async function loadEditorData() {
+      try {
+        const response = await fetch("/api/editor-data", { cache: "no-store" });
+        if (!response.ok) throw new Error(await response.text());
+        const nextData = (await response.json()) as UnifiedEditorData;
+        if (cancelled) return;
+        setData(nextData);
+        setOverlays(nextData.overlays);
+      } catch (error) {
+        if (!cancelled) showToast(error instanceof Error ? error.message : "에디터 데이터 로드 실패", "error");
+      } finally {
+        if (!cancelled) setDataLoading(false);
+      }
+    }
+
+    void loadEditorData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialData, showToast]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -529,34 +592,52 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!mapLoaded) return;
+    if (!mapLoaded || dataLoading) return;
+
+    let cancelled = false;
     const idleId = scheduleIdle(() => {
-      const map = mapRef.current;
-      if (!map?.isStyleLoaded()) return;
-      (map.getSource("railmap-stations") as GeoJSONSource | undefined)?.setData(stationFeatures);
+      void (async () => {
+        const features = await buildStationFeaturesChunked(data.stations, selectedStationIds, nonTransferIds, layers.stations, layers.nonTransfer, () => cancelled);
+        if (cancelled || !features) return;
+        const source = mapRef.current?.getSource("railmap-stations") as GeoJSONSource | undefined;
+        source?.setData(features);
+      })();
     });
-    return () => cancelIdle(idleId);
-  }, [mapLoaded, stationFeatures]);
+
+    return () => {
+      cancelled = true;
+      cancelIdle(idleId);
+    };
+  }, [data.stations, dataLoading, layers.nonTransfer, layers.stations, mapLoaded, nonTransferIds, selectedStationIds]);
 
   useEffect(() => {
-    if (!mapLoaded) return;
+    if (!mapLoaded || dataLoading) return;
+
+    let cancelled = false;
     const idleId = scheduleIdle(() => {
-      const map = mapRef.current;
-      if (!map?.isStyleLoaded()) return;
-      (map.getSource("railmap-branches") as GeoJSONSource | undefined)?.setData(branchFeatures);
+      void (async () => {
+        const features = await buildBranchFeaturesChunked(data.branches, layers.lines, () => cancelled);
+        if (cancelled || !features) return;
+        const source = mapRef.current?.getSource("railmap-branches") as GeoJSONSource | undefined;
+        source?.setData(features);
+      })();
     });
-    return () => cancelIdle(idleId);
-  }, [branchFeatures, mapLoaded]);
+
+    return () => {
+      cancelled = true;
+      cancelIdle(idleId);
+    };
+  }, [data.branches, dataLoading, layers.lines, mapLoaded]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!mapLoaded || !map?.isStyleLoaded() || !map.getLayer("railmap-selected-branches-line")) return;
+    if (!mapLoaded || !map?.getLayer("railmap-selected-branches-line")) return;
     map.setFilter("railmap-selected-branches-line", ["==", ["get", "id"], selectedBranchId ?? "__none__"]);
   }, [mapLoaded, selectedBranchId]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map?.isStyleLoaded()) return;
+    if (!map) return;
     const visibility = layers.labels ? "visible" : "none";
     if (map.getLayer("railmap-stations-label")) map.setLayoutProperty("railmap-stations-label", "visibility", visibility);
     if (map.getLayer("railmap-selected-stations-label")) map.setLayoutProperty("railmap-selected-stations-label", "visibility", visibility);
@@ -689,7 +770,7 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
                       <span className="h-1.5 w-8 rounded-full" style={{ backgroundColor: branch.colorHex }} />
                       <strong className="truncate text-sm font-black">{branch.canonicalLineNameKo}</strong>
                     </div>
-                    <p className="mt-1 truncate text-xs font-bold text-slate-500">{branch.sourceLineName} · {branch.routeStops.length} stops</p>
+                    <p className="mt-1 truncate text-xs font-bold text-slate-500">{branch.sourceLineName} · {branch.routeStopCount} stops</p>
                   </button>
                 ))}
               </div>
@@ -705,6 +786,7 @@ export default function UnifiedMapEditor({ data }: { data: UnifiedEditorData }) 
           <div className="pointer-events-none absolute left-4 top-4 flex flex-wrap gap-2">
             <Badge className="bg-white/90 text-slate-700">{selectionLabel(selection)}</Badge>
             <Badge className="bg-white/90 text-slate-700">Zoom {zoom.toFixed(1)}</Badge>
+            {dataLoading ? <Badge className="bg-white/90 text-slate-700">데이터 로딩 중</Badge> : null}
           </div>
           <div className="absolute left-1/2 top-4 flex -translate-x-1/2 gap-2 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
             {toolOptions.map(({ mode, label, Icon }) => (
@@ -865,7 +947,7 @@ function BranchInspector({ branch }: { branch: EditorMapBranch }) {
       <InfoRow label="Branch ID" value={branch.id} />
       <InfoRow label="기점" value={branch.origin ?? "-"} />
       <InfoRow label="종점" value={branch.terminal ?? "-"} />
-      <InfoRow label="Route stops" value={`${branch.routeStops.length}개`} />
+      <InfoRow label="Route stops" value={`${branch.routeStopCount}개`} />
       <Button asChild variant="outline"><a href="/geometry/map">선형 보정 화면 열기</a></Button>
     </div>
   );

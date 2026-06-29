@@ -48,6 +48,8 @@ export type EditorMapBranch = {
   origin?: string | null;
   terminal?: string | null;
   geometryOverrideCoordinates?: Array<[number, number]>;
+  geometryCoordinates: Array<[number, number]>;
+  routeStopCount: number;
   routeStops: Array<{
     id: string;
     sequence: number;
@@ -170,30 +172,38 @@ function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geome
   );
 
   return (bundle.lines ?? []).flatMap((line) =>
-    (line.branches ?? []).map((branch) => ({
-      id: branch.id,
-      canonicalLineId: line.canonicalKey ?? line.id ?? branch.id,
-      canonicalLineNameKo: line.nameKo,
-      colorHex: line.colorHex ?? "#0284c7",
-      role: branch.role,
-      sourceLineNumber: branch.sourceLineNumber,
-      sourceLineName: branch.sourceLineName,
-      origin: branch.origin ?? null,
-      terminal: branch.terminal ?? null,
-      geometryOverrideCoordinates: overrideByBranchId.get(branch.id)?.points
+    (line.branches ?? []).map((branch) => {
+      const geometryOverrideCoordinates = overrideByBranchId.get(branch.id)?.points
         .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
-        .map((point) => [point.lng, point.lat] as [number, number]),
-      routeStops: branch.routeStops.map((stop) => {
-        const stationId = getRouteStopStationId(stop);
-        return {
-          id: stop.id,
-          sequence: stop.sequence,
-          displayNameKo: stop.displayNameKo,
-          station: stationId ? stationById.get(stationId) ?? null : null,
-          confidence: stop.confidence ?? "none",
-        };
-      }),
-    })),
+        .map((point) => [point.lng, point.lat] as [number, number]);
+      const geometryCoordinates = geometryOverrideCoordinates && geometryOverrideCoordinates.length >= 2
+        ? geometryOverrideCoordinates
+        : branch.routeStops
+            .map((stop) => {
+              const stationId = getRouteStopStationId(stop);
+              const station = stationId ? stationById.get(stationId) : null;
+              return station && typeof station.lng === "number" && typeof station.lat === "number" && Number.isFinite(station.lng) && Number.isFinite(station.lat)
+                ? ([station.lng, station.lat] as [number, number])
+                : null;
+            })
+            .filter((coordinates): coordinates is [number, number] => coordinates !== null);
+
+      return {
+        id: branch.id,
+        canonicalLineId: line.canonicalKey ?? line.id ?? branch.id,
+        canonicalLineNameKo: line.nameKo,
+        colorHex: line.colorHex ?? "#0284c7",
+        role: branch.role,
+        sourceLineNumber: branch.sourceLineNumber,
+        sourceLineName: branch.sourceLineName,
+        origin: branch.origin ?? null,
+        terminal: branch.terminal ?? null,
+        geometryOverrideCoordinates,
+        geometryCoordinates,
+        routeStopCount: branch.routeStops.length,
+        routeStops: [],
+      };
+    }),
   );
 }
 
