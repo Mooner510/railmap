@@ -21,10 +21,10 @@ const variantClass: Record<ButtonVariant, string> = {
 };
 
 const sizeClass: Record<ButtonSize, string> = {
-  sm: "h-8 rounded-xl px-3 text-xs",
-  md: "h-10 rounded-2xl px-4 text-sm",
-  lg: "h-11 rounded-2xl px-5 text-sm",
-  icon: "size-9 rounded-xl p-0",
+  sm: "h-7 rounded-lg px-2.5 text-xs",
+  md: "h-8 rounded-xl px-3 text-xs",
+  lg: "h-9 rounded-xl px-4 text-xs",
+  icon: "size-8 rounded-lg p-0",
 };
 
 export function Button({
@@ -37,7 +37,7 @@ export function Button({
   ...props
 }: ButtonProps) {
   const composedClassName = cn(
-    "inline-flex shrink-0 items-center justify-center gap-2 border font-extrabold transition disabled:pointer-events-none disabled:opacity-50",
+    "inline-flex shrink-0 items-center justify-center gap-2 border font-medium transition disabled:pointer-events-none disabled:opacity-50",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300",
     variantClass[variant],
     sizeClass[size],

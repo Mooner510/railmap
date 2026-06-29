@@ -7,7 +7,7 @@ export function Toast({ message, tone = "info" }: { message: string | null; tone
   return (
     <div
       className={cn(
-        "fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-2xl px-4 py-2 text-sm font-black shadow-xl",
+        "fixed bottom-3 left-1/2 z-50 -translate-x-1/2 rounded-xl px-3 py-2 text-xs font-medium shadow-xl",
         tone === "success" ? "bg-emerald-600 text-white" : null,
         tone === "error" ? "bg-rose-600 text-white" : null,
         tone === "info" ? "bg-slate-950 text-white" : null,
