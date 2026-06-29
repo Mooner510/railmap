@@ -1614,9 +1614,9 @@ function RouteTransferConnection({
   return (
     <div className="min-w-0 rounded border border-dashed border-slate-300 bg-slate-50 px-2 py-1.5">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white">환승</span>
+        <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white">수동 환승</span>
         <p className="min-w-0 break-words text-[11px] font-bold leading-4 text-slate-700">
-          {fromStationName === toStationName ? `${fromStationName}에서 갈아타기` : `${fromStationName} → ${toStationName} 이동`}
+          {fromStationName === toStationName ? `${fromStationName}에서 갈아타기` : `${fromStationName} ↔ ${toStationName}`}
         </p>
       </div>
       {typeof transferMinutes === "number" ? (
