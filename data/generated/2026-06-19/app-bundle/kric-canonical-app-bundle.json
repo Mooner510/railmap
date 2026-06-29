@@ -1,7 +1,7 @@
 {
   "bundleId": "kric-canonical-app-bundle",
   "acquiredDate": "2026-06-19",
-  "generatedAt": "2026-06-26T05:39:14.288Z",
+  "generatedAt": "2026-06-29T07:57:35.056Z",
   "policy": {
     "canonicalLineSource": "data/manual/kric-subway-route-info-line-map.csv",
     "canonicalSourceLineMap": "data/manual/kric-canonical-source-line-map.csv",
@@ -16,7 +16,7 @@
   "counts": {
     "canonicalLines": 34,
     "branches": 43,
-    "stations": 1003,
+    "stations": 1002,
     "routeStops": 1017,
     "skippedRouteStops": 0,
     "missingCanonicalLines": 1
@@ -10527,17 +10527,15 @@
               "sourceLineName": "분당선",
               "role": "branch",
               "sequence": 23,
-              "stationId": "candidate:kric:urban-rail-station:I4105:1862:row-943",
+              "stationId": "candidate:kric:urban-rail-station:S2702:0224:row-942",
               "sourceStationCode": "1862",
               "displayNameKo": "죽전역",
-              "matchStatus": "manual-override",
-              "confidence": "manual-override",
+              "matchStatus": "name-based",
+              "confidence": "low",
               "sourceCandidateId": "candidate:kric:urban-rail-route-stop:I28K1:23",
               "diagnostics": [
                 "matched-by-global-normalized-name",
-                "ambiguous-name-match-resolved-by-first-global-candidate",
-                "manual-override:suwon-bundang-jukjeon-station",
-                "fix-ambiguous-jukjeon-name-match"
+                "ambiguous-name-match-resolved-by-first-global-candidate"
               ]
             },
             {
@@ -18581,8 +18579,8 @@
       "nameEn": "Yangwon",
       "lineNumber": "I4108",
       "lineNameKo": "경의중앙선",
-      "lat": 37.60667,
-      "lng": 127.10778,
+      "lat": 36.963729,
+      "lng": 129.091321,
       "operatorNameKo": "한국철도공사",
       "sourceCandidateId": "candidate:kric:urban-rail-station:I4108:1204:row-733"
     },
@@ -30093,18 +30091,6 @@
       "lng": 127.314581,
       "operatorNameKo": "대전교통공사",
       "sourceCandidateId": "candidate:kric:urban-rail-station:S3001:0122:row-407"
-    },
-    {
-      "id": "candidate:kric:urban-rail-station:I4105:1862:row-943",
-      "stationNumber": "1862",
-      "nameKo": "죽전역",
-      "nameEn": "Jukjeon",
-      "lineNumber": "I4105",
-      "lineNameKo": "분당선",
-      "lat": 37.324583,
-      "lng": 127.107417,
-      "operatorNameKo": "한국철도공사",
-      "sourceCandidateId": "candidate:kric:urban-rail-station:I4105:1862:row-943"
     }
   ],
   "routeStops": [
