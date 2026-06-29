@@ -1458,14 +1458,12 @@ function RouteResultSummary({
             {formatNumber(result.stationIds.length)}역 · 환승 {formatNumber(result.transferCount)}회
           </p>
         </div>
-        <p className="mt-1 line-clamp-2 break-words text-xs font-bold leading-4 text-slate-950">
+        <p className="mt-1 break-words text-xs font-bold leading-4 text-slate-950">
           {originName} → {destinationName}
         </p>
       </div>
 
-      <div className="grid min-w-0 gap-0 px-2.5 py-2">
-        <RouteRoadmapEndpoint label="출발" stationName={originName} tone="origin" />
-
+      <div className="grid min-w-0 gap-2 px-2.5 py-2">
         {segments.map((segment, index) => {
           const fromName = stationById.get(segment.fromStationId)?.nameKo ?? "이전 역";
           const toName = stationById.get(segment.toStationId)?.nameKo ?? "다음 역";
@@ -1485,31 +1483,6 @@ function RouteResultSummary({
             </div>
           );
         })}
-
-        <RouteRoadmapEndpoint label="도착" stationName={destinationName} tone="destination" />
-      </div>
-    </div>
-  );
-}
-
-function RouteRoadmapEndpoint({
-  label,
-  stationName,
-  tone,
-}: {
-  label: string;
-  stationName: string;
-  tone: "origin" | "destination";
-}) {
-  const dotClass = tone === "origin" ? "bg-sky-500" : "bg-amber-500";
-  const labelClass = tone === "origin" ? "text-sky-600" : "text-amber-600";
-
-  return (
-    <div className="flex min-w-0 items-center gap-2 py-1">
-      <span className={`h-3 w-3 shrink-0 rounded-full ${dotClass}`} />
-      <div className="min-w-0">
-        <p className={`text-[10px] font-bold ${labelClass}`}>{label}</p>
-        <p className="truncate text-xs font-bold text-slate-950">{stationName}</p>
       </div>
     </div>
   );
@@ -1517,9 +1490,9 @@ function RouteRoadmapEndpoint({
 
 function RouteTransferStep({ stationName }: { stationName: string }) {
   return (
-    <div className="ml-1.5 flex min-w-0 items-center gap-2 border-l-2 border-dashed border-slate-300 py-1.5 pl-3">
-      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">환승</span>
-      <p className="min-w-0 truncate text-[11px] font-semibold text-slate-600">{stationName}</p>
+    <div className="mb-1.5 flex min-w-0 items-center gap-2 rounded border border-dashed border-slate-300 bg-slate-50 px-2 py-1.5">
+      <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white">환승</span>
+      <p className="min-w-0 break-words text-[11px] font-bold leading-4 text-slate-700">{stationName}에서 갈아타기</p>
     </div>
   );
 }
@@ -1542,18 +1515,33 @@ function RouteRoadmapSegment({
   const lineLabel = sourceLineName && sourceLineName !== lineName ? `${lineName} · ${sourceLineName}` : lineName;
 
   return (
-    <div className="ml-1.5 min-w-0 border-l-2 py-1.5 pl-3" style={{ borderColor: colorHex }}>
-      <div className="min-w-0 border border-slate-200 bg-slate-50 px-2 py-1.5">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colorHex }} />
-          <p className="min-w-0 truncate text-xs font-bold text-slate-900">{lineLabel}</p>
+    <div className="min-w-0 overflow-hidden border border-slate-200 bg-white">
+      <div className="flex min-w-0 items-center gap-2 border-b border-slate-100 bg-slate-50 px-2 py-1.5">
+        <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: colorHex }} />
+        <p className="min-w-0 break-words text-xs font-black leading-4 text-slate-950">{lineLabel}</p>
+      </div>
+
+      <div className="grid min-w-0 grid-cols-[18px_minmax(0,1fr)] px-2 py-2">
+        <RouteRoadmapStationDot colorHex={colorHex} />
+        <p className="min-w-0 break-words text-xs font-bold leading-4 text-slate-950">{fromStationName}</p>
+
+        <div className="mx-auto min-h-7 w-0.5" style={{ backgroundColor: colorHex }} />
+        <div className="flex min-w-0 items-center py-1">
+          <p className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
+            {formatNumber(Math.max(1, stationCount - 1))}개 구간 이동
+          </p>
         </div>
-        <p className="mt-1 break-words text-[11px] font-medium leading-4 text-slate-600">
-          {fromStationName} → {toStationName}
-        </p>
-        <p className="mt-0.5 text-[10px] font-semibold text-slate-400">{formatNumber(stationCount)}개 역 이동</p>
+
+        <RouteRoadmapStationDot colorHex={colorHex} />
+        <p className="min-w-0 break-words text-xs font-bold leading-4 text-slate-950">{toStationName}</p>
       </div>
     </div>
+  );
+}
+
+function RouteRoadmapStationDot({ colorHex }: { colorHex: string }) {
+  return (
+    <span className="mt-0.5 h-3.5 w-3.5 rounded-full border-2 border-white shadow-sm" style={{ backgroundColor: colorHex }} />
   );
 }
 
