@@ -16,6 +16,14 @@ export interface RailMapStation {
   lng: number | null;
 }
 
+export interface RailMapTransferGroup {
+  id: string;
+  nameKo: string;
+  stationIds: string[];
+  enabled: boolean;
+  note?: string | null;
+}
+
 export interface RailMapBranch {
   id: string;
   canonicalLineId: string;
@@ -53,7 +61,10 @@ function isValidCoordinate(
 }
 
 function getBranchCoordinates(branch: RailMapBranch): LngLatTuple[] {
-  if (branch.geometryOverrideCoordinates && branch.geometryOverrideCoordinates.length >= 2) {
+  if (
+    branch.geometryOverrideCoordinates &&
+    branch.geometryOverrideCoordinates.length >= 2
+  ) {
     const overrideCoordinates = branch.geometryOverrideCoordinates
       .map((coordinate): LngLatTuple | null => {
         const [lng, lat] = coordinate;
@@ -62,7 +73,8 @@ function getBranchCoordinates(branch: RailMapBranch): LngLatTuple[] {
       })
       .filter((coordinate): coordinate is LngLatTuple => coordinate !== null);
 
-    if (overrideCoordinates.length >= 2) return smoothCoordinates(overrideCoordinates);
+    if (overrideCoordinates.length >= 2)
+      return smoothCoordinates(overrideCoordinates);
   }
 
   const coordinates = branch.routeStops
@@ -249,10 +261,13 @@ function buildStationFeatures(
   selectedStationId: string | null,
   highlightedRouteStationIdSet: Set<string>,
   stationColorIndex: Map<string, string>,
+  stationTransferGroupIndex: Map<string, RailMapTransferGroup>,
 ) {
   return {
     type: "FeatureCollection" as const,
     features: stations.map((station) => {
+      const transferGroup = stationTransferGroupIndex.get(station.id) ?? null;
+      const lineNameKo = station.lineNameKo ?? "";
       const isSelected = selectedStationId === station.id;
       const isRouteStation = highlightedRouteStationIdSet.has(station.id);
       return {
@@ -260,11 +275,17 @@ function buildStationFeatures(
         properties: {
           id: station.id,
           nameKo: station.nameKo ?? "역",
-          lineNameKo: station.lineNameKo ?? "",
+          labelNameKo: transferGroup
+            ? `${transferGroup.nameKo}(${lineNameKo || "노선"})`
+            : (station.nameKo ?? "역"),
+          lineNameKo,
           colorHex: stationColorIndex.get(station.id) ?? "#64748b",
           isSelected,
           isRouteStation,
           isEmphasized: isSelected || isRouteStation,
+          isTransferChild: Boolean(transferGroup),
+          transferGroupId: transferGroup?.id ?? "",
+          transferGroupNameKo: transferGroup?.nameKo ?? "",
         },
         geometry: {
           type: "Point" as const,
@@ -272,6 +293,118 @@ function buildStationFeatures(
         },
       };
     }),
+  };
+}
+
+function buildStationTransferGroupIndex(
+  transferGroups: RailMapTransferGroup[],
+) {
+  const index = new Map<string, RailMapTransferGroup>();
+
+  for (const group of transferGroups) {
+    if (group.enabled === false) continue;
+    for (const stationId of group.stationIds) {
+      if (!index.has(stationId)) index.set(stationId, group);
+    }
+  }
+
+  return index;
+}
+
+function buildTransferGroupAreaFeatures(
+  transferGroups: RailMapTransferGroup[],
+  stationIndex: Map<string, ValidRailMapStation>,
+  selectedTransferGroupId: string | null,
+) {
+  return {
+    type: "FeatureCollection" as const,
+    features: transferGroups
+      .map((group) => {
+        if (group.enabled === false) return null;
+        const members = group.stationIds
+          .map((stationId) => stationIndex.get(stationId))
+          .filter((station): station is ValidRailMapStation =>
+            Boolean(station),
+          );
+        if (members.length < 2) return null;
+
+        const lngs = members.map((station) => station.lng);
+        const lats = members.map((station) => station.lat);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const lngPadding = Math.max(0.0018, (maxLng - minLng) * 0.35);
+        const latPadding = Math.max(0.0018, (maxLat - minLat) * 0.35);
+        const coordinates: LngLatTuple[] = [
+          [minLng - lngPadding, minLat - latPadding],
+          [maxLng + lngPadding, minLat - latPadding],
+          [maxLng + lngPadding, maxLat + latPadding],
+          [minLng - lngPadding, maxLat + latPadding],
+          [minLng - lngPadding, minLat - latPadding],
+        ];
+
+        return {
+          type: "Feature" as const,
+          properties: {
+            id: group.id,
+            nameKo: group.nameKo,
+            stationCount: members.length,
+            isSelected: selectedTransferGroupId === group.id,
+          },
+          geometry: {
+            type: "Polygon" as const,
+            coordinates: [coordinates],
+          },
+        };
+      })
+      .filter(
+        (feature): feature is NonNullable<typeof feature> => feature !== null,
+      ),
+  };
+}
+
+function buildTransferGroupIconFeatures(
+  transferGroups: RailMapTransferGroup[],
+  stationIndex: Map<string, ValidRailMapStation>,
+  selectedTransferGroupId: string | null,
+) {
+  return {
+    type: "FeatureCollection" as const,
+    features: transferGroups
+      .map((group) => {
+        if (group.enabled === false) return null;
+        const members = group.stationIds
+          .map((stationId) => stationIndex.get(stationId))
+          .filter((station): station is ValidRailMapStation =>
+            Boolean(station),
+          );
+        if (members.length < 2) return null;
+
+        const lng =
+          members.reduce((sum, station) => sum + station.lng, 0) /
+          members.length;
+        const lat =
+          members.reduce((sum, station) => sum + station.lat, 0) /
+          members.length;
+
+        return {
+          type: "Feature" as const,
+          properties: {
+            id: group.id,
+            nameKo: group.nameKo,
+            stationCount: members.length,
+            isSelected: selectedTransferGroupId === group.id,
+          },
+          geometry: {
+            type: "Point" as const,
+            coordinates: [lng, lat] as LngLatTuple,
+          },
+        };
+      })
+      .filter(
+        (feature): feature is NonNullable<typeof feature> => feature !== null,
+      ),
   };
 }
 
@@ -308,11 +441,14 @@ interface RailMapProps {
   selectedStationId?: string | null;
   highlightedRouteStationIds?: string[];
   highlightedRouteBranchIds?: string[];
+  transferGroups?: RailMapTransferGroup[];
+  selectedTransferGroupId?: string | null;
   focusVersion?: number;
   showBranches?: boolean;
   showStations?: boolean;
   onSelectBranch?: (branch: RailMapBranch) => void;
   onSelectStation?: (station: RailMapStation) => void;
+  onSelectTransferGroup?: (group: RailMapTransferGroup) => void;
   onClearStation?: () => void;
   className?: string;
 }
@@ -407,11 +543,14 @@ export default function RailMap({
   selectedStationId = null,
   highlightedRouteStationIds = [],
   highlightedRouteBranchIds = [],
+  transferGroups = [],
+  selectedTransferGroupId = null,
   focusVersion = 0,
   showBranches = true,
   showStations = true,
   onSelectBranch,
   onSelectStation,
+  onSelectTransferGroup,
   onClearStation,
   className = "",
 }: RailMapProps) {
@@ -423,6 +562,7 @@ export default function RailMap({
   const stationsRef = useRef(stations);
   const onSelectBranchRef = useRef(onSelectBranch);
   const onSelectStationRef = useRef(onSelectStation);
+  const onSelectTransferGroupRef = useRef(onSelectTransferGroup);
   const onClearStationRef = useRef(onClearStation);
 
   useEffect(() => {
@@ -442,12 +582,46 @@ export default function RailMap({
   }, [onSelectStation]);
 
   useEffect(() => {
+    onSelectTransferGroupRef.current = onSelectTransferGroup;
+  }, [onSelectTransferGroup]);
+
+  useEffect(() => {
     onClearStationRef.current = onClearStation;
   }, [onClearStation]);
 
   const validStations = useMemo(
     () => stations.filter(isValidCoordinate),
     [stations],
+  );
+  const validStationIndex = useMemo(
+    () => new Map(validStations.map((station) => [station.id, station])),
+    [validStations],
+  );
+  const stationTransferGroupIndex = useMemo(
+    () => buildStationTransferGroupIndex(transferGroups),
+    [transferGroups],
+  );
+  const transferGroupIndex = useMemo(
+    () => new Map(transferGroups.map((group) => [group.id, group])),
+    [transferGroups],
+  );
+  const transferGroupAreaFeatures = useMemo(
+    () =>
+      buildTransferGroupAreaFeatures(
+        transferGroups,
+        validStationIndex,
+        selectedTransferGroupId,
+      ),
+    [selectedTransferGroupId, transferGroups, validStationIndex],
+  );
+  const transferGroupIconFeatures = useMemo(
+    () =>
+      buildTransferGroupIconFeatures(
+        transferGroups,
+        validStationIndex,
+        selectedTransferGroupId,
+      ),
+    [selectedTransferGroupId, transferGroups, validStationIndex],
   );
   const branchFeatures = useMemo(
     () => buildBranchFeatures(showBranches ? branches : []),
@@ -464,6 +638,10 @@ export default function RailMap({
   );
   const branchFeaturesRef = useRef(branchFeatures);
   const highlightedRouteFeaturesRef = useRef(highlightedRouteFeatures);
+  const transferGroupAreaFeaturesRef = useRef(transferGroupAreaFeatures);
+  const transferGroupIconFeaturesRef = useRef(transferGroupIconFeatures);
+  const stationTransferGroupIndexRef = useRef(stationTransferGroupIndex);
+  const transferGroupIndexRef = useRef(transferGroupIndex);
   const highlightedRouteStationIdSet = useMemo(
     () => new Set(highlightedRouteStationIds),
     [highlightedRouteStationIds],
@@ -476,6 +654,22 @@ export default function RailMap({
   useEffect(() => {
     highlightedRouteFeaturesRef.current = highlightedRouteFeatures;
   }, [highlightedRouteFeatures]);
+
+  useEffect(() => {
+    transferGroupAreaFeaturesRef.current = transferGroupAreaFeatures;
+  }, [transferGroupAreaFeatures]);
+
+  useEffect(() => {
+    transferGroupIconFeaturesRef.current = transferGroupIconFeatures;
+  }, [transferGroupIconFeatures]);
+
+  useEffect(() => {
+    stationTransferGroupIndexRef.current = stationTransferGroupIndex;
+  }, [stationTransferGroupIndex]);
+
+  useEffect(() => {
+    transferGroupIndexRef.current = transferGroupIndex;
+  }, [transferGroupIndex]);
   const selectedBranch = useMemo(
     () => branches.find((branch) => branch.id === selectedBranchId) ?? null,
     [branches, selectedBranchId],
@@ -551,12 +745,14 @@ export default function RailMap({
         selectedStationId,
         highlightedRouteStationIdSet,
         stationColorIndex,
+        stationTransferGroupIndex,
       ),
     [
       highlightedRouteStationIdSet,
       markerStations,
       selectedStationId,
       stationColorIndex,
+      stationTransferGroupIndex,
     ],
   );
   const stationFeaturesRef = useRef(stationFeatures);
@@ -730,6 +926,137 @@ export default function RailMap({
             },
           });
 
+          map.addSource("transfer-group-areas", {
+            type: "geojson",
+            data: transferGroupAreaFeaturesRef.current,
+          });
+
+          map.addSource("transfer-group-icons", {
+            type: "geojson",
+            data: transferGroupIconFeaturesRef.current,
+          });
+
+          map.addLayer({
+            id: "transfer-group-areas-fill",
+            type: "fill",
+            source: "transfer-group-areas",
+            minzoom: 12,
+            paint: {
+              "fill-color": [
+                "case",
+                ["==", ["get", "isSelected"], true],
+                "#2563eb",
+                "#0f172a",
+              ],
+              "fill-opacity": [
+                "case",
+                ["==", ["get", "isSelected"], true],
+                0.15,
+                0.08,
+              ],
+            },
+          });
+
+          map.addLayer({
+            id: "transfer-group-areas-outline",
+            type: "line",
+            source: "transfer-group-areas",
+            minzoom: 12,
+            paint: {
+              "line-color": [
+                "case",
+                ["==", ["get", "isSelected"], true],
+                "#2563eb",
+                "#64748b",
+              ],
+              "line-width": ["case", ["==", ["get", "isSelected"], true], 2, 1],
+              "line-opacity": 0.55,
+              "line-dasharray": [2, 2],
+            },
+          });
+
+          map.addLayer({
+            id: "transfer-group-collapsed-hit",
+            type: "circle",
+            source: "transfer-group-icons",
+            maxzoom: 12,
+            paint: {
+              "circle-radius": 17,
+              "circle-color": "#000000",
+              "circle-opacity": 0.01,
+            },
+          });
+
+          map.addLayer({
+            id: "transfer-group-collapsed-casing",
+            type: "circle",
+            source: "transfer-group-icons",
+            maxzoom: 12,
+            paint: {
+              "circle-color": "#ffffff",
+              "circle-radius": [
+                "case",
+                ["==", ["get", "isSelected"], true],
+                12,
+                10,
+              ],
+              "circle-stroke-color": [
+                "case",
+                ["==", ["get", "isSelected"], true],
+                "#2563eb",
+                "#475569",
+              ],
+              "circle-stroke-width": [
+                "case",
+                ["==", ["get", "isSelected"], true],
+                2.4,
+                1.4,
+              ],
+              "circle-opacity": 0.96,
+            },
+          });
+
+          map.addLayer({
+            id: "transfer-group-collapsed-icon",
+            type: "symbol",
+            source: "transfer-group-icons",
+            maxzoom: 12,
+            layout: {
+              "text-field": "☯",
+              "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
+              "text-size": 15,
+              "text-allow-overlap": true,
+              "text-ignore-placement": true,
+            },
+            paint: {
+              "text-color": "#0f172a",
+              "text-halo-color": "#ffffff",
+              "text-halo-width": 0.8,
+            },
+          });
+
+          map.addLayer({
+            id: "transfer-group-collapsed-label",
+            type: "symbol",
+            source: "transfer-group-icons",
+            minzoom: 9,
+            maxzoom: 12,
+            layout: {
+              "text-field": ["get", "nameKo"],
+              "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
+              "text-size": 11,
+              "text-offset": [0, 1.45],
+              "text-anchor": "top",
+              "text-allow-overlap": false,
+              "text-ignore-placement": false,
+            },
+            paint: {
+              "text-color": "#0f172a",
+              "text-halo-color": "#ffffff",
+              "text-halo-width": 1.5,
+            },
+          });
+
           map.addSource("branch-preview-stations", {
             type: "geojson",
             data: stationFeaturesRef.current,
@@ -747,7 +1074,13 @@ export default function RailMap({
                 7.2,
                 5.6,
               ],
-              "circle-opacity": 0.96,
+              "circle-opacity": [
+                "step",
+                ["zoom"],
+                ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
+                12,
+                0.96,
+              ],
             },
           });
 
@@ -775,7 +1108,13 @@ export default function RailMap({
                 2.2,
                 1.2,
               ],
-              "circle-opacity": 0.96,
+              "circle-opacity": [
+                "step",
+                ["zoom"],
+                ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
+                12,
+                0.96,
+              ],
             },
           });
 
@@ -785,7 +1124,7 @@ export default function RailMap({
             source: "branch-preview-stations",
             minzoom: 12,
             layout: {
-              "text-field": ["get", "nameKo"],
+              "text-field": ["get", "labelNameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
               "text-size": 11,
               "text-offset": [0, -1.15],
@@ -842,6 +1181,41 @@ export default function RailMap({
             if (branch) onSelectBranchRef.current?.(branch);
           });
 
+          map.on("mouseenter", "transfer-group-collapsed-hit", () => {
+            map.getCanvas().style.cursor = "pointer";
+          });
+
+          map.on("mouseleave", "transfer-group-collapsed-hit", () => {
+            map.getCanvas().style.cursor = "";
+          });
+
+          map.on("mouseenter", "transfer-group-areas-fill", () => {
+            map.getCanvas().style.cursor = "pointer";
+          });
+
+          map.on("mouseleave", "transfer-group-areas-fill", () => {
+            map.getCanvas().style.cursor = "";
+          });
+
+          const selectTransferGroupFromFeature = (
+            feature:
+              { properties?: Record<string, unknown> | null } | undefined,
+          ) => {
+            const props = feature?.properties as
+              Record<string, unknown> | undefined;
+            const groupId = String(props?.id ?? "");
+            const group = transferGroupIndexRef.current.get(groupId);
+            if (group) onSelectTransferGroupRef.current?.(group);
+          };
+
+          map.on("click", "transfer-group-collapsed-hit", (event) => {
+            selectTransferGroupFromFeature(event.features?.[0]);
+          });
+
+          map.on("click", "transfer-group-areas-fill", (event) => {
+            selectTransferGroupFromFeature(event.features?.[0]);
+          });
+
           map.on("mouseenter", "branch-preview-stations-dot", () => {
             map.getCanvas().style.cursor = "pointer";
           });
@@ -855,6 +1229,13 @@ export default function RailMap({
             const props = feature?.properties as
               Record<string, unknown> | undefined;
             const stationId = String(props?.id ?? "");
+            const transferGroup =
+              stationTransferGroupIndexRef.current.get(stationId);
+            if (transferGroup && onSelectTransferGroupRef.current) {
+              onSelectTransferGroupRef.current(transferGroup);
+              return;
+            }
+
             const station = stationsRef.current.find(
               (item) => item.id === stationId,
             );
@@ -866,6 +1247,8 @@ export default function RailMap({
               layers: [
                 "branch-preview-lines",
                 "branch-preview-lines-selected",
+                "transfer-group-collapsed-hit",
+                "transfer-group-areas-fill",
                 "branch-preview-stations-dot",
               ],
             });
@@ -961,6 +1344,19 @@ export default function RailMap({
 
     source.setData(highlightedRouteFeatures);
   }, [highlightedRouteFeatures, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    const areaSource = map.getSource("transfer-group-areas") as
+      GeoJSONSource | undefined;
+    const iconSource = map.getSource("transfer-group-icons") as
+      GeoJSONSource | undefined;
+
+    areaSource?.setData(transferGroupAreaFeatures);
+    iconSource?.setData(transferGroupIconFeatures);
+  }, [transferGroupAreaFeatures, transferGroupIconFeatures, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;

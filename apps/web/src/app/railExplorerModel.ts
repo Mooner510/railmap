@@ -38,8 +38,6 @@ export interface CanonicalLine {
   sourceLineNumbers: string[];
 }
 
-
-
 export interface ManualTransferGroup {
   id: string;
   nameKo: string;
@@ -104,7 +102,11 @@ export interface ManualOverlayBundle {
 
 export interface ManualOverlayValidationIssue {
   id: string;
-  type: "manual-transfer" | "station-override" | "branch-override" | "geometry-override";
+  type:
+    | "manual-transfer"
+    | "station-override"
+    | "branch-override"
+    | "geometry-override";
   message: string;
 }
 
@@ -131,6 +133,7 @@ export interface CanonicalBundle {
     missingCanonicalLines: number;
   };
   lines: CanonicalLine[];
+  manualTransferGroups?: ManualTransferGroup[];
   manualTransferEdges?: ManualTransferEdge[];
   missingCanonicalLines: string[];
 }
@@ -162,7 +165,10 @@ export function normalizeSearchText(value: string): string {
 }
 
 export function countRouteStops(line: CanonicalLine): number {
-  return line.branches.reduce((sum, branch) => sum + branch.routeStops.length, 0);
+  return line.branches.reduce(
+    (sum, branch) => sum + branch.routeStops.length,
+    0,
+  );
 }
 
 export function formatBranchRole(role: string): string {
