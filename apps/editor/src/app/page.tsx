@@ -8,20 +8,30 @@ const editorCards = [
   {
     href: "/editor",
     title: "통합 맵 에디터",
-    description: "검색, 지도, Inspector, 명령 팔레트 기반으로 수동 데이터를 한 화면에서 편집합니다.",
+    description:
+      "검색, 지도, Inspector, 명령 팔레트 기반으로 수동 데이터를 한 화면에서 편집합니다.",
     status: "v12 신규",
     primary: true,
   },
   {
+    href: "/changes",
+    title: "전체 변경 내용",
+    description:
+      "editor가 저장한 모든 override를 종류별로 조회하고 수정/삭제/스냅샷 저장합니다.",
+    status: "신규",
+  },
+  {
     href: "/transfers",
     title: "수동 환승 그룹",
-    description: "환승 가능한 역들을 하나의 그룹으로 묶고, 역간 환승 시간을 시간표처럼 관리합니다.",
+    description:
+      "환승 가능한 역들을 하나의 그룹으로 묶고, 역간 환승 시간을 시간표처럼 관리합니다.",
     status: "유지",
   },
   {
     href: "/transfers/map",
     title: "수동 환승 맵 에디터",
-    description: "전체화면 지도에서 영역 선택으로 미환승역과 수동 환승 그룹을 빠르게 편집합니다.",
+    description:
+      "전체화면 지도에서 영역 선택으로 미환승역과 수동 환승 그룹을 빠르게 편집합니다.",
     status: "유지",
   },
   {
@@ -51,39 +61,90 @@ export default async function Home() {
     <main className="min-h-dvh bg-slate-50 px-6 py-8 text-slate-950">
       <section className="mx-auto max-w-6xl rounded-[28px] border border-slate-200 bg-white/95 p-7 shadow-[0_12px_30px_rgb(15_23_42_/_0.08)] backdrop-blur-xl">
         <Badge>Railmap Local Editor</Badge>
-        <h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em]">수동 데이터 편집기</h1>
+        <h1 className="mt-2 text-2xl font-semibold tracking-[-0.04em]">
+          수동 데이터 편집기
+        </h1>
         <p className="mt-2 max-w-3xl text-sm font-normal leading-7 text-slate-500">
-          v12부터 통합 맵 에디터를 중심으로 전환합니다. 기존 페이지는 안전한 fallback으로 유지합니다.
+          v12부터 통합 맵 에디터를 중심으로 전환합니다. 기존 페이지는 안전한
+          fallback으로 유지합니다.
         </p>
-        <Button asChild className="mt-5">
-          <Link href="/editor">통합 에디터 열기</Link>
-        </Button>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href="/editor">통합 에디터 열기</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/changes">전체 변경 내용</Link>
+          </Button>
+        </div>
       </section>
 
-      <section className="mx-auto mt-2 grid max-w-6xl grid-cols-2 gap-3 lg:grid-cols-4" aria-label="manual overlay summary">
-        <SummaryCard label="환승 그룹" value={overlays.manualTransferGroups.length} />
-        <SummaryCard label="환승 edge" value={overlays.manualTransferEdges.length} />
+      <section
+        className="mx-auto mt-2 grid max-w-6xl grid-cols-2 gap-3 lg:grid-cols-4"
+        aria-label="manual overlay summary"
+      >
+        <SummaryCard
+          label="환승 그룹"
+          value={overlays.manualTransferGroups.length}
+        />
+        <SummaryCard
+          label="환승 edge"
+          value={overlays.manualTransferEdges.length}
+        />
         <SummaryCard label="역 보정" value={overlays.stationOverrides.length} />
-        <SummaryCard label="선형 보정" value={overlays.geometryOverrides.length} />
+        <SummaryCard
+          label="선형 보정"
+          value={overlays.geometryOverrides.length}
+        />
       </section>
 
-      <section className="mx-auto mt-2 grid max-w-6xl grid-cols-1 gap-3 md:grid-cols-2" aria-label="editor navigation">
+      <section
+        className="mx-auto mt-2 grid max-w-6xl grid-cols-1 gap-3 md:grid-cols-2"
+        aria-label="editor navigation"
+      >
         {editorCards.map((card) => {
           const disabled = card.href === "#";
           const content = (
-            <Panel className={card.primary ? "border-blue-200 bg-blue-50/80" : disabled ? "opacity-60" : "transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50"}>
+            <Panel
+              className={
+                card.primary
+                  ? "border-blue-200 bg-blue-50/80"
+                  : disabled
+                    ? "opacity-60"
+                    : "transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50"
+              }
+            >
               <div className="flex min-h-40 flex-col justify-between p-5">
                 <div>
-                  <Badge className={card.primary ? "bg-blue-600 text-white" : undefined}>{card.status}</Badge>
-                  <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">{card.title}</h2>
-                  <p className="mt-2 text-sm font-normal leading-6 text-slate-500">{card.description}</p>
+                  <Badge
+                    className={
+                      card.primary ? "bg-blue-600 text-white" : undefined
+                    }
+                  >
+                    {card.status}
+                  </Badge>
+                  <h2 className="mt-2 text-lg font-semibold tracking-[-0.03em]">
+                    {card.title}
+                  </h2>
+                  <p className="mt-2 text-sm font-normal leading-6 text-slate-500">
+                    {card.description}
+                  </p>
                 </div>
-                {!disabled ? <span className="mt-2 text-sm font-semibold text-blue-600">열기</span> : null}
+                {!disabled ? (
+                  <span className="mt-2 text-sm font-semibold text-blue-600">
+                    열기
+                  </span>
+                ) : null}
               </div>
             </Panel>
           );
 
-          return disabled ? <div key={card.title}>{content}</div> : <Link key={card.title} href={card.href}>{content}</Link>;
+          return disabled ? (
+            <div key={card.title}>{content}</div>
+          ) : (
+            <Link key={card.title} href={card.href}>
+              {content}
+            </Link>
+          );
         })}
       </section>
     </main>
