@@ -76,6 +76,29 @@ export interface ManualBranchOverride {
   note?: string | null;
 }
 
+export type ManualLineBranchMode = "add-station" | "connect-line";
+
+export interface ManualLineBranchGeometryPoint {
+  lng: number;
+  lat: number;
+  kind: "station" | "control";
+  stationId?: string;
+}
+
+export interface ManualLineBranchOverride {
+  id: string;
+  mode: ManualLineBranchMode;
+  parentBranchId: string;
+  anchorStationId: string;
+  branchStationId?: string;
+  connectedBranchId?: string;
+  connectedEndpointStationId?: string;
+  geometry?: ManualLineBranchGeometryPoint[];
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 export interface ManualGeometryOverridePoint {
   lng: number;
   lat: number;
@@ -97,6 +120,7 @@ export interface ManualOverlayBundle {
   nonTransferStationIds: string[];
   stationOverrides: ManualStationOverride[];
   branchOverrides: ManualBranchOverride[];
+  lineBranchOverrides: ManualLineBranchOverride[];
   geometryOverrides: ManualGeometryOverride[];
 }
 
@@ -106,6 +130,7 @@ export interface ManualOverlayValidationIssue {
     | "manual-transfer"
     | "station-override"
     | "branch-override"
+    | "line-branch-override"
     | "geometry-override";
   message: string;
 }
@@ -117,6 +142,7 @@ export const EMPTY_MANUAL_OVERLAY_BUNDLE: ManualOverlayBundle = {
   nonTransferStationIds: [],
   stationOverrides: [],
   branchOverrides: [],
+  lineBranchOverrides: [],
   geometryOverrides: [],
 };
 
