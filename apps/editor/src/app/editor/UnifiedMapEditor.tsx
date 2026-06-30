@@ -6,7 +6,7 @@ import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
 import { Dialog } from "@repo/ui/dialog";
 import { Input, Textarea } from "@repo/ui/input";
-import { AppShell } from "@repo/ui/layout";
+import { AppShell, InspectorGrid } from "@repo/ui/layout";
 import { Panel, PanelBody, PanelHeader } from "@repo/ui/panel";
 import { TabButton, TabList } from "@repo/ui/tabs";
 import { Toast, type ToastTone } from "@repo/ui/toast";
@@ -5118,16 +5118,8 @@ export default function UnifiedMapEditor({
 
   return (
     <AppShell>
-      <div
-        className={cn(
-          "grid h-full min-h-0 flex-1 gap-4",
-          isGeometryMode
-            ? "grid-cols-[minmax(0,1fr)_320px]"
-            : "grid-cols-[320px_minmax(0,1fr)_340px]",
-        )}
-      >
-        {!isGeometryMode ? (
-          <Panel className="flex min-h-0 flex-col overflow-hidden">
+      <InspectorGrid>
+        <Panel className="flex min-h-0 flex-col overflow-hidden">
             <PanelHeader>
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -5351,10 +5343,9 @@ export default function UnifiedMapEditor({
                 />
               ) : null}
             </PanelBody>
-          </Panel>
-        ) : null}
+        </Panel>
 
-        <main className="relative h-full min-h-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-xl">
+        <main className="relative min-h-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-xl">
           <div ref={mapContainerRef} className="absolute inset-0 size-full" />
           <div className="pointer-events-none absolute left-4 top-4 flex flex-wrap gap-2">
             <Badge className="bg-white/90 text-slate-700">
@@ -5562,7 +5553,7 @@ export default function UnifiedMapEditor({
             ) : null}
           </PanelBody>
         </Panel>
-      </div>
+      </InspectorGrid>
 
       <Dialog
         open={Boolean(pendingTransferSelection)}
