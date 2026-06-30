@@ -690,20 +690,22 @@ function getLineBranchDisplay(
     const branchStation = override.branchStationId ? stationById.get(override.branchStationId) ?? null : null;
     return {
       title: "지선 역 추가",
-      summary: `${formatBranchDisplayName(parentBranch)} · ${formatStationDisplayName(anchorStation)} → ${formatStationDisplayName(branchStation)}`,
+      summary: `${formatBranchDisplayName(parentBranch)} ${formatStationDisplayName(anchorStation)} <-> ${formatStationDisplayName(branchStation)}`,
       detail: "미소속 역을 선택한 노선의 특정 역에 연결합니다.",
     };
   }
 
   const connectedBranch = override.connectedBranchId ? branchById.get(override.connectedBranchId) ?? null : null;
   const connectedStation = override.connectedEndpointStationId ? stationById.get(override.connectedEndpointStationId) ?? null : null;
-  const directionLabel = getBranchDirectionOptions(connectedBranch, override.connectedEndpointStationId ?? "").find(
-    (option) => option.value === (override.connectedDirection ?? "toward-end"),
-  )?.label;
+  const directionLabel = formatLineBranchDirectionSummary(
+    connectedBranch,
+    override.connectedEndpointStationId,
+    override.connectedDirection ?? "toward-end",
+  );
 
   return {
     title: "지선 노선 결합",
-    summary: `${formatBranchDisplayName(parentBranch)} · ${formatStationDisplayName(anchorStation)} ↔ ${formatBranchDisplayName(connectedBranch)} · ${formatStationDisplayName(connectedStation)}${directionLabel ? ` · ${directionLabel}` : ""}`,
+    summary: `${formatBranchDisplayName(parentBranch)} ${formatStationDisplayName(anchorStation)} <-> ${formatBranchDisplayName(connectedBranch)} ${formatStationDisplayName(connectedStation)}${directionLabel ? ` (${directionLabel})` : ""}`,
     detail: "선택한 노선의 특정 역과 다른 노선의 특정 역을 연결합니다.",
   };
 }
@@ -929,6 +931,24 @@ function getBranchStopStations(branch: EditorMapBranch): EditorStation[] {
   return branch.routeStops
     .map((stop) => stop.station)
     .filter((station): station is EditorStation => Boolean(station));
+}
+
+function getBranchesServingStation(branches: EditorMapBranch[], stationId: string) {
+  return branches.filter((branch) =>
+    getBranchStopStations(branch).some((station) => station.id === stationId),
+  );
+}
+
+function formatLineBranchDirectionSummary(
+  branch: EditorMapBranch | null,
+  stationId: string | undefined,
+  direction: LineBranchDirection | undefined,
+) {
+  if (!branch || !stationId || !direction) return null;
+  const options = getBranchDirectionOptions(branch, stationId);
+  const label = options.find((option) => option.value === direction)?.label;
+  if (!label) return null;
+  return label.replace("행 (", "행 / ").replace(/\)$/u, "");
 }
 
 function getBranchEndpointStations(branch: EditorMapBranch): EditorStation[] {
@@ -1253,6 +1273,7 @@ export default function UnifiedMapEditor({
     lng: number;
     lat: number;
   } | null>(null);
+  const [cursorPoint, setCursorPoint] = useState<{ x: number; y: number } | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [stationLocationPickMode, setStationLocationPickMode] = useState(false);
@@ -1368,6 +1389,8 @@ export default function UnifiedMapEditor({
 
   useEffect(() => {
     stationLocationPickModeRef.current = stationLocationPickMode;
+    const canvas = mapRef.current?.getCanvas();
+    if (canvas) canvas.style.cursor = stationLocationPickMode ? "crosshair" : "grab";
   }, [stationLocationPickMode]);
 
   useEffect(() => {
@@ -1608,7 +1631,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-area-fill",
         type: "fill",
         source: "railmap-transfer-group-areas",
-        minzoom: 12,
+        minzoom: 14.5,
         paint: {
           "fill-color": [
             "case",
@@ -1629,7 +1652,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-area-outline",
         type: "line",
         source: "railmap-transfer-group-areas",
-        minzoom: 12,
+        minzoom: 14.5,
         paint: {
           "line-color": [
             "case",
@@ -1674,7 +1697,7 @@ export default function UnifiedMapEditor({
         maxzoom: 14.5,
         layout: {
           "icon-image": "transfer-icon",
-          "icon-size": ["case", ["==", ["get", "selected"], true], 0.085, 0.075],
+          "icon-size": ["case", ["==", ["get", "selected"], true], 0.038, 0.034],
           "icon-allow-overlap": true,
           "icon-ignore-placement": true,
         },
@@ -1684,8 +1707,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-label",
         type: "symbol",
         source: "railmap-transfer-group-icons",
-        minzoom: 12,
-        maxzoom: 14.5,
+        minzoom: 14.5,
         layout: {
           "text-field": ["get", "nameKo"],
           "text-size": 11,
@@ -1840,8 +1862,11 @@ export default function UnifiedMapEditor({
         lng: event.lngLat.lng,
         lat: event.lngLat.lat,
       };
+      setCursorPoint({ x: event.point.x, y: event.point.y });
 
-      if (!selectionBoxStartRef.current) {
+      if (stationLocationPickModeRef.current) {
+        map.getCanvas().style.cursor = "crosshair";
+      } else if (!selectionBoxStartRef.current) {
         const queryLayers = [
           "railmap-transfer-group-hit",
           "railmap-transfer-group-area-fill",
@@ -1891,6 +1916,8 @@ export default function UnifiedMapEditor({
 
     map.on("click", (event) => {
       if (stationLocationPickModeRef.current) {
+        const original = event.originalEvent as MouseEvent;
+        if (original.shiftKey) return;
         setStationDraftFromMapRef.current(event.lngLat.lng, event.lngLat.lat);
         stationLocationPickModeRef.current = false;
         setStationLocationPickMode(false);
@@ -1899,10 +1926,10 @@ export default function UnifiedMapEditor({
       }
 
       const queryLayers = [
-        "railmap-transfer-group-hit",
-        "railmap-transfer-group-area-fill",
         "railmap-stations-hit",
         "railmap-stations-circle",
+        "railmap-transfer-group-hit",
+        "railmap-transfer-group-area-fill",
         "railmap-selected-branches-line",
         "railmap-branches-line",
       ].filter((layerId) => map.getLayer(layerId));
@@ -1910,24 +1937,21 @@ export default function UnifiedMapEditor({
         queryLayers.length > 0
           ? map.queryRenderedFeatures(event.point, { layers: queryLayers })
           : [];
+      const stationId = firstFeatureId(features, [
+        "railmap-stations-hit",
+        "railmap-stations-circle",
+      ]);
+      if (stationId) {
+        selectStationFromMapRef.current(stationId);
+        return;
+      }
+
       const transferGroupId = firstFeatureId(features, [
         "railmap-transfer-group-hit",
         "railmap-transfer-group-area-fill",
       ]);
       if (transferGroupId) {
         selectTransferGroupFromMapRef.current(transferGroupId);
-        return;
-      }
-
-      const stationId = firstFeatureId(features, [
-        "railmap-stations-hit",
-        "railmap-stations-circle",
-      ]);
-      if (stationId) {
-        const transferGroup = stationTransferGroupIndex.get(stationId);
-        if (transferGroup)
-          selectTransferGroupFromMapRef.current(transferGroup.id);
-        else selectStationFromMapRef.current(stationId);
         return;
       }
 
@@ -2257,27 +2281,9 @@ export default function UnifiedMapEditor({
     );
     if (!saved) return;
 
-    setData((previous) => ({
-      ...previous,
-      stations: previous.stations.map((station) =>
-        station.id === stationDraft.stationId
-          ? {
-              ...station,
-              nameKo: stationDraft.nameKo?.trim() || station.nameKo,
-              lat:
-                typeof stationDraft.lat === "number" &&
-                Number.isFinite(stationDraft.lat)
-                  ? stationDraft.lat
-                  : station.lat,
-              lng:
-                typeof stationDraft.lng === "number" &&
-                Number.isFinite(stationDraft.lng)
-                  ? stationDraft.lng
-                  : station.lng,
-            }
-          : station,
-      ),
-    }));
+    const nextData = await reloadEditorData();
+    const nextStation = nextData?.stations.find((station) => station.id === stationDraft.stationId);
+    if (nextStation) setStationDraft(emptyStationOverride(nextStation, stationDraft));
   }
 
   async function saveTransferDraft() {
@@ -2563,6 +2569,9 @@ export default function UnifiedMapEditor({
     selection.type === "station"
       ? (stationById.get(selection.id) ?? null)
       : null;
+  const selectedStationBranches = selectedStation
+    ? getBranchesServingStation(data.branches, selectedStation.id)
+    : [];
   const selectedBranch =
     selection.type === "branch" ? (branchById.get(selection.id) ?? null) : null;
   const selectedGroup =
@@ -2841,6 +2850,24 @@ export default function UnifiedMapEditor({
               style={selectionBox}
             />
           ) : null}
+          {stationLocationPickMode && cursorPoint ? (
+            <div className="pointer-events-none absolute inset-0 z-20">
+              <div
+                className="absolute bottom-0 top-0 w-px bg-blue-500/70 shadow-[0_0_0_1px_rgba(255,255,255,0.85)]"
+                style={{ left: cursorPoint.x }}
+              />
+              <div
+                className="absolute left-0 right-0 h-px bg-blue-500/70 shadow-[0_0_0_1px_rgba(255,255,255,0.85)]"
+                style={{ top: cursorPoint.y }}
+              />
+              <div
+                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-blue-600 bg-white/80 px-2 py-1 text-[10px] font-bold text-blue-700 shadow"
+                style={{ left: cursorPoint.x, top: cursorPoint.y }}
+              >
+                위치 지정
+              </div>
+            </div>
+          ) : null}
           <div className="absolute bottom-3 right-3 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium text-slate-600 shadow-lg backdrop-blur">
             {cursorLngLat
               ? `${cursorLngLat.lng.toFixed(6)}, ${cursorLngLat.lat.toFixed(6)}`
@@ -2891,6 +2918,10 @@ export default function UnifiedMapEditor({
                 onStartMapPick={() => setStationLocationPickMode(true)}
                 onFocus={() => focusStation(selectedStation.id)}
                 pickMode={stationLocationPickMode}
+                branchRemovalOptions={selectedStationBranches}
+                onExcludeFromBranch={(branchId) =>
+                  void createBranchStationExclusion(branchId, selectedStation.id)
+                }
               />
             ) : null}
             {selectedBranch && geometryDraft ? (
@@ -3097,6 +3128,8 @@ function StationInspector({
   onSetNonTransfer,
   onStartMapPick,
   onFocus,
+  branchRemovalOptions,
+  onExcludeFromBranch,
 }: {
   station: EditorStation;
   draft: ManualStationOverride;
@@ -3107,7 +3140,17 @@ function StationInspector({
   onSetNonTransfer: (enabled: boolean) => void;
   onStartMapPick: () => void;
   onFocus: () => void;
+  branchRemovalOptions: EditorMapBranch[];
+  onExcludeFromBranch: (branchId: string) => void;
 }) {
+  const [removeBranchId, setRemoveBranchId] = useState(branchRemovalOptions[0]?.id ?? "");
+
+  useEffect(() => {
+    if (!branchRemovalOptions.some((branch) => branch.id === removeBranchId)) {
+      setRemoveBranchId(branchRemovalOptions[0]?.id ?? "");
+    }
+  }, [branchRemovalOptions, removeBranchId]);
+
   return (
     <div className="grid gap-4">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
@@ -3179,6 +3222,42 @@ function StationInspector({
         <Button onClick={onSave}>
           <Save className="mr-1 size-4" />
           저장
+        </Button>
+      </div>
+      <div className="grid gap-3 rounded-3xl border border-amber-100 bg-amber-50/70 p-3">
+        <div>
+          <strong className="text-xs font-semibold text-amber-800">
+            특정 노선에서 제거
+          </strong>
+          <p className="mt-1 text-[11px] font-medium text-amber-700">
+            선택한 역을 지정한 노선에서만 제외합니다. 제외된 역은 지선 역 추가 후보로 사용할 수 있습니다.
+          </p>
+        </div>
+        <Field label="제거할 노선">
+          <select
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+            value={removeBranchId}
+            onChange={(event) => setRemoveBranchId(event.target.value)}
+            disabled={branchRemovalOptions.length === 0}
+          >
+            {branchRemovalOptions.length === 0 ? (
+              <option value="">제거 가능한 노선 없음</option>
+            ) : (
+              branchRemovalOptions.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {formatBranchDisplayName(branch)}
+                </option>
+              ))
+            )}
+          </select>
+        </Field>
+        <Button
+          disabled={!removeBranchId}
+          variant="outline"
+          onClick={() => onExcludeFromBranch(removeBranchId)}
+        >
+          <Trash2 className="mr-1 size-4" />
+          이 노선에서 역 제거
         </Button>
       </div>
     </div>
@@ -3292,8 +3371,6 @@ function BranchInspector({
   const [connectDirection, setConnectDirection] = useState<LineBranchDirection>("toward-end");
   const connectDirectionOptions = getBranchDirectionOptions(selectedConnectBranch, connectEndpointStationId);
   const branchStationExclusionsForBranch = branchStationExclusions.filter((exclusion) => exclusion.enabled !== false && exclusion.branchId === branch.id);
-  const excludedStationIds = new Set(branchStationExclusionsForBranch.map((exclusion) => exclusion.stationId));
-  const [excludeStationId, setExcludeStationId] = useState(branchStations.find((station) => !excludedStationIds.has(station.id))?.id ?? "");
 
   useEffect(() => {
     if (!branchStations.some((station) => station.id === addAnchorStationId))
@@ -3329,11 +3406,6 @@ function BranchInspector({
       setConnectDirection(connectDirectionOptions[0]?.value ?? "toward-end");
   }, [connectDirection, connectDirectionOptions]);
 
-  useEffect(() => {
-    if (!branchStations.some((station) => station.id === excludeStationId && !excludedStationIds.has(station.id))) {
-      setExcludeStationId(branchStations.find((station) => !excludedStationIds.has(station.id))?.id ?? "");
-    }
-  }, [branchStations, excludeStationId, excludedStationIds]);
 
   function updatePoint(
     index: number,
@@ -3388,57 +3460,26 @@ function BranchInspector({
       <InfoRow label="종점" value={branch.terminal ?? "-"} />
       <InfoRow label="Route stops" value={`${branch.routeStopCount}개`} />
 
-      <div className="grid gap-3 rounded-3xl border border-amber-100 bg-amber-50/70 p-3">
-        <div>
+      {branchStationExclusionsForBranch.length > 0 ? (
+        <div className="grid gap-2 rounded-3xl border border-amber-100 bg-amber-50/70 p-3">
           <strong className="text-xs font-semibold text-amber-800">
-            노선에서 역 제거
+            이 노선에서 제거된 역
           </strong>
-          <p className="mt-1 text-[11px] font-medium text-amber-700">
-            본선에 잘못 포함된 역을 이 노선에서 제외합니다. 제외된 역은 지선 역 추가 후보로 다시 사용할 수 있습니다.
-          </p>
+          {branchStationExclusionsForBranch.map((exclusion) => {
+            const station = [...branchStations, ...unassignedStations].find((candidate) => candidate.id === exclusion.stationId);
+            return (
+              <div key={exclusion.id} className="flex items-center justify-between gap-2 rounded-2xl bg-white/75 px-3 py-2">
+                <span className="min-w-0 truncate text-xs font-semibold text-amber-800">
+                  {formatStationDisplayName(station)}
+                </span>
+                <Button size="sm" variant="outline" onClick={() => onRestoreBranchStation(exclusion.id)}>
+                  복원
+                </Button>
+              </div>
+            );
+          })}
         </div>
-        <Field label="제거할 역">
-          <select
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
-            value={excludeStationId}
-            onChange={(event) => setExcludeStationId(event.target.value)}
-            disabled={branchStations.filter((station) => !excludedStationIds.has(station.id)).length === 0}
-          >
-            {branchStations.filter((station) => !excludedStationIds.has(station.id)).length === 0 ? (
-              <option value="">제거 가능한 역 없음</option>
-            ) : (
-              branchStations
-                .filter((station) => !excludedStationIds.has(station.id))
-                .map((station) => (
-                  <option key={station.id} value={station.id}>
-                    {station.nameKo} · {station.lineNameKo}
-                  </option>
-                ))
-            )}
-          </select>
-        </Field>
-        <Button disabled={!excludeStationId} variant="outline" onClick={() => onExcludeBranchStation(excludeStationId)}>
-          <Trash2 className="mr-1 size-4" />
-          이 노선에서 역 제거
-        </Button>
-        {branchStationExclusionsForBranch.length > 0 ? (
-          <div className="grid gap-2">
-            {branchStationExclusionsForBranch.map((exclusion) => {
-              const station = [...branchStations, ...unassignedStations].find((candidate) => candidate.id === exclusion.stationId);
-              return (
-                <div key={exclusion.id} className="flex items-center justify-between gap-2 rounded-2xl bg-white/75 px-3 py-2">
-                  <span className="min-w-0 truncate text-xs font-semibold text-amber-800">
-                    제거됨 · {formatStationDisplayName(station)}
-                  </span>
-                  <Button size="sm" variant="outline" onClick={() => onRestoreBranchStation(exclusion.id)}>
-                    복원
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-      </div>
+      ) : null}
 
       <div className="grid gap-3 rounded-3xl border border-blue-100 bg-blue-50/60 p-3">
         <div>
