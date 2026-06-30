@@ -3379,6 +3379,7 @@ export default function UnifiedMapEditor({
     selection.type === "multiStation" ? selection.ids : [];
   const canUndo = historyVersion >= 0 && undoStackRef.current.length > 0;
   const canRedo = historyVersion >= 0 && redoStackRef.current.length > 0;
+  const isGeometryMode = toolMode === "geometry";
 
   return (
     <AppShell>
@@ -3388,10 +3389,10 @@ export default function UnifiedMapEditor({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                  Railmap
+                  {isGeometryMode ? "Geometry" : "Railmap"}
                 </p>
                 <h1 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
-                  통합 맵 에디터
+                  {isGeometryMode ? "선형 편집" : "통합 맵 에디터"}
                 </h1>
               </div>
               <div className="flex items-center gap-1">
@@ -3423,50 +3424,66 @@ export default function UnifiedMapEditor({
                 </Button>
               </div>
             </div>
-            <TabList className="mt-4 grid grid-cols-3">
-              <TabButton
-                active={sidebarTab === "search"}
-                onClick={() => setSidebarTab("search")}
-              >
-                검색
-              </TabButton>
-              <TabButton
-                active={sidebarTab === "layers"}
-                onClick={() => setSidebarTab("layers")}
-              >
-                레이어
-              </TabButton>
-              <TabButton
-                active={sidebarTab === "transfers"}
-                onClick={() => setSidebarTab("transfers")}
-              >
-                환승
-              </TabButton>
-            </TabList>
-            <TabList className="mt-2 grid grid-cols-3">
-              <TabButton
-                active={sidebarTab === "geometry"}
-                onClick={() => setSidebarTab("geometry")}
-              >
-                선형
-              </TabButton>
-              <TabButton
-                active={sidebarTab === "validation"}
-                onClick={() => setSidebarTab("validation")}
-              >
-                검증
-              </TabButton>
-              <TabButton
-                active={sidebarTab === "history"}
-                onClick={() => setSidebarTab("history")}
-              >
-                기록
-              </TabButton>
-            </TabList>
+            {!isGeometryMode ? (
+              <>
+                <TabList className="mt-4 grid grid-cols-3">
+                  <TabButton
+                    active={sidebarTab === "search"}
+                    onClick={() => setSidebarTab("search")}
+                  >
+                    검색
+                  </TabButton>
+                  <TabButton
+                    active={sidebarTab === "layers"}
+                    onClick={() => setSidebarTab("layers")}
+                  >
+                    레이어
+                  </TabButton>
+                  <TabButton
+                    active={sidebarTab === "transfers"}
+                    onClick={() => setSidebarTab("transfers")}
+                  >
+                    환승
+                  </TabButton>
+                </TabList>
+                <TabList className="mt-2 grid grid-cols-3">
+                  <TabButton
+                    active={sidebarTab === "geometry"}
+                    onClick={() => setSidebarTab("geometry")}
+                  >
+                    선형
+                  </TabButton>
+                  <TabButton
+                    active={sidebarTab === "validation"}
+                    onClick={() => setSidebarTab("validation")}
+                  >
+                    검증
+                  </TabButton>
+                  <TabButton
+                    active={sidebarTab === "history"}
+                    onClick={() => setSidebarTab("history")}
+                  >
+                    기록
+                  </TabButton>
+                </TabList>
+              </>
+            ) : (
+              <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-[11px] font-medium leading-5 text-blue-700">
+                지도 위 선형과 회색 보정 정점만 편집합니다. 역/환승/검색 패널은 이 모드에서 숨깁니다.
+              </div>
+            )}
           </PanelHeader>
 
           <PanelBody className="min-h-0 flex-1 overflow-y-auto">
-            {sidebarTab === "search" ? (
+            {isGeometryMode ? (
+              <GeometryModeSidebar
+                branches={data.branches}
+                activeBranchId={geometryDraft?.branchId ?? null}
+                onSelectBranch={selectBranch}
+              />
+            ) : null}
+
+            {!isGeometryMode && sidebarTab === "search" ? (
               <div className="grid gap-3">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
@@ -3510,7 +3527,7 @@ export default function UnifiedMapEditor({
               </div>
             ) : null}
 
-            {sidebarTab === "layers" ? (
+            {!isGeometryMode && sidebarTab === "layers" ? (
               <div className="grid gap-2">
                 {layerOptions.map(({ key, label, Icon }) => (
                   <label
@@ -3534,7 +3551,7 @@ export default function UnifiedMapEditor({
               </div>
             ) : null}
 
-            {sidebarTab === "transfers" ? (
+            {!isGeometryMode && sidebarTab === "transfers" ? (
               <div className="grid gap-2">
                 {multiStationIds.length >= 2 ? (
                   <Button
@@ -3565,9 +3582,9 @@ export default function UnifiedMapEditor({
               </div>
             ) : null}
 
-            {sidebarTab === "geometry" ? (
+            {!isGeometryMode && sidebarTab === "geometry" ? (
               <div className="grid gap-2">
-                {data.branches.slice(0, 200).map((branch) => (
+                {data.branches.map((branch) => (
                   <button
                     key={branch.id}
                     type="button"
@@ -3591,7 +3608,7 @@ export default function UnifiedMapEditor({
               </div>
             ) : null}
 
-            {sidebarTab === "validation" ? (
+            {!isGeometryMode && sidebarTab === "validation" ? (
               <LineBranchValidationPanel
                 count={
                   (overlays.lineBranchOverrides?.length ?? 0) +
@@ -3600,7 +3617,7 @@ export default function UnifiedMapEditor({
                 issues={lineBranchIssues}
               />
             ) : null}
-            {sidebarTab === "history" ? (
+            {!isGeometryMode && sidebarTab === "history" ? (
               <CommandHistoryPanel
                 undoCount={undoStackRef.current.length}
                 redoCount={redoStackRef.current.length}
@@ -3708,14 +3725,32 @@ export default function UnifiedMapEditor({
         <Panel className="flex min-h-0 flex-col overflow-hidden">
           <PanelHeader>
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-              Inspector
+              {isGeometryMode ? "Geometry Tools" : "Inspector"}
             </p>
             <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
-              {selectionLabel(selection)}
+              {isGeometryMode
+                ? (activeGeometryBranch?.canonicalLineNameKo ?? "선형 선택")
+                : selectionLabel(selection)}
             </h2>
           </PanelHeader>
           <PanelBody className="min-h-0 flex-1 overflow-y-auto">
-            {selectedStation && stationDraft ? (
+            {isGeometryMode ? (
+              activeGeometryBranch && geometryDraft ? (
+                <GeometryModeInspector
+                  branch={activeGeometryBranch}
+                  draft={geometryDraft}
+                  onSave={() => void saveGeometryDraft()}
+                  onClear={() => void clearGeometryOverride(activeGeometryBranch.id)}
+                />
+              ) : (
+                <Placeholder
+                  title="선형을 선택하세요"
+                  description="지도에서 노선선을 드래그하거나 왼쪽 목록에서 편집할 노선을 선택하세요."
+                />
+              )
+            ) : null}
+
+            {!isGeometryMode && selectedStation && stationDraft ? (
               <StationInspector
                 station={selectedStation}
                 draft={stationDraft}
@@ -3759,7 +3794,7 @@ export default function UnifiedMapEditor({
                 }
               />
             ) : null}
-            {activeGeometryBranch && geometryDraft ? (
+            {!isGeometryMode && activeGeometryBranch && geometryDraft ? (
               <BranchInspector
                 branch={activeGeometryBranch}
                 draft={geometryDraft}
@@ -3805,7 +3840,7 @@ export default function UnifiedMapEditor({
                 }
               />
             ) : null}
-            {selectedGroup && transferDraft ? (
+            {!isGeometryMode && selectedGroup && transferDraft ? (
               <TransferGroupInspector
                 group={selectedGroup}
                 draft={transferDraft}
@@ -3815,7 +3850,7 @@ export default function UnifiedMapEditor({
                 onDelete={() => void deleteTransferGroup(selectedGroup.id)}
               />
             ) : null}
-            {!selectedGroup && transferDraft ? (
+            {!isGeometryMode && !selectedGroup && transferDraft ? (
               <NewTransferGroupInspector
                 draft={transferDraft}
                 stationById={stationById}
@@ -3824,7 +3859,7 @@ export default function UnifiedMapEditor({
                 onCancel={() => setTransferDraft(null)}
               />
             ) : null}
-            {multiStationIds.length > 0 && !transferDraft ? (
+            {!isGeometryMode && multiStationIds.length > 0 && !transferDraft ? (
               <MultiStationInspector
                 ids={multiStationIds}
                 stationById={stationById}
@@ -3837,7 +3872,7 @@ export default function UnifiedMapEditor({
                 }
               />
             ) : null}
-            {selection.type === "none" ? (
+            {!isGeometryMode && selection.type === "none" ? (
               <Placeholder
                 title="객체를 선택하세요"
                 description="지도에서 역/노선선을 클릭하거나 Cmd/Ctrl+K로 검색하세요."
@@ -3930,6 +3965,136 @@ function CommandHistoryPanel({
           description="저장 작업을 실행하면 command history에 기록됩니다."
         />
       )}
+    </div>
+  );
+}
+
+
+function GeometryModeSidebar({
+  branches,
+  activeBranchId,
+  onSelectBranch,
+}: {
+  branches: EditorMapBranch[];
+  activeBranchId: string | null;
+  onSelectBranch: (id: string) => void;
+}) {
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-3xl border border-blue-100 bg-blue-50/70 p-3">
+        <strong className="text-xs font-semibold text-blue-800">
+          선형 편집 대상
+        </strong>
+        <p className="mt-1 text-[11px] font-medium leading-5 text-blue-600">
+          역 검색과 상세 정보는 숨겼습니다. 노선선을 직접 드래그하거나 아래 목록에서 편집할 노선을 고르세요.
+        </p>
+        <p className="mt-2 text-[11px] font-semibold text-blue-700">
+          총 {branches.length.toLocaleString("ko-KR")}개 노선
+        </p>
+      </div>
+      <div className="grid max-h-[calc(100vh-260px)] gap-1.5 overflow-y-auto pr-1">
+        {branches.map((branch) => {
+          const active = activeBranchId === branch.id;
+          return (
+            <button
+              key={branch.id}
+              type="button"
+              className={cn(
+                "rounded-2xl border p-2.5 text-left transition",
+                active
+                  ? "border-blue-300 bg-blue-50 shadow-sm"
+                  : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50",
+              )}
+              onClick={() => onSelectBranch(branch.id)}
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <span
+                  className="h-1.5 w-8 shrink-0 rounded-full"
+                  style={{ backgroundColor: branch.colorHex }}
+                />
+                <strong className="truncate text-xs font-semibold text-slate-800">
+                  {branch.canonicalLineNameKo}
+                </strong>
+              </div>
+              <p className="mt-1 truncate text-[11px] font-medium text-slate-500">
+                {branch.sourceLineName} · {branch.routeStopCount} stops
+              </p>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function GeometryModeInspector({
+  branch,
+  draft,
+  onSave,
+  onClear,
+}: {
+  branch: EditorMapBranch;
+  draft: GeometryDraft;
+  onSave: () => void;
+  onClear: () => void;
+}) {
+  const controlCount = draft.points.filter((point) => point.kind === "control").length;
+  const stationAnchorCount = draft.points.filter((point) => point.kind === "station").length;
+
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-3xl border border-slate-200 bg-white p-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="h-2 w-10 rounded-full"
+            style={{ backgroundColor: branch.colorHex }}
+          />
+          <strong className="min-w-0 truncate text-sm font-semibold text-slate-900">
+            {branch.canonicalLineNameKo}
+          </strong>
+        </div>
+        <p className="mt-1 truncate text-xs font-medium text-slate-500">
+          {branch.sourceLineName}
+        </p>
+        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-2xl bg-slate-50 px-2 py-2">
+            <p className="text-[10px] font-semibold text-slate-400">역 anchor</p>
+            <p className="mt-1 text-sm font-bold text-slate-700">{stationAnchorCount}</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 px-2 py-2">
+            <p className="text-[10px] font-semibold text-slate-400">보정점</p>
+            <p className="mt-1 text-sm font-bold text-slate-700">{controlCount}</p>
+          </div>
+          <div className="rounded-2xl bg-slate-50 px-2 py-2">
+            <p className="text-[10px] font-semibold text-slate-400">정차역</p>
+            <p className="mt-1 text-sm font-bold text-slate-700">{branch.routeStopCount}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <Button variant="outline" onClick={onClear}>
+          보정 제거
+        </Button>
+        <Button onClick={onSave}>
+          <Save className="mr-1 size-4" />
+          선형 저장
+        </Button>
+      </div>
+
+      <div className="rounded-3xl border border-blue-100 bg-blue-50/70 p-3 text-[11px] font-medium leading-5 text-blue-700">
+        <strong className="block text-xs text-blue-800">조작법</strong>
+        <p className="mt-1">노선선을 드래그하면 역 사이에 회색 보정점이 추가됩니다.</p>
+        <p>회색 보정점은 드래그로 이동합니다.</p>
+        <p>Ctrl/Cmd + 회색 보정점 클릭으로 보정점을 제거합니다.</p>
+        <p>역은 anchor로만 사용되며 이동하거나 선택할 수 없습니다.</p>
+      </div>
+
+      {controlCount === 0 ? (
+        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium leading-5 text-slate-500">
+          아직 수동 보정점이 없습니다. 지도에서 노선 구간을 드래그해 필요한 구간만 보정하세요.
+        </div>
+      ) : null}
     </div>
   );
 }
