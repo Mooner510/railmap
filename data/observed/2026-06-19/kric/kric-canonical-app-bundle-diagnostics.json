@@ -1,7 +1,7 @@
 {
   "diagnosticsId": "kric-canonical-app-bundle-diagnostics",
   "acquiredDate": "2026-06-19",
-  "generatedAt": "2026-06-30T01:45:17.964Z",
+  "generatedAt": "2026-06-30T11:02:17.332Z",
   "sourceBundle": "data/generated/2026-06-19/app-bundle/kric-canonical-app-bundle.json",
   "policy": {
     "lowConfidenceMeaning": "Route stop was matched by fallback logic, usually global normalized station name rather than exact same-line station code.",

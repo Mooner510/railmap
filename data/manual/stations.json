@@ -1,6 +1,31 @@
 {
   "schemaVersion": 1,
-  "stationOverrides": [],
+  "stationOverrides": [
+    {
+      "stationId": "candidate:kric:urban-rail-station:I1104:0430:row-868",
+      "nameKo": "이촌(국립중앙박물관)",
+      "lat": 37.522424633965684,
+      "lng": 126.97335383888748,
+      "enabled": true,
+      "note": null
+    },
+    {
+      "stationId": "candidate:kric:urban-rail-station:I4101:1703:row-162",
+      "nameKo": "금천구청역",
+      "lat": 37.455872665610016,
+      "lng": 126.8938866998331,
+      "enabled": true,
+      "note": null
+    },
+    {
+      "stationId": "candidate:kric:urban-rail-station:I4108:1204:row-733",
+      "nameKo": "양원역",
+      "lat": 37.60659529367665,
+      "lng": 127.1079205391614,
+      "enabled": true,
+      "note": null
+    }
+  ],
   "nonTransferStationIds": [
     "candidate:kric:urban-rail-station:S1105:0524:row-772"
   ]
