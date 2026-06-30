@@ -105,6 +105,11 @@ type GeometryDraft = {
   note: string;
 };
 
+type GeometryPointDragState = {
+  branchId: string;
+  pointIndex: number;
+} | null;
+
 type LineBranchValidationIssue = {
   id: string;
   message: string;
@@ -1350,6 +1355,118 @@ function toGeometryOverride(draft: GeometryDraft): ManualGeometryOverride {
   };
 }
 
+function applyGeometryDraftToBranches(
+  branches: EditorMapBranch[],
+  draft: GeometryDraft | null,
+): EditorMapBranch[] {
+  if (!draft) return branches;
+
+  const coordinates = draft.points
+    .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
+    .map((point) => [point.lng, point.lat] as LngLatTuple);
+
+  if (coordinates.length < 2) return branches;
+
+  return branches.map((branch) =>
+    branch.id === draft.branchId
+      ? {
+          ...branch,
+          geometryOverrideCoordinates: coordinates,
+          geometryCoordinates: coordinates,
+        }
+      : branch,
+  );
+}
+
+function buildGeometryEditPointFeatures(
+  draft: GeometryDraft | null,
+  visible: boolean,
+): RailFeatureCollection {
+  if (!visible || !draft) return EMPTY_FEATURE_COLLECTION;
+
+  return {
+    type: "FeatureCollection",
+    features: draft.points
+      .map((point, index) => {
+        if (!Number.isFinite(point.lng) || !Number.isFinite(point.lat))
+          return null;
+        return {
+          type: "Feature" as const,
+          properties: {
+            id: `${draft.branchId}:geometry-point:${index}`,
+            branchId: draft.branchId,
+            pointIndex: index,
+            kind: point.kind,
+            draggable: point.kind !== "station",
+          },
+          geometry: {
+            type: "Point" as const,
+            coordinates: [point.lng, point.lat] as LngLatTuple,
+          },
+        };
+      })
+      .filter(
+        (feature): feature is NonNullable<typeof feature> => feature !== null,
+      ),
+  };
+}
+
+function distanceToSegmentSquared(
+  point: { x: number; y: number },
+  start: { x: number; y: number },
+  end: { x: number; y: number },
+) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) {
+    const px = point.x - start.x;
+    const py = point.y - start.y;
+    return px * px + py * py;
+  }
+
+  const t = Math.max(
+    0,
+    Math.min(
+      1,
+      ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared,
+    ),
+  );
+  const projectedX = start.x + t * dx;
+  const projectedY = start.y + t * dy;
+  const px = point.x - projectedX;
+  const py = point.y - projectedY;
+  return px * px + py * py;
+}
+
+function nearestGeometrySegmentIndex(
+  draft: GeometryDraft,
+  map: MapLibreMap,
+  point: { x: number; y: number },
+) {
+  if (draft.points.length < 2) return 0;
+
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (let index = 0; index < draft.points.length - 1; index += 1) {
+    const startPoint = draft.points[index];
+    const endPoint = draft.points[index + 1];
+    if (!startPoint || !endPoint) continue;
+
+    const start = map.project([startPoint.lng, startPoint.lat]);
+    const end = map.project([endPoint.lng, endPoint.lat]);
+    const distance = distanceToSegmentSquared(point, start, end);
+
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+
+  return bestIndex;
+}
+
 function makeCommandRecord(
   label: string,
   before: ManualOverlayBundle,
@@ -1388,6 +1505,7 @@ export default function UnifiedMapEditor({
   );
   const selectionBoxStartRef = useRef<{ x: number; y: number } | null>(null);
   const mapPointerDownPointRef = useRef<{ x: number; y: number } | null>(null);
+  const geometryPointDragRef = useRef<GeometryPointDragState>(null);
   const selectStationFromMapRef = useRef<(stationId: string) => void>(
     () => undefined,
   );
@@ -1398,6 +1516,11 @@ export default function UnifiedMapEditor({
     () => undefined,
   );
   const toolModeRef = useRef<ToolMode>("select");
+  const geometryDraftRef = useRef<GeometryDraft | null>(null);
+  const branchByIdRef = useRef<Map<string, EditorMapBranch>>(new Map());
+  const overlaysRef = useRef<ManualOverlayBundle>(
+    (initialData ?? EMPTY_UNIFIED_EDITOR_DATA).overlays,
+  );
   const stationLocationPickModeRef = useRef(false);
   const showToastRef = useRef<(message: string, tone?: ToastTone) => void>(
     () => undefined,
@@ -1460,6 +1583,19 @@ export default function UnifiedMapEditor({
   const branchById = useMemo(
     () => new Map(data.branches.map((branch) => [branch.id, branch])),
     [data.branches],
+  );
+  const displayBranches = useMemo(
+    () =>
+      applyGeometryDraftToBranches(
+        data.branches,
+        toolMode === "geometry" ? geometryDraft : null,
+      ),
+    [data.branches, geometryDraft, toolMode],
+  );
+  const geometryEditPointFeatures = useMemo(
+    () =>
+      buildGeometryEditPointFeatures(geometryDraft, toolMode === "geometry"),
+    [geometryDraft, toolMode],
   );
   const lineBranchIssues = useMemo(
     () => [
@@ -1646,6 +1782,30 @@ export default function UnifiedMapEditor({
   }, [toolMode]);
 
   useEffect(() => {
+    geometryDraftRef.current = geometryDraft;
+  }, [geometryDraft]);
+
+  useEffect(() => {
+    branchByIdRef.current = branchById;
+  }, [branchById]);
+
+  useEffect(() => {
+    overlaysRef.current = overlays;
+  }, [overlays]);
+
+  useEffect(() => {
+    if (toolMode !== "geometry") return;
+
+    setSelection({ type: "none" });
+    setStationDraft(null);
+    setTransferDraft(null);
+    setStationLocationPickMode(false);
+    stationLocationPickModeRef.current = false;
+    setContextMenu(null);
+    setSidebarTab("geometry");
+  }, [toolMode]);
+
+  useEffect(() => {
     if (initialData) return;
 
     let cancelled = false;
@@ -1747,6 +1907,10 @@ export default function UnifiedMapEditor({
         type: "geojson",
         data: EMPTY_FEATURE_COLLECTION,
       });
+      map.addSource("railmap-geometry-edit-points", {
+        type: "geojson",
+        data: EMPTY_FEATURE_COLLECTION,
+      });
 
       map.addLayer({
         id: "railmap-branches-line",
@@ -1771,6 +1935,33 @@ export default function UnifiedMapEditor({
           "line-opacity": 0.95,
         },
         layout: { "line-cap": "round", "line-join": "round" },
+      });
+
+      map.addLayer({
+        id: "railmap-geometry-points",
+        type: "circle",
+        source: "railmap-geometry-edit-points",
+        filter: ["==", ["get", "kind"], "control"],
+        paint: {
+          "circle-color": "#64748b",
+          "circle-radius": 5.5,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 2,
+          "circle-opacity": 0.98,
+        },
+      });
+
+      map.addLayer({
+        id: "railmap-geometry-points-hit",
+        type: "circle",
+        source: "railmap-geometry-edit-points",
+        filter: ["==", ["get", "kind"], "control"],
+        paint: {
+          "circle-color": "rgba(0,0,0,0)",
+          "circle-radius": 13,
+          "circle-opacity": 0,
+          "circle-stroke-width": 0,
+        },
       });
 
       map.addLayer({
@@ -2059,6 +2250,119 @@ export default function UnifiedMapEditor({
       setContextMenu(null);
     };
 
+    const beginGeometryPointDrag = (branchId: string, pointIndex: number) => {
+      geometryPointDragRef.current = { branchId, pointIndex };
+      map.dragPan.disable();
+      map.getCanvas().style.cursor = "grabbing";
+    };
+
+    const handleGeometryMouseDown = (event: maplibregl.MapMouseEvent) => {
+      const original = event.originalEvent as MouseEvent;
+      const pointFeatures = map.queryRenderedFeatures(event.point, {
+        layers: [
+          "railmap-geometry-points-hit",
+          "railmap-geometry-points",
+        ].filter((layerId) => map.getLayer(layerId)),
+      });
+      const pointFeature = pointFeatures.find((feature) => {
+        const index = Number(feature.properties?.pointIndex);
+        return Number.isInteger(index);
+      });
+
+      if (pointFeature) {
+        const branchId = String(pointFeature.properties?.branchId ?? "");
+        const pointIndex = Number(pointFeature.properties?.pointIndex);
+
+        if (!branchId || !Number.isInteger(pointIndex)) return;
+
+        original.preventDefault();
+        event.preventDefault();
+
+        if (original.ctrlKey) {
+          setGeometryDraft((previous) => {
+            if (!previous || previous.branchId !== branchId) return previous;
+            const target = previous.points[pointIndex];
+            if (
+              !target ||
+              target.kind === "station" ||
+              previous.points.length <= 2
+            ) {
+              return previous;
+            }
+            return {
+              ...previous,
+              points: previous.points.filter(
+                (_, index) => index !== pointIndex,
+              ),
+            };
+          });
+          showToastRef.current("선형 정점을 제거했습니다", "success");
+          return;
+        }
+
+        beginGeometryPointDrag(branchId, pointIndex);
+        return;
+      }
+
+      const stationFeatures = map.queryRenderedFeatures(event.point, {
+        layers: ["railmap-stations-hit", "railmap-stations-circle"].filter(
+          (layerId) => map.getLayer(layerId),
+        ),
+      });
+      if (stationFeatures.length > 0) return;
+
+      const branchFeatures = map.queryRenderedFeatures(event.point, {
+        layers: [
+          "railmap-selected-branches-line",
+          "railmap-branches-line",
+        ].filter((layerId) => map.getLayer(layerId)),
+      });
+      const branchId = firstFeatureId(branchFeatures, [
+        "railmap-selected-branches-line",
+        "railmap-branches-line",
+      ]);
+      if (!branchId) return;
+
+      const branch = branchByIdRef.current.get(branchId);
+      if (!branch) return;
+
+      original.preventDefault();
+      event.preventDefault();
+
+      const existingDraft = geometryDraftRef.current;
+      const baseDraft =
+        existingDraft?.branchId === branchId
+          ? existingDraft
+          : makeGeometryDraftFromBranch(
+              branch,
+              overlaysRef.current.geometryOverrides.find(
+                (override) => override.branchId === branchId,
+              ),
+            );
+      const insertAfterIndex = nearestGeometrySegmentIndex(
+        baseDraft,
+        map,
+        event.point,
+      );
+      const insertIndex = insertAfterIndex + 1;
+      const nextDraft: GeometryDraft = {
+        ...baseDraft,
+        points: [
+          ...baseDraft.points.slice(0, insertIndex),
+          {
+            lng: event.lngLat.lng,
+            lat: event.lngLat.lat,
+            kind: "control" as const,
+          },
+          ...baseDraft.points.slice(insertIndex),
+        ],
+      };
+
+      setGeometryDraft(nextDraft);
+      setSidebarTab("geometry");
+      beginGeometryPointDrag(branchId, insertIndex);
+    };
+
     map.on("mousemove", (event) => {
       pendingCursorLngLatRef.current = {
         lng: event.lngLat.lng,
@@ -2066,45 +2370,88 @@ export default function UnifiedMapEditor({
       };
       setCursorPoint({ x: event.point.x, y: event.point.y });
 
-      if (stationLocationPickModeRef.current) {
+      const geometryDrag = geometryPointDragRef.current;
+      if (geometryDrag) {
+        setGeometryDraft((previous) => {
+          if (!previous || previous.branchId !== geometryDrag.branchId)
+            return previous;
+          const target = previous.points[geometryDrag.pointIndex];
+          if (!target || target.kind === "station") return previous;
+
+          return {
+            ...previous,
+            points: previous.points.map((point, index) =>
+              index === geometryDrag.pointIndex
+                ? { ...point, lng: event.lngLat.lng, lat: event.lngLat.lat }
+                : point,
+            ),
+          };
+        });
+        map.getCanvas().style.cursor = "grabbing";
+      } else if (stationLocationPickModeRef.current) {
         map.getCanvas().style.cursor = "crosshair";
       } else if (!selectionBoxStartRef.current) {
-        const queryLayers = [
-          "railmap-transfer-group-hit",
-          "railmap-transfer-group-area-fill",
-          "railmap-stations-hit",
-          "railmap-stations-circle",
-          "railmap-selected-branches-line",
-          "railmap-branches-line",
-        ].filter((layerId) => map.getLayer(layerId));
+        const queryLayers =
+          toolModeRef.current === "geometry"
+            ? [
+                "railmap-geometry-points-hit",
+                "railmap-geometry-points",
+                "railmap-branches-line",
+              ].filter((layerId) => map.getLayer(layerId))
+            : [
+                "railmap-transfer-group-hit",
+                "railmap-transfer-group-area-fill",
+                "railmap-stations-hit",
+                "railmap-stations-circle",
+                "railmap-selected-branches-line",
+                "railmap-branches-line",
+              ].filter((layerId) => map.getLayer(layerId));
         const features =
           queryLayers.length > 0
             ? map.queryRenderedFeatures(event.point, { layers: queryLayers })
             : [];
-        const hasTransferGroup = Boolean(
-          firstFeatureId(features, [
-            "railmap-transfer-group-hit",
-            "railmap-transfer-group-area-fill",
-          ]),
-        );
-        const hasStation = Boolean(
-          firstFeatureId(features, [
-            "railmap-stations-hit",
-            "railmap-stations-circle",
-          ]),
-        );
-        const hasBranch = Boolean(
-          firstFeatureId(features, [
-            "railmap-selected-branches-line",
-            "railmap-branches-line",
-          ]),
-        );
-        map.getCanvas().style.cursor =
-          hasTransferGroup || hasStation
-            ? "pointer"
+
+        if (toolModeRef.current === "geometry") {
+          const hasGeometryPoint = Boolean(
+            firstFeatureId(features, [
+              "railmap-geometry-points-hit",
+              "railmap-geometry-points",
+            ]),
+          );
+          const hasBranch = Boolean(
+            firstFeatureId(features, ["railmap-branches-line"]),
+          );
+          map.getCanvas().style.cursor = hasGeometryPoint
+            ? "grab"
             : hasBranch
               ? "crosshair"
               : "grab";
+        } else {
+          const hasTransferGroup = Boolean(
+            firstFeatureId(features, [
+              "railmap-transfer-group-hit",
+              "railmap-transfer-group-area-fill",
+            ]),
+          );
+          const hasStation = Boolean(
+            firstFeatureId(features, [
+              "railmap-stations-hit",
+              "railmap-stations-circle",
+            ]),
+          );
+          const hasBranch = Boolean(
+            firstFeatureId(features, [
+              "railmap-selected-branches-line",
+              "railmap-branches-line",
+            ]),
+          );
+          map.getCanvas().style.cursor =
+            hasTransferGroup || hasStation
+              ? "pointer"
+              : hasBranch
+                ? "crosshair"
+                : "grab";
+        }
       }
 
       if (cursorFrameRef.current !== null) return;
@@ -2118,6 +2465,7 @@ export default function UnifiedMapEditor({
 
     map.on("click", (event) => {
       if (isClickAfterDrag(event.point)) return;
+      if (toolModeRef.current === "geometry") return;
 
       if (stationLocationPickModeRef.current) {
         const original = event.originalEvent as MouseEvent;
@@ -2173,6 +2521,7 @@ export default function UnifiedMapEditor({
 
     map.on("contextmenu", (event) => {
       event.preventDefault();
+      if (toolModeRef.current === "geometry") return;
       const queryLayers = [
         "railmap-transfer-group-hit",
         "railmap-transfer-group-area-fill",
@@ -2201,6 +2550,10 @@ export default function UnifiedMapEditor({
 
     map.on("mousedown", (event) => {
       mapPointerDownPointRef.current = { x: event.point.x, y: event.point.y };
+      if (toolModeRef.current === "geometry") {
+        handleGeometryMouseDown(event);
+        return;
+      }
       const original = event.originalEvent as MouseEvent;
       if (
         !(original.metaKey || original.ctrlKey) &&
@@ -2233,6 +2586,14 @@ export default function UnifiedMapEditor({
     });
 
     map.on("mouseup", (event) => {
+      if (geometryPointDragRef.current) {
+        geometryPointDragRef.current = null;
+        map.dragPan.enable();
+        map.getCanvas().style.cursor =
+          toolModeRef.current === "geometry" ? "grab" : "grab";
+        return;
+      }
+
       const start = selectionBoxStartRef.current;
       if (!start) return;
       const box = [
@@ -2306,7 +2667,7 @@ export default function UnifiedMapEditor({
     const idleId = scheduleIdle(() => {
       void (async () => {
         const features = await buildBranchFeaturesChunked(
-          data.branches,
+          displayBranches,
           layers.lines,
           () => cancelled,
         );
@@ -2321,7 +2682,15 @@ export default function UnifiedMapEditor({
       cancelled = true;
       cancelIdle(idleId);
     };
-  }, [data.branches, dataLoading, layers.lines, mapLoaded]);
+  }, [dataLoading, displayBranches, layers.lines, mapLoaded]);
+
+  useEffect(() => {
+    if (!mapLoaded || dataLoading) return;
+
+    const source = mapRef.current?.getSource("railmap-geometry-edit-points") as
+      GeoJSONSource | undefined;
+    source?.setData(geometryEditPointFeatures);
+  }, [dataLoading, geometryEditPointFeatures, mapLoaded]);
 
   useEffect(() => {
     if (!mapLoaded || dataLoading) return;
@@ -2846,6 +3215,9 @@ export default function UnifiedMapEditor({
     : [];
   const selectedBranch =
     selection.type === "branch" ? (branchById.get(selection.id) ?? null) : null;
+  const activeGeometryBranch = geometryDraft
+    ? (branchById.get(geometryDraft.branchId) ?? null)
+    : selectedBranch;
   const selectedGroup =
     selection.type === "transferGroup"
       ? (groupById.get(selection.id) ?? null)
@@ -3100,6 +3472,16 @@ export default function UnifiedMapEditor({
               </Badge>
             ) : null}
           </div>
+          {toolMode === "geometry" ? (
+            <div className="pointer-events-none absolute left-4 top-20 max-w-[360px] rounded-3xl border border-blue-100 bg-white/95 p-3 text-[11px] font-medium leading-5 text-slate-600 shadow-lg backdrop-blur">
+              <strong className="block text-xs text-blue-700">
+                선형 편집 모드
+              </strong>
+              노선선을 드래그하면 해당 구간에 회색 정점이 추가됩니다. 회색
+              정점은 드래그로 이동하고, Ctrl+클릭으로 제거합니다. 역 아이콘은 이
+              모드에서 선택/이동되지 않습니다.
+            </div>
+          ) : null}
           <div className="absolute left-1/2 top-4 flex -translate-x-1/2 gap-2 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
             {toolOptions.map(({ mode, label, description, Icon }) => (
               <button
@@ -3224,9 +3606,9 @@ export default function UnifiedMapEditor({
                 }
               />
             ) : null}
-            {selectedBranch && geometryDraft ? (
+            {activeGeometryBranch && geometryDraft ? (
               <BranchInspector
-                branch={selectedBranch}
+                branch={activeGeometryBranch}
                 draft={geometryDraft}
                 branches={data.branches}
                 lineBranchOverrides={overlays.lineBranchOverrides}
@@ -3234,10 +3616,12 @@ export default function UnifiedMapEditor({
                 unassignedStations={unassignedStations}
                 onChange={setGeometryDraft}
                 onSave={() => void saveGeometryDraft()}
-                onClear={() => void clearGeometryOverride(selectedBranch.id)}
+                onClear={() =>
+                  void clearGeometryOverride(activeGeometryBranch.id)
+                }
                 onCreateAddStation={(anchorStationId, branchStationId) =>
                   void createAddStationLineBranch(
-                    selectedBranch.id,
+                    activeGeometryBranch.id,
                     anchorStationId,
                     branchStationId,
                   )
@@ -3249,7 +3633,7 @@ export default function UnifiedMapEditor({
                   connectedDirection,
                 ) =>
                   void createConnectLineBranch(
-                    selectedBranch.id,
+                    activeGeometryBranch.id,
                     anchorStationId,
                     connectedBranchId,
                     connectedEndpointStationId,
@@ -3259,7 +3643,7 @@ export default function UnifiedMapEditor({
                 onDeleteLineBranch={(id) => void deleteLineBranchOverride(id)}
                 onExcludeBranchStation={(stationId) =>
                   void createBranchStationExclusion(
-                    selectedBranch.id,
+                    activeGeometryBranch.id,
                     stationId,
                   )
                 }
