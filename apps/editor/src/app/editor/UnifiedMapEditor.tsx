@@ -896,6 +896,91 @@ function validateSavedGeometryStationAnchors(
   return issues;
 }
 
+
+function replaceStaleSavedStationAnchorPoints(
+  points: ManualGeometryOverridePoint[],
+  stationId: string,
+  coordinate: LngLatTuple,
+) {
+  let changedCount = 0;
+  const nextPoints = points.map((point) => {
+    if (point.kind !== "station" || point.stationId !== stationId) return point;
+    if (
+      Math.abs(point.lng - coordinate[0]) <= SAVED_STATION_ANCHOR_TOLERANCE &&
+      Math.abs(point.lat - coordinate[1]) <= SAVED_STATION_ANCHOR_TOLERANCE
+    ) {
+      return point;
+    }
+    changedCount += 1;
+    return {
+      ...point,
+      lng: coordinate[0],
+      lat: coordinate[1],
+    };
+  });
+  return { points: nextPoints, changedCount };
+}
+
+function syncSavedGeometryAnchorsForStation(
+  overlays: ManualOverlayBundle,
+  stationId: string,
+  stationById: Map<string, EditorStation>,
+) {
+  const coordinate = getStationCoordinate(stationById.get(stationId));
+  if (!coordinate) return { overlays, changedCount: 0 };
+
+  let changedCount = 0;
+  const geometryOverrides = overlays.geometryOverrides.map((override) => {
+    const replaced = replaceStaleSavedStationAnchorPoints(
+      override.points,
+      stationId,
+      coordinate,
+    );
+    changedCount += replaced.changedCount;
+    return replaced.changedCount > 0
+      ? { ...override, points: replaced.points }
+      : override;
+  });
+
+  const lineBranchOverrides = (overlays.lineBranchOverrides ?? []).map(
+    (override) => {
+      if (!override.geometry?.length) return override;
+      const replaced = replaceStaleSavedStationAnchorPoints(
+        override.geometry,
+        stationId,
+        coordinate,
+      );
+      changedCount += replaced.changedCount;
+      return replaced.changedCount > 0
+        ? { ...override, geometry: replaced.points }
+        : override;
+    },
+  );
+
+  if (changedCount === 0) return { overlays, changedCount };
+
+  return {
+    overlays: {
+      ...overlays,
+      geometryOverrides,
+      lineBranchOverrides,
+    },
+    changedCount,
+  };
+}
+
+function countStaleSavedGeometryAnchorsForStation(
+  overlays: ManualOverlayBundle,
+  stationId: string,
+  stationById: Map<string, EditorStation>,
+) {
+  return syncSavedGeometryAnchorsForStation(
+    overlays,
+    stationId,
+    stationById,
+  ).changedCount;
+}
+
 function validateStationGeometryAlignment(
   branches: EditorMapBranch[],
   lineBranchOverrides: ManualLineBranchOverride[],
@@ -4307,6 +4392,38 @@ export default function UnifiedMapEditor({
     setStationLocationPickMode(false);
   }
 
+  async function syncSelectedStationSavedGeometryAnchors() {
+    if (!selectedStation) return;
+
+    const result = syncSavedGeometryAnchorsForStation(
+      overlays,
+      selectedStation.id,
+      displayStationById,
+    );
+    if (result.changedCount < 1) {
+      showToast("동기화할 저장 선형 anchor가 없습니다", "info");
+      return;
+    }
+
+    const saved = await executeOverlayCommand(
+      "역 선형 anchor 동기화",
+      result.overlays,
+      `${formatStationDisplayName(selectedStation)}의 저장 선형 anchor ${result.changedCount}개를 현재 역 위치로 맞췄습니다`,
+    );
+    if (!saved) return;
+
+    const nextData = await reloadEditorData();
+    const nextStation = nextData?.stations.find(
+      (station) => station.id === selectedStation.id,
+    );
+    if (nextStation) {
+      const nextOverride = nextData?.overlays.stationOverrides.find(
+        (override) => override.stationId === nextStation.id,
+      );
+      setStationDraft(emptyStationOverride(nextStation, nextOverride));
+    }
+  }
+
   async function saveTransferDraft() {
     if (!transferDraft) return;
     const group = toTransferGroup(transferDraft);
@@ -4755,6 +4872,13 @@ export default function UnifiedMapEditor({
   const selectedStationHasPositionOverride = selectedStation
     ? hasStationPositionOverride(selectedStation, selectedStationOverride)
     : false;
+  const selectedStationStaleSavedAnchorCount = selectedStation
+    ? countStaleSavedGeometryAnchorsForStation(
+        overlays,
+        selectedStation.id,
+        displayStationById,
+      )
+    : 0;
   const selectedStationBranches = selectedStation
     ? getBranchesServingStation(data.branches, selectedStation.id)
     : [];
@@ -5152,6 +5276,10 @@ export default function UnifiedMapEditor({
                   void rollbackSelectedStationPosition()
                 }
                 canRollbackPosition={selectedStationHasPositionOverride}
+                staleSavedAnchorCount={selectedStationStaleSavedAnchorCount}
+                onSyncSavedAnchors={() =>
+                  void syncSelectedStationSavedGeometryAnchors()
+                }
                 onSetNonTransfer={(enabled) =>
                   void setStationsNonTransfer([selectedStation.id], enabled)
                 }
@@ -5765,6 +5893,8 @@ function StationInspector({
   onSave,
   onRollbackPosition,
   canRollbackPosition,
+  staleSavedAnchorCount,
+  onSyncSavedAnchors,
   onSetNonTransfer,
   onStartMapPick,
   onFocus,
@@ -5782,6 +5912,8 @@ function StationInspector({
   onSave: () => void;
   onRollbackPosition: () => void;
   canRollbackPosition: boolean;
+  staleSavedAnchorCount: number;
+  onSyncSavedAnchors: () => void;
   onSetNonTransfer: (enabled: boolean) => void;
   onStartMapPick: () => void;
   onFocus: () => void;
@@ -5954,6 +6086,29 @@ function StationInspector({
           }
         />
       </Field>
+      {staleSavedAnchorCount > 0 ? (
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <strong className="font-semibold">저장 선형 anchor 불일치</strong>
+              <p className="mt-1 leading-5 text-orange-800">
+                역 위치 override가 아니라 저장된 선형 보정 안의 역 anchor
+                좌표가 현재 역 위치와 다릅니다. 위치 롤백 대신 anchor
+                동기화를 실행하세요.
+              </p>
+            </div>
+            <Badge>{staleSavedAnchorCount}개</Badge>
+          </div>
+          <Button
+            className="mt-3 w-full"
+            variant="outline"
+            onClick={onSyncSavedAnchors}
+          >
+            <Waypoints className="mr-1 size-4" />
+            저장 선형 anchor 현재 위치로 맞추기
+          </Button>
+        </div>
+      ) : null}
       <div className="grid grid-cols-2 gap-2">
         <Button variant="outline" onClick={onFocus}>
           <LocateFixed className="mr-1 size-4" />
