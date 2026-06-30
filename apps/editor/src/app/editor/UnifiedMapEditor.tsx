@@ -1642,7 +1642,10 @@ function coordinatesEqual(
   right: { lng: number; lat: number } | null | undefined,
 ) {
   if (!left || !right) return false;
-  return Math.abs(left[0] - right.lng) < 0.0000001 && Math.abs(left[1] - right.lat) < 0.0000001;
+  return (
+    Math.abs(left[0] - right.lng) < 0.0000001 &&
+    Math.abs(left[1] - right.lat) < 0.0000001
+  );
 }
 
 function replaceCoordinateIfStationMatch(
@@ -1700,7 +1703,10 @@ function applyStationCoordinateToBranches(
       ...branch,
       routeStops,
       geometryCoordinates: branch.geometryCoordinates?.map((coordinate) =>
-        replaceCoordinateIfStationMatch(coordinate, previousCoordinate, { lng, lat }),
+        replaceCoordinateIfStationMatch(coordinate, previousCoordinate, {
+          lng,
+          lat,
+        }),
       ),
       geometryOverrideCoordinates: branch.geometryOverrideCoordinates?.map(
         (coordinate) =>
@@ -3681,11 +3687,12 @@ export default function UnifiedMapEditor({
         return;
       }
 
-      const stationPositionOverrides = getMovedStationOverridesFromGeometryDraft(
-        geometryDraft,
-        stationById,
-        overlays.stationOverrides,
-      );
+      const stationPositionOverrides =
+        getMovedStationOverridesFromGeometryDraft(
+          geometryDraft,
+          stationById,
+          overlays.stationOverrides,
+        );
       const next: ManualOverlayBundle = {
         ...overlays,
         stationOverrides: mergeStationOverrides(
@@ -4779,7 +4786,7 @@ function GeometryModeInspector({
 
   return (
     <div className="grid gap-3">
-      <div className="rounded-3xl border border-slate-200 bg-white p-3">
+      <div className="rounded-2xl border border-slate-200 bg-white p-3">
         <div className="flex items-center gap-2">
           <span
             className="h-2 w-10 rounded-full"
@@ -4793,7 +4800,7 @@ function GeometryModeInspector({
           {target.subtitle}
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-2xl bg-slate-50 px-2 py-2">
+          <div className="rounded-xl bg-slate-50 px-2 py-1.5">
             <p className="text-[10px] font-semibold text-slate-400">
               역 anchor
             </p>
@@ -4801,13 +4808,13 @@ function GeometryModeInspector({
               {stationAnchorCount}
             </p>
           </div>
-          <div className="rounded-2xl bg-slate-50 px-2 py-2">
+          <div className="rounded-xl bg-slate-50 px-2 py-1.5">
             <p className="text-[10px] font-semibold text-slate-400">보정점</p>
             <p className="mt-1 text-sm font-bold text-slate-700">
               {controlCount}
             </p>
           </div>
-          <div className="rounded-2xl bg-slate-50 px-2 py-2">
+          <div className="rounded-xl bg-slate-50 px-2 py-1.5">
             <p className="text-[10px] font-semibold text-slate-400">대상</p>
             <p className="mt-1 text-sm font-bold text-slate-700">
               {target.type === "branch" ? "일반" : "지선"}
@@ -4848,9 +4855,8 @@ function GeometryModeInspector({
       </div>
 
       {controlCount === 0 ? (
-        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium leading-5 text-slate-500">
-          아직 수동 보정점이 없습니다. 지도에서 대상 선형을 드래그해 필요한
-          구간만 보정하세요.
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium leading-5 text-slate-500">
+          보정점 없음 · 지도에서 선형을 드래그해 필요한 구간만 보정
         </div>
       ) : null}
     </div>
@@ -4865,9 +4871,9 @@ function Placeholder({
   description: string;
 }) {
   return (
-    <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
+    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-center">
       <strong className="text-sm font-semibold text-slate-700">{title}</strong>
-      <p className="mt-2 text-xs font-medium leading-5 text-slate-500">
+      <p className="mt-1 text-[11px] font-medium leading-4 text-slate-500">
         {description}
       </p>
     </div>
@@ -4876,8 +4882,8 @@ function Placeholder({
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <label className="grid gap-1.5">
-      <span className="text-xs font-semibold text-slate-500">{label}</span>
+    <label className="grid gap-1">
+      <span className="text-[11px] font-semibold text-slate-500">{label}</span>
       {children}
     </label>
   );
@@ -5027,8 +5033,8 @@ function StationInspector({
   }, [connectDirection, connectDirectionOptions]);
 
   return (
-    <div className="grid gap-4">
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+    <div className="grid gap-3">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
         <div className="flex items-center gap-2">
           <span
             className="size-3 rounded-full"
@@ -5039,7 +5045,7 @@ function StationInspector({
         <p className="mt-1 text-xs font-medium text-slate-500">
           {formatStationSubLabel(station)}
         </p>
-        <p className="mt-2 break-all text-[11px] font-medium text-slate-400">
+        <p className="mt-1 truncate text-[10px] font-medium text-slate-400">
           {station.id}
         </p>
       </div>
@@ -5100,15 +5106,14 @@ function StationInspector({
         </Button>
       </div>
       {branchRemovalOptions.length > 0 ? (
-        <div className="grid gap-3 rounded-3xl border border-amber-100 bg-amber-50/70 p-3">
-          <div>
+        <div className="grid gap-2 rounded-2xl border border-amber-100 bg-amber-50/70 p-3">
+          <div className="flex items-center justify-between">
             <strong className="text-xs font-semibold text-amber-800">
               특정 노선에서 제거
             </strong>
-            <p className="mt-1 text-[11px] font-medium text-amber-700">
-              선택한 역을 지정한 노선에서만 제외합니다. 제외된 역은 지선 역 추가
-              후보로 사용할 수 있습니다.
-            </p>
+            <span className="text-[10px] font-semibold text-amber-700">
+              제외
+            </span>
           </div>
           <Field label="제거할 노선">
             <select
@@ -5132,15 +5137,14 @@ function StationInspector({
           </Button>
         </div>
       ) : (
-        <div className="grid gap-3 rounded-3xl border border-blue-100 bg-blue-50/70 p-3">
-          <div>
+        <div className="grid gap-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
+          <div className="flex items-center justify-between">
             <strong className="text-xs font-semibold text-blue-800">
-              특정 노선의 지선 역으로 추가
+              지선 역으로 추가
             </strong>
-            <p className="mt-1 text-[11px] font-medium text-blue-700">
-              현재 역은 어느 노선에도 포함되지 않았습니다. 연결할 노선과 기준
-              역을 선택해 지선으로 추가합니다.
-            </p>
+            <span className="text-[10px] font-semibold text-blue-700">
+              미소속 역
+            </span>
           </div>
           <Field label="연결할 노선">
             <select
@@ -5189,15 +5193,14 @@ function StationInspector({
         </div>
       )}
       {endpointConnectOptions.length > 0 ? (
-        <div className="grid gap-3 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-3">
-          <div>
+        <div className="grid gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
+          <div className="flex items-center justify-between">
             <strong className="text-xs font-semibold text-emerald-800">
               이 역에서 노선 결합
             </strong>
-            <p className="mt-1 text-[11px] font-medium text-emerald-700">
-              선택한 역이 노선의 시작/끝 역인 경우, 이 역을 기준으로 다른 노선과
-              지선 결합을 생성합니다.
-            </p>
+            <span className="text-[10px] font-semibold text-emerald-700">
+              시작/끝 역
+            </span>
           </div>
           <Field label="기준 노선">
             <select
@@ -5374,7 +5377,7 @@ function BranchInspector({
 
   return (
     <div className="grid gap-3">
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3">
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
         <span
           className="block h-2 w-14 rounded-full"
           style={{ backgroundColor: branch.colorHex }}
@@ -5386,19 +5389,19 @@ function BranchInspector({
           {branch.sourceLineName} · {branch.role}
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-2xl bg-white px-2 py-2">
+          <div className="rounded-xl bg-white px-2 py-1.5">
             <p className="text-[10px] font-semibold text-slate-400">정차역</p>
             <p className="mt-1 text-sm font-bold text-slate-700">
               {branch.routeStopCount}
             </p>
           </div>
-          <div className="rounded-2xl bg-white px-2 py-2">
+          <div className="rounded-xl bg-white px-2 py-1.5">
             <p className="text-[10px] font-semibold text-slate-400">기점</p>
             <p className="mt-1 truncate text-xs font-bold text-slate-700">
               {branch.origin ?? "-"}
             </p>
           </div>
-          <div className="rounded-2xl bg-white px-2 py-2">
+          <div className="rounded-xl bg-white px-2 py-1.5">
             <p className="text-[10px] font-semibold text-slate-400">종점</p>
             <p className="mt-1 truncate text-xs font-bold text-slate-700">
               {branch.terminal ?? "-"}
@@ -5408,7 +5411,7 @@ function BranchInspector({
       </div>
 
       {branchStationExclusionsForBranch.length > 0 ? (
-        <div className="grid gap-2 rounded-3xl border border-amber-100 bg-amber-50/70 p-3">
+        <div className="grid gap-2 rounded-2xl border border-amber-100 bg-amber-50/70 p-3">
           <div className="flex items-center justify-between">
             <strong className="text-xs font-semibold text-amber-800">
               제거된 역
@@ -5440,7 +5443,7 @@ function BranchInspector({
         </div>
       ) : null}
 
-      <div className="grid gap-2 rounded-3xl border border-slate-200 p-3">
+      <div className="grid gap-2 rounded-2xl border border-slate-200 p-3">
         <div className="flex items-center justify-between">
           <strong className="text-xs font-semibold text-slate-600">
             연결된 지선 오버레이
@@ -5461,7 +5464,7 @@ function BranchInspector({
             return (
               <div
                 key={override.id}
-                className="grid gap-2 rounded-2xl bg-slate-50 p-2"
+                className="grid gap-1.5 rounded-xl bg-slate-50 p-2"
               >
                 <div className="min-w-0">
                   <p className="truncate text-xs font-bold text-slate-700">
