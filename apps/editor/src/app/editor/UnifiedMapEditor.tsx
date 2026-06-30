@@ -75,6 +75,8 @@ type ToolMode = "select" | "box" | "geometry";
 type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
 
+const TRANSFER_GROUP_EXPANDED_ZOOM = 13.8;
+
 type ContextMenuState = {
   x: number;
   y: number;
@@ -118,6 +120,10 @@ type GeometryPointDragState = {
   targetId: string;
   pointIndex: number;
 } | null;
+
+type PendingTransferSelection =
+  | { type: "station"; stationId: string; shouldFocus: boolean }
+  | { type: "multiStation"; ids: string[] };
 
 type GeometryEditTarget = {
   type: GeometryTargetType;
@@ -1807,6 +1813,9 @@ export default function UnifiedMapEditor({
   const selectStationFromMapRef = useRef<(stationId: string) => void>(
     () => undefined,
   );
+  const selectMultipleStationsFromMapRef = useRef<(ids: string[]) => void>(
+    () => undefined,
+  );
   const selectBranchFromMapRef = useRef<(branchId: string) => void>(
     () => undefined,
   );
@@ -1879,6 +1888,8 @@ export default function UnifiedMapEditor({
     null,
   );
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const [pendingTransferSelection, setPendingTransferSelection] =
+    useState<PendingTransferSelection | null>(null);
 
   const stationById = useMemo(
     () => new Map(data.stations.map((station) => [station.id, station])),
@@ -2068,7 +2079,7 @@ export default function UnifiedMapEditor({
     [stationById],
   );
 
-  const selectStation = useCallback(
+  const applyStationSelection = useCallback(
     (stationId: string, shouldFocus = true) => {
       setSelection({ type: "station", id: stationId });
       const station = stationById.get(stationId);
@@ -2076,13 +2087,65 @@ export default function UnifiedMapEditor({
         (override) => override.stationId === stationId,
       );
       if (station) setStationDraft(emptyStationOverride(station, previous));
-      setTransferDraft(null);
       setGeometryDraft(null);
       setStationLocationPickMode(false);
       if (shouldFocus) focusStation(stationId);
     },
     [focusStation, overlays.stationOverrides, stationById],
   );
+
+  const applyMultiStationSelection = useCallback((ids: string[]) => {
+    setSelection({ type: "multiStation", ids });
+    setStationDraft(null);
+    setGeometryDraft(null);
+    setStationLocationPickMode(false);
+  }, []);
+
+  const selectStation = useCallback(
+    (stationId: string, shouldFocus = true) => {
+      if (transferDraft) {
+        setPendingTransferSelection({
+          type: "station",
+          stationId,
+          shouldFocus,
+        });
+        return;
+      }
+      applyStationSelection(stationId, shouldFocus);
+      setTransferDraft(null);
+    },
+    [applyStationSelection, transferDraft],
+  );
+
+  const selectMultipleStations = useCallback(
+    (ids: string[]) => {
+      if (transferDraft) {
+        setPendingTransferSelection({ type: "multiStation", ids });
+        return;
+      }
+      applyMultiStationSelection(ids);
+      setTransferDraft(null);
+    },
+    [applyMultiStationSelection, transferDraft],
+  );
+
+  function keepTransferDraftSelection() {
+    setPendingTransferSelection(null);
+    showToast("기존 환승 그룹 등록 상태를 유지했습니다", "info");
+  }
+
+  function applyPendingSelectionAfterTransferDraftCancel() {
+    const pending = pendingTransferSelection;
+    if (!pending) return;
+    setPendingTransferSelection(null);
+    setTransferDraft(null);
+    setSidebarTab("search");
+    if (pending.type === "station") {
+      applyStationSelection(pending.stationId, pending.shouldFocus);
+      return;
+    }
+    applyMultiStationSelection(pending.ids);
+  }
 
   const selectBranch = useCallback(
     (branchId: string) => {
@@ -2156,6 +2219,10 @@ export default function UnifiedMapEditor({
     selectStationFromMapRef.current = (stationId) =>
       selectStation(stationId, false);
   }, [selectStation]);
+
+  useEffect(() => {
+    selectMultipleStationsFromMapRef.current = selectMultipleStations;
+  }, [selectMultipleStations]);
 
   useEffect(() => {
     selectBranchFromMapRef.current = selectBranch;
@@ -2464,7 +2531,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-area-fill",
         type: "fill",
         source: "railmap-transfer-group-areas",
-        minzoom: 14.5,
+        minzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
         paint: {
           "fill-color": [
             "case",
@@ -2485,7 +2552,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-area-outline",
         type: "line",
         source: "railmap-transfer-group-areas",
-        minzoom: 14.5,
+        minzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
         paint: {
           "line-color": [
             "case",
@@ -2502,7 +2569,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-hit",
         type: "circle",
         source: "railmap-transfer-group-icons",
-        maxzoom: 14.5,
+        maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
         paint: {
           "circle-radius": 22,
           "circle-color": "rgba(0,0,0,0)",
@@ -2514,7 +2581,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-casing",
         type: "circle",
         source: "railmap-transfer-group-icons",
-        maxzoom: 14.5,
+        maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
         paint: {
           "circle-color": "rgba(255,255,255,0)",
           "circle-radius": 0,
@@ -2527,7 +2594,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-icon",
         type: "symbol",
         source: "railmap-transfer-group-icons",
-        maxzoom: 14.5,
+        maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
         layout: {
           "icon-image": "transfer-icon",
           "icon-size": [
@@ -2546,7 +2613,7 @@ export default function UnifiedMapEditor({
         type: "symbol",
         source: "railmap-transfer-group-icons",
         minzoom: 11,
-        maxzoom: 14.5,
+        maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
         layout: {
           "text-field": ["get", "nameKo"],
           "text-size": 11,
@@ -2591,7 +2658,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-            14.5,
+            TRANSFER_GROUP_EXPANDED_ZOOM,
             0.96,
           ],
         },
@@ -2606,7 +2673,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 12],
-            14.5,
+            TRANSFER_GROUP_EXPANDED_ZOOM,
             12,
           ],
           "circle-color": "rgba(0,0,0,0)",
@@ -2657,7 +2724,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 0.92],
-            14.5,
+            TRANSFER_GROUP_EXPANDED_ZOOM,
             0.92,
           ],
         },
@@ -2686,7 +2753,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
-            14.5,
+            TRANSFER_GROUP_EXPANDED_ZOOM,
             1,
           ],
         },
@@ -3152,7 +3219,7 @@ export default function UnifiedMapEditor({
         .filter((id): id is string => Boolean(id));
       const ids = [...new Set(selected)];
       if (ids.length === 1) selectStationFromMapRef.current(ids[0] ?? "");
-      if (ids.length > 1) setSelection({ type: "multiStation", ids });
+      if (ids.length > 1) selectMultipleStationsFromMapRef.current(ids);
       selectionBoxStartRef.current = null;
       setSelectionBox(null);
       map.dragPan.enable();
@@ -3601,7 +3668,7 @@ export default function UnifiedMapEditor({
       return;
     }
     setTransferDraft(makeTransferDraftFromStations(uniqueIds, stationById));
-    setSelection({ type: "multiStation", ids: uniqueIds });
+    applyMultiStationSelection(uniqueIds);
     setSidebarTab("transfers");
   }
 
@@ -4303,6 +4370,28 @@ export default function UnifiedMapEditor({
           </PanelBody>
         </Panel>
       </InspectorGrid>
+
+      <Dialog
+        open={Boolean(pendingTransferSelection)}
+        className="max-w-md overflow-hidden"
+      >
+        <div className="border-b border-slate-200 px-4 py-3">
+          <strong className="block text-sm font-semibold text-slate-950">
+            진행 중인 환승 그룹 등록이 있습니다
+          </strong>
+          <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+            새 역 선택을 적용하면 현재 환승 그룹 등록/수정 화면이 닫힙니다.
+          </p>
+        </div>
+        <div className="grid gap-2 p-3">
+          <Button variant="ghost" onClick={keepTransferDraftSelection}>
+            이어서 하기
+          </Button>
+          <Button onClick={applyPendingSelectionAfterTransferDraftCancel}>
+            새로 선택하기
+          </Button>
+        </div>
+      </Dialog>
 
       <Dialog open={commandOpen} className="flex h-[520px] max-w-xl flex-col">
         <div className="shrink-0 border-b border-slate-200 p-3">
