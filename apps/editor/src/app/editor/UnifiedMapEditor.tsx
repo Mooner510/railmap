@@ -798,10 +798,7 @@ function validateBranchStationExclusions(
   return issues;
 }
 
-function stationGeometryDistance(
-  left: LngLatTuple,
-  right: LngLatTuple,
-) {
+function stationGeometryDistance(left: LngLatTuple, right: LngLatTuple) {
   return getCoordinateDistance(left, right);
 }
 
@@ -810,7 +807,8 @@ function distanceToCoordinatePolyline(
   coordinates: LngLatTuple[],
 ) {
   if (coordinates.length < 1) return Number.POSITIVE_INFINITY;
-  if (coordinates.length === 1) return stationGeometryDistance(point, coordinates[0] ?? point);
+  if (coordinates.length === 1)
+    return stationGeometryDistance(point, coordinates[0] ?? point);
 
   let best = Number.POSITIVE_INFINITY;
   const probe: ManualGeometryOverridePoint = {
@@ -834,7 +832,11 @@ function distanceToCoordinatePolyline(
       lat: endCoordinate[1],
       kind: "control",
     };
-    const distanceSquared = distanceToCoordinateSegmentSquared(probe, start, end);
+    const distanceSquared = distanceToCoordinateSegmentSquared(
+      probe,
+      start,
+      end,
+    );
     if (distanceSquared < best) best = distanceSquared;
   }
 
@@ -854,7 +856,10 @@ function validateSavedGeometryStationAnchors(
       if (point.kind !== "station" || !point.stationId) continue;
       const coordinate = getStationCoordinate(stationById.get(point.stationId));
       if (!coordinate) continue;
-      const distance = stationGeometryDistance(coordinate, [point.lng, point.lat]);
+      const distance = stationGeometryDistance(coordinate, [
+        point.lng,
+        point.lat,
+      ]);
       if (distance <= SAVED_STATION_ANCHOR_TOLERANCE) continue;
       issues.push({
         id: `${override.branchId}:${point.stationId}:stale-anchor`,
@@ -869,7 +874,10 @@ function validateSavedGeometryStationAnchors(
       if (point.kind !== "station" || !point.stationId) continue;
       const coordinate = getStationCoordinate(stationById.get(point.stationId));
       if (!coordinate) continue;
-      const distance = stationGeometryDistance(coordinate, [point.lng, point.lat]);
+      const distance = stationGeometryDistance(coordinate, [
+        point.lng,
+        point.lat,
+      ]);
       if (distance <= SAVED_STATION_ANCHOR_TOLERANCE) continue;
       issues.push({
         id: `${override.id}:${point.stationId}:stale-line-branch-anchor`,
@@ -896,7 +904,8 @@ function validateStationGeometryAlignment(
     for (const stop of branch.routeStops) {
       const station = stop.station;
       const coordinate = getStationCoordinate(station);
-      if (!station || !coordinate || reportedStationIds.has(station.id)) continue;
+      if (!station || !coordinate || reportedStationIds.has(station.id))
+        continue;
       const distance = distanceToCoordinatePolyline(coordinate, coordinates);
       if (distance <= STATION_GEOMETRY_ANCHOR_TOLERANCE) continue;
       reportedStationIds.add(station.id);
@@ -909,7 +918,12 @@ function validateStationGeometryAlignment(
 
   for (const override of lineBranchOverrides) {
     if (override.enabled === false) continue;
-    const coordinates = buildLineBranchCoordinates(override, null, null, stationById);
+    const coordinates = buildLineBranchCoordinates(
+      override,
+      null,
+      null,
+      stationById,
+    );
     if (coordinates.length < 2) continue;
 
     const stationIds = [
@@ -920,9 +934,14 @@ function validateStationGeometryAlignment(
     ].filter((stationId): stationId is string => Boolean(stationId));
 
     for (const stationId of stationIds) {
-      const stationCoordinate = getStationCoordinate(stationById.get(stationId));
+      const stationCoordinate = getStationCoordinate(
+        stationById.get(stationId),
+      );
       if (!stationCoordinate) continue;
-      const distance = distanceToCoordinatePolyline(stationCoordinate, coordinates);
+      const distance = distanceToCoordinatePolyline(
+        stationCoordinate,
+        coordinates,
+      );
       if (distance <= STATION_GEOMETRY_ANCHOR_TOLERANCE) continue;
       issues.push({
         id: `${override.id}:${stationId}:detached-line-branch-station`,
@@ -947,7 +966,11 @@ function validateGeometryConsistency(
       storedLineBranchOverrides,
       stationById,
     ),
-    ...validateStationGeometryAlignment(branches, lineBranchOverrides, stationById),
+    ...validateStationGeometryAlignment(
+      branches,
+      lineBranchOverrides,
+      stationById,
+    ),
   ];
 }
 
@@ -1373,6 +1396,21 @@ function getStationGeometryPoint(
     kind: "station",
     stationId: station.id,
   };
+}
+
+function getGeometryDraftStationAnchorLabels(
+  draft: GeometryDraft | null,
+  stationById: Map<string, EditorStation>,
+) {
+  if (!draft) return [];
+
+  return draft.points
+    .filter(
+      (point): point is ManualGeometryOverridePoint & { stationId: string } =>
+        point.kind === "station" && Boolean(point.stationId),
+    )
+    .map((point) => formatStationDisplayName(stationById.get(point.stationId)))
+    .filter((label, index, labels) => labels.indexOf(label) === index);
 }
 
 function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
@@ -3077,17 +3115,27 @@ export default function UnifiedMapEditor({
           "circle-color": [
             "case",
             ["==", ["get", "kind"], "station"],
-            "#2563eb",
+            "#f59e0b",
             "#64748b",
           ],
           "circle-radius": [
             "case",
             ["==", ["get", "kind"], "station"],
-            4.8,
-            5.5,
+            6.4,
+            5.4,
           ],
-          "circle-stroke-color": "#ffffff",
-          "circle-stroke-width": 2,
+          "circle-stroke-color": [
+            "case",
+            ["==", ["get", "kind"], "station"],
+            "#111827",
+            "#ffffff",
+          ],
+          "circle-stroke-width": [
+            "case",
+            ["==", ["get", "kind"], "station"],
+            2.4,
+            2,
+          ],
           "circle-opacity": 0.98,
         },
       });
@@ -3409,6 +3457,16 @@ export default function UnifiedMapEditor({
       geometryPointDragRef.current = { targetType, targetId, pointIndex };
       map.dragPan.disable();
       map.getCanvas().style.cursor = "grabbing";
+
+      const point = (historyBefore ?? geometryDraftRef.current)?.points[
+        pointIndex
+      ];
+      if (point?.kind === "station") {
+        showToastRef.current(
+          "역 위치 anchor를 이동합니다. 저장하면 역 위치가 변경됩니다.",
+          "info",
+        );
+      }
     };
 
     const handleGeometryMouseDown = (event: maplibregl.MapMouseEvent) => {
@@ -3450,8 +3508,15 @@ export default function UnifiedMapEditor({
           )
             return;
           const target = before.points[pointIndex];
-          if (!target || target.kind === "station" || before.points.length <= 2)
+          if (!target) return;
+          if (target.kind === "station") {
+            showToastRef.current(
+              "역 anchor는 삭제할 수 없습니다. 위치 변경은 드래그로만 처리됩니다.",
+              "info",
+            );
             return;
+          }
+          if (before.points.length <= 2) return;
 
           const after: GeometryDraft = {
             ...before,
@@ -4565,6 +4630,10 @@ export default function UnifiedMapEditor({
   const geometryDraftDirty = geometryDraft
     ? !areGeometryDraftsEqual(geometryDraft, savedGeometryDraft)
     : false;
+  const geometryDraftStationAnchorLabels = getGeometryDraftStationAnchorLabels(
+    geometryDraft,
+    displayStationById,
+  );
   const isGeometryMode = toolMode === "geometry";
   const canUndo = isGeometryMode
     ? geometryHistoryVersion >= 0 && geometryUndoStackRef.current.length > 0
@@ -4900,6 +4969,7 @@ export default function UnifiedMapEditor({
                   isDirty={geometryDraftDirty}
                   canUndo={canUndo}
                   canRedo={canRedo}
+                  stationAnchorLabels={geometryDraftStationAnchorLabels}
                   onSave={() => void saveGeometryDraft()}
                   onReset={resetGeometryDraftToSaved}
                   onUndo={undoGeometryDraftEdit}
@@ -5293,6 +5363,10 @@ function GeometryModeSidebar({
               <span>보정점 제거</span>
               <kbd>Cmd/Ctrl+Click</kbd>
             </div>
+            <div className="flex justify-between gap-3">
+              <span>역 위치 변경</span>
+              <kbd>주황점 Drag</kbd>
+            </div>
           </div>
         ) : null}
       </div>
@@ -5306,6 +5380,7 @@ function GeometryModeInspector({
   isDirty,
   canUndo,
   canRedo,
+  stationAnchorLabels,
   onSave,
   onReset,
   onUndo,
@@ -5317,6 +5392,7 @@ function GeometryModeInspector({
   isDirty: boolean;
   canUndo: boolean;
   canRedo: boolean;
+  stationAnchorLabels: string[];
   onSave: () => void;
   onReset: () => void;
   onUndo: () => void;
@@ -5377,6 +5453,35 @@ function GeometryModeInspector({
               {target.type === "branch" ? "일반" : "지선"}
             </p>
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-medium leading-5 text-amber-800">
+        <div className="flex items-center gap-2 font-bold">
+          <MapPin className="size-4" />역 anchor는 역 위치입니다
+        </div>
+        <p className="mt-1">
+          주황색 정점을 드래그하면 선형 보정이 아니라 역 위치 override가 함께
+          저장됩니다. 회색 정점만 수동 선형 보정점입니다.
+        </p>
+        {stationAnchorLabels.length > 0 ? (
+          <p className="mt-1 truncate text-[11px] text-amber-700">
+            대상 역: {stationAnchorLabels.slice(0, 4).join(", ")}
+            {stationAnchorLabels.length > 4
+              ? ` 외 ${stationAnchorLabels.length - 4}개`
+              : ""}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-[11px] font-semibold">
+        <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-white px-3 py-2 text-amber-700">
+          <span className="size-3 rounded-full border-2 border-slate-900 bg-amber-500" />
+          역 위치 anchor
+        </div>
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-slate-600">
+          <span className="size-3 rounded-full border-2 border-white bg-slate-500 shadow" />
+          수동 보정점
         </div>
       </div>
 
