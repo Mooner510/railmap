@@ -42,6 +42,8 @@ export interface RailMapBranch {
   }>;
 }
 
+type RailMapLineBranchDirection = "toward-start" | "toward-end";
+
 export interface RailMapLineBranchGeometryPoint {
   lng: number;
   lat: number;
@@ -57,6 +59,7 @@ export interface RailMapLineBranchOverride {
   branchStationId?: string;
   connectedBranchId?: string;
   connectedEndpointStationId?: string;
+  connectedDirection?: RailMapLineBranchDirection;
   geometry?: RailMapLineBranchGeometryPoint[];
   enabled: boolean;
 }
@@ -171,38 +174,28 @@ function buildAddStationLineBranchCoordinates(
   return smoothCoordinateRange(context, anchorIndex, context.length - 1);
 }
 
-function orientParentBranchCoordinatesToStation(
+function getParentBranchCoordinatesToStation(
   branch: RailMapBranch,
   stationId: string,
 ) {
   const points = getBranchStopCoordinatePoints(branch);
-  if (points.length === 0) return [];
-
   const index = points.findIndex((point) => point.stationId === stationId);
   if (index < 0) return [];
 
-  const coordinates = points.map((point) => point.coordinate);
-  const fromStart = coordinates.slice(0, index + 1);
-  const fromEnd = coordinates.slice(index).reverse();
-
-  return fromStart.length >= fromEnd.length ? fromStart : fromEnd;
+  return points.slice(0, index + 1).map((point) => point.coordinate);
 }
 
-function orientConnectedBranchCoordinatesFromStation(
+function getConnectedBranchTangentCoordinate(
   branch: RailMapBranch,
   stationId: string,
+  direction: RailMapLineBranchDirection,
 ) {
   const points = getBranchStopCoordinatePoints(branch);
-  if (points.length === 0) return [];
-
   const index = points.findIndex((point) => point.stationId === stationId);
-  if (index < 0) return [];
+  if (index < 0) return null;
 
-  const coordinates = points.map((point) => point.coordinate);
-  const towardEnd = coordinates.slice(index);
-  const towardStart = coordinates.slice(0, index + 1).reverse();
-
-  return towardEnd.length >= 2 ? towardEnd : towardStart;
+  const nextIndex = direction === "toward-start" ? index - 1 : index + 1;
+  return points[nextIndex]?.coordinate ?? null;
 }
 
 function buildConnectLineBranchCoordinates(
@@ -212,18 +205,28 @@ function buildConnectLineBranchCoordinates(
 ) {
   if (!parentBranch || !connectedBranch || !override.connectedEndpointStationId) return [];
 
-  const parentCoordinates = orientParentBranchCoordinatesToStation(
+  const parentCoordinates = getParentBranchCoordinatesToStation(
     parentBranch,
     override.anchorStationId,
   );
-  const connectedCoordinates = orientConnectedBranchCoordinatesFromStation(
+
+  const target = getBranchStopCoordinatePoints(connectedBranch).find(
+    (point) => point.stationId === override.connectedEndpointStationId,
+  );
+  if (parentCoordinates.length < 1 || !target) return [];
+
+  const direction = override.connectedDirection ?? "toward-end";
+  const tangent = getConnectedBranchTangentCoordinate(
     connectedBranch,
     override.connectedEndpointStationId,
+    direction,
   );
 
-  if (parentCoordinates.length < 1 || connectedCoordinates.length < 1) return [];
+  const context = tangent
+    ? [...parentCoordinates, target.coordinate, tangent]
+    : [...parentCoordinates, target.coordinate];
 
-  return smoothCoordinates([...parentCoordinates, ...connectedCoordinates]);
+  return smoothCoordinateRange(context, 0, parentCoordinates.length);
 }
 
 function buildLineBranchCoordinates(
@@ -1271,7 +1274,7 @@ export default function RailMap({
             maxzoom: 14.5,
             layout: {
               "icon-image": "transfer-icon",
-              "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.18, 0.16],
+              "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.085, 0.075],
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
             },

@@ -108,6 +108,13 @@ type LineBranchValidationIssue = {
   message: string;
 };
 
+type LineBranchDirection = "toward-start" | "toward-end";
+
+type LineBranchDirectionOption = {
+  value: LineBranchDirection;
+  label: string;
+};
+
 const defaultLayers = {
   stations: true,
   lines: true,
@@ -665,10 +672,13 @@ function getLineBranchDisplay(
 
   const connectedBranch = override.connectedBranchId ? branchById.get(override.connectedBranchId) ?? null : null;
   const connectedStation = override.connectedEndpointStationId ? stationById.get(override.connectedEndpointStationId) ?? null : null;
+  const directionLabel = getBranchDirectionOptions(connectedBranch, override.connectedEndpointStationId ?? "").find(
+    (option) => option.value === (override.connectedDirection ?? "toward-end"),
+  )?.label;
 
   return {
     title: "지선 노선 결합",
-    summary: `${formatBranchDisplayName(parentBranch)} · ${formatStationDisplayName(anchorStation)} ↔ ${formatBranchDisplayName(connectedBranch)} · ${formatStationDisplayName(connectedStation)}`,
+    summary: `${formatBranchDisplayName(parentBranch)} · ${formatStationDisplayName(anchorStation)} ↔ ${formatBranchDisplayName(connectedBranch)} · ${formatStationDisplayName(connectedStation)}${directionLabel ? ` · ${directionLabel}` : ""}`,
     detail: "선택한 노선의 특정 역과 다른 노선의 특정 역을 연결합니다.",
   };
 }
@@ -725,38 +735,58 @@ function buildAddStationLineBranchCoordinates(
   return smoothCoordinateRange(context, anchorIndex, context.length - 1);
 }
 
-function orientParentBranchCoordinatesToStation(
+function getParentBranchCoordinatesToStation(
   branch: EditorMapBranch,
   stationId: string,
 ) {
   const points = getBranchStopCoordinatePoints(branch);
-  if (points.length === 0) return [];
-
   const index = points.findIndex((point) => point.stationId === stationId);
   if (index < 0) return [];
 
-  const coordinates = points.map((point) => point.coordinate);
-  const fromStart = coordinates.slice(0, index + 1);
-  const fromEnd = coordinates.slice(index).reverse();
-
-  return fromStart.length >= fromEnd.length ? fromStart : fromEnd;
+  return points.slice(0, index + 1).map((point) => point.coordinate);
 }
 
-function orientConnectedBranchCoordinatesFromStation(
-  branch: EditorMapBranch,
-  stationId: string,
-) {
-  const points = getBranchStopCoordinatePoints(branch);
-  if (points.length === 0) return [];
+function getBranchDirectionOptions(branch: EditorMapBranch | null, stationId: string): LineBranchDirectionOption[] {
+  if (!branch || !stationId) return [];
 
-  const index = points.findIndex((point) => point.stationId === stationId);
+  const stations = getBranchStopStations(branch);
+  const index = stations.findIndex((station) => station.id === stationId);
   if (index < 0) return [];
 
-  const coordinates = points.map((point) => point.coordinate);
-  const towardEnd = coordinates.slice(index);
-  const towardStart = coordinates.slice(0, index + 1).reverse();
+  const options: LineBranchDirectionOption[] = [];
+  const start = stations[0];
+  const end = stations.at(-1);
+  const previous = stations[index - 1];
+  const next = stations[index + 1];
 
-  return towardEnd.length >= 2 ? towardEnd : towardStart;
+  if (next && end) {
+    options.push({
+      value: "toward-end",
+      label: `${end.nameKo}행 (${next.nameKo} 방향)`,
+    });
+  }
+
+  if (previous && start) {
+    options.push({
+      value: "toward-start",
+      label: `${start.nameKo}행 (${previous.nameKo} 방향)`,
+    });
+  }
+
+  return options;
+}
+
+function getConnectedBranchTangentCoordinate(
+  branch: EditorMapBranch,
+  stationId: string,
+  direction: LineBranchDirection,
+) {
+  const points = getBranchStopCoordinatePoints(branch);
+  const index = points.findIndex((point) => point.stationId === stationId);
+  if (index < 0) return null;
+
+  const nextIndex = direction === "toward-start" ? index - 1 : index + 1;
+  return points[nextIndex]?.coordinate ?? null;
 }
 
 function buildConnectLineBranchCoordinates(
@@ -766,18 +796,28 @@ function buildConnectLineBranchCoordinates(
 ) {
   if (!parentBranch || !connectedBranch || !override.connectedEndpointStationId) return [];
 
-  const parentCoordinates = orientParentBranchCoordinatesToStation(
+  const parentCoordinates = getParentBranchCoordinatesToStation(
     parentBranch,
     override.anchorStationId,
   );
-  const connectedCoordinates = orientConnectedBranchCoordinatesFromStation(
+
+  const target = getBranchStopCoordinatePoints(connectedBranch).find(
+    (point) => point.stationId === override.connectedEndpointStationId,
+  );
+  if (parentCoordinates.length < 1 || !target) return [];
+
+  const direction = override.connectedDirection ?? "toward-end";
+  const tangent = getConnectedBranchTangentCoordinate(
     connectedBranch,
     override.connectedEndpointStationId,
+    direction,
   );
 
-  if (parentCoordinates.length < 1 || connectedCoordinates.length < 1) return [];
+  const context = tangent
+    ? [...parentCoordinates, target.coordinate, tangent]
+    : [...parentCoordinates, target.coordinate];
 
-  return smoothCoordinates([...parentCoordinates, ...connectedCoordinates]);
+  return smoothCoordinateRange(context, 0, parentCoordinates.length);
 }
 
 function buildLineBranchCoordinates(
@@ -1601,7 +1641,7 @@ export default function UnifiedMapEditor({
         maxzoom: 14.5,
         layout: {
           "icon-image": "transfer-icon",
-          "icon-size": ["case", ["==", ["get", "selected"], true], 0.18, 0.16],
+          "icon-size": ["case", ["==", ["get", "selected"], true], 0.085, 0.075],
           "icon-allow-overlap": true,
           "icon-ignore-placement": true,
         },
@@ -2359,7 +2399,7 @@ export default function UnifiedMapEditor({
     setSidebarTab("validation");
   }
 
-  async function createConnectLineBranch(parentBranchId: string, anchorStationId: string, connectedBranchId: string, connectedEndpointStationId: string) {
+  async function createConnectLineBranch(parentBranchId: string, anchorStationId: string, connectedBranchId: string, connectedEndpointStationId: string, connectedDirection: LineBranchDirection) {
     const parentBranch = branchById.get(parentBranchId);
     const connectedBranch = branchById.get(connectedBranchId);
     const anchorStation = stationById.get(anchorStationId);
@@ -2387,12 +2427,13 @@ export default function UnifiedMapEditor({
     }
 
     const override: ManualLineBranchOverride = {
-      id: makeLineBranchOverrideId("connect-line", parentBranchId, anchorStationId, `${connectedBranchId}:${connectedEndpointStationId}`),
+      id: makeLineBranchOverrideId("connect-line", parentBranchId, anchorStationId, `${connectedBranchId}:${connectedEndpointStationId}:${connectedDirection}`),
       mode: "connect-line",
       parentBranchId,
       anchorStationId,
       connectedBranchId,
       connectedEndpointStationId,
+      connectedDirection,
       geometry: makeLineBranchGeometry(anchorStation, connectedEndpointStation),
       enabled: true,
       source: "editor",
@@ -2776,12 +2817,14 @@ export default function UnifiedMapEditor({
                   anchorStationId,
                   connectedBranchId,
                   connectedEndpointStationId,
+                  connectedDirection,
                 ) =>
                   void createConnectLineBranch(
                     selectedBranch.id,
                     anchorStationId,
                     connectedBranchId,
                     connectedEndpointStationId,
+                    connectedDirection,
                   )
                 }
                 onDeleteLineBranch={(id) => void deleteLineBranchOverride(id)}
@@ -3104,6 +3147,7 @@ function BranchInspector({
     anchorStationId: string,
     connectedBranchId: string,
     connectedEndpointStationId: string,
+    connectedDirection: LineBranchDirection,
   ) => void;
   onDeleteLineBranch: (id: string) => void;
 }) {
@@ -3137,6 +3181,8 @@ function BranchInspector({
   const [connectEndpointStationId, setConnectEndpointStationId] = useState(
     connectEndpointStations[0]?.id ?? "",
   );
+  const [connectDirection, setConnectDirection] = useState<LineBranchDirection>("toward-end");
+  const connectDirectionOptions = getBranchDirectionOptions(selectedConnectBranch, connectEndpointStationId);
 
   useEffect(() => {
     if (!branchStations.some((station) => station.id === addAnchorStationId))
@@ -3166,6 +3212,11 @@ function BranchInspector({
     )
       setConnectEndpointStationId(connectEndpointStations[0]?.id ?? "");
   }, [connectEndpointStationId, connectEndpointStations]);
+
+  useEffect(() => {
+    if (!connectDirectionOptions.some((option) => option.value === connectDirection))
+      setConnectDirection(connectDirectionOptions[0]?.value ?? "toward-end");
+  }, [connectDirection, connectDirectionOptions]);
 
   function updatePoint(
     index: number,
@@ -3320,17 +3371,37 @@ function BranchInspector({
             ))}
           </select>
         </Field>
+        <Field label="연결 방향">
+          <select
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+            value={connectDirection}
+            onChange={(event) => setConnectDirection(event.target.value as LineBranchDirection)}
+            disabled={connectDirectionOptions.length === 0}
+          >
+            {connectDirectionOptions.length === 0 ? (
+              <option value="toward-end">선택 가능한 방향 없음</option>
+            ) : (
+              connectDirectionOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))
+            )}
+          </select>
+        </Field>
         <Button
           disabled={
             !connectAnchorStationId ||
             !connectBranchId ||
-            !connectEndpointStationId
+            !connectEndpointStationId ||
+            connectDirectionOptions.length === 0
           }
           onClick={() =>
             onCreateConnectLine(
               connectAnchorStationId,
               connectBranchId,
               connectEndpointStationId,
+              connectDirection,
             )
           }
         >

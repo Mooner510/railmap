@@ -77,6 +77,7 @@ export interface ManualBranchOverride {
 }
 
 export type ManualLineBranchMode = "add-station" | "connect-line";
+export type ManualLineBranchDirection = "toward-start" | "toward-end";
 
 export interface ManualLineBranchGeometryPoint {
   lng: number;
@@ -93,6 +94,7 @@ export interface ManualLineBranchOverride {
   branchStationId?: string;
   connectedBranchId?: string;
   connectedEndpointStationId?: string;
+  connectedDirection?: ManualLineBranchDirection;
   geometry?: ManualLineBranchGeometryPoint[];
   enabled: boolean;
   source?: "manual" | "editor" | string;
