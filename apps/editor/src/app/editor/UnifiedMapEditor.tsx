@@ -1723,6 +1723,196 @@ function applyStationCoordinateToBranches(
   });
 }
 
+function applyStationCoordinateToStations(
+  stations: EditorStation[],
+  stationId: string,
+  lng: number,
+  lat: number,
+): EditorStation[] {
+  return stations.map((station) =>
+    station.id === stationId
+      ? {
+          ...station,
+          lng,
+          lat,
+        }
+      : station,
+  );
+}
+
+function applyStationOverridesToStations(
+  stations: EditorStation[],
+  overrides: ManualStationOverride[],
+): EditorStation[] {
+  return overrides.reduce((current, override) => {
+    const lng = override.lng;
+    const lat = override.lat;
+    if (override.enabled === false) return current;
+    if (typeof lng !== "number" || typeof lat !== "number") return current;
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return current;
+    return applyStationCoordinateToStations(
+      current,
+      override.stationId,
+      lng,
+      lat,
+    );
+  }, stations);
+}
+
+function applyStationOverridesToBranches(
+  branches: EditorMapBranch[],
+  overrides: ManualStationOverride[],
+): EditorMapBranch[] {
+  return overrides.reduce((current, override) => {
+    const lng = override.lng;
+    const lat = override.lat;
+    if (override.enabled === false) return current;
+    if (typeof lng !== "number" || typeof lat !== "number") return current;
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return current;
+
+    return current.map((branch) => {
+      const hasStation = branch.routeStops.some(
+        (stop) => stop.station?.id === override.stationId,
+      );
+      if (!hasStation) return branch;
+
+      const updated = applyStationCoordinateToBranches(
+        [branch],
+        override.stationId,
+        lng,
+        lat,
+      )[0];
+      if (!updated) return branch;
+
+      const hasSavedGeometry = Boolean(
+        updated.geometryOverrideCoordinates &&
+        updated.geometryOverrideCoordinates.length >= 2,
+      );
+      if (hasSavedGeometry) return updated;
+
+      // When a station position override exists, stale generated line coordinates can
+      // leave the station detached from its branch. In the editor preview, rebuild the
+      // default branch path from current route-stop anchors so the line always passes
+      // through the edited station.
+      const routeStopCoordinates = updated.routeStops
+        .map((stop) => getStationCoordinate(stop.station))
+        .filter((coordinate): coordinate is LngLatTuple => coordinate !== null);
+
+      return routeStopCoordinates.length >= 2
+        ? {
+            ...updated,
+            geometryCoordinates: routeStopCoordinates,
+          }
+        : updated;
+    });
+  }, branches);
+}
+
+function applyGeometryDraftStationPointsToStations(
+  stations: EditorStation[],
+  draft: GeometryDraft | null,
+): EditorStation[] {
+  if (!draft) return stations;
+
+  return draft.points.reduce((current, point) => {
+    if (point.kind !== "station" || !point.stationId) return current;
+    if (!Number.isFinite(point.lng) || !Number.isFinite(point.lat))
+      return current;
+    return applyStationCoordinateToStations(
+      current,
+      point.stationId,
+      point.lng,
+      point.lat,
+    );
+  }, stations);
+}
+
+function applyGeometryDraftStationPointsToBranches(
+  branches: EditorMapBranch[],
+  draft: GeometryDraft | null,
+): EditorMapBranch[] {
+  if (!draft) return branches;
+
+  return draft.points.reduce((current, point) => {
+    if (point.kind !== "station" || !point.stationId) return current;
+    if (!Number.isFinite(point.lng) || !Number.isFinite(point.lat))
+      return current;
+    return applyStationCoordinateToBranches(
+      current,
+      point.stationId,
+      point.lng,
+      point.lat,
+    );
+  }, branches);
+}
+
+function resolveGeometryPointStationAnchors(
+  points: ManualGeometryOverridePoint[],
+  stationById: Map<string, EditorStation>,
+): ManualGeometryOverridePoint[] {
+  return points.map((point) => {
+    if (point.kind !== "station" || !point.stationId) return point;
+    const coordinate = getStationCoordinate(stationById.get(point.stationId));
+    if (!coordinate) return point;
+    return {
+      ...point,
+      lng: coordinate[0],
+      lat: coordinate[1],
+    };
+  });
+}
+
+function applySavedGeometryOverridesToBranches(
+  branches: EditorMapBranch[],
+  overrides: ManualGeometryOverride[],
+  stationById: Map<string, EditorStation>,
+): EditorMapBranch[] {
+  if (overrides.length < 1) return branches;
+  const overrideByBranchId = new Map(
+    overrides
+      .filter(
+        (override) => override.enabled !== false && override.points.length >= 2,
+      )
+      .map((override) => [override.branchId, override]),
+  );
+
+  return branches.map((branch) => {
+    const override = overrideByBranchId.get(branch.id);
+    if (!override) return branch;
+    const coordinates = resolveGeometryPointStationAnchors(
+      override.points,
+      stationById,
+    )
+      .filter(
+        (point) => Number.isFinite(point.lng) && Number.isFinite(point.lat),
+      )
+      .map((point) => [point.lng, point.lat] as LngLatTuple);
+    if (coordinates.length < 2) return branch;
+    return {
+      ...branch,
+      geometryOverrideCoordinates: coordinates,
+      geometryCoordinates: coordinates,
+    };
+  });
+}
+
+function applyDisplayStationAnchorsToLineBranchOverrides(
+  overrides: ManualLineBranchOverride[],
+  stationById: Map<string, EditorStation>,
+): ManualLineBranchOverride[] {
+  return overrides.map((override) =>
+    override.geometry?.length
+      ? {
+          ...override,
+          geometry: resolveGeometryPointStationAnchors(
+            override.geometry,
+            stationById,
+          ),
+        }
+      : override,
+  );
+}
+
 function applyStationDraftToBranches(
   branches: EditorMapBranch[],
   draft: ManualStationOverride | null,
@@ -2043,30 +2233,75 @@ export default function UnifiedMapEditor({
     () => new Map(data.stations.map((station) => [station.id, station])),
     [data.stations],
   );
+  const displayStations = useMemo(
+    () =>
+      applyGeometryDraftStationPointsToStations(
+        applyStationOverridesToStations(
+          data.stations,
+          overlays.stationOverrides,
+        ),
+        toolMode === "geometry" ? geometryDraft : null,
+      ),
+    [data.stations, geometryDraft, overlays.stationOverrides, toolMode],
+  );
+  const displayStationById = useMemo(
+    () => new Map(displayStations.map((station) => [station.id, station])),
+    [displayStations],
+  );
   const branchById = useMemo(
     () => new Map(data.branches.map((branch) => [branch.id, branch])),
     [data.branches],
   );
 
   useEffect(() => {
-    stationByIdRef.current = stationById;
-  }, [stationById]);
+    stationByIdRef.current = displayStationById;
+  }, [displayStationById]);
 
-  const displayBranches = useMemo(
-    () =>
-      applyGeometryDraftToBranches(
-        applyStationDraftToBranches(data.branches, stationDraft),
-        toolMode === "geometry" ? geometryDraft : null,
-      ),
-    [data.branches, geometryDraft, stationDraft, toolMode],
-  );
+  const displayBranches = useMemo(() => {
+    const branchesWithStationOverrides = applyStationOverridesToBranches(
+      data.branches,
+      overlays.stationOverrides,
+    );
+    const branchesWithSavedGeometry = applySavedGeometryOverridesToBranches(
+      branchesWithStationOverrides,
+      overlays.geometryOverrides,
+      displayStationById,
+    );
+    const branchesWithStationDraft = applyStationDraftToBranches(
+      branchesWithSavedGeometry,
+      stationDraft,
+    );
+    const branchesWithGeometryStationPreview =
+      toolMode === "geometry"
+        ? applyGeometryDraftStationPointsToBranches(
+            branchesWithStationDraft,
+            geometryDraft,
+          )
+        : branchesWithStationDraft;
+
+    return applyGeometryDraftToBranches(
+      branchesWithGeometryStationPreview,
+      toolMode === "geometry" ? geometryDraft : null,
+    );
+  }, [
+    data.branches,
+    displayStationById,
+    geometryDraft,
+    overlays.geometryOverrides,
+    overlays.stationOverrides,
+    stationDraft,
+    toolMode,
+  ]);
   const displayLineBranchOverrides = useMemo(
     () =>
-      applyGeometryDraftToLineBranchOverrides(
-        overlays.lineBranchOverrides ?? [],
-        toolMode === "geometry" ? geometryDraft : null,
+      applyDisplayStationAnchorsToLineBranchOverrides(
+        applyGeometryDraftToLineBranchOverrides(
+          overlays.lineBranchOverrides ?? [],
+          toolMode === "geometry" ? geometryDraft : null,
+        ),
+        displayStationById,
       ),
-    [geometryDraft, overlays.lineBranchOverrides, toolMode],
+    [displayStationById, geometryDraft, overlays.lineBranchOverrides, toolMode],
   );
   const geometryEditPointFeatures = useMemo(
     () =>
@@ -2082,7 +2317,10 @@ export default function UnifiedMapEditor({
   );
   const geometryTargets = useMemo<GeometryEditTarget[]>(() => {
     const geometryOverrideByBranchId = new Map(
-      overlays.geometryOverrides.map((override) => [override.branchId, override]),
+      overlays.geometryOverrides.map((override) => [
+        override.branchId,
+        override,
+      ]),
     );
     const branchTargets: GeometryEditTarget[] = data.branches.map((branch) => {
       const savedGeometry = geometryOverrideByBranchId.get(branch.id);
@@ -2130,13 +2368,16 @@ export default function UnifiedMapEditor({
     data.branches,
     overlays.geometryOverrides,
     overlays.lineBranchOverrides,
-    stationById,
+    displayStationById,
   ]);
   const filteredGeometryTargets = useMemo(() => {
     const normalizedQuery = normalizeSearchText(geometryTargetQuery);
 
     return geometryTargets.filter((target) => {
-      if (geometryTargetFilter !== "all" && target.kind !== geometryTargetFilter) {
+      if (
+        geometryTargetFilter !== "all" &&
+        target.kind !== geometryTargetFilter
+      ) {
         return false;
       }
 
@@ -2959,6 +3200,13 @@ export default function UnifiedMapEditor({
         if (map.getLayer(layerId)) map.moveLayer(layerId);
       }
 
+      for (const layerId of [
+        "railmap-geometry-points",
+        "railmap-geometry-points-hit",
+      ]) {
+        if (map.getLayer(layerId)) map.moveLayer(layerId);
+      }
+
       window.requestAnimationFrame(() => setMapLoaded(true));
     });
 
@@ -3432,7 +3680,7 @@ export default function UnifiedMapEditor({
     const idleId = scheduleIdle(() => {
       void (async () => {
         const features = await buildStationFeaturesChunked(
-          data.stations,
+          displayStations,
           selectedStationIds,
           nonTransferIds,
           stationTransferGroupIndex,
@@ -3452,8 +3700,8 @@ export default function UnifiedMapEditor({
       cancelIdle(idleId);
     };
   }, [
-    data.stations,
     dataLoading,
+    displayStations,
     layers.nonTransfer,
     layers.stations,
     mapLoaded,
@@ -3503,7 +3751,7 @@ export default function UnifiedMapEditor({
         const features = await buildLineBranchFeaturesChunked(
           displayLineBranchOverrides,
           branchById,
-          stationById,
+          displayStationById,
           layers.lines,
           () => cancelled,
         );
@@ -3524,7 +3772,7 @@ export default function UnifiedMapEditor({
     layers.lines,
     mapLoaded,
     displayLineBranchOverrides,
-    stationById,
+    displayStationById,
   ]);
 
   useEffect(() => {
@@ -3536,13 +3784,13 @@ export default function UnifiedMapEditor({
         const [areaFeatures, iconFeatures] = await Promise.all([
           buildTransferGroupAreaFeaturesChunked(
             overlays.manualTransferGroups,
-            stationById,
+            displayStationById,
             selectedTransferGroupId,
             () => cancelled,
           ),
           buildTransferGroupIconFeaturesChunked(
             overlays.manualTransferGroups,
-            stationById,
+            displayStationById,
             selectedTransferGroupId,
             () => cancelled,
           ),
@@ -3568,7 +3816,7 @@ export default function UnifiedMapEditor({
     mapLoaded,
     overlays.manualTransferGroups,
     selectedTransferGroupId,
-    stationById,
+    displayStationById,
   ]);
 
   useEffect(() => {
@@ -3757,22 +4005,19 @@ export default function UnifiedMapEditor({
       if (!saved) return;
       clearGeometryDraftHistory();
 
-      setData((previous) => ({
-        ...previous,
-        branches: previous.branches.map((branch) =>
-          branch.id === override.branchId
-            ? {
-                ...branch,
-                geometryOverrideCoordinates: override.points.map(
-                  (point) => [point.lng, point.lat] as [number, number],
-                ),
-                geometryCoordinates: override.points.map(
-                  (point) => [point.lng, point.lat] as [number, number],
-                ),
-              }
-            : branch,
-        ),
-      }));
+      const nextData = await reloadEditorData();
+      const savedBranch = nextData?.branches.find(
+        (branch) => branch.id === override.branchId,
+      );
+      const savedOverride =
+        nextData?.overlays.geometryOverrides.find(
+          (candidate) => candidate.branchId === override.branchId,
+        ) ?? override;
+      setGeometryDraft(
+        savedBranch
+          ? makeGeometryDraftFromBranch(savedBranch, savedOverride)
+          : null,
+      );
       return;
     }
 
@@ -3815,12 +4060,26 @@ export default function UnifiedMapEditor({
     if (!saved) return;
     clearGeometryDraftHistory();
 
-    const savedOverride = next.lineBranchOverrides.find(
-      (override) => override.id === geometryDraft.targetId,
+    const nextData = await reloadEditorData();
+    const nextStationById = new Map(
+      (nextData?.stations ?? data.stations).map((station) => [
+        station.id,
+        station,
+      ]),
     );
+    const savedOverride =
+      nextData?.overlays.lineBranchOverrides.find(
+        (override) => override.id === geometryDraft.targetId,
+      ) ??
+      next.lineBranchOverrides.find(
+        (override) => override.id === geometryDraft.targetId,
+      );
     setGeometryDraft(
       savedOverride
-        ? makeGeometryDraftFromLineBranchOverride(savedOverride, stationById)
+        ? makeGeometryDraftFromLineBranchOverride(
+            savedOverride,
+            nextStationById,
+          )
         : null,
     );
   }
@@ -4241,7 +4500,9 @@ export default function UnifiedMapEditor({
                 totalTargetCount={geometryTargets.length}
                 activeTargetKey={getGeometryDraftTargetKey(geometryDraft)}
                 dirtyTargetKey={
-                  geometryDraftDirty ? getGeometryDraftTargetKey(geometryDraft) : null
+                  geometryDraftDirty
+                    ? getGeometryDraftTargetKey(geometryDraft)
+                    : null
                 }
                 query={geometryTargetQuery}
                 filter={geometryTargetFilter}
@@ -4731,7 +4992,8 @@ function GeometryModeSidebar({
           선형 편집 대상
         </strong>
         <span className="text-[11px] font-semibold text-slate-400">
-          {targets.length.toLocaleString("ko-KR")} / {totalTargetCount.toLocaleString("ko-KR")}
+          {targets.length.toLocaleString("ko-KR")} /{" "}
+          {totalTargetCount.toLocaleString("ko-KR")}
         </span>
       </div>
       <div className="relative px-1">
@@ -4819,7 +5081,9 @@ function GeometryModeSidebar({
                   <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-400">
                     <span className="truncate">{target.meta}</span>
                     {target.hasSavedGeometry ? (
-                      <span className="shrink-0">{target.savedPointCount}점</span>
+                      <span className="shrink-0">
+                        {target.savedPointCount}점
+                      </span>
                     ) : null}
                   </div>
                 </button>
