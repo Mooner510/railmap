@@ -135,6 +135,8 @@ type GeometryEditTarget = {
   colorHex: string;
   meta: string;
   kind: GeometryTargetFilter;
+  hasSavedGeometry: boolean;
+  savedPointCount: number;
 };
 
 type LineBranchValidationIssue = {
@@ -2079,16 +2081,25 @@ export default function UnifiedMapEditor({
     [data.branches, overlays, stationById],
   );
   const geometryTargets = useMemo<GeometryEditTarget[]>(() => {
-    const branchTargets: GeometryEditTarget[] = data.branches.map((branch) => ({
-      type: "branch",
-      id: branch.id,
-      branchId: branch.id,
-      title: branch.canonicalLineNameKo,
-      subtitle: branch.sourceLineName,
-      colorHex: branch.colorHex ?? "#64748b",
-      meta: `${branch.routeStopCount.toLocaleString("ko-KR")} stops`,
-      kind: "branch",
-    }));
+    const geometryOverrideByBranchId = new Map(
+      overlays.geometryOverrides.map((override) => [override.branchId, override]),
+    );
+    const branchTargets: GeometryEditTarget[] = data.branches.map((branch) => {
+      const savedGeometry = geometryOverrideByBranchId.get(branch.id);
+      const savedPointCount = savedGeometry?.points.length ?? 0;
+      return {
+        type: "branch",
+        id: branch.id,
+        branchId: branch.id,
+        title: branch.canonicalLineNameKo,
+        subtitle: branch.sourceLineName,
+        colorHex: branch.colorHex ?? "#64748b",
+        meta: `${branch.routeStopCount.toLocaleString("ko-KR")} stops`,
+        kind: "branch",
+        hasSavedGeometry: savedPointCount >= 2,
+        savedPointCount,
+      };
+    });
 
     const lineBranchTargets: GeometryEditTarget[] = (
       overlays.lineBranchOverrides ?? []
@@ -2097,6 +2108,7 @@ export default function UnifiedMapEditor({
       .map((override) => {
         const parentBranch = branchById.get(override.parentBranchId) ?? null;
         const display = getLineBranchDisplay(override, branchById, stationById);
+        const savedPointCount = override.geometry?.length ?? 0;
         return {
           type: "lineBranch",
           id: override.id,
@@ -2107,11 +2119,19 @@ export default function UnifiedMapEditor({
           meta:
             override.mode === "add-station" ? "지선 역 추가" : "지선 노선 결합",
           kind: override.mode,
+          hasSavedGeometry: savedPointCount >= 2,
+          savedPointCount,
         };
       });
 
     return [...branchTargets, ...lineBranchTargets];
-  }, [branchById, data.branches, overlays.lineBranchOverrides, stationById]);
+  }, [
+    branchById,
+    data.branches,
+    overlays.geometryOverrides,
+    overlays.lineBranchOverrides,
+    stationById,
+  ]);
   const filteredGeometryTargets = useMemo(() => {
     const normalizedQuery = normalizeSearchText(geometryTargetQuery);
 
@@ -4220,6 +4240,9 @@ export default function UnifiedMapEditor({
                 targets={filteredGeometryTargets}
                 totalTargetCount={geometryTargets.length}
                 activeTargetKey={getGeometryDraftTargetKey(geometryDraft)}
+                dirtyTargetKey={
+                  geometryDraftDirty ? getGeometryDraftTargetKey(geometryDraft) : null
+                }
                 query={geometryTargetQuery}
                 filter={geometryTargetFilter}
                 shortcutsOpen={shortcutHelpOpen}
@@ -4673,6 +4696,7 @@ function GeometryModeSidebar({
   targets,
   totalTargetCount,
   activeTargetKey,
+  dirtyTargetKey,
   query,
   filter,
   shortcutsOpen,
@@ -4684,6 +4708,7 @@ function GeometryModeSidebar({
   targets: GeometryEditTarget[];
   totalTargetCount: number;
   activeTargetKey: string | null;
+  dirtyTargetKey: string | null;
   query: string;
   filter: GeometryTargetFilter;
   shortcutsOpen: boolean;
@@ -4735,6 +4760,18 @@ function GeometryModeSidebar({
           </button>
         ))}
       </div>
+      {query || filter !== "all" ? (
+        <button
+          type="button"
+          className="mx-1 rounded-xl border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-500 transition hover:bg-slate-50"
+          onClick={() => {
+            onQueryChange("");
+            onFilterChange("all");
+          }}
+        >
+          검색/필터 초기화
+        </button>
+      ) : null}
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         {targets.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-6 text-center text-xs font-medium text-slate-400">
@@ -4743,37 +4780,50 @@ function GeometryModeSidebar({
         ) : (
           <div className="grid gap-1.5">
             {targets.map((target) => {
-            const targetKey = getGeometryTargetKey(target.type, target.id);
-            const active = activeTargetKey === targetKey;
-            return (
-              <button
-                key={targetKey}
-                type="button"
-                className={cn(
-                  "rounded-2xl border px-2.5 py-2 text-left transition",
-                  active
-                    ? "border-blue-300 bg-blue-50 shadow-sm"
-                    : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50",
-                )}
-                onClick={() => onSelectTarget(target)}
-              >
-                <div className="flex min-w-0 items-center gap-2">
-                  <span
-                    className="h-1.5 w-8 shrink-0 rounded-full"
-                    style={{ backgroundColor: target.colorHex }}
-                  />
-                  <strong className="truncate text-xs font-semibold text-slate-800">
-                    {target.title}
-                  </strong>
-                </div>
-                <p className="mt-1 truncate text-[11px] font-medium text-slate-500">
-                  {target.subtitle}
-                </p>
-                <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
-                  {target.meta}
-                </p>
-              </button>
-            );
+              const targetKey = getGeometryTargetKey(target.type, target.id);
+              const active = activeTargetKey === targetKey;
+              const dirty = dirtyTargetKey === targetKey;
+              return (
+                <button
+                  key={targetKey}
+                  type="button"
+                  className={cn(
+                    "rounded-2xl border px-2.5 py-2 text-left transition",
+                    active
+                      ? "border-blue-300 bg-blue-50 shadow-sm"
+                      : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50",
+                  )}
+                  onClick={() => onSelectTarget(target)}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="h-1.5 w-8 shrink-0 rounded-full"
+                      style={{ backgroundColor: target.colorHex }}
+                    />
+                    <strong className="min-w-0 flex-1 truncate text-xs font-semibold text-slate-800">
+                      {target.title}
+                    </strong>
+                    {dirty ? (
+                      <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
+                        수정중
+                      </span>
+                    ) : target.hasSavedGeometry ? (
+                      <span className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">
+                        보정됨
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 truncate text-[11px] font-medium text-slate-500">
+                    {target.subtitle}
+                  </p>
+                  <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-400">
+                    <span className="truncate">{target.meta}</span>
+                    {target.hasSavedGeometry ? (
+                      <span className="shrink-0">{target.savedPointCount}점</span>
+                    ) : null}
+                  </div>
+                </button>
+              );
             })}
           </div>
         )}
@@ -4859,9 +4909,20 @@ function GeometryModeInspector({
             {target.title}
           </strong>
         </div>
-        <p className="mt-1 truncate text-xs font-medium text-slate-500">
-          {target.subtitle}
-        </p>
+        <div className="mt-1 flex items-center gap-2">
+          <p className="min-w-0 flex-1 truncate text-xs font-medium text-slate-500">
+            {target.subtitle}
+          </p>
+          {target.hasSavedGeometry ? (
+            <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+              저장 보정 {target.savedPointCount}점
+            </span>
+          ) : (
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+              기본 선형
+            </span>
+          )}
+        </div>
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
           <div className="rounded-xl bg-slate-50 px-2 py-1.5">
             <p className="text-[10px] font-semibold text-slate-400">
