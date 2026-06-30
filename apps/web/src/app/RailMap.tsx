@@ -171,20 +171,38 @@ function buildAddStationLineBranchCoordinates(
   return smoothCoordinateRange(context, anchorIndex, context.length - 1);
 }
 
-function orientBranchCoordinatesFromEndpoint(
+function orientParentBranchCoordinatesToStation(
   branch: RailMapBranch,
-  endpointStationId: string,
-  endpointRole: "start" | "end",
+  stationId: string,
 ) {
   const points = getBranchStopCoordinatePoints(branch);
-  if (points.length < 2) return [];
+  if (points.length === 0) return [];
 
-  const index = points.findIndex((point) => point.stationId === endpointStationId);
+  const index = points.findIndex((point) => point.stationId === stationId);
   if (index < 0) return [];
 
   const coordinates = points.map((point) => point.coordinate);
-  if (endpointRole === "end") return index === 0 ? [...coordinates].reverse() : coordinates;
-  return index === points.length - 1 ? [...coordinates].reverse() : coordinates;
+  const fromStart = coordinates.slice(0, index + 1);
+  const fromEnd = coordinates.slice(index).reverse();
+
+  return fromStart.length >= fromEnd.length ? fromStart : fromEnd;
+}
+
+function orientConnectedBranchCoordinatesFromStation(
+  branch: RailMapBranch,
+  stationId: string,
+) {
+  const points = getBranchStopCoordinatePoints(branch);
+  if (points.length === 0) return [];
+
+  const index = points.findIndex((point) => point.stationId === stationId);
+  if (index < 0) return [];
+
+  const coordinates = points.map((point) => point.coordinate);
+  const towardEnd = coordinates.slice(index);
+  const towardStart = coordinates.slice(0, index + 1).reverse();
+
+  return towardEnd.length >= 2 ? towardEnd : towardStart;
 }
 
 function buildConnectLineBranchCoordinates(
@@ -194,18 +212,16 @@ function buildConnectLineBranchCoordinates(
 ) {
   if (!parentBranch || !connectedBranch || !override.connectedEndpointStationId) return [];
 
-  const parentCoordinates = orientBranchCoordinatesFromEndpoint(
+  const parentCoordinates = orientParentBranchCoordinatesToStation(
     parentBranch,
     override.anchorStationId,
-    "end",
   );
-  const connectedCoordinates = orientBranchCoordinatesFromEndpoint(
+  const connectedCoordinates = orientConnectedBranchCoordinatesFromStation(
     connectedBranch,
     override.connectedEndpointStationId,
-    "start",
   );
 
-  if (parentCoordinates.length < 2 || connectedCoordinates.length < 2) return [];
+  if (parentCoordinates.length < 1 || connectedCoordinates.length < 1) return [];
 
   return smoothCoordinates([...parentCoordinates, ...connectedCoordinates]);
 }
@@ -1051,52 +1067,12 @@ export default function RailMap({
           setMapReady(true);
           setMapError(null);
 
-          const transferIconImage = new Image(128, 128);
+          const transferIconImage = new Image();
           transferIconImage.onload = () => {
             if (!map.hasImage("transfer-icon")) {
               map.addImage("transfer-icon", transferIconImage, { pixelRatio: 2 });
+              map.triggerRepaint();
             }
-            map.triggerRepaint();
-          };
-          transferIconImage.onerror = () => {
-            const size = 128;
-            const canvas = document.createElement("canvas");
-            canvas.width = size;
-            canvas.height = size;
-            const context = canvas.getContext("2d");
-            if (!context) return;
-          
-            const center = size / 2;
-            const radius = size * 0.42;
-            context.beginPath();
-            context.arc(center, center, radius, 0, Math.PI * 2);
-            context.fillStyle = "#f8fafc";
-            context.fill();
-            context.lineWidth = size * 0.05;
-            context.strokeStyle = "#475569";
-            context.stroke();
-            context.save();
-            context.beginPath();
-            context.arc(center, center, radius * 0.82, 0, Math.PI * 2);
-            context.clip();
-            context.fillStyle = "#cd2e3a";
-            context.fillRect(center - radius, center - radius, radius * 2, radius);
-            context.fillStyle = "#0047a0";
-            context.fillRect(center - radius, center, radius * 2, radius);
-            context.fillStyle = "#0047a0";
-            context.beginPath();
-            context.arc(center, center - radius * 0.42, radius * 0.42, 0, Math.PI * 2);
-            context.fill();
-            context.fillStyle = "#cd2e3a";
-            context.beginPath();
-            context.arc(center, center + radius * 0.42, radius * 0.42, 0, Math.PI * 2);
-            context.fill();
-            context.restore();
-          
-            if (!map.hasImage("transfer-icon")) {
-              map.addImage("transfer-icon", context.getImageData(0, 0, size, size), { pixelRatio: 2 });
-            }
-            map.triggerRepaint();
           };
           transferIconImage.src = "/transfer.svg";
 
@@ -1281,26 +1257,10 @@ export default function RailMap({
             source: "transfer-group-icons",
             maxzoom: 14.5,
             paint: {
-              "circle-color": "#ffffff",
-              "circle-radius": [
-                "case",
-                ["==", ["get", "isSelected"], true],
-                15,
-                13,
-              ],
-              "circle-stroke-color": [
-                "case",
-                ["==", ["get", "isSelected"], true],
-                "#2563eb",
-                "#475569",
-              ],
-              "circle-stroke-width": [
-                "case",
-                ["==", ["get", "isSelected"], true],
-                2.4,
-                1.4,
-              ],
-              "circle-opacity": 0.96,
+              "circle-color": "rgba(255,255,255,0)",
+              "circle-radius": 0,
+              "circle-stroke-width": 0,
+              "circle-opacity": 0,
             },
           });
 
@@ -1311,7 +1271,7 @@ export default function RailMap({
             maxzoom: 14.5,
             layout: {
               "icon-image": "transfer-icon",
-              "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.26, 0.22],
+              "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.18, 0.16],
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
             },

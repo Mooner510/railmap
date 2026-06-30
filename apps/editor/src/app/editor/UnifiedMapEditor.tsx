@@ -619,22 +619,12 @@ function validateLineBranchOverrides(
           message: "같은 branch끼리는 지선 결합할 수 없음",
         });
       }
-
-      if (!getBranchEndpointStationIds(parentBranch).has(override.anchorStationId)) {
+      const connectedStationId = override.connectedEndpointStationId;
+      const connectedStationIds = new Set(getBranchStationIds(connectedBranch));
+      if (!connectedStationId || !connectedStationIds.has(connectedStationId)) {
         issues.push({
-          id: `${override.id}:parent-endpoint`,
-          message: `상위 노선 연결 역이 endpoint가 아님: ${formatStationDisplayName(stationById.get(override.anchorStationId))}`,
-        });
-      }
-
-      const connectedEndpoint = override.connectedEndpointStationId;
-      if (
-        !connectedEndpoint ||
-        !getBranchEndpointStationIds(connectedBranch).has(connectedEndpoint)
-      ) {
-        issues.push({
-          id: `${override.id}:connected-endpoint`,
-          message: `연결 노선의 선택 역이 endpoint가 아님: ${formatStationDisplayName(connectedEndpoint ? stationById.get(connectedEndpoint) : null)}`,
+          id: `${override.id}:connected-station`,
+          message: `연결 노선의 선택 역이 노선에 없음: ${formatStationDisplayName(connectedStationId ? stationById.get(connectedStationId) : null)}`,
         });
       }
     }
@@ -679,7 +669,7 @@ function getLineBranchDisplay(
   return {
     title: "지선 노선 결합",
     summary: `${formatBranchDisplayName(parentBranch)} · ${formatStationDisplayName(anchorStation)} ↔ ${formatBranchDisplayName(connectedBranch)} · ${formatStationDisplayName(connectedStation)}`,
-    detail: "두 노선의 endpoint를 연결합니다.",
+    detail: "선택한 노선의 특정 역과 다른 노선의 특정 역을 연결합니다.",
   };
 }
 
@@ -735,20 +725,38 @@ function buildAddStationLineBranchCoordinates(
   return smoothCoordinateRange(context, anchorIndex, context.length - 1);
 }
 
-function orientBranchCoordinatesFromEndpoint(
+function orientParentBranchCoordinatesToStation(
   branch: EditorMapBranch,
-  endpointStationId: string,
-  endpointRole: "start" | "end",
+  stationId: string,
 ) {
   const points = getBranchStopCoordinatePoints(branch);
-  if (points.length < 2) return [];
+  if (points.length === 0) return [];
 
-  const index = points.findIndex((point) => point.stationId === endpointStationId);
+  const index = points.findIndex((point) => point.stationId === stationId);
   if (index < 0) return [];
 
   const coordinates = points.map((point) => point.coordinate);
-  if (endpointRole === "end") return index === 0 ? [...coordinates].reverse() : coordinates;
-  return index === points.length - 1 ? [...coordinates].reverse() : coordinates;
+  const fromStart = coordinates.slice(0, index + 1);
+  const fromEnd = coordinates.slice(index).reverse();
+
+  return fromStart.length >= fromEnd.length ? fromStart : fromEnd;
+}
+
+function orientConnectedBranchCoordinatesFromStation(
+  branch: EditorMapBranch,
+  stationId: string,
+) {
+  const points = getBranchStopCoordinatePoints(branch);
+  if (points.length === 0) return [];
+
+  const index = points.findIndex((point) => point.stationId === stationId);
+  if (index < 0) return [];
+
+  const coordinates = points.map((point) => point.coordinate);
+  const towardEnd = coordinates.slice(index);
+  const towardStart = coordinates.slice(0, index + 1).reverse();
+
+  return towardEnd.length >= 2 ? towardEnd : towardStart;
 }
 
 function buildConnectLineBranchCoordinates(
@@ -758,18 +766,16 @@ function buildConnectLineBranchCoordinates(
 ) {
   if (!parentBranch || !connectedBranch || !override.connectedEndpointStationId) return [];
 
-  const parentCoordinates = orientBranchCoordinatesFromEndpoint(
+  const parentCoordinates = orientParentBranchCoordinatesToStation(
     parentBranch,
     override.anchorStationId,
-    "end",
   );
-  const connectedCoordinates = orientBranchCoordinatesFromEndpoint(
+  const connectedCoordinates = orientConnectedBranchCoordinatesFromStation(
     connectedBranch,
     override.connectedEndpointStationId,
-    "start",
   );
 
-  if (parentCoordinates.length < 2 || connectedCoordinates.length < 2) return [];
+  if (parentCoordinates.length < 1 || connectedCoordinates.length < 1) return [];
 
   return smoothCoordinates([...parentCoordinates, ...connectedCoordinates]);
 }
@@ -1446,52 +1452,12 @@ export default function UnifiedMapEditor({
     );
 
     map.on("load", () => {
-      const transferIconImage = new Image(128, 128);
+      const transferIconImage = new Image();
       transferIconImage.onload = () => {
         if (!map.hasImage("transfer-icon")) {
           map.addImage("transfer-icon", transferIconImage, { pixelRatio: 2 });
+          map.triggerRepaint();
         }
-        map.triggerRepaint();
-      };
-      transferIconImage.onerror = () => {
-        const size = 128;
-        const canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        const context = canvas.getContext("2d");
-        if (!context) return;
-      
-        const center = size / 2;
-        const radius = size * 0.42;
-        context.beginPath();
-        context.arc(center, center, radius, 0, Math.PI * 2);
-        context.fillStyle = "#f8fafc";
-        context.fill();
-        context.lineWidth = size * 0.05;
-        context.strokeStyle = "#475569";
-        context.stroke();
-        context.save();
-        context.beginPath();
-        context.arc(center, center, radius * 0.82, 0, Math.PI * 2);
-        context.clip();
-        context.fillStyle = "#cd2e3a";
-        context.fillRect(center - radius, center - radius, radius * 2, radius);
-        context.fillStyle = "#0047a0";
-        context.fillRect(center - radius, center, radius * 2, radius);
-        context.fillStyle = "#0047a0";
-        context.beginPath();
-        context.arc(center, center - radius * 0.42, radius * 0.42, 0, Math.PI * 2);
-        context.fill();
-        context.fillStyle = "#cd2e3a";
-        context.beginPath();
-        context.arc(center, center + radius * 0.42, radius * 0.42, 0, Math.PI * 2);
-        context.fill();
-        context.restore();
-      
-        if (!map.hasImage("transfer-icon")) {
-          map.addImage("transfer-icon", context.getImageData(0, 0, size, size), { pixelRatio: 2 });
-        }
-        map.triggerRepaint();
       };
       transferIconImage.src = "/transfer.svg";
 
@@ -1621,21 +1587,10 @@ export default function UnifiedMapEditor({
         source: "railmap-transfer-group-icons",
         maxzoom: 14.5,
         paint: {
-          "circle-color": "#ffffff",
-          "circle-radius": ["case", ["==", ["get", "selected"], true], 15, 13],
-          "circle-stroke-color": [
-            "case",
-            ["==", ["get", "selected"], true],
-            "#2563eb",
-            "#475569",
-          ],
-          "circle-stroke-width": [
-            "case",
-            ["==", ["get", "selected"], true],
-            2.4,
-            1.4,
-          ],
-          "circle-opacity": 0.96,
+          "circle-color": "rgba(255,255,255,0)",
+          "circle-radius": 0,
+          "circle-stroke-width": 0,
+          "circle-opacity": 0,
         },
       });
 
@@ -1646,7 +1601,7 @@ export default function UnifiedMapEditor({
         maxzoom: 14.5,
         layout: {
           "icon-image": "transfer-icon",
-          "icon-size": ["case", ["==", ["get", "selected"], true], 0.26, 0.22],
+          "icon-size": ["case", ["==", ["get", "selected"], true], 0.18, 0.16],
           "icon-allow-overlap": true,
           "icon-ignore-placement": true,
         },
@@ -2419,14 +2374,15 @@ export default function UnifiedMapEditor({
       showToast("같은 branch끼리는 결합할 수 없습니다", "error");
       return;
     }
-
-    if (!getBranchEndpointStationIds(parentBranch).has(anchorStationId)) {
-      showToast("상위 branch의 첫 번째/마지막 역만 결합 anchor로 사용할 수 있습니다", "error");
+    const parentStationIds = new Set(getBranchStationIds(parentBranch));
+    if (!parentStationIds.has(anchorStationId)) {
+      showToast("선택한 연결 기준 역이 현재 노선에 없습니다", "error");
       return;
     }
 
-    if (!getBranchEndpointStationIds(connectedBranch).has(connectedEndpointStationId)) {
-      showToast("연결 branch의 첫 번째/마지막 역만 결합할 수 있습니다", "error");
+    const connectedStationIds = new Set(getBranchStationIds(connectedBranch));
+    if (!connectedStationIds.has(connectedEndpointStationId)) {
+      showToast("선택한 연결 대상 역이 연결 노선에 없습니다", "error");
       return;
     }
 
@@ -3152,7 +3108,7 @@ function BranchInspector({
   onDeleteLineBranch: (id: string) => void;
 }) {
   const branchStations = getBranchStopStations(branch);
-  const branchEndpoints = getBranchEndpointStations(branch);
+  const connectAnchorStations = branchStations;
   const otherBranches = branches.filter((candidate) => candidate.id !== branch.id);
   const relatedLineBranches = lineBranchOverrides.filter(
     (override) =>
@@ -3167,7 +3123,7 @@ function BranchInspector({
     unassignedStations[0]?.id ?? "",
   );
   const [connectAnchorStationId, setConnectAnchorStationId] = useState(
-    branchEndpoints[0]?.id ?? "",
+    connectAnchorStations[0]?.id ?? "",
   );
   const [connectBranchId, setConnectBranchId] = useState(
     otherBranches[0]?.id ?? "",
@@ -3176,7 +3132,7 @@ function BranchInspector({
   const selectedConnectBranch =
     branches.find((candidate) => candidate.id === connectBranchId) ?? null;
   const connectEndpointStations = selectedConnectBranch
-    ? getBranchEndpointStations(selectedConnectBranch)
+    ? getBranchStopStations(selectedConnectBranch)
     : [];
   const [connectEndpointStationId, setConnectEndpointStationId] = useState(
     connectEndpointStations[0]?.id ?? "",
@@ -3193,9 +3149,9 @@ function BranchInspector({
   }, [addBranchStationId, unassignedStations]);
 
   useEffect(() => {
-    if (!branchEndpoints.some((station) => station.id === connectAnchorStationId))
-      setConnectAnchorStationId(branchEndpoints[0]?.id ?? "");
-  }, [branchEndpoints, connectAnchorStationId]);
+    if (!connectAnchorStations.some((station) => station.id === connectAnchorStationId))
+      setConnectAnchorStationId(connectAnchorStations[0]?.id ?? "");
+  }, [connectAnchorStations, connectAnchorStationId]);
 
   useEffect(() => {
     if (!otherBranches.some((candidate) => candidate.id === connectBranchId))
@@ -3319,17 +3275,17 @@ function BranchInspector({
             지선 노선 결합
           </strong>
           <p className="mt-1 text-[11px] font-medium text-emerald-600">
-            현재 노선의 endpoint와 다른 노선의 endpoint를 연결합니다.
+            현재 노선의 특정 역과 다른 노선의 특정 역을 연결합니다.
           </p>
         </div>
-        <Field label="현재 노선 endpoint">
+        <Field label="현재 노선 연결 역">
           <select
             className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
             value={connectAnchorStationId}
             onChange={(event) => setConnectAnchorStationId(event.target.value)}
-            disabled={branchEndpoints.length === 0}
+            disabled={connectAnchorStations.length === 0}
           >
-            {branchEndpoints.map((station) => (
+            {connectAnchorStations.map((station) => (
               <option key={station.id} value={station.id}>
                 {station.nameKo} · {station.lineNameKo}
               </option>
@@ -3350,7 +3306,7 @@ function BranchInspector({
             ))}
           </select>
         </Field>
-        <Field label="연결 노선 endpoint">
+        <Field label="연결 노선 연결 역">
           <select
             className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
             value={connectEndpointStationId}
