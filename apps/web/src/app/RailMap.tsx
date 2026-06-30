@@ -1208,7 +1208,7 @@ export default function RailMap({
             id: "transfer-group-areas-fill",
             type: "fill",
             source: "transfer-group-areas",
-            minzoom: 12,
+            minzoom: 14.5,
             paint: {
               "fill-color": [
                 "case",
@@ -1229,7 +1229,7 @@ export default function RailMap({
             id: "transfer-group-areas-outline",
             type: "line",
             source: "transfer-group-areas",
-            minzoom: 12,
+            minzoom: 14.5,
             paint: {
               "line-color": [
                 "case",
@@ -1274,7 +1274,7 @@ export default function RailMap({
             maxzoom: 14.5,
             layout: {
               "icon-image": "transfer-icon",
-              "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.085, 0.075],
+              "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.038, 0.034],
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
             },
@@ -1284,8 +1284,7 @@ export default function RailMap({
             id: "transfer-group-collapsed-label",
             type: "symbol",
             source: "transfer-group-icons",
-            minzoom: 12,
-            maxzoom: 14.5,
+            minzoom: 14.5,
             layout: {
               "text-field": ["get", "nameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
@@ -1490,13 +1489,6 @@ export default function RailMap({
             const props = feature?.properties as
               Record<string, unknown> | undefined;
             const stationId = String(props?.id ?? "");
-            const transferGroup =
-              stationTransferGroupIndexRef.current.get(stationId);
-            if (transferGroup && onSelectTransferGroupRef.current) {
-              onSelectTransferGroupRef.current(transferGroup);
-              return;
-            }
-
             const station = stationsRef.current.find(
               (item) => item.id === stationId,
             );
