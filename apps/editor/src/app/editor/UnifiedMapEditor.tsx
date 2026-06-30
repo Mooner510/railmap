@@ -118,6 +118,13 @@ type GeometryDraftHistoryRecord = {
   after: GeometryDraft | null;
 };
 
+type GeometryDraftSaveModel = {
+  geometryStorageLabel: string;
+  stationPositionChangeLabels: string[];
+  stationAnchorCount: number;
+  controlPointCount: number;
+};
+
 type GeometryPointDragState = {
   targetType: GeometryTargetType;
   targetId: string;
@@ -1411,6 +1418,50 @@ function getGeometryDraftStationAnchorLabels(
     )
     .map((point) => formatStationDisplayName(stationById.get(point.stationId)))
     .filter((label, index, labels) => labels.indexOf(label) === index);
+}
+
+function getGeometryDraftStationPositionChangeLabels(
+  draft: GeometryDraft | null,
+  stationById: Map<string, EditorStation>,
+) {
+  if (!draft) return [];
+
+  return draft.points
+    .filter(
+      (point): point is ManualGeometryOverridePoint & { stationId: string } =>
+        point.kind === "station" && Boolean(point.stationId),
+    )
+    .filter((point) => {
+      const current = getStationCoordinate(stationById.get(point.stationId));
+      return !coordinatesEqual(current, point);
+    })
+    .map((point) => formatStationDisplayName(stationById.get(point.stationId)))
+    .filter((label, index, labels) => labels.indexOf(label) === index);
+}
+
+function getGeometryDraftSaveModel(
+  draft: GeometryDraft,
+  stationById: Map<string, EditorStation>,
+): GeometryDraftSaveModel {
+  const stationAnchorCount = draft.points.filter(
+    (point) => point.kind === "station",
+  ).length;
+  const controlPointCount = draft.points.filter(
+    (point) => point.kind === "control",
+  ).length;
+
+  return {
+    geometryStorageLabel:
+      draft.targetType === "branch"
+        ? "일반 노선 geometryOverrides"
+        : "지선 overlay lineBranchOverrides.geometry",
+    stationPositionChangeLabels: getGeometryDraftStationPositionChangeLabels(
+      draft,
+      stationById,
+    ),
+    stationAnchorCount,
+    controlPointCount,
+  };
 }
 
 function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
@@ -4736,6 +4787,9 @@ export default function UnifiedMapEditor({
     geometryDraft,
     displayStationById,
   );
+  const geometryDraftSaveModel = geometryDraft
+    ? getGeometryDraftSaveModel(geometryDraft, stationById)
+    : null;
   const isGeometryMode = toolMode === "geometry";
   const canUndo = isGeometryMode
     ? geometryHistoryVersion >= 0 && geometryUndoStackRef.current.length > 0
@@ -5072,6 +5126,7 @@ export default function UnifiedMapEditor({
                   canUndo={canUndo}
                   canRedo={canRedo}
                   stationAnchorLabels={geometryDraftStationAnchorLabels}
+                  saveModel={geometryDraftSaveModel}
                   onSave={() => void saveGeometryDraft()}
                   onReset={resetGeometryDraftToSaved}
                   onUndo={undoGeometryDraftEdit}
@@ -5487,6 +5542,7 @@ function GeometryModeInspector({
   canUndo,
   canRedo,
   stationAnchorLabels,
+  saveModel,
   onSave,
   onReset,
   onUndo,
@@ -5499,18 +5555,21 @@ function GeometryModeInspector({
   canUndo: boolean;
   canRedo: boolean;
   stationAnchorLabels: string[];
+  saveModel: GeometryDraftSaveModel | null;
   onSave: () => void;
   onReset: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
 }) {
-  const controlCount = draft.points.filter(
-    (point) => point.kind === "control",
-  ).length;
-  const stationAnchorCount = draft.points.filter(
-    (point) => point.kind === "station",
-  ).length;
+  const controlCount =
+    saveModel?.controlPointCount ??
+    draft.points.filter((point) => point.kind === "control").length;
+  const stationAnchorCount =
+    saveModel?.stationAnchorCount ??
+    draft.points.filter((point) => point.kind === "station").length;
+  const stationPositionChangeLabels =
+    saveModel?.stationPositionChangeLabels ?? [];
 
   return (
     <div className="grid gap-3">
@@ -5588,6 +5647,46 @@ function GeometryModeInspector({
         <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-slate-600">
           <span className="size-3 rounded-full border-2 border-white bg-slate-500 shadow" />
           수동 보정점
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 text-xs font-medium text-slate-600">
+        <div className="flex items-center justify-between gap-2">
+          <strong className="text-slate-800">저장 경계</strong>
+          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+            {draft.targetType === "branch" ? "일반 노선" : "지선 overlay"}
+          </span>
+        </div>
+        <div className="mt-2 grid gap-1.5 text-[11px] leading-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-slate-500">선형 보정 저장소</span>
+            <span className="truncate font-semibold text-slate-700">
+              {saveModel?.geometryStorageLabel ?? "geometry"}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-slate-500">역 위치 변경</span>
+            <span
+              className={cn(
+                "font-semibold",
+                stationPositionChangeLabels.length > 0
+                  ? "text-amber-700"
+                  : "text-slate-400",
+              )}
+            >
+              {stationPositionChangeLabels.length > 0
+                ? `${stationPositionChangeLabels.length}개 함께 저장`
+                : "없음"}
+            </span>
+          </div>
+          {stationPositionChangeLabels.length > 0 ? (
+            <p className="truncate text-[11px] font-semibold text-amber-700">
+              위치 변경 역: {stationPositionChangeLabels.slice(0, 3).join(", ")}
+              {stationPositionChangeLabels.length > 3
+                ? ` 외 ${stationPositionChangeLabels.length - 3}개`
+                : ""}
+            </p>
+          ) : null}
         </div>
       </div>
 
