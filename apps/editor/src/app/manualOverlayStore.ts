@@ -7,6 +7,9 @@ import {
   type ManualOverlayBundle,
   type ManualGeometryOverride,
   type ManualGeometryOverridePoint,
+  type ManualLineBranchGeometryPoint,
+  type ManualLineBranchMode,
+  type ManualLineBranchOverride,
   type ManualStationOverride,
   type ManualTransferEdge,
   type ManualTransferGroup,
@@ -71,6 +74,10 @@ function asNullableCoordinateNumber(value: unknown): number | null {
   return Number.isFinite(numberValue) ? numberValue : null;
 }
 
+function asLineBranchMode(value: unknown): ManualLineBranchMode | null {
+  return value === "add-station" || value === "connect-line" ? value : null;
+}
+
 function normalizeMinutesByPair(value: unknown, stationIds: string[]): Record<string, number | null> {
   const result: Record<string, number | null> = {};
   const source = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
@@ -127,6 +134,25 @@ function normalizeStationOverride(value: unknown): ManualStationOverride | null 
 }
 
 
+function normalizeLineBranchGeometryPoint(value: unknown): ManualLineBranchGeometryPoint | null {
+  if (!value || typeof value !== "object") return null;
+
+  const point = value as Record<string, unknown>;
+  const lng = asNullableCoordinateNumber(point.lng);
+  const lat = asNullableCoordinateNumber(point.lat);
+  if (lng === null || lat === null) return null;
+
+  const kind = point.kind === "station" ? "station" : "control";
+  const stationId = asString(point.stationId);
+
+  return {
+    lng,
+    lat,
+    kind,
+    stationId: stationId ?? undefined,
+  };
+}
+
 function normalizeGeometryPoint(value: unknown): ManualGeometryOverridePoint | null {
   if (!value || typeof value !== "object") return null;
 
@@ -143,6 +169,42 @@ function normalizeGeometryPoint(value: unknown): ManualGeometryOverridePoint | n
     lat,
     kind,
     stationId: stationId ?? undefined,
+  };
+}
+
+function normalizeLineBranchOverride(value: unknown): ManualLineBranchOverride | null {
+  if (!value || typeof value !== "object") return null;
+
+  const override = value as Record<string, unknown>;
+  const mode = asLineBranchMode(override.mode);
+  const parentBranchId = asString(override.parentBranchId);
+  const anchorStationId = asString(override.anchorStationId);
+
+  if (!mode || !parentBranchId || !anchorStationId) return null;
+
+  const branchStationId = asString(override.branchStationId) ?? undefined;
+  const connectedBranchId = asString(override.connectedBranchId) ?? undefined;
+  const connectedEndpointStationId = asString(override.connectedEndpointStationId) ?? undefined;
+
+  if (mode === "add-station" && !branchStationId) return null;
+  if (mode === "connect-line" && (!connectedBranchId || !connectedEndpointStationId)) return null;
+
+  const geometry = Array.isArray(override.geometry)
+    ? override.geometry.map(normalizeLineBranchGeometryPoint).filter((point): point is ManualLineBranchGeometryPoint => point !== null)
+    : undefined;
+
+  return {
+    id: asString(override.id) ?? `manual-line-branch:${mode}:${parentBranchId}:${anchorStationId}:${branchStationId ?? connectedBranchId}`,
+    mode,
+    parentBranchId,
+    anchorStationId,
+    branchStationId,
+    connectedBranchId,
+    connectedEndpointStationId,
+    geometry: geometry && geometry.length >= 2 ? geometry : undefined,
+    enabled: override.enabled !== false,
+    source: asString(override.source) ?? "editor",
+    note: asNullableString(override.note),
   };
 }
 
@@ -217,6 +279,9 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
       ? data.stationOverrides.map(normalizeStationOverride).filter((override): override is ManualStationOverride => override !== null)
       : [],
     branchOverrides: Array.isArray(data.branchOverrides) ? data.branchOverrides : [],
+    lineBranchOverrides: Array.isArray((data as { lineBranchOverrides?: unknown }).lineBranchOverrides)
+      ? (data as { lineBranchOverrides: unknown[] }).lineBranchOverrides.map(normalizeLineBranchOverride).filter((override): override is ManualLineBranchOverride => override !== null)
+      : [],
     geometryOverrides: Array.isArray(data.geometryOverrides)
       ? data.geometryOverrides.map(normalizeGeometryOverride).filter((override): override is ManualGeometryOverride => override !== null)
       : [],
@@ -263,6 +328,7 @@ async function writeManualOverlaySplitFiles(overlays: ManualOverlayBundle) {
     writeJson(paths.geometry, {
       schemaVersion: overlays.schemaVersion,
       branchOverrides: overlays.branchOverrides,
+      lineBranchOverrides: overlays.lineBranchOverrides,
       geometryOverrides: overlays.geometryOverrides,
     }),
     writeJson(paths.settings, {

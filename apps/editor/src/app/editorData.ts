@@ -201,7 +201,18 @@ function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geome
         geometryOverrideCoordinates,
         geometryCoordinates,
         routeStopCount: branch.routeStops.length,
-        routeStops: [],
+        routeStops: branch.routeStops.map((stop) => {
+          const stationId = getRouteStopStationId(stop);
+          const station = stationId ? stationById.get(stationId) ?? null : null;
+
+          return {
+            id: stop.id,
+            sequence: stop.sequence,
+            displayNameKo: stop.displayNameKo,
+            station,
+            confidence: stop.confidence ?? "unknown",
+          };
+        }),
       };
     }),
   );

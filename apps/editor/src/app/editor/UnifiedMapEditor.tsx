@@ -101,6 +101,11 @@ type GeometryDraft = {
   note: string;
 };
 
+type LineBranchValidationIssue = {
+  id: string;
+  message: string;
+};
+
 const defaultLayers = {
   stations: true,
   lines: true,
@@ -494,6 +499,107 @@ function smoothCoordinates(coordinates: LngLatTuple[]): LngLatTuple[] {
   return result;
 }
 
+function getBranchStationIds(branch: EditorMapBranch): string[] {
+  return branch.routeStops
+    .map((stop) => stop.station?.id ?? null)
+    .filter((stationId): stationId is string => Boolean(stationId));
+}
+
+function getBranchEndpointStationIds(branch: EditorMapBranch): Set<string> {
+  const stationIds = getBranchStationIds(branch);
+  return new Set(
+    [stationIds[0], stationIds.at(-1)].filter(
+      (stationId): stationId is string => Boolean(stationId),
+    ),
+  );
+}
+
+function validateLineBranchOverrides(
+  overlays: ManualOverlayBundle,
+  branches: EditorMapBranch[],
+  stationById: Map<string, EditorStation>,
+): LineBranchValidationIssue[] {
+  const issues: LineBranchValidationIssue[] = [];
+  const branchById = new Map(branches.map((branch) => [branch.id, branch]));
+  const assignedStationIds = new Set(branches.flatMap(getBranchStationIds));
+
+  for (const override of overlays.lineBranchOverrides ?? []) {
+    if (override.enabled === false) continue;
+
+    const parentBranch = branchById.get(override.parentBranchId);
+    if (!parentBranch) {
+      issues.push({
+        id: `${override.id}:parent`,
+        message: `상위 branch를 찾을 수 없음: ${override.parentBranchId}`,
+      });
+      continue;
+    }
+
+    const parentStationIds = new Set(getBranchStationIds(parentBranch));
+    if (!parentStationIds.has(override.anchorStationId)) {
+      issues.push({
+        id: `${override.id}:anchor`,
+        message: `anchor 역이 상위 branch에 없음: ${override.anchorStationId}`,
+      });
+    }
+
+    if (override.mode === "add-station") {
+      const branchStationId = override.branchStationId;
+      if (!branchStationId || !stationById.has(branchStationId)) {
+        issues.push({
+          id: `${override.id}:branch-station`,
+          message: `추가할 지선 역을 찾을 수 없음: ${branchStationId ?? "-"}`,
+        });
+      } else if (assignedStationIds.has(branchStationId)) {
+        issues.push({
+          id: `${override.id}:branch-station-assigned`,
+          message: `추가할 지선 역이 이미 노선에 소속됨: ${branchStationId}`,
+        });
+      }
+    }
+
+    if (override.mode === "connect-line") {
+      const connectedBranch = override.connectedBranchId
+        ? branchById.get(override.connectedBranchId)
+        : null;
+      if (!connectedBranch) {
+        issues.push({
+          id: `${override.id}:connected`,
+          message: `연결할 branch를 찾을 수 없음: ${override.connectedBranchId ?? "-"}`,
+        });
+        continue;
+      }
+
+      if (connectedBranch.id === parentBranch.id) {
+        issues.push({
+          id: `${override.id}:same-branch`,
+          message: "같은 branch끼리는 지선 결합할 수 없음",
+        });
+      }
+
+      if (!getBranchEndpointStationIds(parentBranch).has(override.anchorStationId)) {
+        issues.push({
+          id: `${override.id}:parent-endpoint`,
+          message: `상위 branch anchor가 endpoint가 아님: ${override.anchorStationId}`,
+        });
+      }
+
+      const connectedEndpoint = override.connectedEndpointStationId;
+      if (
+        !connectedEndpoint ||
+        !getBranchEndpointStationIds(connectedBranch).has(connectedEndpoint)
+      ) {
+        issues.push({
+          id: `${override.id}:connected-endpoint`,
+          message: `연결 branch endpoint가 아님: ${connectedEndpoint ?? "-"}`,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
 function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
   const override = (branch.geometryOverrideCoordinates ?? []).filter(
     ([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat),
@@ -808,6 +914,10 @@ export default function UnifiedMapEditor({
   const branchById = useMemo(
     () => new Map(data.branches.map((branch) => [branch.id, branch])),
     [data.branches],
+  );
+  const lineBranchIssues = useMemo(
+    () => validateLineBranchOverrides(overlays, data.branches, stationById),
+    [data.branches, overlays, stationById],
   );
   const groupById = useMemo(
     () =>
@@ -2079,9 +2189,9 @@ export default function UnifiedMapEditor({
             ) : null}
 
             {sidebarTab === "validation" ? (
-              <Placeholder
-                title="Validation"
-                description="다음 단계에서 Validator 결과와 Inspector 이동을 연결합니다."
+              <LineBranchValidationPanel
+                count={overlays.lineBranchOverrides?.length ?? 0}
+                issues={lineBranchIssues}
               />
             ) : null}
             {sidebarTab === "history" ? (
@@ -2444,6 +2554,44 @@ function StationInspector({
           저장
         </Button>
       </div>
+    </div>
+  );
+}
+
+function LineBranchValidationPanel({
+  count,
+  issues,
+}: {
+  count: number;
+  issues: LineBranchValidationIssue[];
+}) {
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+        <strong className="text-sm font-semibold text-slate-700">
+          Line branch overlays
+        </strong>
+        <p className="mt-2 text-xs font-medium text-slate-500">
+          등록 {count}개 · 오류 {issues.length}개
+        </p>
+      </div>
+      {issues.length === 0 ? (
+        <Placeholder
+          title="지선 검증 통과"
+          description="현재 저장된 지선 오버레이에서 기본 검증 오류가 없습니다."
+        />
+      ) : (
+        <div className="grid gap-2">
+          {issues.map((issue) => (
+            <div
+              key={issue.id}
+              className="rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+            >
+              {issue.message}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
