@@ -896,7 +896,6 @@ function validateSavedGeometryStationAnchors(
   return issues;
 }
 
-
 function replaceStaleSavedStationAnchorPoints(
   points: ManualGeometryOverridePoint[],
   stationId: string,
@@ -974,11 +973,8 @@ function countStaleSavedGeometryAnchorsForStation(
   stationId: string,
   stationById: Map<string, EditorStation>,
 ) {
-  return syncSavedGeometryAnchorsForStation(
-    overlays,
-    stationId,
-    stationById,
-  ).changedCount;
+  return syncSavedGeometryAnchorsForStation(overlays, stationId, stationById)
+    .changedCount;
 }
 
 function validateStationGeometryAlignment(
@@ -1547,6 +1543,68 @@ function getGeometryDraftSaveModel(
     stationAnchorCount,
     controlPointCount,
   };
+}
+
+function getGeometryDraftChangeSummaryLabels(
+  draft: GeometryDraft | null,
+  savedDraft: GeometryDraft | null,
+  stationById: Map<string, EditorStation>,
+) {
+  if (!draft || areGeometryDraftsEqual(draft, savedDraft)) return [];
+
+  const labels: string[] = [];
+  const currentControlCount = draft.points.filter(
+    (point) => point.kind === "control",
+  ).length;
+  const savedControlCount = (savedDraft?.points ?? []).filter(
+    (point) => point.kind === "control",
+  ).length;
+  const stationPositionLabels = getGeometryDraftStationPositionChangeLabels(
+    draft,
+    stationById,
+  );
+
+  if (currentControlCount > savedControlCount) {
+    labels.push(
+      `수동 보정점 ${currentControlCount - savedControlCount}개 추가`,
+    );
+  } else if (currentControlCount < savedControlCount) {
+    labels.push(
+      `수동 보정점 ${savedControlCount - currentControlCount}개 제거`,
+    );
+  }
+
+  const controlSignature = (target: GeometryDraft | null) =>
+    JSON.stringify(
+      (target?.points ?? [])
+        .filter((point) => point.kind === "control")
+        .map((point) => ({
+          lng: Number(point.lng.toFixed(8)),
+          lat: Number(point.lat.toFixed(8)),
+        })),
+    );
+
+  if (
+    currentControlCount > 0 &&
+    controlSignature(draft) !== controlSignature(savedDraft) &&
+    !labels.some((label) => label.includes("수동 보정점"))
+  ) {
+    labels.push("수동 보정점 위치 변경");
+  }
+
+  for (const label of stationPositionLabels) {
+    labels.push(`${label} 역 위치 변경`);
+  }
+
+  if ((draft.note ?? "") !== (savedDraft?.note ?? "")) {
+    labels.push("선형 메모 변경");
+  }
+
+  if (labels.length === 0) {
+    labels.push("선형 좌표 변경");
+  }
+
+  return labels;
 }
 
 function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
@@ -4914,6 +4972,13 @@ export default function UnifiedMapEditor({
   const geometryDraftSaveModel = geometryDraft
     ? getGeometryDraftSaveModel(geometryDraft, stationById)
     : null;
+  const geometryDraftChangeSummaryLabels = geometryDraftDirty
+    ? getGeometryDraftChangeSummaryLabels(
+        geometryDraft,
+        savedGeometryDraft,
+        stationById,
+      )
+    : [];
   const isGeometryMode = toolMode === "geometry";
   const canUndo = isGeometryMode
     ? geometryHistoryVersion >= 0 && geometryUndoStackRef.current.length > 0
@@ -5251,6 +5316,7 @@ export default function UnifiedMapEditor({
                   canRedo={canRedo}
                   stationAnchorLabels={geometryDraftStationAnchorLabels}
                   saveModel={geometryDraftSaveModel}
+                  changeSummaryLabels={geometryDraftChangeSummaryLabels}
                   onSave={() => void saveGeometryDraft()}
                   onReset={resetGeometryDraftToSaved}
                   onUndo={undoGeometryDraftEdit}
@@ -5671,6 +5737,7 @@ function GeometryModeInspector({
   canRedo,
   stationAnchorLabels,
   saveModel,
+  changeSummaryLabels,
   onSave,
   onReset,
   onUndo,
@@ -5684,6 +5751,7 @@ function GeometryModeInspector({
   canRedo: boolean;
   stationAnchorLabels: string[];
   saveModel: GeometryDraftSaveModel | null;
+  changeSummaryLabels: string[];
   onSave: () => void;
   onReset: () => void;
   onUndo: () => void;
@@ -5776,6 +5844,58 @@ function GeometryModeInspector({
           <span className="size-3 rounded-full border-2 border-white bg-slate-500 shadow" />
           수동 보정점
         </div>
+      </div>
+
+      <div
+        className={cn(
+          "rounded-2xl border p-3 text-xs font-medium",
+          changeSummaryLabels.length > 0
+            ? "border-amber-200 bg-amber-50 text-amber-900"
+            : "border-slate-200 bg-white text-slate-500",
+        )}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <strong
+            className={
+              changeSummaryLabels.length > 0
+                ? "text-amber-900"
+                : "text-slate-800"
+            }
+          >
+            저장 전 변경사항
+          </strong>
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[10px] font-bold",
+              changeSummaryLabels.length > 0
+                ? "bg-amber-100 text-amber-700"
+                : "bg-slate-100 text-slate-400",
+            )}
+          >
+            {changeSummaryLabels.length > 0
+              ? `${changeSummaryLabels.length}개`
+              : "없음"}
+          </span>
+        </div>
+        {changeSummaryLabels.length > 0 ? (
+          <ul className="mt-2 grid gap-1.5 text-[11px] leading-4 text-amber-800">
+            {changeSummaryLabels.slice(0, 5).map((label) => (
+              <li key={label} className="flex gap-1.5">
+                <span className="mt-[0.45em] size-1 shrink-0 rounded-full bg-amber-500" />
+                <span className="min-w-0 truncate">{label}</span>
+              </li>
+            ))}
+            {changeSummaryLabels.length > 5 ? (
+              <li className="text-[10px] font-semibold text-amber-700">
+                외 {changeSummaryLabels.length - 5}개 변경
+              </li>
+            ) : null}
+          </ul>
+        ) : (
+          <p className="mt-1 text-[11px] leading-4">
+            저장 대기 중인 선형/역 위치 변경이 없습니다.
+          </p>
+        )}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-3 text-xs font-medium text-slate-600">
@@ -6092,9 +6212,9 @@ function StationInspector({
             <div>
               <strong className="font-semibold">저장 선형 anchor 불일치</strong>
               <p className="mt-1 leading-5 text-orange-800">
-                역 위치 override가 아니라 저장된 선형 보정 안의 역 anchor
-                좌표가 현재 역 위치와 다릅니다. 위치 롤백 대신 anchor
-                동기화를 실행하세요.
+                역 위치 override가 아니라 저장된 선형 보정 안의 역 anchor 좌표가
+                현재 역 위치와 다릅니다. 위치 롤백 대신 anchor 동기화를
+                실행하세요.
               </p>
             </div>
             <Badge>{staleSavedAnchorCount}개</Badge>
