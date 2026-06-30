@@ -6,7 +6,7 @@ import { Badge } from "@repo/ui/badge";
 import { Button } from "@repo/ui/button";
 import { Dialog } from "@repo/ui/dialog";
 import { Input, Textarea } from "@repo/ui/input";
-import { AppShell, InspectorGrid } from "@repo/ui/layout";
+import { AppShell } from "@repo/ui/layout";
 import { Panel, PanelBody, PanelHeader } from "@repo/ui/panel";
 import { TabButton, TabList } from "@repo/ui/tabs";
 import { Toast, type ToastTone } from "@repo/ui/toast";
@@ -119,11 +119,14 @@ type GeometryDraftHistoryRecord = {
   after: GeometryDraft | null;
 };
 
-type GeometryDraftSaveModel = {
-  geometryStorageLabel: string;
-  stationPositionChangeLabels: string[];
-  stationAnchorCount: number;
-  controlPointCount: number;
+type GeometryDraftMap = Record<string, GeometryDraft>;
+
+type GeometryWorkspaceSummary = {
+  changedTargetCount: number;
+  addedControlPointCount: number;
+  removedControlPointCount: number;
+  movedStationCount: number;
+  movedStationLabels: string[];
 };
 
 type GeometryPointDragState = {
@@ -806,6 +809,56 @@ function validateBranchStationExclusions(
   return issues;
 }
 
+function getPublicWebManualChangeRows(overlays: ManualOverlayBundle) {
+  return [
+    {
+      label: "역 보정",
+      count: overlays.stationOverrides.length,
+      description:
+        "역 표시명, 위치 override, 메모가 공개 Web 역/선형 계산에 반영됩니다.",
+    },
+    {
+      label: "환승 그룹",
+      count: overlays.manualTransferGroups.length,
+      description:
+        "환승역 collapsed/expanded 표시와 환승 그룹 라벨에 반영됩니다.",
+    },
+    {
+      label: "미환승역",
+      count: overlays.nonTransferStationIds.length,
+      description: "환승 후보에서 제외되는 역 목록입니다.",
+    },
+    {
+      label: "노선별 역 제외",
+      count: overlays.branchStationExclusions.length,
+      description: "특정 branch에서 역을 제거한 override입니다.",
+    },
+    {
+      label: "지선 overlay",
+      count: (overlays.lineBranchOverrides ?? []).length,
+      description: "역 추가/노선 결합으로 만든 수동 지선 선형입니다.",
+    },
+    {
+      label: "선형 보정",
+      count: overlays.geometryOverrides.length,
+      description:
+        "일반 branch의 수동 station anchor/control point 보정입니다.",
+    },
+    {
+      label: "노선 보정",
+      count: overlays.branchOverrides.length,
+      description: "노선 단위 표시/메타 보정입니다.",
+    },
+  ];
+}
+
+function getPublicWebManualChangeTotal(overlays: ManualOverlayBundle) {
+  return getPublicWebManualChangeRows(overlays).reduce(
+    (total, row) => total + row.count,
+    0,
+  );
+}
+
 function stationGeometryDistance(left: LngLatTuple, right: LngLatTuple) {
   return getCoordinateDistance(left, right);
 }
@@ -1447,6 +1500,10 @@ function cloneGeometryDraft(draft: GeometryDraft | null): GeometryDraft | null {
   };
 }
 
+function getGeometryDraftsFromMap(map: GeometryDraftMap): GeometryDraft[] {
+  return Object.values(map).map((draft) => cloneGeometryDraft(draft) ?? draft);
+}
+
 function getGeometryDraftSignature(draft: GeometryDraft | null) {
   if (!draft) return "";
   return JSON.stringify({
@@ -1470,6 +1527,10 @@ function areGeometryDraftsEqual(
   return getGeometryDraftSignature(left) === getGeometryDraftSignature(right);
 }
 
+function getControlPointCount(draft: GeometryDraft | null) {
+  return draft?.points.filter((point) => point.kind === "control").length ?? 0;
+}
+
 function getStationGeometryPoint(
   stationId: string | undefined,
   stationById: Map<string, EditorStation>,
@@ -1485,21 +1546,6 @@ function getStationGeometryPoint(
     kind: "station",
     stationId: station.id,
   };
-}
-
-function getGeometryDraftStationAnchorLabels(
-  draft: GeometryDraft | null,
-  stationById: Map<string, EditorStation>,
-) {
-  if (!draft) return [];
-
-  return draft.points
-    .filter(
-      (point): point is ManualGeometryOverridePoint & { stationId: string } =>
-        point.kind === "station" && Boolean(point.stationId),
-    )
-    .map((point) => formatStationDisplayName(stationById.get(point.stationId)))
-    .filter((label, index, labels) => labels.indexOf(label) === index);
 }
 
 function getGeometryDraftStationPositionChangeLabels(
@@ -1519,93 +1565,6 @@ function getGeometryDraftStationPositionChangeLabels(
     })
     .map((point) => formatStationDisplayName(stationById.get(point.stationId)))
     .filter((label, index, labels) => labels.indexOf(label) === index);
-}
-
-function getGeometryDraftSaveModel(
-  draft: GeometryDraft,
-  stationById: Map<string, EditorStation>,
-): GeometryDraftSaveModel {
-  const stationAnchorCount = draft.points.filter(
-    (point) => point.kind === "station",
-  ).length;
-  const controlPointCount = draft.points.filter(
-    (point) => point.kind === "control",
-  ).length;
-
-  return {
-    geometryStorageLabel:
-      draft.targetType === "branch"
-        ? "일반 노선 geometryOverrides"
-        : "지선 overlay lineBranchOverrides.geometry",
-    stationPositionChangeLabels: getGeometryDraftStationPositionChangeLabels(
-      draft,
-      stationById,
-    ),
-    stationAnchorCount,
-    controlPointCount,
-  };
-}
-
-function getGeometryDraftChangeSummaryLabels(
-  draft: GeometryDraft | null,
-  savedDraft: GeometryDraft | null,
-  stationById: Map<string, EditorStation>,
-) {
-  if (!draft || areGeometryDraftsEqual(draft, savedDraft)) return [];
-
-  const labels: string[] = [];
-  const currentControlCount = draft.points.filter(
-    (point) => point.kind === "control",
-  ).length;
-  const savedControlCount = (savedDraft?.points ?? []).filter(
-    (point) => point.kind === "control",
-  ).length;
-  const stationPositionLabels = getGeometryDraftStationPositionChangeLabels(
-    draft,
-    stationById,
-  );
-
-  if (currentControlCount > savedControlCount) {
-    labels.push(
-      `수동 보정점 ${currentControlCount - savedControlCount}개 추가`,
-    );
-  } else if (currentControlCount < savedControlCount) {
-    labels.push(
-      `수동 보정점 ${savedControlCount - currentControlCount}개 제거`,
-    );
-  }
-
-  const controlSignature = (target: GeometryDraft | null) =>
-    JSON.stringify(
-      (target?.points ?? [])
-        .filter((point) => point.kind === "control")
-        .map((point) => ({
-          lng: Number(point.lng.toFixed(8)),
-          lat: Number(point.lat.toFixed(8)),
-        })),
-    );
-
-  if (
-    currentControlCount > 0 &&
-    controlSignature(draft) !== controlSignature(savedDraft) &&
-    !labels.some((label) => label.includes("수동 보정점"))
-  ) {
-    labels.push("수동 보정점 위치 변경");
-  }
-
-  for (const label of stationPositionLabels) {
-    labels.push(`${label} 역 위치 변경`);
-  }
-
-  if ((draft.note ?? "") !== (savedDraft?.note ?? "")) {
-    labels.push("선형 메모 변경");
-  }
-
-  if (labels.length === 0) {
-    labels.push("선형 좌표 변경");
-  }
-
-  return labels;
 }
 
 function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
@@ -2283,6 +2242,28 @@ function applyGeometryDraftStationPointsToBranches(
   }, branches);
 }
 
+function applyGeometryDraftsStationPointsToStations(
+  stations: EditorStation[],
+  drafts: GeometryDraft[],
+): EditorStation[] {
+  return drafts.reduce(
+    (current, draft) =>
+      applyGeometryDraftStationPointsToStations(current, draft),
+    stations,
+  );
+}
+
+function applyGeometryDraftsStationPointsToBranches(
+  branches: EditorMapBranch[],
+  drafts: GeometryDraft[],
+): EditorMapBranch[] {
+  return drafts.reduce(
+    (current, draft) =>
+      applyGeometryDraftStationPointsToBranches(current, draft),
+    branches,
+  );
+}
+
 function resolveGeometryPointStationAnchors(
   points: ManualGeometryOverridePoint[],
   stationById: Map<string, EditorStation>,
@@ -2437,38 +2418,60 @@ function applyGeometryDraftToLineBranchOverrides(
   );
 }
 
+function applyGeometryDraftsToBranches(
+  branches: EditorMapBranch[],
+  drafts: GeometryDraft[],
+): EditorMapBranch[] {
+  return drafts.reduce(
+    (current, draft) => applyGeometryDraftToBranches(current, draft),
+    branches,
+  );
+}
+
+function applyGeometryDraftsToLineBranchOverrides(
+  overrides: ManualLineBranchOverride[],
+  drafts: GeometryDraft[],
+): ManualLineBranchOverride[] {
+  return drafts.reduce(
+    (current, draft) => applyGeometryDraftToLineBranchOverrides(current, draft),
+    overrides,
+  );
+}
+
 function buildGeometryEditPointFeatures(
-  draft: GeometryDraft | null,
+  drafts: GeometryDraft[],
   visible: boolean,
 ): RailFeatureCollection {
-  if (!visible || !draft) return EMPTY_FEATURE_COLLECTION;
+  if (!visible || drafts.length < 1) return EMPTY_FEATURE_COLLECTION;
 
   return {
     type: "FeatureCollection",
-    features: draft.points
-      .map((point, index) => {
-        if (!Number.isFinite(point.lng) || !Number.isFinite(point.lat))
-          return null;
-        return {
-          type: "Feature" as const,
-          properties: {
-            id: `${draft.targetType}:${draft.targetId}:geometry-point:${index}`,
-            targetType: draft.targetType,
-            targetId: draft.targetId,
-            branchId: draft.branchId,
-            pointIndex: index,
-            kind: point.kind,
-            draggable: true,
-          },
-          geometry: {
-            type: "Point" as const,
-            coordinates: [point.lng, point.lat] as LngLatTuple,
-          },
-        };
-      })
-      .filter(
-        (feature): feature is NonNullable<typeof feature> => feature !== null,
-      ),
+    features: drafts.flatMap((draft) =>
+      draft.points
+        .map((point, index) => {
+          if (!Number.isFinite(point.lng) || !Number.isFinite(point.lat))
+            return null;
+          return {
+            type: "Feature" as const,
+            properties: {
+              id: `${draft.targetType}:${draft.targetId}:geometry-point:${index}`,
+              targetType: draft.targetType,
+              targetId: draft.targetId,
+              branchId: draft.branchId,
+              pointIndex: index,
+              kind: point.kind,
+              draggable: true,
+            },
+            geometry: {
+              type: "Point" as const,
+              coordinates: [point.lng, point.lat] as LngLatTuple,
+            },
+          };
+        })
+        .filter(
+          (feature): feature is NonNullable<typeof feature> => feature !== null,
+        ),
+    ),
   };
 }
 
@@ -2581,6 +2584,7 @@ export default function UnifiedMapEditor({
   );
   const toolModeRef = useRef<ToolMode>("select");
   const geometryDraftRef = useRef<GeometryDraft | null>(null);
+  const geometryDraftsByKeyRef = useRef<GeometryDraftMap>({});
   const geometryUndoStackRef = useRef<GeometryDraftHistoryRecord[]>([]);
   const geometryRedoStackRef = useRef<GeometryDraftHistoryRecord[]>([]);
   const geometryDragStartDraftRef = useRef<GeometryDraft | null>(null);
@@ -2648,9 +2652,16 @@ export default function UnifiedMapEditor({
   const [geometryDraft, setGeometryDraft] = useState<GeometryDraft | null>(
     null,
   );
+  const [geometryDraftsByKey, setGeometryDraftsByKey] =
+    useState<GeometryDraftMap>({});
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
   const [pendingTransferSelection, setPendingTransferSelection] =
     useState<PendingTransferSelection | null>(null);
+
+  const geometryWorkspaceDrafts = useMemo(
+    () => getGeometryDraftsFromMap(geometryDraftsByKey),
+    [geometryDraftsByKey],
+  );
 
   const stationById = useMemo(
     () => new Map(data.stations.map((station) => [station.id, station])),
@@ -2658,14 +2669,24 @@ export default function UnifiedMapEditor({
   );
   const displayStations = useMemo(
     () =>
-      applyGeometryDraftStationPointsToStations(
-        applyStationOverridesToStations(
-          data.stations,
-          overlays.stationOverrides,
-        ),
-        toolMode === "geometry" ? geometryDraft : null,
-      ),
-    [data.stations, geometryDraft, overlays.stationOverrides, toolMode],
+      toolMode === "geometry"
+        ? applyGeometryDraftsStationPointsToStations(
+            applyStationOverridesToStations(
+              data.stations,
+              overlays.stationOverrides,
+            ),
+            geometryWorkspaceDrafts,
+          )
+        : applyStationOverridesToStations(
+            data.stations,
+            overlays.stationOverrides,
+          ),
+    [
+      data.stations,
+      geometryWorkspaceDrafts,
+      overlays.stationOverrides,
+      toolMode,
+    ],
   );
   const displayStationById = useMemo(
     () => new Map(displayStations.map((station) => [station.id, station])),
@@ -2692,20 +2713,22 @@ export default function UnifiedMapEditor({
     );
     const branchesWithGeometryStationPreview =
       toolMode === "geometry"
-        ? applyGeometryDraftStationPointsToBranches(
+        ? applyGeometryDraftsStationPointsToBranches(
             branchesWithSavedGeometry,
-            geometryDraft,
+            geometryWorkspaceDrafts,
           )
         : branchesWithSavedGeometry;
 
-    return applyGeometryDraftToBranches(
-      branchesWithGeometryStationPreview,
-      toolMode === "geometry" ? geometryDraft : null,
-    );
+    return toolMode === "geometry"
+      ? applyGeometryDraftsToBranches(
+          branchesWithGeometryStationPreview,
+          geometryWorkspaceDrafts,
+        )
+      : branchesWithGeometryStationPreview;
   }, [
     data.branches,
     displayStationById,
-    geometryDraft,
+    geometryWorkspaceDrafts,
     overlays.geometryOverrides,
     overlays.stationOverrides,
     toolMode,
@@ -2713,18 +2736,28 @@ export default function UnifiedMapEditor({
   const displayLineBranchOverrides = useMemo(
     () =>
       applyDisplayStationAnchorsToLineBranchOverrides(
-        applyGeometryDraftToLineBranchOverrides(
-          overlays.lineBranchOverrides ?? [],
-          toolMode === "geometry" ? geometryDraft : null,
-        ),
+        toolMode === "geometry"
+          ? applyGeometryDraftsToLineBranchOverrides(
+              overlays.lineBranchOverrides ?? [],
+              geometryWorkspaceDrafts,
+            )
+          : (overlays.lineBranchOverrides ?? []),
         displayStationById,
       ),
-    [displayStationById, geometryDraft, overlays.lineBranchOverrides, toolMode],
+    [
+      displayStationById,
+      geometryWorkspaceDrafts,
+      overlays.lineBranchOverrides,
+      toolMode,
+    ],
   );
   const geometryEditPointFeatures = useMemo(
     () =>
-      buildGeometryEditPointFeatures(geometryDraft, toolMode === "geometry"),
-    [geometryDraft, toolMode],
+      buildGeometryEditPointFeatures(
+        geometryWorkspaceDrafts,
+        toolMode === "geometry",
+      ),
+    [geometryWorkspaceDrafts, toolMode],
   );
   const lineBranchIssues = useMemo(
     () => [
@@ -3097,7 +3130,22 @@ export default function UnifiedMapEditor({
 
   useEffect(() => {
     geometryDraftRef.current = geometryDraft;
+    if (!geometryDraft) return;
+    const key = getGeometryDraftTargetKey(geometryDraft);
+    if (!key) return;
+    setGeometryDraftsByKey((previous) => {
+      const previousDraft = previous[key] ?? null;
+      if (areGeometryDraftsEqual(previousDraft, geometryDraft)) return previous;
+      return {
+        ...previous,
+        [key]: cloneGeometryDraft(geometryDraft) ?? geometryDraft,
+      };
+    });
   }, [geometryDraft]);
+
+  useEffect(() => {
+    geometryDraftsByKeyRef.current = geometryDraftsByKey;
+  }, [geometryDraftsByKey]);
 
   function pushGeometryDraftHistory(
     before: GeometryDraft | null,
@@ -3127,7 +3175,17 @@ export default function UnifiedMapEditor({
       ...geometryRedoStackRef.current,
       record,
     ].slice(-80);
-    setGeometryDraft(cloneGeometryDraft(record.before));
+    const nextDraft = cloneGeometryDraft(record.before);
+    setGeometryDraft(nextDraft);
+    const key = getGeometryDraftTargetKey(record.after ?? record.before);
+    if (key) {
+      setGeometryDraftsByKey((previous) => {
+        const next = { ...previous };
+        if (nextDraft) next[key] = nextDraft;
+        else delete next[key];
+        return next;
+      });
+    }
     setGeometryHistoryVersion((value) => value + 1);
   }
 
@@ -3139,12 +3197,21 @@ export default function UnifiedMapEditor({
       ...geometryUndoStackRef.current,
       record,
     ].slice(-80);
-    setGeometryDraft(cloneGeometryDraft(record.after));
+    const nextDraft = cloneGeometryDraft(record.after);
+    setGeometryDraft(nextDraft);
+    const key = getGeometryDraftTargetKey(record.after ?? record.before);
+    if (key) {
+      setGeometryDraftsByKey((previous) => {
+        const next = { ...previous };
+        if (nextDraft) next[key] = nextDraft;
+        else delete next[key];
+        return next;
+      });
+    }
     setGeometryHistoryVersion((value) => value + 1);
   }
 
-  function getSavedGeometryDraftForCurrentTarget() {
-    const draft = geometryDraftRef.current;
+  function getSavedGeometryDraftForDraft(draft: GeometryDraft | null) {
     if (!draft) return null;
 
     if (draft.targetType === "branch") {
@@ -3166,10 +3233,11 @@ export default function UnifiedMapEditor({
       : null;
   }
 
-  function resetGeometryDraftToSaved() {
-    const savedDraft = getSavedGeometryDraftForCurrentTarget();
-    setGeometryDraft(cloneGeometryDraft(savedDraft));
+  function resetGeometryWorkspaceToSaved() {
+    setGeometryDraft(null);
+    setGeometryDraftsByKey({});
     clearGeometryDraftHistory();
+    showToastRef.current("선형 편집 변경을 되돌렸습니다", "info");
   }
 
   useEffect(() => {
@@ -3190,6 +3258,10 @@ export default function UnifiedMapEditor({
     stationLocationPickModeRef.current = false;
     setContextMenu(null);
     setSidebarTab("search");
+    if (toolMode !== "geometry") {
+      setGeometryDraft(null);
+      setGeometryDraftsByKey({});
+    }
     clearGeometryDraftHistory();
   }, [toolMode]);
 
@@ -3728,7 +3800,11 @@ export default function UnifiedMapEditor({
         event.preventDefault();
 
         if (original.ctrlKey || original.metaKey) {
-          const before = cloneGeometryDraft(geometryDraftRef.current);
+          const targetKey = getGeometryTargetKey(targetType, targetId);
+          const before = cloneGeometryDraft(
+            geometryDraftsByKeyRef.current[targetKey] ??
+              geometryDraftRef.current,
+          );
           if (
             !before ||
             before.targetType !== targetType ||
@@ -3751,6 +3827,10 @@ export default function UnifiedMapEditor({
             points: before.points.filter((_, index) => index !== pointIndex),
           };
           setGeometryDraft(after);
+          setGeometryDraftsByKey((previous) => ({
+            ...previous,
+            [targetKey]: after,
+          }));
           pushGeometryDraftHistory(before, after);
           showToastRef.current("선형 정점을 제거했습니다", "success");
           return;
@@ -3760,7 +3840,9 @@ export default function UnifiedMapEditor({
           targetType,
           targetId,
           pointIndex,
-          geometryDraftRef.current,
+          geometryDraftsByKeyRef.current[
+            getGeometryTargetKey(targetType, targetId)
+          ] ?? geometryDraftRef.current,
         );
         return;
       }
@@ -3826,9 +3908,12 @@ export default function UnifiedMapEditor({
       original.preventDefault();
       event.preventDefault();
 
-      const existingDraft = geometryDraftRef.current;
-      const existingTargetKey = getGeometryDraftTargetKey(existingDraft);
       const baseTargetKey = getGeometryDraftTargetKey(baseDraft);
+      const existingDraft = baseTargetKey
+        ? (geometryDraftsByKeyRef.current[baseTargetKey] ??
+          geometryDraftRef.current)
+        : geometryDraftRef.current;
+      const existingTargetKey = getGeometryDraftTargetKey(existingDraft);
       if (existingDraft && existingTargetKey === baseTargetKey)
         baseDraft = existingDraft;
 
@@ -3852,6 +3937,12 @@ export default function UnifiedMapEditor({
       };
 
       setGeometryDraft(nextDraft);
+      if (baseTargetKey) {
+        setGeometryDraftsByKey((previous) => ({
+          ...previous,
+          [baseTargetKey]: nextDraft,
+        }));
+      }
       setSidebarTab("search");
       beginGeometryPointDrag(
         nextDraft.targetType,
@@ -3870,25 +3961,34 @@ export default function UnifiedMapEditor({
 
       const geometryDrag = geometryPointDragRef.current;
       if (geometryDrag) {
-        setGeometryDraft((previous) => {
-          if (
-            !previous ||
-            previous.targetType !== geometryDrag.targetType ||
-            previous.targetId !== geometryDrag.targetId
-          )
-            return previous;
-          const target = previous.points[geometryDrag.pointIndex];
-          if (!target) return previous;
-
-          return {
-            ...previous,
-            points: previous.points.map((point, index) =>
-              index === geometryDrag.pointIndex
-                ? { ...point, lng: event.lngLat.lng, lat: event.lngLat.lat }
-                : point,
-            ),
-          };
-        });
+        const targetKey = getGeometryTargetKey(
+          geometryDrag.targetType,
+          geometryDrag.targetId,
+        );
+        const currentDraft =
+          geometryDraftsByKeyRef.current[targetKey] ?? geometryDraftRef.current;
+        if (
+          currentDraft &&
+          currentDraft.targetType === geometryDrag.targetType &&
+          currentDraft.targetId === geometryDrag.targetId
+        ) {
+          const target = currentDraft.points[geometryDrag.pointIndex];
+          if (target) {
+            const nextDraft: GeometryDraft = {
+              ...currentDraft,
+              points: currentDraft.points.map((point, index) =>
+                index === geometryDrag.pointIndex
+                  ? { ...point, lng: event.lngLat.lng, lat: event.lngLat.lat }
+                  : point,
+              ),
+            };
+            setGeometryDraft(nextDraft);
+            setGeometryDraftsByKey((previous) => ({
+              ...previous,
+              [targetKey]: nextDraft,
+            }));
+          }
+        }
         map.getCanvas().style.cursor = "grabbing";
       } else if (stationLocationPickModeRef.current) {
         map.getCanvas().style.cursor = "crosshair";
@@ -4095,8 +4195,15 @@ export default function UnifiedMapEditor({
 
     map.on("mouseup", (event) => {
       if (geometryPointDragRef.current) {
+        const geometryDrag = geometryPointDragRef.current;
+        const targetKey = getGeometryTargetKey(
+          geometryDrag.targetType,
+          geometryDrag.targetId,
+        );
         const before = cloneGeometryDraft(geometryDragStartDraftRef.current);
-        const after = cloneGeometryDraft(geometryDraftRef.current);
+        const after = cloneGeometryDraft(
+          geometryDraftsByKeyRef.current[targetKey] ?? geometryDraftRef.current,
+        );
         geometryPointDragRef.current = null;
         geometryDragStartDraftRef.current = null;
         pushGeometryDraftHistory(before, after);
@@ -4559,167 +4666,85 @@ export default function UnifiedMapEditor({
     setSelection({ type: "none" });
   }
 
-  async function saveGeometryDraft() {
-    if (!geometryDraft) return;
+  async function saveGeometryWorkspaceDrafts() {
+    const drafts = getGeometryDraftsFromMap(geometryDraftsByKeyRef.current);
+    const dirtyDrafts = drafts.filter(
+      (draft) =>
+        !areGeometryDraftsEqual(draft, getSavedGeometryDraftForDraft(draft)),
+    );
 
-    if (geometryDraft.targetType === "branch") {
-      const override = toGeometryOverride(geometryDraft);
-      if (override.points.length < 2) {
-        showToast("선형은 좌표가 2개 이상 필요합니다", "error");
-        return;
-      }
+    if (dirtyDrafts.length < 1) {
+      showToast("저장할 선형 편집 변경이 없습니다", "info");
+      return;
+    }
 
+    let nextStationOverrides = overlays.stationOverrides;
+    let nextGeometryOverrides = overlays.geometryOverrides;
+    let nextLineBranchOverrides = overlays.lineBranchOverrides ?? [];
+
+    for (const draft of dirtyDrafts) {
       const stationPositionOverrides =
         getMovedStationOverridesFromGeometryDraft(
-          geometryDraft,
+          draft,
           stationById,
-          overlays.stationOverrides,
+          nextStationOverrides,
         );
-      const next: ManualOverlayBundle = {
-        ...overlays,
-        stationOverrides: mergeStationOverrides(
-          overlays.stationOverrides,
-          stationPositionOverrides,
-        ),
-        geometryOverrides: [
-          ...overlays.geometryOverrides.filter(
+      nextStationOverrides = mergeStationOverrides(
+        nextStationOverrides,
+        stationPositionOverrides,
+      );
+
+      if (draft.targetType === "branch") {
+        const override = toGeometryOverride(draft);
+        if (override.points.length < 2) {
+          showToast("선형은 좌표가 2개 이상 필요합니다", "error");
+          return;
+        }
+        nextGeometryOverrides = [
+          ...nextGeometryOverrides.filter(
             (candidate) => candidate.branchId !== override.branchId,
           ),
           override,
-        ],
-      };
+        ];
+        continue;
+      }
 
-      const saved = await executeOverlayCommand(
-        "선형 보정",
-        next,
-        "선형 보정 저장 완료",
+      const geometry = toLineBranchGeometryPoints(draft);
+      if (geometry.length < 2) {
+        showToast("선형은 좌표가 2개 이상 필요합니다", "error");
+        return;
+      }
+      nextLineBranchOverrides = nextLineBranchOverrides.map((override) =>
+        override.id === draft.targetId
+          ? {
+              ...override,
+              geometry,
+              note: draft.note.trim()
+                ? draft.note.trim()
+                : (override.note ?? null),
+            }
+          : override,
       );
-      if (!saved) return;
-      clearGeometryDraftHistory();
-
-      const nextData = await reloadEditorData();
-      const savedBranch = nextData?.branches.find(
-        (branch) => branch.id === override.branchId,
-      );
-      const savedOverride =
-        nextData?.overlays.geometryOverrides.find(
-          (candidate) => candidate.branchId === override.branchId,
-        ) ?? override;
-      setGeometryDraft(
-        savedBranch
-          ? makeGeometryDraftFromBranch(savedBranch, savedOverride)
-          : null,
-      );
-      return;
     }
 
-    const geometry = toLineBranchGeometryPoints(geometryDraft);
-    if (geometry.length < 2) {
-      showToast("선형은 좌표가 2개 이상 필요합니다", "error");
-      return;
-    }
-
-    const stationPositionOverrides = getMovedStationOverridesFromGeometryDraft(
-      geometryDraft,
-      stationById,
-      overlays.stationOverrides,
-    );
     const next: ManualOverlayBundle = {
       ...overlays,
-      stationOverrides: mergeStationOverrides(
-        overlays.stationOverrides,
-        stationPositionOverrides,
-      ),
-      lineBranchOverrides: (overlays.lineBranchOverrides ?? []).map(
-        (override) =>
-          override.id === geometryDraft.targetId
-            ? {
-                ...override,
-                geometry,
-                note: geometryDraft.note.trim()
-                  ? geometryDraft.note.trim()
-                  : (override.note ?? null),
-              }
-            : override,
-      ),
+      stationOverrides: nextStationOverrides,
+      geometryOverrides: nextGeometryOverrides,
+      lineBranchOverrides: nextLineBranchOverrides,
     };
 
     const saved = await executeOverlayCommand(
-      "지선 선형 보정",
+      "선형 전체 보정",
       next,
-      "지선 선형 보정 저장 완료",
+      `선형 편집 ${dirtyDrafts.length.toLocaleString("ko-KR")}개 저장 완료`,
     );
     if (!saved) return;
+
+    setGeometryDraft(null);
+    setGeometryDraftsByKey({});
     clearGeometryDraftHistory();
-
-    const nextData = await reloadEditorData();
-    const nextStationById = new Map(
-      (nextData?.stations ?? data.stations).map((station) => [
-        station.id,
-        station,
-      ]),
-    );
-    const savedOverride =
-      nextData?.overlays.lineBranchOverrides.find(
-        (override) => override.id === geometryDraft.targetId,
-      ) ??
-      next.lineBranchOverrides.find(
-        (override) => override.id === geometryDraft.targetId,
-      );
-    setGeometryDraft(
-      savedOverride
-        ? makeGeometryDraftFromLineBranchOverride(
-            savedOverride,
-            nextStationById,
-          )
-        : null,
-    );
-  }
-
-  async function clearGeometryOverrideForDraft() {
-    if (!geometryDraft) return;
-
-    if (geometryDraft.targetType === "branch") {
-      const next: ManualOverlayBundle = {
-        ...overlays,
-        geometryOverrides: overlays.geometryOverrides.filter(
-          (override) => override.branchId !== geometryDraft.branchId,
-        ),
-      };
-      await executeOverlayCommand(
-        "선형 보정 제거",
-        next,
-        "선형 보정 제거 완료",
-      );
-      const branch = branchById.get(geometryDraft.branchId);
-      setGeometryDraft(branch ? makeGeometryDraftFromBranch(branch) : null);
-      clearGeometryDraftHistory();
-      return;
-    }
-
-    const next: ManualOverlayBundle = {
-      ...overlays,
-      lineBranchOverrides: (overlays.lineBranchOverrides ?? []).map(
-        (override) =>
-          override.id === geometryDraft.targetId
-            ? { ...override, geometry: undefined }
-            : override,
-      ),
-    };
-    await executeOverlayCommand(
-      "지선 선형 보정 제거",
-      next,
-      "지선 선형 보정 제거 완료",
-    );
-    const override = next.lineBranchOverrides.find(
-      (candidate) => candidate.id === geometryDraft.targetId,
-    );
-    setGeometryDraft(
-      override
-        ? makeGeometryDraftFromLineBranchOverride(override, stationById)
-        : null,
-    );
-    clearGeometryDraftHistory();
+    await reloadEditorData();
   }
 
   function createTransferGroupFromSelection(ids: string[]) {
@@ -4980,6 +5005,49 @@ export default function UnifiedMapEditor({
     : [];
   const selectedBranch =
     selection.type === "branch" ? (branchById.get(selection.id) ?? null) : null;
+  const geometryWorkspaceDirtyDrafts = geometryWorkspaceDrafts.filter(
+    (draft) =>
+      !areGeometryDraftsEqual(draft, getSavedGeometryDraftForDraft(draft)),
+  );
+  const geometryWorkspaceSummary: GeometryWorkspaceSummary =
+    geometryWorkspaceDirtyDrafts.reduce<GeometryWorkspaceSummary>(
+      (summary, draft) => {
+        const savedDraft = getSavedGeometryDraftForDraft(draft);
+        const movedStationLabels = getGeometryDraftStationPositionChangeLabels(
+          draft,
+          stationById,
+        );
+        const addedControlPointCount = Math.max(
+          0,
+          getControlPointCount(draft) - getControlPointCount(savedDraft),
+        );
+        const removedControlPointCount = Math.max(
+          0,
+          getControlPointCount(savedDraft) - getControlPointCount(draft),
+        );
+
+        return {
+          changedTargetCount: summary.changedTargetCount + 1,
+          addedControlPointCount:
+            summary.addedControlPointCount + addedControlPointCount,
+          removedControlPointCount:
+            summary.removedControlPointCount + removedControlPointCount,
+          movedStationCount:
+            summary.movedStationCount + movedStationLabels.length,
+          movedStationLabels: [
+            ...summary.movedStationLabels,
+            ...movedStationLabels,
+          ],
+        };
+      },
+      {
+        changedTargetCount: 0,
+        addedControlPointCount: 0,
+        removedControlPointCount: 0,
+        movedStationCount: 0,
+        movedStationLabels: [],
+      },
+    );
   const activeGeometryTargetKey = getGeometryDraftTargetKey(geometryDraft);
   const activeGeometryTarget = activeGeometryTargetKey
     ? (geometryTargets.find(
@@ -4997,26 +5065,7 @@ export default function UnifiedMapEditor({
       : null;
   const multiStationIds =
     selection.type === "multiStation" ? selection.ids : [];
-  const savedGeometryDraft = geometryDraft
-    ? getSavedGeometryDraftForCurrentTarget()
-    : null;
-  const geometryDraftDirty = geometryDraft
-    ? !areGeometryDraftsEqual(geometryDraft, savedGeometryDraft)
-    : false;
-  const geometryDraftStationAnchorLabels = getGeometryDraftStationAnchorLabels(
-    geometryDraft,
-    displayStationById,
-  );
-  const geometryDraftSaveModel = geometryDraft
-    ? getGeometryDraftSaveModel(geometryDraft, stationById)
-    : null;
-  const geometryDraftChangeSummaryLabels = geometryDraftDirty
-    ? getGeometryDraftChangeSummaryLabels(
-        geometryDraft,
-        savedGeometryDraft,
-        stationById,
-      )
-    : [];
+  const geometryDraftDirty = geometryWorkspaceDirtyDrafts.length > 0;
   const isGeometryMode = toolMode === "geometry";
   const canUndo = isGeometryMode
     ? geometryHistoryVersion >= 0 && geometryUndoStackRef.current.length > 0
@@ -5027,237 +5076,247 @@ export default function UnifiedMapEditor({
 
   return (
     <AppShell>
-      <InspectorGrid>
-        <Panel className="flex min-h-0 flex-col overflow-hidden">
-          <PanelHeader>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                  {isGeometryMode ? "Geometry" : "Railmap"}
-                </p>
-                <h1 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
-                  {isGeometryMode ? "선형 편집" : "통합 맵 에디터"}
-                </h1>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button variant="outline" asChild>
-                  <Link href="/">메인</Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link href="/changes">변경</Link>
-                </Button>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => {
-                    if (isGeometryMode) undoGeometryDraftEdit();
-                    else void undoOverlayCommand();
-                  }}
-                  disabled={!canUndo}
-                  aria-label="되돌리기"
-                >
-                  <Undo2 className="size-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => {
-                    if (isGeometryMode) redoGeometryDraftEdit();
-                    else void redoOverlayCommand();
-                  }}
-                  disabled={!canRedo}
-                  aria-label="다시 실행"
-                >
-                  <Redo2 className="size-4" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setCommandOpen(true)}
-                  aria-label="명령 팔레트 열기"
-                >
-                  <Command className="size-4" />
-                </Button>
-              </div>
-            </div>
-            {!isGeometryMode ? (
-              <>
-                <TabList className="mt-4 grid grid-cols-3">
-                  <TabButton
-                    active={sidebarTab === "search"}
-                    onClick={() => setSidebarTab("search")}
-                  >
-                    검색
-                  </TabButton>
-                  <TabButton
-                    active={sidebarTab === "layers"}
-                    onClick={() => setSidebarTab("layers")}
-                  >
-                    레이어
-                  </TabButton>
-                  <TabButton
-                    active={sidebarTab === "transfers"}
-                    onClick={() => setSidebarTab("transfers")}
-                  >
-                    환승
-                  </TabButton>
-                </TabList>
-                <TabList className="mt-2 grid grid-cols-2">
-                  <TabButton
-                    active={sidebarTab === "validation"}
-                    onClick={() => setSidebarTab("validation")}
-                  >
-                    검증
-                  </TabButton>
-                  <TabButton
-                    active={sidebarTab === "history"}
-                    onClick={() => setSidebarTab("history")}
-                  >
-                    기록
-                  </TabButton>
-                </TabList>
-              </>
-            ) : null}
-          </PanelHeader>
-
-          <PanelBody className="min-h-0 flex-1 overflow-y-auto">
-            {isGeometryMode ? (
-              <GeometryModeSidebar
-                targets={filteredGeometryTargets}
-                totalTargetCount={geometryTargets.length}
-                activeTargetKey={getGeometryDraftTargetKey(geometryDraft)}
-                dirtyTargetKey={
-                  geometryDraftDirty
-                    ? getGeometryDraftTargetKey(geometryDraft)
-                    : null
-                }
-                query={geometryTargetQuery}
-                filter={geometryTargetFilter}
-                shortcutsOpen={shortcutHelpOpen}
-                onQueryChange={setGeometryTargetQuery}
-                onFilterChange={setGeometryTargetFilter}
-                onToggleShortcuts={() => setShortcutHelpOpen((open) => !open)}
-                onSelectTarget={selectGeometryTarget}
-              />
-            ) : null}
-
-            {!isGeometryMode && sidebarTab === "search" ? (
-              <div className="grid gap-3">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    className="pl-9"
-                    placeholder="역명, 노선명, 역번호 검색"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
+      <div
+        className={cn(
+          "grid min-h-0 flex-1 gap-4",
+          isGeometryMode
+            ? "grid-cols-[minmax(0,1fr)_320px]"
+            : "grid-cols-[320px_minmax(0,1fr)_340px]",
+        )}
+      >
+        {!isGeometryMode ? (
+          <Panel className="flex min-h-0 flex-col overflow-hidden">
+            <PanelHeader>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    {isGeometryMode ? "Geometry" : "Railmap"}
+                  </p>
+                  <h1 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+                    {isGeometryMode ? "선형 편집" : "통합 맵 에디터"}
+                  </h1>
                 </div>
-                <div className="grid gap-2">
-                  {filteredStations.map((station) => (
-                    <button
-                      key={station.id}
-                      type="button"
-                      className={cn(
-                        "rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50",
-                        selectedStationIds.has(station.id)
-                          ? "border-blue-300 bg-blue-50"
-                          : null,
-                      )}
-                      onClick={() => selectStation(station.id)}
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" asChild>
+                    <Link href="/">메인</Link>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link href="/changes">변경</Link>
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => {
+                      if (isGeometryMode) undoGeometryDraftEdit();
+                      else void undoOverlayCommand();
+                    }}
+                    disabled={!canUndo}
+                    aria-label="되돌리기"
+                  >
+                    <Undo2 className="size-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => {
+                      if (isGeometryMode) redoGeometryDraftEdit();
+                      else void redoOverlayCommand();
+                    }}
+                    disabled={!canRedo}
+                    aria-label="다시 실행"
+                  >
+                    <Redo2 className="size-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={() => setCommandOpen(true)}
+                    aria-label="명령 팔레트 열기"
+                  >
+                    <Command className="size-4" />
+                  </Button>
+                </div>
+              </div>
+              {!isGeometryMode ? (
+                <>
+                  <TabList className="mt-4 grid grid-cols-3">
+                    <TabButton
+                      active={sidebarTab === "search"}
+                      onClick={() => setSidebarTab("search")}
                     >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="size-2.5 rounded-full"
-                          style={{
-                            backgroundColor: station.colorHex ?? "#64748b",
-                          }}
-                        />
-                        <strong className="truncate text-sm font-semibold">
-                          {station.nameKo}
-                        </strong>
-                      </div>
-                      <p className="mt-1 truncate text-xs font-medium text-slate-500">
-                        {formatStationSubLabel(station)}
+                      검색
+                    </TabButton>
+                    <TabButton
+                      active={sidebarTab === "layers"}
+                      onClick={() => setSidebarTab("layers")}
+                    >
+                      레이어
+                    </TabButton>
+                    <TabButton
+                      active={sidebarTab === "transfers"}
+                      onClick={() => setSidebarTab("transfers")}
+                    >
+                      환승
+                    </TabButton>
+                  </TabList>
+                  <TabList className="mt-2 grid grid-cols-2">
+                    <TabButton
+                      active={sidebarTab === "validation"}
+                      onClick={() => setSidebarTab("validation")}
+                    >
+                      검증
+                    </TabButton>
+                    <TabButton
+                      active={sidebarTab === "history"}
+                      onClick={() => setSidebarTab("history")}
+                    >
+                      기록
+                    </TabButton>
+                  </TabList>
+                </>
+              ) : null}
+            </PanelHeader>
+
+            <PanelBody className="min-h-0 flex-1 overflow-y-auto">
+              {isGeometryMode ? (
+                <GeometryModeSidebar
+                  targets={filteredGeometryTargets}
+                  totalTargetCount={geometryTargets.length}
+                  activeTargetKey={getGeometryDraftTargetKey(geometryDraft)}
+                  dirtyTargetKey={
+                    geometryDraftDirty
+                      ? getGeometryDraftTargetKey(geometryDraft)
+                      : null
+                  }
+                  query={geometryTargetQuery}
+                  filter={geometryTargetFilter}
+                  shortcutsOpen={shortcutHelpOpen}
+                  onQueryChange={setGeometryTargetQuery}
+                  onFilterChange={setGeometryTargetFilter}
+                  onToggleShortcuts={() => setShortcutHelpOpen((open) => !open)}
+                  onSelectTarget={selectGeometryTarget}
+                />
+              ) : null}
+
+              {!isGeometryMode && sidebarTab === "search" ? (
+                <div className="grid gap-3">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                    <Input
+                      className="pl-9"
+                      placeholder="역명, 노선명, 역번호 검색"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    {filteredStations.map((station) => (
+                      <button
+                        key={station.id}
+                        type="button"
+                        className={cn(
+                          "rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50",
+                          selectedStationIds.has(station.id)
+                            ? "border-blue-300 bg-blue-50"
+                            : null,
+                        )}
+                        onClick={() => selectStation(station.id)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="size-2.5 rounded-full"
+                            style={{
+                              backgroundColor: station.colorHex ?? "#64748b",
+                            }}
+                          />
+                          <strong className="truncate text-sm font-semibold">
+                            {station.nameKo}
+                          </strong>
+                        </div>
+                        <p className="mt-1 truncate text-xs font-medium text-slate-500">
+                          {formatStationSubLabel(station)}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {!isGeometryMode && sidebarTab === "layers" ? (
+                <div className="grid gap-2">
+                  {layerOptions.map(({ key, label, Icon }) => (
+                    <label
+                      key={String(key)}
+                      className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm font-semibold"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={layers[key]}
+                        onChange={(event) =>
+                          setLayers((previous) => ({
+                            ...previous,
+                            [key]: event.target.checked,
+                          }))
+                        }
+                      />
+                      <Icon className="size-4 text-slate-400" />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+
+              {!isGeometryMode && sidebarTab === "transfers" ? (
+                <div className="grid gap-2">
+                  {multiStationIds.length >= 2 ? (
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        createTransferGroupFromSelection(multiStationIds)
+                      }
+                    >
+                      선택한 역으로 환승 그룹 생성
+                    </Button>
+                  ) : null}
+                  {overlays.manualTransferGroups.map((group) => (
+                    <button
+                      key={group.id}
+                      type="button"
+                      className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50"
+                      onClick={() => selectTransferGroup(group.id)}
+                    >
+                      <strong className="text-sm font-semibold">
+                        {group.nameKo}
+                      </strong>
+                      <p className="mt-1 text-xs font-medium text-slate-500">
+                        {group.stationIds.length}개 역 ·{" "}
+                        {group.note || "메모 없음"}
                       </p>
                     </button>
                   ))}
                 </div>
-              </div>
-            ) : null}
+              ) : null}
 
-            {!isGeometryMode && sidebarTab === "layers" ? (
-              <div className="grid gap-2">
-                {layerOptions.map(({ key, label, Icon }) => (
-                  <label
-                    key={String(key)}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm font-semibold"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={layers[key]}
-                      onChange={(event) =>
-                        setLayers((previous) => ({
-                          ...previous,
-                          [key]: event.target.checked,
-                        }))
-                      }
-                    />
-                    <Icon className="size-4 text-slate-400" />
-                    {label}
-                  </label>
-                ))}
-              </div>
-            ) : null}
-
-            {!isGeometryMode && sidebarTab === "transfers" ? (
-              <div className="grid gap-2">
-                {multiStationIds.length >= 2 ? (
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      createTransferGroupFromSelection(multiStationIds)
-                    }
-                  >
-                    선택한 역으로 환승 그룹 생성
-                  </Button>
-                ) : null}
-                {overlays.manualTransferGroups.map((group) => (
-                  <button
-                    key={group.id}
-                    type="button"
-                    className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50"
-                    onClick={() => selectTransferGroup(group.id)}
-                  >
-                    <strong className="text-sm font-semibold">
-                      {group.nameKo}
-                    </strong>
-                    <p className="mt-1 text-xs font-medium text-slate-500">
-                      {group.stationIds.length}개 역 ·{" "}
-                      {group.note || "메모 없음"}
-                    </p>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {!isGeometryMode && sidebarTab === "validation" ? (
-              <LineBranchValidationPanel
-                count={
-                  (overlays.lineBranchOverrides?.length ?? 0) +
-                  (overlays.branchStationExclusions?.length ?? 0)
-                }
-                issues={lineBranchIssues}
-              />
-            ) : null}
-            {!isGeometryMode && sidebarTab === "history" ? (
-              <CommandHistoryPanel
-                undoCount={undoStackRef.current.length}
-                redoCount={redoStackRef.current.length}
-                latest={undoStackRef.current.at(-1)}
-              />
-            ) : null}
-          </PanelBody>
-        </Panel>
+              {!isGeometryMode && sidebarTab === "validation" ? (
+                <LineBranchValidationPanel
+                  count={
+                    (overlays.lineBranchOverrides?.length ?? 0) +
+                    (overlays.branchStationExclusions?.length ?? 0)
+                  }
+                  issues={lineBranchIssues}
+                  overlays={overlays}
+                />
+              ) : null}
+              {!isGeometryMode && sidebarTab === "history" ? (
+                <CommandHistoryPanel
+                  undoCount={undoStackRef.current.length}
+                  redoCount={redoStackRef.current.length}
+                  latest={undoStackRef.current.at(-1)}
+                />
+              ) : null}
+            </PanelBody>
+          </Panel>
+        ) : null}
 
         <main className="relative min-h-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-xl">
           <div ref={mapContainerRef} className="absolute inset-0" />
@@ -5274,6 +5333,16 @@ export default function UnifiedMapEditor({
               </Badge>
             ) : null}
           </div>
+          {isGeometryMode ? (
+            <div className="absolute left-4 top-16 z-10 flex gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
+              <Button size="sm" variant="ghost" asChild>
+                <Link href="/">메인</Link>
+              </Button>
+              <Button size="sm" variant="ghost" asChild>
+                <Link href="/changes">변경</Link>
+              </Button>
+            </div>
+          ) : null}
           <div className="absolute left-1/2 top-4 flex -translate-x-1/2 gap-2 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
             {toolOptions.map(({ mode, label, description, Icon }) => (
               <button
@@ -5344,35 +5413,22 @@ export default function UnifiedMapEditor({
               {isGeometryMode ? "Geometry Tools" : "Inspector"}
             </p>
             <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
-              {isGeometryMode
-                ? (activeGeometryTarget?.title ?? "선형 선택")
-                : selectionLabel(selection)}
+              {isGeometryMode ? "전체 선형 편집" : selectionLabel(selection)}
             </h2>
           </PanelHeader>
           <PanelBody className="min-h-0 flex-1 overflow-y-auto">
             {isGeometryMode ? (
-              activeGeometryTarget && geometryDraft ? (
-                <GeometryModeInspector
-                  target={activeGeometryTarget}
-                  draft={geometryDraft}
-                  isDirty={geometryDraftDirty}
-                  canUndo={canUndo}
-                  canRedo={canRedo}
-                  stationAnchorLabels={geometryDraftStationAnchorLabels}
-                  saveModel={geometryDraftSaveModel}
-                  changeSummaryLabels={geometryDraftChangeSummaryLabels}
-                  onSave={() => void saveGeometryDraft()}
-                  onReset={resetGeometryDraftToSaved}
-                  onUndo={undoGeometryDraftEdit}
-                  onRedo={redoGeometryDraftEdit}
-                  onClear={() => void clearGeometryOverrideForDraft()}
-                />
-              ) : (
-                <Placeholder
-                  title="선형을 선택하세요"
-                  description="지도에서 노선선을 드래그하거나 왼쪽 목록에서 편집할 노선을 선택하세요."
-                />
-              )
+              <GeometryModeInspector
+                summary={geometryWorkspaceSummary}
+                isDirty={geometryDraftDirty}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                activeTargetTitle={activeGeometryTarget?.title ?? null}
+                onSave={() => void saveGeometryWorkspaceDrafts()}
+                onReset={resetGeometryWorkspaceToSaved}
+                onUndo={undoGeometryDraftEdit}
+                onRedo={redoGeometryDraftEdit}
+              />
             ) : null}
 
             {!isGeometryMode && selectedStation && stationDraft ? (
@@ -5480,7 +5536,7 @@ export default function UnifiedMapEditor({
             ) : null}
           </PanelBody>
         </Panel>
-      </InspectorGrid>
+      </div>
 
       <Dialog
         open={Boolean(pendingTransferSelection)}
@@ -5774,212 +5830,114 @@ function GeometryModeSidebar({
 }
 
 function GeometryModeInspector({
-  target,
-  draft,
+  summary,
   isDirty,
   canUndo,
   canRedo,
-  stationAnchorLabels,
-  saveModel,
-  changeSummaryLabels,
+  activeTargetTitle,
   onSave,
   onReset,
   onUndo,
   onRedo,
-  onClear,
 }: {
-  target: GeometryEditTarget;
-  draft: GeometryDraft;
+  summary: GeometryWorkspaceSummary;
   isDirty: boolean;
   canUndo: boolean;
   canRedo: boolean;
-  stationAnchorLabels: string[];
-  saveModel: GeometryDraftSaveModel | null;
-  changeSummaryLabels: string[];
+  activeTargetTitle: string | null;
   onSave: () => void;
   onReset: () => void;
   onUndo: () => void;
   onRedo: () => void;
-  onClear: () => void;
 }) {
-  const controlCount =
-    saveModel?.controlPointCount ??
-    draft.points.filter((point) => point.kind === "control").length;
-  const stationAnchorCount =
-    saveModel?.stationAnchorCount ??
-    draft.points.filter((point) => point.kind === "station").length;
-  const stationPositionChangeLabels =
-    saveModel?.stationPositionChangeLabels ?? [];
+  const movedStationPreview = [...new Set(summary.movedStationLabels)].slice(
+    0,
+    4,
+  );
 
   return (
     <div className="grid gap-3">
       <div className="rounded-2xl border border-slate-200 bg-white p-3">
-        <div className="flex items-center gap-2">
-          <span
-            className="h-2 w-10 rounded-full"
-            style={{ backgroundColor: target.colorHex }}
-          />
-          <strong className="min-w-0 truncate text-sm font-semibold text-slate-900">
-            {target.title}
-          </strong>
-        </div>
-        <div className="mt-1 flex items-center gap-2">
-          <p className="min-w-0 flex-1 truncate text-xs font-medium text-slate-500">
-            {target.subtitle}
-          </p>
-          {target.hasSavedGeometry ? (
-            <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-              저장 보정 {target.savedPointCount}점
-            </span>
-          ) : (
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-              기본 선형
-            </span>
-          )}
-        </div>
-        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-          <div className="rounded-xl bg-slate-50 px-2 py-1.5">
-            <p className="text-[10px] font-semibold text-slate-400">
-              역 anchor
-            </p>
-            <p className="mt-1 text-sm font-bold text-slate-700">
-              {stationAnchorCount}
-            </p>
-          </div>
-          <div className="rounded-xl bg-slate-50 px-2 py-1.5">
-            <p className="text-[10px] font-semibold text-slate-400">보정점</p>
-            <p className="mt-1 text-sm font-bold text-slate-700">
-              {controlCount}
-            </p>
-          </div>
-          <div className="rounded-xl bg-slate-50 px-2 py-1.5">
-            <p className="text-[10px] font-semibold text-slate-400">대상</p>
-            <p className="mt-1 text-sm font-bold text-slate-700">
-              {target.type === "branch" ? "일반" : "지선"}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-medium leading-5 text-amber-800">
-        <div className="flex items-center gap-2 font-bold">
-          <MapPin className="size-4" />역 anchor는 역 위치입니다
-        </div>
-        <p className="mt-1">
-          주황색 정점을 드래그하면 선형 보정이 아니라 역 위치 override가 함께
-          저장됩니다. 회색 정점만 수동 선형 보정점입니다.
+        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+          Geometry Workspace
         </p>
-        {stationAnchorLabels.length > 0 ? (
-          <p className="mt-1 truncate text-[11px] text-amber-700">
-            대상 역: {stationAnchorLabels.slice(0, 4).join(", ")}
-            {stationAnchorLabels.length > 4
-              ? ` 외 ${stationAnchorLabels.length - 4}개`
-              : ""}
+        <strong className="mt-1 block text-sm font-semibold text-slate-900">
+          전체 선형 편집
+        </strong>
+        <p className="mt-1 text-[11px] font-medium leading-4 text-slate-500">
+          지도 위 본선/지선을 직접 드래그해 여러 노선을 동시에 수정합니다. 저장
+          전까지 변경 draft는 유지됩니다.
+        </p>
+        {activeTargetTitle ? (
+          <p className="mt-2 truncate rounded-xl bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600">
+            최근 편집: {activeTargetTitle}
           </p>
         ) : null}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 text-[11px] font-semibold">
-        <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-white px-3 py-2 text-amber-700">
-          <span className="size-3 rounded-full border-2 border-slate-900 bg-amber-500" />
-          역 위치 anchor
-        </div>
-        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-slate-600">
-          <span className="size-3 rounded-full border-2 border-white bg-slate-500 shadow" />
-          수동 보정점
-        </div>
       </div>
 
       <div
         className={cn(
           "rounded-2xl border p-3 text-xs font-medium",
-          changeSummaryLabels.length > 0
+          isDirty
             ? "border-amber-200 bg-amber-50 text-amber-900"
-            : "border-slate-200 bg-white text-slate-500",
+            : "border-slate-200 bg-slate-50 text-slate-500",
         )}
       >
         <div className="flex items-center justify-between gap-2">
-          <strong
-            className={
-              changeSummaryLabels.length > 0
-                ? "text-amber-900"
-                : "text-slate-800"
-            }
-          >
-            저장 전 변경사항
+          <strong className={isDirty ? "text-amber-900" : "text-slate-700"}>
+            이번 편집 요약
           </strong>
           <span
             className={cn(
               "rounded-full px-2 py-0.5 text-[10px] font-bold",
-              changeSummaryLabels.length > 0
+              isDirty
                 ? "bg-amber-100 text-amber-700"
                 : "bg-slate-100 text-slate-400",
             )}
           >
-            {changeSummaryLabels.length > 0
-              ? `${changeSummaryLabels.length}개`
-              : "없음"}
+            {isDirty ? `${summary.changedTargetCount}개 노선` : "변경 없음"}
           </span>
         </div>
-        {changeSummaryLabels.length > 0 ? (
-          <ul className="mt-2 grid gap-1.5 text-[11px] leading-4 text-amber-800">
-            {changeSummaryLabels.slice(0, 5).map((label) => (
-              <li key={label} className="flex gap-1.5">
-                <span className="mt-[0.45em] size-1 shrink-0 rounded-full bg-amber-500" />
-                <span className="min-w-0 truncate">{label}</span>
-              </li>
-            ))}
-            {changeSummaryLabels.length > 5 ? (
-              <li className="text-[10px] font-semibold text-amber-700">
-                외 {changeSummaryLabels.length - 5}개 변경
-              </li>
-            ) : null}
-          </ul>
-        ) : (
-          <p className="mt-1 text-[11px] leading-4">
-            저장 대기 중인 선형/역 위치 변경이 없습니다.
-          </p>
-        )}
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white p-3 text-xs font-medium text-slate-600">
-        <div className="flex items-center justify-between gap-2">
-          <strong className="text-slate-800">저장 경계</strong>
-          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-            {draft.targetType === "branch" ? "일반 노선" : "지선 overlay"}
-          </span>
-        </div>
-        <div className="mt-2 grid gap-1.5 text-[11px] leading-4">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-slate-500">선형 보정 저장소</span>
-            <span className="truncate font-semibold text-slate-700">
-              {saveModel?.geometryStorageLabel ?? "geometry"}
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-slate-500">역 위치 변경</span>
-            <span
-              className={cn(
-                "font-semibold",
-                stationPositionChangeLabels.length > 0
-                  ? "text-amber-700"
-                  : "text-slate-400",
-              )}
-            >
-              {stationPositionChangeLabels.length > 0
-                ? `${stationPositionChangeLabels.length}개 함께 저장`
-                : "없음"}
-            </span>
-          </div>
-          {stationPositionChangeLabels.length > 0 ? (
-            <p className="truncate text-[11px] font-semibold text-amber-700">
-              위치 변경 역: {stationPositionChangeLabels.slice(0, 3).join(", ")}
-              {stationPositionChangeLabels.length > 3
-                ? ` 외 ${stationPositionChangeLabels.length - 3}개`
-                : ""}
+        <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+          <div className="rounded-xl bg-white/70 px-2 py-2">
+            <p className="text-[10px] font-semibold text-slate-400">
+              변경 노선
             </p>
-          ) : null}
+            <p className="mt-1 text-lg font-bold text-slate-900">
+              {summary.changedTargetCount}
+            </p>
+          </div>
+          <div className="rounded-xl bg-white/70 px-2 py-2">
+            <p className="text-[10px] font-semibold text-slate-400">이동 역</p>
+            <p className="mt-1 text-lg font-bold text-slate-900">
+              {summary.movedStationCount}
+            </p>
+          </div>
+          <div className="rounded-xl bg-white/70 px-2 py-2">
+            <p className="text-[10px] font-semibold text-slate-400">
+              추가 정점
+            </p>
+            <p className="mt-1 text-lg font-bold text-slate-900">
+              {summary.addedControlPointCount}
+            </p>
+          </div>
+          <div className="rounded-xl bg-white/70 px-2 py-2">
+            <p className="text-[10px] font-semibold text-slate-400">
+              삭제 정점
+            </p>
+            <p className="mt-1 text-lg font-bold text-slate-900">
+              {summary.removedControlPointCount}
+            </p>
+          </div>
         </div>
+        {movedStationPreview.length > 0 ? (
+          <p className="mt-2 truncate text-[11px] font-semibold text-amber-700">
+            이동 역: {movedStationPreview.join(", ")}
+            {summary.movedStationLabels.length > movedStationPreview.length
+              ? ` 외 ${summary.movedStationLabels.length - movedStationPreview.length}개`
+              : ""}
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-2">
@@ -5999,25 +5957,35 @@ function GeometryModeInspector({
             Redo
           </Button>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <Button variant="outline" onClick={onReset} disabled={!isDirty}>
-            되돌리기
-          </Button>
-          <Button variant="outline" onClick={onClear}>
-            보정 제거
+            전체 되돌리기
           </Button>
           <Button onClick={onSave} disabled={!isDirty}>
             <Save className="mr-1 size-4" />
-            저장
+            전체 저장
           </Button>
         </div>
       </div>
 
-      {controlCount === 0 ? (
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium leading-5 text-slate-500">
-          보정점 없음 · 지도에서 선형을 드래그해 필요한 구간만 보정
+      <div className="rounded-2xl border border-slate-200 bg-white p-3 text-[11px] font-medium leading-5 text-slate-500">
+        <div className="flex justify-between gap-3">
+          <span>선형 구간 드래그</span>
+          <kbd>보정점 추가</kbd>
         </div>
-      ) : null}
+        <div className="flex justify-between gap-3">
+          <span>회색점 Drag</span>
+          <kbd>보정점 이동</kbd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <span>주황점 Drag</span>
+          <kbd>역 위치 변경</kbd>
+        </div>
+        <div className="flex justify-between gap-3">
+          <span>Cmd/Ctrl+Click</span>
+          <kbd>회색점 삭제</kbd>
+        </div>
+      </div>
     </div>
   );
 }
@@ -6500,10 +6468,15 @@ function StationInspector({
 function LineBranchValidationPanel({
   count,
   issues,
+  overlays,
 }: {
   count: number;
   issues: LineBranchValidationIssue[];
+  overlays: ManualOverlayBundle;
 }) {
+  const webRows = getPublicWebManualChangeRows(overlays);
+  const webChangeTotal = getPublicWebManualChangeTotal(overlays);
+
   return (
     <div className="grid gap-3">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
@@ -6513,6 +6486,49 @@ function LineBranchValidationPanel({
         <p className="mt-2 text-xs font-medium text-slate-500">
           지선 등록 {count}개 · 검증 항목 {issues.length}개
         </p>
+      </div>
+      <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <strong className="text-xs font-semibold text-blue-900">
+              공개 Web 반영 대상
+            </strong>
+            <p className="mt-1 text-[11px] font-medium leading-4 text-blue-800">
+              Editor override 중 공개 Web 렌더링과 데이터 계산에 반영되어야 하는
+              항목입니다. 이 목록을 기준으로 Editor/Web 표시 차이를 줄입니다.
+            </p>
+          </div>
+          <Badge className="shrink-0 bg-white/80 text-blue-700">
+            {webChangeTotal}개
+          </Badge>
+        </div>
+        <div className="mt-3 grid gap-1.5">
+          {webRows.map((row) => (
+            <div
+              key={row.label}
+              className="rounded-xl bg-white/75 px-3 py-2 text-[11px] font-medium text-slate-600"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-slate-800">
+                  {row.label}
+                </span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                  {row.count.toLocaleString("ko-KR")}
+                </span>
+              </div>
+              {row.count > 0 ? (
+                <p className="mt-1 leading-4 text-slate-500">
+                  {row.description}
+                </p>
+              ) : null}
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 rounded-xl border border-blue-100 bg-white/70 px-3 py-2 text-[11px] font-semibold text-blue-800">
+          {issues.length === 0
+            ? "선형 검증 오류가 없어 공개 Web 반영 전제 조건이 충족되었습니다."
+            : "선형/anchor 검증 오류가 남아 있으면 공개 Web에서도 같은 오류가 노출될 수 있습니다."}
+        </div>
       </div>
       {issues.length === 0 ? (
         <Placeholder
