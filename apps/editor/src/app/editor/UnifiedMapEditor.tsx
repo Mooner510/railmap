@@ -11,7 +11,6 @@ import { Panel, PanelBody, PanelHeader } from "@repo/ui/panel";
 import { TabButton, TabList } from "@repo/ui/tabs";
 import { Toast, type ToastTone } from "@repo/ui/toast";
 import { cn } from "@repo/ui/utils";
-import Link from "next/link";
 import {
   ChevronRight,
   Command,
@@ -3348,6 +3347,21 @@ export default function UnifiedMapEditor({
     );
 
     map.on("load", () => {
+      setMapLoaded(true);
+      const resize = () => map.resize();
+      window.requestAnimationFrame(resize);
+      window.setTimeout(resize, 80);
+      window.setTimeout(resize, 240);
+      const center = map.getCenter();
+      if (
+        center.lng < KOREA_MAX_BOUNDS[0][0] ||
+        center.lng > KOREA_MAX_BOUNDS[1][0] ||
+        center.lat < KOREA_MAX_BOUNDS[0][1] ||
+        center.lat > KOREA_MAX_BOUNDS[1][1]
+      ) {
+        map.jumpTo({ center: [127.3, 36.35], zoom: 7 });
+      }
+
       const transferIconImage = new Image();
       transferIconImage.onload = () => {
         if (!map.hasImage("transfer-icon")) {
@@ -5074,11 +5088,39 @@ export default function UnifiedMapEditor({
     ? geometryHistoryVersion >= 0 && geometryRedoStackRef.current.length > 0
     : historyVersion >= 0 && redoStackRef.current.length > 0;
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const resize = () => map.resize();
+    const frame = window.requestAnimationFrame(resize);
+    const timers = [60, 180, 360].map((delay) =>
+      window.setTimeout(resize, delay),
+    );
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [isGeometryMode, sidebarTab, dataLoading, selection.type]);
+
+  useEffect(() => {
+    const container = mapContainerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+
+    const observer = new ResizeObserver(() => {
+      mapRef.current?.resize();
+    });
+    observer.observe(container);
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <AppShell>
       <div
         className={cn(
-          "grid min-h-0 flex-1 gap-4",
+          "grid h-full min-h-0 flex-1 gap-4",
           isGeometryMode
             ? "grid-cols-[minmax(0,1fr)_320px]"
             : "grid-cols-[320px_minmax(0,1fr)_340px]",
@@ -5097,12 +5139,6 @@ export default function UnifiedMapEditor({
                   </h1>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="outline" asChild>
-                    <Link href="/">메인</Link>
-                  </Button>
-                  <Button variant="outline" asChild>
-                    <Link href="/changes">변경</Link>
-                  </Button>
                   <Button
                     size="icon"
                     variant="outline"
@@ -5318,8 +5354,8 @@ export default function UnifiedMapEditor({
           </Panel>
         ) : null}
 
-        <main className="relative min-h-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-xl">
-          <div ref={mapContainerRef} className="absolute inset-0" />
+        <main className="relative h-full min-h-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-xl">
+          <div ref={mapContainerRef} className="absolute inset-0 size-full" />
           <div className="pointer-events-none absolute left-4 top-4 flex flex-wrap gap-2">
             <Badge className="bg-white/90 text-slate-700">
               {selectionLabel(selection)}
@@ -5333,16 +5369,6 @@ export default function UnifiedMapEditor({
               </Badge>
             ) : null}
           </div>
-          {isGeometryMode ? (
-            <div className="absolute left-4 top-16 z-10 flex gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
-              <Button size="sm" variant="ghost" asChild>
-                <Link href="/">메인</Link>
-              </Button>
-              <Button size="sm" variant="ghost" asChild>
-                <Link href="/changes">변경</Link>
-              </Button>
-            </div>
-          ) : null}
           <div className="absolute left-1/2 top-4 flex -translate-x-1/2 gap-2 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
             {toolOptions.map(({ mode, label, description, Icon }) => (
               <button
