@@ -503,11 +503,11 @@ function buildTransferGroupCircleCoordinates(members: ValidRailMapStation[]) {
   const centerLat = members.reduce((sum, station) => sum + station.lat, 0) / members.length;
   const lngScale = Math.max(0.35, Math.cos((centerLat * Math.PI) / 180));
   const radius = Math.max(
-    0.00075,
+    0.0022,
     ...members.map((station) => {
       const dx = (station.lng - centerLng) * lngScale;
       const dy = station.lat - centerLat;
-      return Math.sqrt(dx * dx + dy * dy) * 1.18;
+      return Math.sqrt(dx * dx + dy * dy) * 1.45;
     }),
   );
 
@@ -605,64 +605,6 @@ function buildTransferGroupIconFeatures(
         (feature): feature is NonNullable<typeof feature> => feature !== null,
       ),
   };
-}
-
-
-function addTransferIconImage(map: MapLibreMap) {
-  if (map.hasImage("transfer-icon")) return;
-
-  const commitCanvas = (draw: (context: CanvasRenderingContext2D, size: number) => void) => {
-    if (map.hasImage("transfer-icon")) return;
-    const size = 128;
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    context.clearRect(0, 0, size, size);
-    draw(context, size);
-    const imageData = context.getImageData(0, 0, size, size);
-    if (!map.hasImage("transfer-icon")) {
-      map.addImage("transfer-icon", imageData, { pixelRatio: 2 });
-    }
-  };
-
-  const drawFallback = (context: CanvasRenderingContext2D, size: number) => {
-    const center = size / 2;
-    const radius = size * 0.43;
-    context.beginPath();
-    context.arc(center, center, radius, 0, Math.PI * 2);
-    context.fillStyle = "#ffffff";
-    context.fill();
-    context.lineWidth = size * 0.08;
-    context.strokeStyle = "#334155";
-    context.stroke();
-    context.beginPath();
-    context.arc(center, center, radius * 0.76, -Math.PI / 2, Math.PI / 2);
-    context.fillStyle = "#cd2e3a";
-    context.fill();
-    context.beginPath();
-    context.arc(center, center, radius * 0.76, Math.PI / 2, Math.PI * 1.5);
-    context.fillStyle = "#0047a0";
-    context.fill();
-    context.beginPath();
-    context.arc(center, center - radius * 0.38, radius * 0.38, 0, Math.PI * 2);
-    context.fillStyle = "#0047a0";
-    context.fill();
-    context.beginPath();
-    context.arc(center, center + radius * 0.38, radius * 0.38, 0, Math.PI * 2);
-    context.fillStyle = "#cd2e3a";
-    context.fill();
-  };
-
-  const image = new Image();
-  image.onload = () => {
-    commitCanvas((context, size) => context.drawImage(image, 0, 0, size, size));
-  };
-  image.onerror = () => {
-    commitCanvas(drawFallback);
-  };
-  image.src = "/transfer.svg";
 }
 
 function getMapErrorMessage(error: unknown): string {
@@ -1109,7 +1051,54 @@ export default function RailMap({
           setMapReady(true);
           setMapError(null);
 
-          addTransferIconImage(map);
+          const transferIconImage = new Image(128, 128);
+          transferIconImage.onload = () => {
+            if (!map.hasImage("transfer-icon")) {
+              map.addImage("transfer-icon", transferIconImage, { pixelRatio: 2 });
+            }
+            map.triggerRepaint();
+          };
+          transferIconImage.onerror = () => {
+            const size = 128;
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+            const context = canvas.getContext("2d");
+            if (!context) return;
+          
+            const center = size / 2;
+            const radius = size * 0.42;
+            context.beginPath();
+            context.arc(center, center, radius, 0, Math.PI * 2);
+            context.fillStyle = "#f8fafc";
+            context.fill();
+            context.lineWidth = size * 0.05;
+            context.strokeStyle = "#475569";
+            context.stroke();
+            context.save();
+            context.beginPath();
+            context.arc(center, center, radius * 0.82, 0, Math.PI * 2);
+            context.clip();
+            context.fillStyle = "#cd2e3a";
+            context.fillRect(center - radius, center - radius, radius * 2, radius);
+            context.fillStyle = "#0047a0";
+            context.fillRect(center - radius, center, radius * 2, radius);
+            context.fillStyle = "#0047a0";
+            context.beginPath();
+            context.arc(center, center - radius * 0.42, radius * 0.42, 0, Math.PI * 2);
+            context.fill();
+            context.fillStyle = "#cd2e3a";
+            context.beginPath();
+            context.arc(center, center + radius * 0.42, radius * 0.42, 0, Math.PI * 2);
+            context.fill();
+            context.restore();
+          
+            if (!map.hasImage("transfer-icon")) {
+              map.addImage("transfer-icon", context.getImageData(0, 0, size, size), { pixelRatio: 2 });
+            }
+            map.triggerRepaint();
+          };
+          transferIconImage.src = "/transfer.svg";
 
           map.addSource("branch-preview-lines", {
             type: "geojson",
@@ -1241,7 +1230,6 @@ export default function RailMap({
             type: "fill",
             source: "transfer-group-areas",
             minzoom: 12,
-            maxzoom: 15,
             paint: {
               "fill-color": [
                 "case",
@@ -1263,7 +1251,6 @@ export default function RailMap({
             type: "line",
             source: "transfer-group-areas",
             minzoom: 12,
-            maxzoom: 15,
             paint: {
               "line-color": [
                 "case",
@@ -1280,9 +1267,9 @@ export default function RailMap({
             id: "transfer-group-collapsed-hit",
             type: "circle",
             source: "transfer-group-icons",
-            maxzoom: 15,
+            maxzoom: 14.5,
             paint: {
-              "circle-radius": 12,
+              "circle-radius": 22,
               "circle-color": "#000000",
               "circle-opacity": 0.01,
             },
@@ -1292,14 +1279,14 @@ export default function RailMap({
             id: "transfer-group-collapsed-casing",
             type: "circle",
             source: "transfer-group-icons",
-            maxzoom: 15,
+            maxzoom: 14.5,
             paint: {
               "circle-color": "#ffffff",
               "circle-radius": [
                 "case",
                 ["==", ["get", "isSelected"], true],
-                7.2,
-                5.8,
+                15,
+                13,
               ],
               "circle-stroke-color": [
                 "case",
@@ -1310,8 +1297,8 @@ export default function RailMap({
               "circle-stroke-width": [
                 "case",
                 ["==", ["get", "isSelected"], true],
-                1.8,
-                1.1,
+                2.4,
+                1.4,
               ],
               "circle-opacity": 0.96,
             },
@@ -1321,10 +1308,10 @@ export default function RailMap({
             id: "transfer-group-collapsed-icon",
             type: "symbol",
             source: "transfer-group-icons",
-            maxzoom: 15,
+            maxzoom: 14.5,
             layout: {
               "icon-image": "transfer-icon",
-              "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.038, 0.032],
+              "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.26, 0.22],
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
             },
@@ -1335,7 +1322,7 @@ export default function RailMap({
             type: "symbol",
             source: "transfer-group-icons",
             minzoom: 12,
-            maxzoom: 15,
+            maxzoom: 14.5,
             layout: {
               "text-field": ["get", "nameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
@@ -1373,7 +1360,7 @@ export default function RailMap({
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-                15,
+                14.5,
                 0.96,
               ],
             },
@@ -1407,7 +1394,7 @@ export default function RailMap({
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-                15,
+                14.5,
                 0.96,
               ],
             },
@@ -1435,7 +1422,7 @@ export default function RailMap({
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 0.92],
-                15.6,
+                14.5,
                 0.92,
               ],
             },
@@ -1540,6 +1527,13 @@ export default function RailMap({
             const props = feature?.properties as
               Record<string, unknown> | undefined;
             const stationId = String(props?.id ?? "");
+            const transferGroup =
+              stationTransferGroupIndexRef.current.get(stationId);
+            if (transferGroup && onSelectTransferGroupRef.current) {
+              onSelectTransferGroupRef.current(transferGroup);
+              return;
+            }
+
             const station = stationsRef.current.find(
               (item) => item.id === stationId,
             );
@@ -1551,9 +1545,9 @@ export default function RailMap({
               layers: [
                 "branch-preview-lines",
                 "branch-preview-lines-selected",
-                "branch-preview-stations-dot",
                 "transfer-group-collapsed-hit",
                 "transfer-group-areas-fill",
+                "branch-preview-stations-dot",
               ],
             });
 
