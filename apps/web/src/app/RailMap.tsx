@@ -42,6 +42,25 @@ export interface RailMapBranch {
   }>;
 }
 
+export interface RailMapLineBranchGeometryPoint {
+  lng: number;
+  lat: number;
+  kind: "station" | "control";
+  stationId?: string;
+}
+
+export interface RailMapLineBranchOverride {
+  id: string;
+  mode: "add-station" | "connect-line";
+  parentBranchId: string;
+  anchorStationId: string;
+  branchStationId?: string;
+  connectedBranchId?: string;
+  connectedEndpointStationId?: string;
+  geometry?: RailMapLineBranchGeometryPoint[];
+  enabled: boolean;
+}
+
 type ValidRailMapStation = RailMapStation & {
   lat: number;
   lng: number;
@@ -87,6 +106,69 @@ function getBranchCoordinates(branch: RailMapBranch): LngLatTuple[] {
   const smoothed = smoothCoordinates(coordinates);
 
   return smoothed.length >= 2 ? smoothed : coordinates;
+}
+
+function getStationDisplayName(station: RailMapStation | null | undefined) {
+  if (!station) return "알 수 없는 역";
+  return station.lineNameKo ? `${station.nameKo} · ${station.lineNameKo}` : station.nameKo;
+}
+
+function getBranchDisplayName(branch: RailMapBranch | null | undefined) {
+  if (!branch) return "알 수 없는 노선";
+  const sourceName = branch.sourceLineName && branch.sourceLineName !== branch.canonicalLineNameKo ? ` · ${branch.sourceLineName}` : "";
+  return `${branch.canonicalLineNameKo}${sourceName}`;
+}
+
+function buildLineBranchFeatures(
+  overrides: RailMapLineBranchOverride[],
+  branches: RailMapBranch[],
+  stations: RailMapStation[],
+) {
+  const branchById = new Map(branches.map((branch) => [branch.id, branch]));
+  const stationById = new Map(stations.map((station) => [station.id, station]));
+
+  return {
+    type: "FeatureCollection" as const,
+    features: overrides
+      .map((override) => {
+        if (override.enabled === false) return null;
+
+        const parentBranch = branchById.get(override.parentBranchId) ?? null;
+        const anchorStation = stationById.get(override.anchorStationId) ?? null;
+        const targetStationId = override.mode === "add-station" ? override.branchStationId : override.connectedEndpointStationId;
+        const targetStation = targetStationId ? stationById.get(targetStationId) ?? null : null;
+        const connectedBranch = override.connectedBranchId ? branchById.get(override.connectedBranchId) ?? null : null;
+        const geometryCoordinates = (override.geometry ?? [])
+          .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
+          .map((point) => [point.lng, point.lat] as LngLatTuple);
+
+        let coordinates = geometryCoordinates;
+        if (coordinates.length < 2 && isValidCoordinate(anchorStation) && isValidCoordinate(targetStation)) {
+          coordinates = [[anchorStation.lng, anchorStation.lat], [targetStation.lng, targetStation.lat]];
+        }
+        if (coordinates.length < 2) return null;
+
+        const title = override.mode === "add-station" ? "지선 역 추가" : "지선 노선 결합";
+        const summary = override.mode === "add-station"
+          ? `${getBranchDisplayName(parentBranch)} · ${getStationDisplayName(anchorStation)} → ${getStationDisplayName(targetStation)}`
+          : `${getBranchDisplayName(parentBranch)} · ${getStationDisplayName(anchorStation)} ↔ ${getBranchDisplayName(connectedBranch)} · ${getStationDisplayName(targetStation)}`;
+
+        return {
+          type: "Feature" as const,
+          properties: {
+            id: override.id,
+            colorHex: parentBranch?.colorHex ?? "#0f766e",
+            title,
+            summary,
+          },
+          geometry: {
+            type: "LineString" as const,
+            coordinates: smoothCoordinates(coordinates),
+          },
+        };
+      })
+      .filter((feature): feature is NonNullable<typeof feature> => feature !== null),
+  };
 }
 
 function buildBranchFeatures(branches: RailMapBranch[]) {
@@ -442,6 +524,7 @@ interface RailMapProps {
   highlightedRouteStationIds?: string[];
   highlightedRouteBranchIds?: string[];
   transferGroups?: RailMapTransferGroup[];
+  lineBranchOverrides?: RailMapLineBranchOverride[];
   selectedTransferGroupId?: string | null;
   focusVersion?: number;
   showBranches?: boolean;
@@ -544,6 +627,7 @@ export default function RailMap({
   highlightedRouteStationIds = [],
   highlightedRouteBranchIds = [],
   transferGroups = [],
+  lineBranchOverrides = [],
   selectedTransferGroupId = null,
   focusVersion = 0,
   showBranches = true,
@@ -627,6 +711,10 @@ export default function RailMap({
     () => buildBranchFeatures(showBranches ? branches : []),
     [branches, showBranches],
   );
+  const lineBranchFeatures = useMemo(
+    () => buildLineBranchFeatures(showBranches ? lineBranchOverrides : [], branches, stations),
+    [branches, lineBranchOverrides, showBranches, stations],
+  );
   const highlightedRouteFeatures = useMemo(
     () =>
       buildHighlightedRouteFeature(
@@ -637,6 +725,7 @@ export default function RailMap({
     [branches, highlightedRouteStationIds, highlightedRouteBranchIds],
   );
   const branchFeaturesRef = useRef(branchFeatures);
+  const lineBranchFeaturesRef = useRef(lineBranchFeatures);
   const highlightedRouteFeaturesRef = useRef(highlightedRouteFeatures);
   const transferGroupAreaFeaturesRef = useRef(transferGroupAreaFeatures);
   const transferGroupIconFeaturesRef = useRef(transferGroupIconFeatures);
@@ -650,6 +739,10 @@ export default function RailMap({
   useEffect(() => {
     branchFeaturesRef.current = branchFeatures;
   }, [branchFeatures]);
+
+  useEffect(() => {
+    lineBranchFeaturesRef.current = lineBranchFeatures;
+  }, [lineBranchFeatures]);
 
   useEffect(() => {
     highlightedRouteFeaturesRef.current = highlightedRouteFeatures;
@@ -845,6 +938,11 @@ export default function RailMap({
             data: branchFeaturesRef.current,
           });
 
+          map.addSource("line-branch-lines", {
+            type: "geojson",
+            data: lineBranchFeaturesRef.current,
+          });
+
           map.addSource("route-result-lines", {
             type: "geojson",
             data: highlightedRouteFeaturesRef.current,
@@ -894,6 +992,31 @@ export default function RailMap({
               "line-cap": "round",
               "line-join": "round",
             },
+          });
+
+          map.addLayer({
+            id: "line-branch-lines-casing",
+            type: "line",
+            source: "line-branch-lines",
+            paint: {
+              "line-color": "#ffffff",
+              "line-width": 6.8,
+              "line-opacity": 0.9,
+            },
+            layout: { "line-cap": "round", "line-join": "round" },
+          });
+
+          map.addLayer({
+            id: "line-branch-lines",
+            type: "line",
+            source: "line-branch-lines",
+            paint: {
+              "line-color": ["get", "colorHex"],
+              "line-width": 3.8,
+              "line-opacity": 0.9,
+              "line-dasharray": [1.2, 1.2],
+            },
+            layout: { "line-cap": "round", "line-join": "round" },
           });
 
           map.addLayer({
@@ -1333,6 +1456,17 @@ export default function RailMap({
 
     updateSource();
   }, [branchFeatures, mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    const source = map.getSource("line-branch-lines") as
+      GeoJSONSource | undefined;
+    if (!source) return;
+
+    source.setData(lineBranchFeatures);
+  }, [lineBranchFeatures, mapReady]);
 
   useEffect(() => {
     const map = mapRef.current;

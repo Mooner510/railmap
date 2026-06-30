@@ -532,7 +532,7 @@ function validateLineBranchOverrides(
     if (!parentBranch) {
       issues.push({
         id: `${override.id}:parent`,
-        message: `상위 branch를 찾을 수 없음: ${override.parentBranchId}`,
+        message: `상위 노선을 찾을 수 없음: ${override.parentBranchId}`,
       });
       continue;
     }
@@ -541,7 +541,7 @@ function validateLineBranchOverrides(
     if (!parentStationIds.has(override.anchorStationId)) {
       issues.push({
         id: `${override.id}:anchor`,
-        message: `anchor 역이 상위 branch에 없음: ${override.anchorStationId}`,
+        message: `연결 기준 역이 상위 노선에 없음: ${formatStationDisplayName(stationById.get(override.anchorStationId))}`,
       });
     }
 
@@ -555,7 +555,7 @@ function validateLineBranchOverrides(
       } else if (assignedStationIds.has(branchStationId)) {
         issues.push({
           id: `${override.id}:branch-station-assigned`,
-          message: `추가할 지선 역이 이미 노선에 소속됨: ${branchStationId}`,
+          message: `추가할 지선 역이 이미 다른 노선에 소속됨: ${formatStationDisplayName(stationById.get(branchStationId))}`,
         });
       }
     }
@@ -567,7 +567,7 @@ function validateLineBranchOverrides(
       if (!connectedBranch) {
         issues.push({
           id: `${override.id}:connected`,
-          message: `연결할 branch를 찾을 수 없음: ${override.connectedBranchId ?? "-"}`,
+          message: `연결할 노선을 찾을 수 없음: ${override.connectedBranchId ?? "-"}`,
         });
         continue;
       }
@@ -582,7 +582,7 @@ function validateLineBranchOverrides(
       if (!getBranchEndpointStationIds(parentBranch).has(override.anchorStationId)) {
         issues.push({
           id: `${override.id}:parent-endpoint`,
-          message: `상위 branch anchor가 endpoint가 아님: ${override.anchorStationId}`,
+          message: `상위 노선 연결 역이 endpoint가 아님: ${formatStationDisplayName(stationById.get(override.anchorStationId))}`,
         });
       }
 
@@ -593,13 +593,111 @@ function validateLineBranchOverrides(
       ) {
         issues.push({
           id: `${override.id}:connected-endpoint`,
-          message: `연결 branch endpoint가 아님: ${connectedEndpoint ?? "-"}`,
+          message: `연결 노선의 선택 역이 endpoint가 아님: ${formatStationDisplayName(connectedEndpoint ? stationById.get(connectedEndpoint) : null)}`,
         });
       }
     }
   }
 
   return issues;
+}
+
+
+function formatBranchDisplayName(branch: EditorMapBranch | null | undefined) {
+  if (!branch) return "알 수 없는 노선";
+  const sourceName = branch.sourceLineName && branch.sourceLineName !== branch.canonicalLineNameKo ? ` · ${branch.sourceLineName}` : "";
+  return `${branch.canonicalLineNameKo}${sourceName}`;
+}
+
+function formatStationDisplayName(station: EditorStation | null | undefined) {
+  if (!station) return "알 수 없는 역";
+  const lineName = station.lineNameKo ? ` · ${station.lineNameKo}` : "";
+  return `${station.nameKo}${lineName}`;
+}
+
+function getLineBranchDisplay(
+  override: ManualLineBranchOverride,
+  branchById: Map<string, EditorMapBranch>,
+  stationById: Map<string, EditorStation>,
+) {
+  const parentBranch = branchById.get(override.parentBranchId) ?? null;
+  const anchorStation = stationById.get(override.anchorStationId) ?? null;
+
+  if (override.mode === "add-station") {
+    const branchStation = override.branchStationId ? stationById.get(override.branchStationId) ?? null : null;
+    return {
+      title: "지선 역 추가",
+      summary: `${formatBranchDisplayName(parentBranch)} · ${formatStationDisplayName(anchorStation)} → ${formatStationDisplayName(branchStation)}`,
+      detail: "미소속 역을 선택한 노선의 특정 역에 연결합니다.",
+    };
+  }
+
+  const connectedBranch = override.connectedBranchId ? branchById.get(override.connectedBranchId) ?? null : null;
+  const connectedStation = override.connectedEndpointStationId ? stationById.get(override.connectedEndpointStationId) ?? null : null;
+
+  return {
+    title: "지선 노선 결합",
+    summary: `${formatBranchDisplayName(parentBranch)} · ${formatStationDisplayName(anchorStation)} ↔ ${formatBranchDisplayName(connectedBranch)} · ${formatStationDisplayName(connectedStation)}`,
+    detail: "두 노선의 endpoint를 연결합니다.",
+  };
+}
+
+async function buildLineBranchFeaturesChunked(
+  overrides: ManualLineBranchOverride[],
+  branchById: Map<string, EditorMapBranch>,
+  stationById: Map<string, EditorStation>,
+  visible: boolean,
+  isCancelled: () => boolean,
+): Promise<RailFeatureCollection | null> {
+  if (!visible) return EMPTY_FEATURE_COLLECTION;
+
+  const features: RailFeatureCollection["features"] = [];
+  const batchSize = 80;
+
+  for (let start = 0; start < overrides.length; start += batchSize) {
+    if (isCancelled()) return null;
+
+    for (const override of overrides.slice(start, start + batchSize)) {
+      if (override.enabled === false) continue;
+
+      const parentBranch = branchById.get(override.parentBranchId) ?? null;
+      const display = getLineBranchDisplay(override, branchById, stationById);
+      const geometryCoordinates = (override.geometry ?? [])
+        .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
+        .map((point) => [point.lng, point.lat] as LngLatTuple);
+
+      let coordinates = geometryCoordinates;
+      if (coordinates.length < 2) {
+        const anchor = stationById.get(override.anchorStationId) ?? null;
+        const targetStationId = override.mode === "add-station" ? override.branchStationId : override.connectedEndpointStationId;
+        const target = targetStationId ? stationById.get(targetStationId) ?? null : null;
+        const anchorCoordinate = getStationCoordinate(anchor);
+        const targetCoordinate = getStationCoordinate(target);
+        if (anchorCoordinate && targetCoordinate) coordinates = [anchorCoordinate, targetCoordinate];
+      }
+
+      if (coordinates.length < 2) continue;
+
+      features.push({
+        type: "Feature",
+        properties: {
+          id: override.id,
+          mode: override.mode,
+          colorHex: parentBranch?.colorHex ?? "#0f766e",
+          title: display.title,
+          summary: display.summary,
+        },
+        geometry: {
+          type: "LineString",
+          coordinates: optimizeCoordinates(coordinates),
+        },
+      });
+    }
+
+    await yieldToMainThread();
+  }
+
+  return { type: "FeatureCollection", features };
 }
 
 
@@ -1210,6 +1308,10 @@ export default function UnifiedMapEditor({
         type: "geojson",
         data: EMPTY_FEATURE_COLLECTION,
       });
+      map.addSource("railmap-line-branches", {
+        type: "geojson",
+        data: EMPTY_FEATURE_COLLECTION,
+      });
       map.addSource("railmap-transfer-group-areas", {
         type: "geojson",
         data: EMPTY_FEATURE_COLLECTION,
@@ -1244,6 +1346,31 @@ export default function UnifiedMapEditor({
           "line-color": ["get", "colorHex"],
           "line-width": 7,
           "line-opacity": 0.95,
+        },
+        layout: { "line-cap": "round", "line-join": "round" },
+      });
+
+      map.addLayer({
+        id: "railmap-line-branches-casing",
+        type: "line",
+        source: "railmap-line-branches",
+        paint: {
+          "line-color": "#ffffff",
+          "line-width": 7,
+          "line-opacity": 0.92,
+        },
+        layout: { "line-cap": "round", "line-join": "round" },
+      });
+
+      map.addLayer({
+        id: "railmap-line-branches-line",
+        type: "line",
+        source: "railmap-line-branches",
+        paint: {
+          "line-color": ["get", "colorHex"],
+          "line-width": 4,
+          "line-opacity": 0.92,
+          "line-dasharray": [1.2, 1.2],
         },
         layout: { "line-cap": "round", "line-join": "round" },
       });
@@ -1735,6 +1862,32 @@ export default function UnifiedMapEditor({
       cancelIdle(idleId);
     };
   }, [data.branches, dataLoading, layers.lines, mapLoaded]);
+
+  useEffect(() => {
+    if (!mapLoaded || dataLoading) return;
+
+    let cancelled = false;
+    const idleId = scheduleIdle(() => {
+      void (async () => {
+        const features = await buildLineBranchFeaturesChunked(
+          overlays.lineBranchOverrides ?? [],
+          branchById,
+          stationById,
+          layers.lines,
+          () => cancelled,
+        );
+        if (cancelled || !features) return;
+        const source = mapRef.current?.getSource("railmap-line-branches") as
+          GeoJSONSource | undefined;
+        source?.setData(features);
+      })();
+    });
+
+    return () => {
+      cancelled = true;
+      cancelIdle(idleId);
+    };
+  }, [branchById, dataLoading, layers.lines, mapLoaded, overlays.lineBranchOverrides, stationById]);
 
   useEffect(() => {
     if (!mapLoaded || dataLoading) return;
@@ -2744,7 +2897,7 @@ function LineBranchValidationPanel({
     <div className="grid gap-3">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
         <strong className="text-sm font-semibold text-slate-700">
-          Line branch overlays
+          지선 오버레이
         </strong>
         <p className="mt-2 text-xs font-medium text-slate-500">
           등록 {count}개 · 오류 {issues.length}개
@@ -2908,7 +3061,7 @@ function BranchInspector({
           {branch.sourceLineName} · {branch.role}
         </p>
       </div>
-      <InfoRow label="Branch ID" value={branch.id} />
+      <InfoRow label="Branch" value={formatBranchDisplayName(branch)} />
       <InfoRow label="기점" value={branch.origin ?? "-"} />
       <InfoRow label="종점" value={branch.terminal ?? "-"} />
       <InfoRow label="Route stops" value={`${branch.routeStopCount}개`} />
@@ -2968,10 +3121,10 @@ function BranchInspector({
             지선 노선 결합
           </strong>
           <p className="mt-1 text-[11px] font-medium text-emerald-600">
-            현재 branch의 endpoint와 다른 branch의 endpoint를 연결합니다.
+            현재 노선의 endpoint와 다른 노선의 endpoint를 연결합니다.
           </p>
         </div>
-        <Field label="현재 branch endpoint">
+        <Field label="현재 노선 endpoint">
           <select
             className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
             value={connectAnchorStationId}
@@ -2985,7 +3138,7 @@ function BranchInspector({
             ))}
           </select>
         </Field>
-        <Field label="연결할 branch">
+        <Field label="연결할 노선">
           <select
             className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
             value={connectBranchId}
@@ -2999,7 +3152,7 @@ function BranchInspector({
             ))}
           </select>
         </Field>
-        <Field label="연결 branch endpoint">
+        <Field label="연결 노선 endpoint">
           <select
             className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
             value={connectEndpointStationId}
@@ -3038,27 +3191,24 @@ function BranchInspector({
         </strong>
         {relatedLineBranches.length === 0 ? (
           <p className="text-xs font-medium text-slate-400">
-            이 branch에 연결된 지선 오버레이가 없습니다.
+            이 노선에 연결된 지선 오버레이가 없습니다.
           </p>
         ) : (
-          relatedLineBranches.map((override) => (
-            <div
-              key={override.id}
-              className="grid gap-2 rounded-2xl bg-slate-50 p-2"
-            >
-              <p className="break-all text-[11px] font-semibold text-slate-600">
-                {override.mode} · {override.id}
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onDeleteLineBranch(override.id)}
-              >
-                <Trash2 className="mr-1 size-3" />
-                제거
-              </Button>
-            </div>
-          ))
+          relatedLineBranches.map((override) => {
+            const display = getLineBranchDisplay(override, new Map(branches.map((candidate) => [candidate.id, candidate])), new Map([...branchStations, ...unassignedStations, ...branches.flatMap(getBranchStopStations)].map((station) => [station.id, station])));
+            return (
+              <div key={override.id} className="grid gap-2 rounded-2xl bg-slate-50 p-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-700">{display.title}</p>
+                  <p className="mt-1 text-[11px] font-medium leading-5 text-slate-500">{display.summary}</p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => onDeleteLineBranch(override.id)}>
+                  <Trash2 className="mr-1 size-3" />
+                  제거
+                </Button>
+              </div>
+            );
+          })
         )}
       </div>
 
