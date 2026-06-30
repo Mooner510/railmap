@@ -1874,7 +1874,8 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-label",
         type: "symbol",
         source: "railmap-transfer-group-icons",
-        minzoom: 14.5,
+        minzoom: 11,
+        maxzoom: 14.5,
         layout: {
           "text-field": ["get", "nameKo"],
           "text-size": 11,
@@ -1995,6 +1996,7 @@ export default function UnifiedMapEditor({
         id: "railmap-selected-stations-label",
         type: "symbol",
         source: "railmap-stations",
+        minzoom: 11,
         filter: ["==", ["get", "selected"], true],
         layout: {
           "text-field": ["get", "labelNameKo"],
@@ -2009,6 +2011,13 @@ export default function UnifiedMapEditor({
           "text-color": "#111827",
           "text-halo-color": "#ffffff",
           "text-halo-width": 2,
+          "text-opacity": [
+            "step",
+            ["zoom"],
+            ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
+            14.5,
+            1,
+          ],
         },
       });
 
