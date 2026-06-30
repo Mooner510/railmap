@@ -7,6 +7,7 @@ import {
   type ManualOverlayBundle,
   type ManualGeometryOverride,
   type ManualGeometryOverridePoint,
+  type ManualLineBranchDirection,
   type ManualLineBranchGeometryPoint,
   type ManualLineBranchMode,
   type ManualLineBranchOverride,
@@ -76,6 +77,10 @@ function asNullableCoordinateNumber(value: unknown): number | null {
 
 function asLineBranchMode(value: unknown): ManualLineBranchMode | null {
   return value === "add-station" || value === "connect-line" ? value : null;
+}
+
+function asLineBranchDirection(value: unknown): ManualLineBranchDirection | null {
+  return value === "toward-start" || value === "toward-end" ? value : null;
 }
 
 function normalizeMinutesByPair(value: unknown, stationIds: string[]): Record<string, number | null> {
@@ -185,6 +190,7 @@ function normalizeLineBranchOverride(value: unknown): ManualLineBranchOverride |
   const branchStationId = asString(override.branchStationId) ?? undefined;
   const connectedBranchId = asString(override.connectedBranchId) ?? undefined;
   const connectedEndpointStationId = asString(override.connectedEndpointStationId) ?? undefined;
+  const connectedDirection = asLineBranchDirection(override.connectedDirection) ?? "toward-end";
 
   if (mode === "add-station" && !branchStationId) return null;
   if (mode === "connect-line" && (!connectedBranchId || !connectedEndpointStationId)) return null;
@@ -201,6 +207,7 @@ function normalizeLineBranchOverride(value: unknown): ManualLineBranchOverride |
     branchStationId,
     connectedBranchId,
     connectedEndpointStationId,
+    connectedDirection,
     geometry: geometry && geometry.length >= 2 ? geometry : undefined,
     enabled: override.enabled !== false,
     source: asString(override.source) ?? "editor",
