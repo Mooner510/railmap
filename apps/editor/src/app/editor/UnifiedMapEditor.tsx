@@ -98,16 +98,31 @@ type TransferGroupDraft = {
   note: string;
 };
 
+type GeometryTargetType = "branch" | "lineBranch";
+
 type GeometryDraft = {
+  targetType: GeometryTargetType;
+  targetId: string;
   branchId: string;
   points: ManualGeometryOverridePoint[];
   note: string;
 };
 
 type GeometryPointDragState = {
-  branchId: string;
+  targetType: GeometryTargetType;
+  targetId: string;
   pointIndex: number;
 } | null;
+
+type GeometryEditTarget = {
+  type: GeometryTargetType;
+  id: string;
+  branchId: string;
+  title: string;
+  subtitle: string;
+  colorHex: string;
+  meta: string;
+};
 
 type LineBranchValidationIssue = {
   id: string;
@@ -1134,6 +1149,31 @@ function makeLineBranchGeometry(anchor: EditorStation, target: EditorStation) {
   ];
 }
 
+function getGeometryTargetKey(type: GeometryTargetType, id: string) {
+  return `${type}:${id}`;
+}
+
+function getGeometryDraftTargetKey(draft: GeometryDraft | null) {
+  return draft ? getGeometryTargetKey(draft.targetType, draft.targetId) : null;
+}
+
+function getStationGeometryPoint(
+  stationId: string | undefined,
+  stationById: Map<string, EditorStation>,
+): ManualGeometryOverridePoint | null {
+  if (!stationId) return null;
+  const station = stationById.get(stationId);
+  const coordinate = getStationCoordinate(station);
+  if (!station || !coordinate) return null;
+
+  return {
+    lng: coordinate[0],
+    lat: coordinate[1],
+    kind: "station",
+    stationId: station.id,
+  };
+}
+
 function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
   const override = (branch.geometryOverrideCoordinates ?? []).filter(
     ([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat),
@@ -1484,9 +1524,55 @@ function makeGeometryDraftFromBranch(
   const points = insertManualControlsBetweenAnchors(anchors, controls);
 
   return {
+    targetType: "branch",
+    targetId: branch.id,
     branchId: branch.id,
     points: points.length >= 2 ? points : anchors,
     note: previous?.note ?? "",
+  };
+}
+
+function getLineBranchAnchorGeometryPoints(
+  override: ManualLineBranchOverride,
+  stationById: Map<string, EditorStation>,
+): ManualGeometryOverridePoint[] {
+  const anchor = getStationGeometryPoint(override.anchorStationId, stationById);
+  const target = getStationGeometryPoint(
+    override.mode === "add-station"
+      ? override.branchStationId
+      : override.connectedEndpointStationId,
+    stationById,
+  );
+
+  return [anchor, target].filter(
+    (point): point is ManualGeometryOverridePoint => point !== null,
+  );
+}
+
+function makeGeometryDraftFromLineBranchOverride(
+  override: ManualLineBranchOverride,
+  stationById: Map<string, EditorStation>,
+): GeometryDraft | null {
+  const anchors = getLineBranchAnchorGeometryPoints(override, stationById);
+  if (anchors.length < 2) return null;
+
+  const previous = override.geometry?.length
+    ? ({
+        branchId: override.id,
+        points: override.geometry,
+        enabled: true,
+        note: override.note ?? null,
+      } satisfies ManualGeometryOverride)
+    : undefined;
+  const controls = getReusableManualControlPoints(previous, anchors);
+  const points = insertManualControlsBetweenAnchors(anchors, controls);
+
+  return {
+    targetType: "lineBranch",
+    targetId: override.id,
+    branchId: override.parentBranchId,
+    points: points.length >= 2 ? points : anchors,
+    note: override.note ?? "",
   };
 }
 
@@ -1501,11 +1587,17 @@ function toGeometryOverride(draft: GeometryDraft): ManualGeometryOverride {
   };
 }
 
+function toLineBranchGeometryPoints(draft: GeometryDraft) {
+  return draft.points.filter(
+    (point) => Number.isFinite(point.lng) && Number.isFinite(point.lat),
+  );
+}
+
 function applyGeometryDraftToBranches(
   branches: EditorMapBranch[],
   draft: GeometryDraft | null,
 ): EditorMapBranch[] {
-  if (!draft) return branches;
+  if (!draft || draft.targetType !== "branch") return branches;
 
   const coordinates = draft.points
     .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
@@ -1524,6 +1616,26 @@ function applyGeometryDraftToBranches(
   );
 }
 
+function applyGeometryDraftToLineBranchOverrides(
+  overrides: ManualLineBranchOverride[],
+  draft: GeometryDraft | null,
+): ManualLineBranchOverride[] {
+  if (!draft || draft.targetType !== "lineBranch") return overrides;
+
+  const points = toLineBranchGeometryPoints(draft);
+  if (points.length < 2) return overrides;
+
+  return overrides.map((override) =>
+    override.id === draft.targetId
+      ? {
+          ...override,
+          geometry: points,
+          note: draft.note.trim() ? draft.note.trim() : override.note ?? null,
+        }
+      : override,
+  );
+}
+
 function buildGeometryEditPointFeatures(
   draft: GeometryDraft | null,
   visible: boolean,
@@ -1539,7 +1651,9 @@ function buildGeometryEditPointFeatures(
         return {
           type: "Feature" as const,
           properties: {
-            id: `${draft.branchId}:geometry-point:${index}`,
+            id: `${draft.targetType}:${draft.targetId}:geometry-point:${index}`,
+            targetType: draft.targetType,
+            targetId: draft.targetId,
             branchId: draft.branchId,
             pointIndex: index,
             kind: point.kind,
@@ -1664,6 +1778,7 @@ export default function UnifiedMapEditor({
   const toolModeRef = useRef<ToolMode>("select");
   const geometryDraftRef = useRef<GeometryDraft | null>(null);
   const branchByIdRef = useRef<Map<string, EditorMapBranch>>(new Map());
+  const stationByIdRef = useRef<Map<string, EditorStation>>(new Map());
   const overlaysRef = useRef<ManualOverlayBundle>(
     (initialData ?? EMPTY_UNIFIED_EDITOR_DATA).overlays,
   );
@@ -1731,6 +1846,11 @@ export default function UnifiedMapEditor({
     () => new Map(data.branches.map((branch) => [branch.id, branch])),
     [data.branches],
   );
+
+  useEffect(() => {
+    stationByIdRef.current = stationById;
+  }, [stationById]);
+
   const displayBranches = useMemo(
     () =>
       applyGeometryDraftToBranches(
@@ -1738,6 +1858,14 @@ export default function UnifiedMapEditor({
         toolMode === "geometry" ? geometryDraft : null,
       ),
     [data.branches, geometryDraft, toolMode],
+  );
+  const displayLineBranchOverrides = useMemo(
+    () =>
+      applyGeometryDraftToLineBranchOverrides(
+        overlays.lineBranchOverrides ?? [],
+        toolMode === "geometry" ? geometryDraft : null,
+      ),
+    [geometryDraft, overlays.lineBranchOverrides, toolMode],
   );
   const geometryEditPointFeatures = useMemo(
     () =>
@@ -1751,6 +1879,35 @@ export default function UnifiedMapEditor({
     ],
     [data.branches, overlays, stationById],
   );
+  const geometryTargets = useMemo<GeometryEditTarget[]>(() => {
+    const branchTargets: GeometryEditTarget[] = data.branches.map((branch) => ({
+      type: "branch",
+      id: branch.id,
+      branchId: branch.id,
+      title: branch.canonicalLineNameKo,
+      subtitle: branch.sourceLineName,
+      colorHex: branch.colorHex ?? "#64748b",
+      meta: `${branch.routeStopCount.toLocaleString("ko-KR")} stops`,
+    }));
+
+    const lineBranchTargets: GeometryEditTarget[] = (overlays.lineBranchOverrides ?? [])
+      .filter((override) => override.enabled !== false)
+      .map((override) => {
+        const parentBranch = branchById.get(override.parentBranchId) ?? null;
+        const display = getLineBranchDisplay(override, branchById, stationById);
+        return {
+          type: "lineBranch",
+          id: override.id,
+          branchId: override.parentBranchId,
+          title: display.title,
+          subtitle: display.summary,
+          colorHex: parentBranch?.colorHex ?? "#0f766e",
+          meta: override.mode === "add-station" ? "지선 역 추가" : "지선 노선 결합",
+        };
+      });
+
+    return [...branchTargets, ...lineBranchTargets];
+  }, [branchById, data.branches, overlays.lineBranchOverrides, stationById]);
   const groupById = useMemo(
     () =>
       new Map(overlays.manualTransferGroups.map((group) => [group.id, group])),
@@ -1896,6 +2053,36 @@ export default function UnifiedMapEditor({
       );
     },
     [branchById, overlays.geometryOverrides],
+  );
+
+  const selectGeometryTarget = useCallback(
+    (target: GeometryEditTarget) => {
+      setSelection({ type: "none" });
+      setStationDraft(null);
+      setTransferDraft(null);
+      setStationLocationPickMode(false);
+
+      if (target.type === "branch") {
+        const branch = branchById.get(target.id);
+        const previous = overlays.geometryOverrides.find(
+          (override) => override.branchId === target.id,
+        );
+        setGeometryDraft(
+          branch ? makeGeometryDraftFromBranch(branch, previous) : null,
+        );
+        return;
+      }
+
+      const override = (overlays.lineBranchOverrides ?? []).find(
+        (candidate) => candidate.id === target.id,
+      );
+      setGeometryDraft(
+        override
+          ? makeGeometryDraftFromLineBranchOverride(override, stationById)
+          : null,
+      );
+    },
+    [branchById, overlays.geometryOverrides, overlays.lineBranchOverrides, stationById],
   );
 
   const selectTransferGroup = useCallback(
@@ -2397,8 +2584,12 @@ export default function UnifiedMapEditor({
       setContextMenu(null);
     };
 
-    const beginGeometryPointDrag = (branchId: string, pointIndex: number) => {
-      geometryPointDragRef.current = { branchId, pointIndex };
+    const beginGeometryPointDrag = (
+      targetType: GeometryTargetType,
+      targetId: string,
+      pointIndex: number,
+    ) => {
+      geometryPointDragRef.current = { targetType, targetId, pointIndex };
       map.dragPan.disable();
       map.getCanvas().style.cursor = "grabbing";
     };
@@ -2417,17 +2608,28 @@ export default function UnifiedMapEditor({
       });
 
       if (pointFeature) {
-        const branchId = String(pointFeature.properties?.branchId ?? "");
+        const targetType = String(pointFeature.properties?.targetType ?? "") as GeometryTargetType;
+        const targetId = String(pointFeature.properties?.targetId ?? "");
         const pointIndex = Number(pointFeature.properties?.pointIndex);
 
-        if (!branchId || !Number.isInteger(pointIndex)) return;
+        if (
+          (targetType !== "branch" && targetType !== "lineBranch") ||
+          !targetId ||
+          !Number.isInteger(pointIndex)
+        )
+          return;
 
         original.preventDefault();
         event.preventDefault();
 
-        if (original.ctrlKey) {
+        if (original.ctrlKey || original.metaKey) {
           setGeometryDraft((previous) => {
-            if (!previous || previous.branchId !== branchId) return previous;
+            if (
+              !previous ||
+              previous.targetType !== targetType ||
+              previous.targetId !== targetId
+            )
+              return previous;
             const target = previous.points[pointIndex];
             if (
               !target ||
@@ -2447,7 +2649,7 @@ export default function UnifiedMapEditor({
           return;
         }
 
-        beginGeometryPointDrag(branchId, pointIndex);
+        beginGeometryPointDrag(targetType, targetId, pointIndex);
         return;
       }
 
@@ -2458,34 +2660,65 @@ export default function UnifiedMapEditor({
       });
       if (stationFeatures.length > 0) return;
 
-      const branchFeatures = map.queryRenderedFeatures(event.point, {
+      const lineBranchFeatures = map.queryRenderedFeatures(event.point, {
         layers: [
-          "railmap-selected-branches-line",
-          "railmap-branches-line",
+          "railmap-line-branches-line",
+          "railmap-line-branches-casing",
         ].filter((layerId) => map.getLayer(layerId)),
       });
-      const branchId = firstFeatureId(branchFeatures, [
-        "railmap-selected-branches-line",
-        "railmap-branches-line",
+      const lineBranchId = firstFeatureId(lineBranchFeatures, [
+        "railmap-line-branches-line",
+        "railmap-line-branches-casing",
       ]);
-      if (!branchId) return;
 
-      const branch = branchByIdRef.current.get(branchId);
-      if (!branch) return;
+      const branchFeatures = lineBranchId
+        ? []
+        : map.queryRenderedFeatures(event.point, {
+            layers: [
+              "railmap-selected-branches-line",
+              "railmap-branches-line",
+            ].filter((layerId) => map.getLayer(layerId)),
+          });
+      const branchId = lineBranchId
+        ? undefined
+        : firstFeatureId(branchFeatures, [
+            "railmap-selected-branches-line",
+            "railmap-branches-line",
+          ]);
+
+      let baseDraft: GeometryDraft | null = null;
+      if (lineBranchId) {
+        const override = overlaysRef.current.lineBranchOverrides.find(
+          (candidate) => candidate.id === lineBranchId,
+        );
+        baseDraft = override
+          ? makeGeometryDraftFromLineBranchOverride(
+              override,
+              stationByIdRef.current,
+            )
+          : null;
+      } else if (branchId) {
+        const branch = branchByIdRef.current.get(branchId);
+        baseDraft = branch
+          ? makeGeometryDraftFromBranch(
+              branch,
+              overlaysRef.current.geometryOverrides.find(
+                (override) => override.branchId === branchId,
+              ),
+            )
+          : null;
+      }
+
+      if (!baseDraft) return;
 
       original.preventDefault();
       event.preventDefault();
 
       const existingDraft = geometryDraftRef.current;
-      const baseDraft =
-        existingDraft?.branchId === branchId
-          ? existingDraft
-          : makeGeometryDraftFromBranch(
-              branch,
-              overlaysRef.current.geometryOverrides.find(
-                (override) => override.branchId === branchId,
-              ),
-            );
+      const existingTargetKey = getGeometryDraftTargetKey(existingDraft);
+      const baseTargetKey = getGeometryDraftTargetKey(baseDraft);
+      if (existingDraft && existingTargetKey === baseTargetKey) baseDraft = existingDraft;
+
       const insertAfterIndex = nearestGeometrySegmentIndex(
         baseDraft,
         map,
@@ -2507,7 +2740,7 @@ export default function UnifiedMapEditor({
 
       setGeometryDraft(nextDraft);
       setSidebarTab("search");
-      beginGeometryPointDrag(branchId, insertIndex);
+      beginGeometryPointDrag(nextDraft.targetType, nextDraft.targetId, insertIndex);
     };
 
     map.on("mousemove", (event) => {
@@ -2520,7 +2753,11 @@ export default function UnifiedMapEditor({
       const geometryDrag = geometryPointDragRef.current;
       if (geometryDrag) {
         setGeometryDraft((previous) => {
-          if (!previous || previous.branchId !== geometryDrag.branchId)
+          if (
+            !previous ||
+            previous.targetType !== geometryDrag.targetType ||
+            previous.targetId !== geometryDrag.targetId
+          )
             return previous;
           const target = previous.points[geometryDrag.pointIndex];
           if (!target || target.kind === "station") return previous;
@@ -2543,6 +2780,8 @@ export default function UnifiedMapEditor({
             ? [
                 "railmap-geometry-points-hit",
                 "railmap-geometry-points",
+                "railmap-line-branches-line",
+                "railmap-line-branches-casing",
                 "railmap-branches-line",
               ].filter((layerId) => map.getLayer(layerId))
             : [
@@ -2566,7 +2805,11 @@ export default function UnifiedMapEditor({
             ]),
           );
           const hasBranch = Boolean(
-            firstFeatureId(features, ["railmap-branches-line"]),
+            firstFeatureId(features, [
+              "railmap-line-branches-line",
+              "railmap-line-branches-casing",
+              "railmap-branches-line",
+            ]),
           );
           map.getCanvas().style.cursor = hasGeometryPoint
             ? "grab"
@@ -2846,7 +3089,7 @@ export default function UnifiedMapEditor({
     const idleId = scheduleIdle(() => {
       void (async () => {
         const features = await buildLineBranchFeaturesChunked(
-          overlays.lineBranchOverrides ?? [],
+          displayLineBranchOverrides,
           branchById,
           stationById,
           layers.lines,
@@ -2868,7 +3111,7 @@ export default function UnifiedMapEditor({
     dataLoading,
     layers.lines,
     mapLoaded,
-    overlays.lineBranchOverrides,
+    displayLineBranchOverrides,
     stationById,
   ]);
 
@@ -3066,57 +3309,123 @@ export default function UnifiedMapEditor({
 
   async function saveGeometryDraft() {
     if (!geometryDraft) return;
-    const override = toGeometryOverride(geometryDraft);
-    if (override.points.length < 2) {
+
+    if (geometryDraft.targetType === "branch") {
+      const override = toGeometryOverride(geometryDraft);
+      if (override.points.length < 2) {
+        showToast("선형은 좌표가 2개 이상 필요합니다", "error");
+        return;
+      }
+
+      const next: ManualOverlayBundle = {
+        ...overlays,
+        geometryOverrides: [
+          ...overlays.geometryOverrides.filter(
+            (candidate) => candidate.branchId !== override.branchId,
+          ),
+          override,
+        ],
+      };
+
+      const saved = await executeOverlayCommand(
+        "선형 보정",
+        next,
+        "선형 보정 저장 완료",
+      );
+      if (!saved) return;
+
+      setData((previous) => ({
+        ...previous,
+        branches: previous.branches.map((branch) =>
+          branch.id === override.branchId
+            ? {
+                ...branch,
+                geometryOverrideCoordinates: override.points.map(
+                  (point) => [point.lng, point.lat] as [number, number],
+                ),
+                geometryCoordinates: override.points.map(
+                  (point) => [point.lng, point.lat] as [number, number],
+                ),
+              }
+            : branch,
+        ),
+      }));
+      return;
+    }
+
+    const geometry = toLineBranchGeometryPoints(geometryDraft);
+    if (geometry.length < 2) {
       showToast("선형은 좌표가 2개 이상 필요합니다", "error");
       return;
     }
 
     const next: ManualOverlayBundle = {
       ...overlays,
-      geometryOverrides: [
-        ...overlays.geometryOverrides.filter(
-          (candidate) => candidate.branchId !== override.branchId,
-        ),
-        override,
-      ],
+      lineBranchOverrides: (overlays.lineBranchOverrides ?? []).map((override) =>
+        override.id === geometryDraft.targetId
+          ? {
+              ...override,
+              geometry,
+              note: geometryDraft.note.trim()
+                ? geometryDraft.note.trim()
+                : override.note ?? null,
+            }
+          : override,
+      ),
     };
 
     const saved = await executeOverlayCommand(
-      "선형 보정",
+      "지선 선형 보정",
       next,
-      "선형 보정 저장 완료",
+      "지선 선형 보정 저장 완료",
     );
     if (!saved) return;
 
-    setData((previous) => ({
-      ...previous,
-      branches: previous.branches.map((branch) =>
-        branch.id === override.branchId
-          ? {
-              ...branch,
-              geometryOverrideCoordinates: override.points.map(
-                (point) => [point.lng, point.lat] as [number, number],
-              ),
-              geometryCoordinates: override.points.map(
-                (point) => [point.lng, point.lat] as [number, number],
-              ),
-            }
-          : branch,
-      ),
-    }));
+    const savedOverride = next.lineBranchOverrides.find(
+      (override) => override.id === geometryDraft.targetId,
+    );
+    setGeometryDraft(
+      savedOverride
+        ? makeGeometryDraftFromLineBranchOverride(savedOverride, stationById)
+        : null,
+    );
   }
 
-  async function clearGeometryOverride(branchId: string) {
+  async function clearGeometryOverrideForDraft() {
+    if (!geometryDraft) return;
+
+    if (geometryDraft.targetType === "branch") {
+      const next: ManualOverlayBundle = {
+        ...overlays,
+        geometryOverrides: overlays.geometryOverrides.filter(
+          (override) => override.branchId !== geometryDraft.branchId,
+        ),
+      };
+      await executeOverlayCommand("선형 보정 제거", next, "선형 보정 제거 완료");
+      const branch = branchById.get(geometryDraft.branchId);
+      setGeometryDraft(branch ? makeGeometryDraftFromBranch(branch) : null);
+      return;
+    }
+
     const next: ManualOverlayBundle = {
       ...overlays,
-      geometryOverrides: overlays.geometryOverrides.filter(
-        (override) => override.branchId !== branchId,
+      lineBranchOverrides: (overlays.lineBranchOverrides ?? []).map((override) =>
+        override.id === geometryDraft.targetId
+          ? { ...override, geometry: undefined }
+          : override,
       ),
     };
-    await executeOverlayCommand("선형 보정 제거", next, "선형 보정 제거 완료");
-    const branch = branchById.get(branchId);
-    setGeometryDraft(branch ? makeGeometryDraftFromBranch(branch) : null);
+    await executeOverlayCommand(
+      "지선 선형 보정 제거",
+      next,
+      "지선 선형 보정 제거 완료",
+    );
+    const override = next.lineBranchOverrides.find(
+      (candidate) => candidate.id === geometryDraft.targetId,
+    );
+    setGeometryDraft(
+      override ? makeGeometryDraftFromLineBranchOverride(override, stationById) : null,
+    );
   }
 
   function createTransferGroupFromSelection(ids: string[]) {
@@ -3362,6 +3671,12 @@ export default function UnifiedMapEditor({
     : [];
   const selectedBranch =
     selection.type === "branch" ? (branchById.get(selection.id) ?? null) : null;
+  const activeGeometryTargetKey = getGeometryDraftTargetKey(geometryDraft);
+  const activeGeometryTarget = activeGeometryTargetKey
+    ? (geometryTargets.find(
+        (target) => getGeometryTargetKey(target.type, target.id) === activeGeometryTargetKey,
+      ) ?? null)
+    : null;
   const activeGeometryBranch = geometryDraft
     ? (branchById.get(geometryDraft.branchId) ?? null)
     : selectedBranch;
@@ -3461,11 +3776,11 @@ export default function UnifiedMapEditor({
           <PanelBody className="min-h-0 flex-1 overflow-y-auto">
             {isGeometryMode ? (
               <GeometryModeSidebar
-                branches={data.branches}
-                activeBranchId={geometryDraft?.branchId ?? null}
+                targets={geometryTargets}
+                activeTargetKey={getGeometryDraftTargetKey(geometryDraft)}
                 shortcutsOpen={shortcutHelpOpen}
                 onToggleShortcuts={() => setShortcutHelpOpen((open) => !open)}
-                onSelectBranch={selectBranch}
+                onSelectTarget={selectGeometryTarget}
               />
             ) : null}
 
@@ -3679,18 +3994,18 @@ export default function UnifiedMapEditor({
             </p>
             <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
               {isGeometryMode
-                ? (activeGeometryBranch?.canonicalLineNameKo ?? "선형 선택")
+                ? (activeGeometryTarget?.title ?? "선형 선택")
                 : selectionLabel(selection)}
             </h2>
           </PanelHeader>
           <PanelBody className="min-h-0 flex-1 overflow-y-auto">
             {isGeometryMode ? (
-              activeGeometryBranch && geometryDraft ? (
+              activeGeometryTarget && geometryDraft ? (
                 <GeometryModeInspector
-                  branch={activeGeometryBranch}
+                  target={activeGeometryTarget}
                   draft={geometryDraft}
                   onSave={() => void saveGeometryDraft()}
-                  onClear={() => void clearGeometryOverride(activeGeometryBranch.id)}
+                  onClear={() => void clearGeometryOverrideForDraft()}
                 />
               ) : (
                 <Placeholder
@@ -3888,18 +4203,21 @@ function CommandHistoryPanel({
 
 
 function GeometryModeSidebar({
-  branches,
-  activeBranchId,
+  targets,
+  activeTargetKey,
   shortcutsOpen,
   onToggleShortcuts,
-  onSelectBranch,
+  onSelectTarget,
 }: {
-  branches: EditorMapBranch[];
-  activeBranchId: string | null;
+  targets: GeometryEditTarget[];
+  activeTargetKey: string | null;
   shortcutsOpen: boolean;
   onToggleShortcuts: () => void;
-  onSelectBranch: (id: string) => void;
+  onSelectTarget: (target: GeometryEditTarget) => void;
 }) {
+  const branchCount = targets.filter((target) => target.type === "branch").length;
+  const overlayCount = targets.length - branchCount;
+
   return (
     <div className="flex min-h-0 h-full flex-col gap-2">
       <div className="flex items-center justify-between px-1">
@@ -3907,16 +4225,25 @@ function GeometryModeSidebar({
           선형 편집 대상
         </strong>
         <span className="text-[11px] font-semibold text-slate-400">
-          {branches.length.toLocaleString("ko-KR")}
+          {targets.length.toLocaleString("ko-KR")}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-1 px-1 text-[10px] font-semibold text-slate-500">
+        <span className="rounded-full bg-slate-100 px-2 py-1 text-center">
+          일반 {branchCount.toLocaleString("ko-KR")}
+        </span>
+        <span className="rounded-full bg-slate-100 px-2 py-1 text-center">
+          지선 {overlayCount.toLocaleString("ko-KR")}
         </span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
         <div className="grid gap-1.5">
-          {branches.map((branch) => {
-            const active = activeBranchId === branch.id;
+          {targets.map((target) => {
+            const targetKey = getGeometryTargetKey(target.type, target.id);
+            const active = activeTargetKey === targetKey;
             return (
               <button
-                key={branch.id}
+                key={targetKey}
                 type="button"
                 className={cn(
                   "rounded-2xl border px-2.5 py-2 text-left transition",
@@ -3924,19 +4251,22 @@ function GeometryModeSidebar({
                     ? "border-blue-300 bg-blue-50 shadow-sm"
                     : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50",
                 )}
-                onClick={() => onSelectBranch(branch.id)}
+                onClick={() => onSelectTarget(target)}
               >
                 <div className="flex min-w-0 items-center gap-2">
                   <span
                     className="h-1.5 w-8 shrink-0 rounded-full"
-                    style={{ backgroundColor: branch.colorHex }}
+                    style={{ backgroundColor: target.colorHex }}
                   />
                   <strong className="truncate text-xs font-semibold text-slate-800">
-                    {branch.canonicalLineNameKo}
+                    {target.title}
                   </strong>
                 </div>
                 <p className="mt-1 truncate text-[11px] font-medium text-slate-500">
-                  {branch.sourceLineName} · {branch.routeStopCount} stops
+                  {target.subtitle}
+                </p>
+                <p className="mt-0.5 text-[10px] font-semibold text-slate-400">
+                  {target.meta}
                 </p>
               </button>
             );
@@ -3983,12 +4313,12 @@ function GeometryModeSidebar({
 }
 
 function GeometryModeInspector({
-  branch,
+  target,
   draft,
   onSave,
   onClear,
 }: {
-  branch: EditorMapBranch;
+  target: GeometryEditTarget;
   draft: GeometryDraft;
   onSave: () => void;
   onClear: () => void;
@@ -4002,14 +4332,14 @@ function GeometryModeInspector({
         <div className="flex items-center gap-2">
           <span
             className="h-2 w-10 rounded-full"
-            style={{ backgroundColor: branch.colorHex }}
+            style={{ backgroundColor: target.colorHex }}
           />
           <strong className="min-w-0 truncate text-sm font-semibold text-slate-900">
-            {branch.canonicalLineNameKo}
+            {target.title}
           </strong>
         </div>
         <p className="mt-1 truncate text-xs font-medium text-slate-500">
-          {branch.sourceLineName}
+          {target.subtitle}
         </p>
         <div className="mt-3 grid grid-cols-3 gap-2 text-center">
           <div className="rounded-2xl bg-slate-50 px-2 py-2">
@@ -4021,8 +4351,10 @@ function GeometryModeInspector({
             <p className="mt-1 text-sm font-bold text-slate-700">{controlCount}</p>
           </div>
           <div className="rounded-2xl bg-slate-50 px-2 py-2">
-            <p className="text-[10px] font-semibold text-slate-400">정차역</p>
-            <p className="mt-1 text-sm font-bold text-slate-700">{branch.routeStopCount}</p>
+            <p className="text-[10px] font-semibold text-slate-400">대상</p>
+            <p className="mt-1 text-sm font-bold text-slate-700">
+              {target.type === "branch" ? "일반" : "지선"}
+            </p>
           </div>
         </div>
       </div>
@@ -4037,17 +4369,9 @@ function GeometryModeInspector({
         </Button>
       </div>
 
-      <div className="rounded-3xl border border-blue-100 bg-blue-50/70 p-3 text-[11px] font-medium leading-5 text-blue-700">
-        <strong className="block text-xs text-blue-800">조작법</strong>
-        <p className="mt-1">노선선을 드래그하면 역 사이에 회색 보정점이 추가됩니다.</p>
-        <p>회색 보정점은 드래그로 이동합니다.</p>
-        <p>Ctrl/Cmd + 회색 보정점 클릭으로 보정점을 제거합니다.</p>
-        <p>역은 anchor로만 사용되며 이동하거나 선택할 수 없습니다.</p>
-      </div>
-
       {controlCount === 0 ? (
         <div className="rounded-3xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium leading-5 text-slate-500">
-          아직 수동 보정점이 없습니다. 지도에서 노선 구간을 드래그해 필요한 구간만 보정하세요.
+          아직 수동 보정점이 없습니다. 지도에서 대상 선형을 드래그해 필요한 구간만 보정하세요.
         </div>
       ) : null}
     </div>
