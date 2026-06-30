@@ -11,11 +11,52 @@ import { Panel, PanelBody, PanelHeader } from "@repo/ui/panel";
 import { TabButton, TabList } from "@repo/ui/tabs";
 import { Toast, type ToastTone } from "@repo/ui/toast";
 import { cn } from "@repo/ui/utils";
-import { ChevronRight, Command, Layers3, LocateFixed, MapPin, MousePointer2, Plus, Redo2, Route, Save, Search, Settings2, Trash2, Undo2, Waypoints, X } from "lucide-react";
-import maplibregl, { type GeoJSONSource, type Map as MapLibreMap, type StyleSpecification } from "maplibre-gl";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
-import type { EditorStation, ManualGeometryOverride, ManualGeometryOverridePoint, ManualOverlayBundle, ManualStationOverride, ManualTransferGroup } from "../editorModel";
-import { EMPTY_MANUAL_OVERLAY_BUNDLE, makeTransferGroupId, makeTransferPairKey, normalizeSearchText } from "../editorModel";
+import {
+  ChevronRight,
+  Command,
+  Layers3,
+  LocateFixed,
+  MapPin,
+  MousePointer2,
+  Plus,
+  Redo2,
+  Route,
+  Save,
+  Search,
+  Settings2,
+  Trash2,
+  Undo2,
+  Waypoints,
+  X,
+} from "lucide-react";
+import maplibregl, {
+  type GeoJSONSource,
+  type Map as MapLibreMap,
+  type StyleSpecification,
+} from "maplibre-gl";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
+import type {
+  EditorStation,
+  ManualGeometryOverride,
+  ManualGeometryOverridePoint,
+  ManualOverlayBundle,
+  ManualStationOverride,
+  ManualTransferGroup,
+} from "../editorModel";
+import {
+  EMPTY_MANUAL_OVERLAY_BUNDLE,
+  makeTransferGroupId,
+  makeTransferPairKey,
+  normalizeSearchText,
+} from "../editorModel";
 import type { EditorMapBranch, UnifiedEditorData } from "../editorData";
 
 type Selection =
@@ -25,7 +66,8 @@ type Selection =
   | { type: "transferGroup"; id: string }
   | { type: "multiStation"; ids: string[] };
 
-type SidebarTab = "search" | "layers" | "transfers" | "geometry" | "validation" | "history";
+type SidebarTab =
+  "search" | "layers" | "transfers" | "geometry" | "validation" | "history";
 type ToolMode = "select" | "box" | "geometry";
 type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
@@ -36,7 +78,6 @@ type ContextMenuState = {
   stationId?: string;
   branchId?: string;
 } | null;
-
 
 type OverlayCommandRecord = {
   id: string;
@@ -60,19 +101,48 @@ type GeometryDraft = {
   note: string;
 };
 
-const defaultLayers = { stations: true, lines: true, labels: true, nonTransfer: true };
+const defaultLayers = {
+  stations: true,
+  lines: true,
+  labels: true,
+  nonTransfer: true,
+};
 
-const layerOptions: Array<{ key: keyof typeof defaultLayers; label: string; Icon: IconComponent }> = [
+const layerOptions: Array<{
+  key: keyof typeof defaultLayers;
+  label: string;
+  Icon: IconComponent;
+}> = [
   { key: "lines", label: "노선선", Icon: Layers3 },
   { key: "stations", label: "역 아이콘", Icon: MapPin },
   { key: "labels", label: "역명 라벨", Icon: Settings2 },
   { key: "nonTransfer", label: "미환승역 상태", Icon: Waypoints },
 ];
 
-const toolOptions: Array<{ mode: ToolMode; label: string; description: string; Icon: IconComponent }> = [
-  { mode: "select", label: "선택", description: "역을 우선 선택하고, 역이 없으면 노선선을 선택", Icon: MousePointer2 },
-  { mode: "box", label: "박스 선택", description: "드래그한 영역 안의 역을 여러 개 선택", Icon: Waypoints },
-  { mode: "geometry", label: "선형 편집", description: "선형 보정 전용 모드", Icon: Route },
+const toolOptions: Array<{
+  mode: ToolMode;
+  label: string;
+  description: string;
+  Icon: IconComponent;
+}> = [
+  {
+    mode: "select",
+    label: "선택",
+    description: "역을 우선 선택하고, 역이 없으면 노선선을 선택",
+    Icon: MousePointer2,
+  },
+  {
+    mode: "box",
+    label: "박스 선택",
+    description: "드래그한 영역 안의 역을 여러 개 선택",
+    Icon: Waypoints,
+  },
+  {
+    mode: "geometry",
+    label: "선형 편집",
+    description: "선형 보정 전용 모드",
+    Icon: Route,
+  },
 ];
 
 const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
@@ -99,11 +169,24 @@ type RailFeatureCollection = {
   features: Array<{
     type: "Feature";
     properties: Record<string, unknown>;
-    geometry: { type: "Point" | "LineString"; coordinates: LngLatTuple | LngLatTuple[] };
+    geometry: {
+      type: "Point" | "LineString" | "Polygon";
+      coordinates: LngLatTuple | LngLatTuple[] | LngLatTuple[][];
+    };
   }>;
 };
 
-const EMPTY_FEATURE_COLLECTION: RailFeatureCollection = { type: "FeatureCollection", features: [] };
+const EMPTY_FEATURE_COLLECTION: RailFeatureCollection = {
+  type: "FeatureCollection",
+  features: [],
+};
+
+type TransferGroupMapInfo = {
+  id: string;
+  nameKo: string;
+  stationIds: string[];
+  selected: boolean;
+};
 
 const EMPTY_UNIFIED_EDITOR_DATA: UnifiedEditorData = {
   stations: [],
@@ -140,7 +223,10 @@ async function buildBranchFeaturesChunked(
           colorHex: branch.colorHex,
           nameKo: branch.canonicalLineNameKo,
         },
-        geometry: { type: "LineString", coordinates: optimizeCoordinates(coordinates) },
+        geometry: {
+          type: "LineString",
+          coordinates: optimizeCoordinates(coordinates),
+        },
       });
     }
 
@@ -154,6 +240,7 @@ async function buildStationFeaturesChunked(
   stations: EditorStation[],
   selectedIds: Set<string>,
   nonTransferIds: Set<string>,
+  stationTransferGroupIndex: Map<string, TransferGroupMapInfo>,
   visible: boolean,
   showNonTransferState: boolean,
   isCancelled: () => boolean,
@@ -170,19 +257,29 @@ async function buildStationFeaturesChunked(
       if (!isValidStation(station)) continue;
       const selected = selectedIds.has(station.id);
       const nonTransfer = nonTransferIds.has(station.id);
+      const transferGroup = stationTransferGroupIndex.get(station.id) ?? null;
 
       features.push({
         type: "Feature",
         properties: {
           id: station.id,
           nameKo: station.nameKo,
+          labelNameKo: transferGroup
+            ? `${transferGroup.nameKo}(${station.lineNameKo || "노선"})`
+            : station.nameKo,
           lineNameKo: station.lineNameKo,
           stationNumber: station.stationNumber,
           colorHex: station.colorHex ?? "#64748b",
           selected,
           nonTransfer: showNonTransferState && nonTransfer,
+          isTransferChild: Boolean(transferGroup),
+          transferGroupId: transferGroup?.id ?? "",
+          transferGroupNameKo: transferGroup?.nameKo ?? "",
         },
-        geometry: { type: "Point", coordinates: [station.lng, station.lat] as LngLatTuple },
+        geometry: {
+          type: "Point",
+          coordinates: [station.lng, station.lat] as LngLatTuple,
+        },
       });
     }
 
@@ -192,16 +289,145 @@ async function buildStationFeaturesChunked(
   return { type: "FeatureCollection", features };
 }
 
+async function buildTransferGroupAreaFeaturesChunked(
+  groups: ManualTransferGroup[],
+  stationById: Map<string, EditorStation>,
+  selectedGroupId: string | null,
+  isCancelled: () => boolean,
+): Promise<RailFeatureCollection | null> {
+  const features: RailFeatureCollection["features"] = [];
+  const batchSize = 80;
+
+  for (let start = 0; start < groups.length; start += batchSize) {
+    if (isCancelled()) return null;
+
+    for (const group of groups.slice(start, start + batchSize)) {
+      if (group.enabled === false) continue;
+      const members = group.stationIds
+        .map((stationId) => stationById.get(stationId))
+        .filter(
+          (station): station is EditorStation & { lat: number; lng: number } =>
+            Boolean(station && isValidStation(station)),
+        );
+      if (members.length < 2) continue;
+
+      const lngs = members.map((station) => station.lng);
+      const lats = members.map((station) => station.lat);
+      const minLng = Math.min(...lngs);
+      const maxLng = Math.max(...lngs);
+      const minLat = Math.min(...lats);
+      const maxLat = Math.max(...lats);
+      const lngPadding = Math.max(0.0018, (maxLng - minLng) * 0.35);
+      const latPadding = Math.max(0.0018, (maxLat - minLat) * 0.35);
+      const coordinates: LngLatTuple[] = [
+        [minLng - lngPadding, minLat - latPadding],
+        [maxLng + lngPadding, minLat - latPadding],
+        [maxLng + lngPadding, maxLat + latPadding],
+        [minLng - lngPadding, maxLat + latPadding],
+        [minLng - lngPadding, minLat - latPadding],
+      ];
+
+      features.push({
+        type: "Feature",
+        properties: {
+          id: group.id,
+          nameKo: group.nameKo,
+          stationCount: members.length,
+          selected: selectedGroupId === group.id,
+        },
+        geometry: { type: "Polygon", coordinates: [coordinates] },
+      });
+    }
+
+    await yieldToMainThread();
+  }
+
+  return { type: "FeatureCollection", features };
+}
+
+async function buildTransferGroupIconFeaturesChunked(
+  groups: ManualTransferGroup[],
+  stationById: Map<string, EditorStation>,
+  selectedGroupId: string | null,
+  isCancelled: () => boolean,
+): Promise<RailFeatureCollection | null> {
+  const features: RailFeatureCollection["features"] = [];
+  const batchSize = 120;
+
+  for (let start = 0; start < groups.length; start += batchSize) {
+    if (isCancelled()) return null;
+
+    for (const group of groups.slice(start, start + batchSize)) {
+      if (group.enabled === false) continue;
+      const members = group.stationIds
+        .map((stationId) => stationById.get(stationId))
+        .filter(
+          (station): station is EditorStation & { lat: number; lng: number } =>
+            Boolean(station && isValidStation(station)),
+        );
+      if (members.length < 2) continue;
+
+      const lng =
+        members.reduce((sum, station) => sum + station.lng, 0) / members.length;
+      const lat =
+        members.reduce((sum, station) => sum + station.lat, 0) / members.length;
+
+      features.push({
+        type: "Feature",
+        properties: {
+          id: group.id,
+          nameKo: group.nameKo,
+          stationCount: members.length,
+          selected: selectedGroupId === group.id,
+        },
+        geometry: { type: "Point", coordinates: [lng, lat] as LngLatTuple },
+      });
+    }
+
+    await yieldToMainThread();
+  }
+
+  return { type: "FeatureCollection", features };
+}
+
+function buildStationTransferGroupIndex(groups: ManualTransferGroup[]) {
+  const index = new Map<string, TransferGroupMapInfo>();
+
+  for (const group of groups) {
+    if (group.enabled === false) continue;
+    const info: TransferGroupMapInfo = {
+      id: group.id,
+      nameKo: group.nameKo,
+      stationIds: group.stationIds,
+      selected: false,
+    };
+    for (const stationId of group.stationIds) {
+      if (!index.has(stationId)) index.set(stationId, info);
+    }
+  }
+
+  return index;
+}
+
 function scheduleIdle(callback: () => void) {
   if (typeof window === "undefined") return 0;
-  const requestIdle = (window as Window & { requestIdleCallback?: (cb: () => void, options?: { timeout: number }) => number }).requestIdleCallback;
+  const requestIdle = (
+    window as Window & {
+      requestIdleCallback?: (
+        cb: () => void,
+        options?: { timeout: number },
+      ) => number;
+    }
+  ).requestIdleCallback;
   if (requestIdle) return requestIdle(callback, { timeout: 600 });
   return window.setTimeout(callback, 16);
 }
 
 function cancelIdle(id: number) {
   if (typeof window === "undefined") return;
-  const cancel = (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback;
+  const cancel = (
+    window as Window & { cancelIdleCallback?: (id: number) => void }
+  ).cancelIdleCallback;
   if (cancel) cancel(id);
   else window.clearTimeout(id);
 }
@@ -215,11 +441,19 @@ function optimizeCoordinates(coordinates: LngLatTuple[]) {
   return result;
 }
 
-function isValidStation(station: EditorStation): station is EditorStation & { lat: number; lng: number } {
+function isValidStation(
+  station: EditorStation,
+): station is EditorStation & { lat: number; lng: number } {
   return Number.isFinite(station.lat) && Number.isFinite(station.lng);
 }
 
-function catmullRomPoint(p0: LngLatTuple, p1: LngLatTuple, p2: LngLatTuple, p3: LngLatTuple, t: number): LngLatTuple {
+function catmullRomPoint(
+  p0: LngLatTuple,
+  p1: LngLatTuple,
+  p2: LngLatTuple,
+  p3: LngLatTuple,
+  t: number,
+): LngLatTuple {
   const [p0Lng, p0Lat] = p0;
   const [p1Lng, p1Lat] = p1;
   const [p2Lng, p2Lat] = p2;
@@ -228,8 +462,16 @@ function catmullRomPoint(p0: LngLatTuple, p1: LngLatTuple, p2: LngLatTuple, p3: 
   const t3 = t2 * t;
 
   return [
-    0.5 * (2 * p1Lng + (-p0Lng + p2Lng) * t + (2 * p0Lng - 5 * p1Lng + 4 * p2Lng - p3Lng) * t2 + (-p0Lng + 3 * p1Lng - 3 * p2Lng + p3Lng) * t3),
-    0.5 * (2 * p1Lat + (-p0Lat + p2Lat) * t + (2 * p0Lat - 5 * p1Lat + 4 * p2Lat - p3Lat) * t2 + (-p0Lat + 3 * p1Lat - 3 * p2Lat + p3Lat) * t3),
+    0.5 *
+      (2 * p1Lng +
+        (-p0Lng + p2Lng) * t +
+        (2 * p0Lng - 5 * p1Lng + 4 * p2Lng - p3Lng) * t2 +
+        (-p0Lng + 3 * p1Lng - 3 * p2Lng + p3Lng) * t3),
+    0.5 *
+      (2 * p1Lat +
+        (-p0Lat + p2Lat) * t +
+        (2 * p0Lat - 5 * p1Lat + 4 * p2Lat - p3Lat) * t2 +
+        (-p0Lat + 3 * p1Lat - 3 * p2Lat + p3Lat) * t3),
   ];
 }
 
@@ -245,19 +487,22 @@ function smoothCoordinates(coordinates: LngLatTuple[]): LngLatTuple[] {
     const p3 = coordinates[Math.min(coordinates.length - 1, index + 2)] ?? p2;
     if (!p0 || !p1 || !p2 || !p3) continue;
     if (index === 0) result.push(p1);
-    for (let step = 1; step <= samplesPerSegment; step += 1) result.push(catmullRomPoint(p0, p1, p2, p3, step / samplesPerSegment));
+    for (let step = 1; step <= samplesPerSegment; step += 1)
+      result.push(catmullRomPoint(p0, p1, p2, p3, step / samplesPerSegment));
   }
 
   return result;
 }
 
 function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
-  const override = (branch.geometryOverrideCoordinates ?? [])
-    .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat)) as LngLatTuple[];
+  const override = (branch.geometryOverrideCoordinates ?? []).filter(
+    ([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat),
+  ) as LngLatTuple[];
   if (override.length >= 2) return override;
 
-  return (branch.geometryCoordinates ?? [])
-    .filter(([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat)) as LngLatTuple[];
+  return (branch.geometryCoordinates ?? []).filter(
+    ([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat),
+  ) as LngLatTuple[];
 }
 
 function formatStationSubLabel(station: EditorStation) {
@@ -277,16 +522,26 @@ function stationSearchRank(station: EditorStation, normalizedQuery: string) {
   return Number.POSITIVE_INFINITY;
 }
 
-function searchStations(stations: EditorStation[], query: string, limit: number) {
+function searchStations(
+  stations: EditorStation[],
+  query: string,
+  limit: number,
+) {
   const normalized = normalizeSearchText(query);
   if (!normalized) return stations.slice(0, limit);
 
   return stations
-    .map((station) => ({ station, rank: stationSearchRank(station, normalized) }))
+    .map((station) => ({
+      station,
+      rank: stationSearchRank(station, normalized),
+    }))
     .filter((entry) => Number.isFinite(entry.rank))
     .sort((a, b) => {
       if (a.rank !== b.rank) return a.rank - b.rank;
-      const nameCompare = a.station.nameKo.localeCompare(b.station.nameKo, "ko-KR");
+      const nameCompare = a.station.nameKo.localeCompare(
+        b.station.nameKo,
+        "ko-KR",
+      );
       if (nameCompare !== 0) return nameCompare;
       return a.station.lineNameKo.localeCompare(b.station.lineNameKo, "ko-KR");
     })
@@ -294,21 +549,33 @@ function searchStations(stations: EditorStation[], query: string, limit: number)
     .map((entry) => entry.station);
 }
 
-function firstFeatureId(features: Array<{ layer: { id: string }; properties?: Record<string, unknown> | null }>, layerIds: string[]) {
-  const feature = features.find((candidate) => layerIds.includes(candidate.layer.id));
+function firstFeatureId(
+  features: Array<{
+    layer: { id: string };
+    properties?: Record<string, unknown> | null;
+  }>,
+  layerIds: string[],
+) {
+  const feature = features.find((candidate) =>
+    layerIds.includes(candidate.layer.id),
+  );
   const id = feature?.properties?.id;
   return typeof id === "string" ? id : undefined;
 }
 
 function selectionLabel(selection: Selection) {
   if (selection.type === "none") return "선택 없음";
-  if (selection.type === "multiStation") return `${selection.ids.length}개 역 선택`;
+  if (selection.type === "multiStation")
+    return `${selection.ids.length}개 역 선택`;
   if (selection.type === "station") return "역";
   if (selection.type === "branch") return "노선/분기";
   return "환승 그룹";
 }
 
-function emptyStationOverride(station: EditorStation, previous?: ManualStationOverride): ManualStationOverride {
+function emptyStationOverride(
+  station: EditorStation,
+  previous?: ManualStationOverride,
+): ManualStationOverride {
   return {
     stationId: station.id,
     nameKo: previous?.nameKo ?? station.nameKo,
@@ -319,8 +586,10 @@ function emptyStationOverride(station: EditorStation, previous?: ManualStationOv
   };
 }
 
-
-function defaultTransferGroupName(stationIds: string[], stationById: Map<string, EditorStation>) {
+function defaultTransferGroupName(
+  stationIds: string[],
+  stationById: Map<string, EditorStation>,
+) {
   const names = stationIds
     .map((stationId) => stationById.get(stationId)?.nameKo)
     .filter((name): name is string => Boolean(name));
@@ -335,12 +604,18 @@ function defaultTransferGroupName(stationIds: string[], stationById: Map<string,
   return `${first} 외 ${names.length - 1}개역 환승`;
 }
 
-function normalizeTransferGroupDraftPairs(stationIds: string[], previous: Record<string, number | null> = {}) {
+function normalizeTransferGroupDraftPairs(
+  stationIds: string[],
+  previous: Record<string, number | null> = {},
+) {
   const result: Record<string, number | null> = {};
 
   for (let i = 0; i < stationIds.length - 1; i += 1) {
     for (let j = i + 1; j < stationIds.length; j += 1) {
-      const pairKey = makeTransferPairKey(stationIds[i] ?? "", stationIds[j] ?? "");
+      const pairKey = makeTransferPairKey(
+        stationIds[i] ?? "",
+        stationIds[j] ?? "",
+      );
       result[pairKey] = previous[pairKey] ?? null;
     }
   }
@@ -348,7 +623,10 @@ function normalizeTransferGroupDraftPairs(stationIds: string[], previous: Record
   return result;
 }
 
-function makeTransferDraftFromStations(stationIds: string[], stationById: Map<string, EditorStation>): TransferGroupDraft {
+function makeTransferDraftFromStations(
+  stationIds: string[],
+  stationById: Map<string, EditorStation>,
+): TransferGroupDraft {
   const uniqueStationIds = [...new Set(stationIds)].filter(Boolean);
 
   return {
@@ -359,12 +637,17 @@ function makeTransferDraftFromStations(stationIds: string[], stationById: Map<st
   };
 }
 
-function makeTransferDraftFromGroup(group: ManualTransferGroup): TransferGroupDraft {
+function makeTransferDraftFromGroup(
+  group: ManualTransferGroup,
+): TransferGroupDraft {
   return {
     id: group.id,
     nameKo: group.nameKo,
     stationIds: [...group.stationIds],
-    transferMinutesByPair: normalizeTransferGroupDraftPairs(group.stationIds, group.transferMinutesByPair),
+    transferMinutesByPair: normalizeTransferGroupDraftPairs(
+      group.stationIds,
+      group.transferMinutesByPair,
+    ),
     note: group.note ?? "",
   };
 }
@@ -377,20 +660,29 @@ function toTransferGroup(draft: TransferGroupDraft): ManualTransferGroup {
     id: draft.id ?? makeTransferGroupId(nameKo, stationIds),
     nameKo,
     stationIds,
-    transferMinutesByPair: normalizeTransferGroupDraftPairs(stationIds, draft.transferMinutesByPair),
+    transferMinutesByPair: normalizeTransferGroupDraftPairs(
+      stationIds,
+      draft.transferMinutesByPair,
+    ),
     enabled: true,
     source: "editor",
     note: draft.note.trim() ? draft.note.trim() : null,
   };
 }
 
-function makeGeometryDraftFromBranch(branch: EditorMapBranch, previous?: ManualGeometryOverride): GeometryDraft {
+function makeGeometryDraftFromBranch(
+  branch: EditorMapBranch,
+  previous?: ManualGeometryOverride,
+): GeometryDraft {
   const points = previous?.points.length
     ? previous.points
     : branchCoordinates(branch).map((coordinates, index, array) => ({
         lng: coordinates[0],
         lat: coordinates[1],
-        kind: index === 0 || index === array.length - 1 ? "station" as const : "control" as const,
+        kind:
+          index === 0 || index === array.length - 1
+            ? ("station" as const)
+            : ("control" as const),
       }));
 
   return {
@@ -403,13 +695,19 @@ function makeGeometryDraftFromBranch(branch: EditorMapBranch, previous?: ManualG
 function toGeometryOverride(draft: GeometryDraft): ManualGeometryOverride {
   return {
     branchId: draft.branchId,
-    points: draft.points.filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat)),
+    points: draft.points.filter(
+      (point) => Number.isFinite(point.lng) && Number.isFinite(point.lat),
+    ),
     enabled: true,
     note: draft.note.trim() ? draft.note.trim() : null,
   };
 }
 
-function makeCommandRecord(label: string, before: ManualOverlayBundle, after: ManualOverlayBundle): OverlayCommandRecord {
+function makeCommandRecord(
+  label: string,
+  before: ManualOverlayBundle,
+  after: ManualOverlayBundle,
+): OverlayCommandRecord {
   return {
     id: `command:${Date.now()}:${Math.random().toString(36).slice(2)}`,
     label,
@@ -430,23 +728,44 @@ async function saveOverlays(nextOverlays: ManualOverlayBundle) {
   return (await response.json()) as ManualOverlayBundle;
 }
 
-export default function UnifiedMapEditor({ data: initialData }: { data?: UnifiedEditorData }) {
+export default function UnifiedMapEditor({
+  data: initialData,
+}: {
+  data?: UnifiedEditorData;
+}) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const cursorFrameRef = useRef<number | null>(null);
-  const pendingCursorLngLatRef = useRef<{ lng: number; lat: number } | null>(null);
+  const pendingCursorLngLatRef = useRef<{ lng: number; lat: number } | null>(
+    null,
+  );
   const selectionBoxStartRef = useRef<{ x: number; y: number } | null>(null);
-  const selectStationFromMapRef = useRef<(stationId: string) => void>(() => undefined);
-  const selectBranchFromMapRef = useRef<(branchId: string) => void>(() => undefined);
+  const selectStationFromMapRef = useRef<(stationId: string) => void>(
+    () => undefined,
+  );
+  const selectBranchFromMapRef = useRef<(branchId: string) => void>(
+    () => undefined,
+  );
+  const selectTransferGroupFromMapRef = useRef<(groupId: string) => void>(
+    () => undefined,
+  );
   const toolModeRef = useRef<ToolMode>("select");
   const stationLocationPickModeRef = useRef(false);
-  const showToastRef = useRef<(message: string, tone?: ToastTone) => void>(() => undefined);
-  const setStationDraftFromMapRef = useRef<(lng: number, lat: number) => void>(() => undefined);
+  const showToastRef = useRef<(message: string, tone?: ToastTone) => void>(
+    () => undefined,
+  );
+  const setStationDraftFromMapRef = useRef<(lng: number, lat: number) => void>(
+    () => undefined,
+  );
   const undoStackRef = useRef<OverlayCommandRecord[]>([]);
   const redoStackRef = useRef<OverlayCommandRecord[]>([]);
-  const [data, setData] = useState<UnifiedEditorData>(initialData ?? EMPTY_UNIFIED_EDITOR_DATA);
+  const [data, setData] = useState<UnifiedEditorData>(
+    initialData ?? EMPTY_UNIFIED_EDITOR_DATA,
+  );
   const [dataLoading, setDataLoading] = useState(!initialData);
-  const [overlays, setOverlays] = useState((initialData ?? EMPTY_UNIFIED_EDITOR_DATA).overlays);
+  const [overlays, setOverlays] = useState(
+    (initialData ?? EMPTY_UNIFIED_EDITOR_DATA).overlays,
+  );
   const [selection, setSelection] = useState<Selection>({ type: "none" });
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("search");
   const [toolMode, setToolMode] = useState<ToolMode>("select");
@@ -454,45 +773,116 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
-  const [toast, setToast] = useState<{ message: string | null; tone: ToastTone }>({ message: null, tone: "info" });
-  const [stationDraft, setStationDraft] = useState<ManualStationOverride | null>(null);
-  const [selectionBox, setSelectionBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string | null;
+    tone: ToastTone;
+  }>({ message: null, tone: "info" });
+  const [stationDraft, setStationDraft] =
+    useState<ManualStationOverride | null>(null);
+  const [selectionBox, setSelectionBox] = useState<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const [layers, setLayers] = useState(defaultLayers);
   const [zoom, setZoom] = useState(7);
-  const [cursorLngLat, setCursorLngLat] = useState<{ lng: number; lat: number } | null>(null);
+  const [cursorLngLat, setCursorLngLat] = useState<{
+    lng: number;
+    lat: number;
+  } | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [stationLocationPickMode, setStationLocationPickMode] = useState(false);
-  const [transferDraft, setTransferDraft] = useState<TransferGroupDraft | null>(null);
-  const [geometryDraft, setGeometryDraft] = useState<GeometryDraft | null>(null);
+  const [transferDraft, setTransferDraft] = useState<TransferGroupDraft | null>(
+    null,
+  );
+  const [geometryDraft, setGeometryDraft] = useState<GeometryDraft | null>(
+    null,
+  );
 
-  const stationById = useMemo(() => new Map(data.stations.map((station) => [station.id, station])), [data.stations]);
-  const branchById = useMemo(() => new Map(data.branches.map((branch) => [branch.id, branch])), [data.branches]);
-  const groupById = useMemo(() => new Map(overlays.manualTransferGroups.map((group) => [group.id, group])), [overlays.manualTransferGroups]);
+  const stationById = useMemo(
+    () => new Map(data.stations.map((station) => [station.id, station])),
+    [data.stations],
+  );
+  const branchById = useMemo(
+    () => new Map(data.branches.map((branch) => [branch.id, branch])),
+    [data.branches],
+  );
+  const groupById = useMemo(
+    () =>
+      new Map(overlays.manualTransferGroups.map((group) => [group.id, group])),
+    [overlays.manualTransferGroups],
+  );
+  const selectedTransferGroupId =
+    selection.type === "transferGroup" ? selection.id : null;
+  const stationTransferGroupIndex = useMemo(
+    () => buildStationTransferGroupIndex(overlays.manualTransferGroups),
+    [overlays.manualTransferGroups],
+  );
   const selectedStationIds = useMemo(() => {
     if (selection.type === "station") return new Set([selection.id]);
     if (selection.type === "multiStation") return new Set(selection.ids);
-    if (selection.type === "transferGroup") return new Set(groupById.get(selection.id)?.stationIds ?? []);
+    if (selection.type === "transferGroup")
+      return new Set(groupById.get(selection.id)?.stationIds ?? []);
     return new Set<string>();
   }, [groupById, selection]);
   const selectedBranchId = selection.type === "branch" ? selection.id : null;
-  const nonTransferIds = useMemo(() => new Set(overlays.nonTransferStationIds), [overlays.nonTransferStationIds]);
-  const filteredStations = useMemo(() => searchStations(data.stations, query, query.trim() ? 80 : 60), [data.stations, query]);
+  const nonTransferIds = useMemo(
+    () => new Set(overlays.nonTransferStationIds),
+    [overlays.nonTransferStationIds],
+  );
+  const filteredStations = useMemo(
+    () => searchStations(data.stations, query, query.trim() ? 80 : 60),
+    [data.stations, query],
+  );
 
   const commandResults = useMemo(() => {
     const normalized = normalizeSearchText(commandQuery);
-    const stations = searchStations(data.stations, commandQuery, normalized ? 12 : 8)
-      .map((station) => ({ type: "station" as const, id: station.id, title: station.nameKo, subtitle: formatStationSubLabel(station) }));
+    const stations = searchStations(
+      data.stations,
+      commandQuery,
+      normalized ? 12 : 8,
+    ).map((station) => ({
+      type: "station" as const,
+      id: station.id,
+      title: station.nameKo,
+      subtitle: formatStationSubLabel(station),
+    }));
     const branches = data.branches
-      .filter((branch) => !normalized || normalizeSearchText(`${branch.canonicalLineNameKo} ${branch.sourceLineName} ${branch.sourceLineNumber}`).includes(normalized))
+      .filter(
+        (branch) =>
+          !normalized ||
+          normalizeSearchText(
+            `${branch.canonicalLineNameKo} ${branch.sourceLineName} ${branch.sourceLineNumber}`,
+          ).includes(normalized),
+      )
       .slice(0, 6)
-      .map((branch) => ({ type: "branch" as const, id: branch.id, title: branch.canonicalLineNameKo, subtitle: branch.sourceLineName }));
+      .map((branch) => ({
+        type: "branch" as const,
+        id: branch.id,
+        title: branch.canonicalLineNameKo,
+        subtitle: branch.sourceLineName,
+      }));
     const groups = overlays.manualTransferGroups
-      .filter((group) => !normalized || normalizeSearchText(group.nameKo).includes(normalized))
+      .filter(
+        (group) =>
+          !normalized || normalizeSearchText(group.nameKo).includes(normalized),
+      )
       .slice(0, 6)
-      .map((group) => ({ type: "transferGroup" as const, id: group.id, title: group.nameKo, subtitle: `${group.stationIds.length}개 역` }));
+      .map((group) => ({
+        type: "transferGroup" as const,
+        id: group.id,
+        title: group.nameKo,
+        subtitle: `${group.stationIds.length}개 역`,
+      }));
     return [...stations, ...branches, ...groups];
-  }, [commandQuery, data.branches, data.stations, overlays.manualTransferGroups]);
+  }, [
+    commandQuery,
+    data.branches,
+    data.stations,
+    overlays.manualTransferGroups,
+  ]);
 
   const showToast = useCallback((message: string, tone: ToastTone = "info") => {
     setToast({ message, tone });
@@ -508,52 +898,82 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
   }, [stationLocationPickMode]);
 
   useEffect(() => {
-    setStationDraftFromMapRef.current = (lng, lat) => setStationDraft((previous) => previous ? { ...previous, lng, lat } : previous);
+    setStationDraftFromMapRef.current = (lng, lat) =>
+      setStationDraft((previous) =>
+        previous ? { ...previous, lng, lat } : previous,
+      );
   }, []);
 
-  const focusStation = useCallback((stationId: string) => {
-    const station = stationById.get(stationId);
-    if (!station || !isValidStation(station)) return;
-    mapRef.current?.flyTo({ center: [station.lng, station.lat], zoom: Math.max(mapRef.current.getZoom(), 13), duration: 500 });
-  }, [stationById]);
+  const focusStation = useCallback(
+    (stationId: string) => {
+      const station = stationById.get(stationId);
+      if (!station || !isValidStation(station)) return;
+      mapRef.current?.flyTo({
+        center: [station.lng, station.lat],
+        zoom: Math.max(mapRef.current.getZoom(), 13),
+        duration: 500,
+      });
+    },
+    [stationById],
+  );
 
-  const selectStation = useCallback((stationId: string, shouldFocus = true) => {
-    setSelection({ type: "station", id: stationId });
-    const station = stationById.get(stationId);
-    const previous = overlays.stationOverrides.find((override) => override.stationId === stationId);
-    if (station) setStationDraft(emptyStationOverride(station, previous));
-    setTransferDraft(null);
-    setGeometryDraft(null);
-    setStationLocationPickMode(false);
-    if (shouldFocus) focusStation(stationId);
-  }, [focusStation, overlays.stationOverrides, stationById]);
+  const selectStation = useCallback(
+    (stationId: string, shouldFocus = true) => {
+      setSelection({ type: "station", id: stationId });
+      const station = stationById.get(stationId);
+      const previous = overlays.stationOverrides.find(
+        (override) => override.stationId === stationId,
+      );
+      if (station) setStationDraft(emptyStationOverride(station, previous));
+      setTransferDraft(null);
+      setGeometryDraft(null);
+      setStationLocationPickMode(false);
+      if (shouldFocus) focusStation(stationId);
+    },
+    [focusStation, overlays.stationOverrides, stationById],
+  );
 
-  const selectBranch = useCallback((branchId: string) => {
-    setSelection({ type: "branch", id: branchId });
-    setStationDraft(null);
-    setTransferDraft(null);
-    const branch = branchById.get(branchId);
-    const previous = overlays.geometryOverrides.find((override) => override.branchId === branchId);
-    setGeometryDraft(branch ? makeGeometryDraftFromBranch(branch, previous) : null);
-  }, [branchById, overlays.geometryOverrides]);
+  const selectBranch = useCallback(
+    (branchId: string) => {
+      setSelection({ type: "branch", id: branchId });
+      setStationDraft(null);
+      setTransferDraft(null);
+      const branch = branchById.get(branchId);
+      const previous = overlays.geometryOverrides.find(
+        (override) => override.branchId === branchId,
+      );
+      setGeometryDraft(
+        branch ? makeGeometryDraftFromBranch(branch, previous) : null,
+      );
+    },
+    [branchById, overlays.geometryOverrides],
+  );
 
-  const selectTransferGroup = useCallback((groupId: string) => {
-    const group = groupById.get(groupId);
-    setSelection({ type: "transferGroup", id: groupId });
-    setStationDraft(null);
-    setGeometryDraft(null);
-    setTransferDraft(group ? makeTransferDraftFromGroup(group) : null);
-    const firstStationId = group?.stationIds[0];
-    if (firstStationId) focusStation(firstStationId);
-  }, [focusStation, groupById]);
+  const selectTransferGroup = useCallback(
+    (groupId: string) => {
+      const group = groupById.get(groupId);
+      setSelection({ type: "transferGroup", id: groupId });
+      setStationDraft(null);
+      setGeometryDraft(null);
+      setTransferDraft(group ? makeTransferDraftFromGroup(group) : null);
+      const firstStationId = group?.stationIds[0];
+      if (firstStationId) focusStation(firstStationId);
+    },
+    [focusStation, groupById],
+  );
 
   useEffect(() => {
-    selectStationFromMapRef.current = (stationId) => selectStation(stationId, false);
+    selectStationFromMapRef.current = (stationId) =>
+      selectStation(stationId, false);
   }, [selectStation]);
 
   useEffect(() => {
     selectBranchFromMapRef.current = selectBranch;
   }, [selectBranch]);
+
+  useEffect(() => {
+    selectTransferGroupFromMapRef.current = selectTransferGroup;
+  }, [selectTransferGroup]);
 
   useEffect(() => {
     toolModeRef.current = toolMode;
@@ -573,7 +993,11 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
         setData(nextData);
         setOverlays(nextData.overlays);
       } catch (error) {
-        if (!cancelled) showToast(error instanceof Error ? error.message : "에디터 데이터 로드 실패", "error");
+        if (!cancelled)
+          showToast(
+            error instanceof Error ? error.message : "에디터 데이터 로드 실패",
+            "error",
+          );
       } finally {
         if (!cancelled) setDataLoading(false);
       }
@@ -618,12 +1042,32 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
     });
 
     mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "bottom-right");
-    map.addControl(new maplibregl.AttributionControl({ compact: true }), "bottom-left");
+    map.addControl(
+      new maplibregl.NavigationControl({ visualizePitch: false }),
+      "bottom-right",
+    );
+    map.addControl(
+      new maplibregl.AttributionControl({ compact: true }),
+      "bottom-left",
+    );
 
     map.on("load", () => {
-      map.addSource("railmap-branches", { type: "geojson", data: EMPTY_FEATURE_COLLECTION });
-      map.addSource("railmap-stations", { type: "geojson", data: EMPTY_FEATURE_COLLECTION });
+      map.addSource("railmap-branches", {
+        type: "geojson",
+        data: EMPTY_FEATURE_COLLECTION,
+      });
+      map.addSource("railmap-transfer-group-areas", {
+        type: "geojson",
+        data: EMPTY_FEATURE_COLLECTION,
+      });
+      map.addSource("railmap-transfer-group-icons", {
+        type: "geojson",
+        data: EMPTY_FEATURE_COLLECTION,
+      });
+      map.addSource("railmap-stations", {
+        type: "geojson",
+        data: EMPTY_FEATURE_COLLECTION,
+      });
 
       map.addLayer({
         id: "railmap-branches-line",
@@ -651,26 +1095,167 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
       });
 
       map.addLayer({
+        id: "railmap-transfer-group-area-fill",
+        type: "fill",
+        source: "railmap-transfer-group-areas",
+        minzoom: 12,
+        paint: {
+          "fill-color": [
+            "case",
+            ["==", ["get", "selected"], true],
+            "#2563eb",
+            "#0f172a",
+          ],
+          "fill-opacity": [
+            "case",
+            ["==", ["get", "selected"], true],
+            0.16,
+            0.08,
+          ],
+        },
+      });
+
+      map.addLayer({
+        id: "railmap-transfer-group-area-outline",
+        type: "line",
+        source: "railmap-transfer-group-areas",
+        minzoom: 12,
+        paint: {
+          "line-color": [
+            "case",
+            ["==", ["get", "selected"], true],
+            "#2563eb",
+            "#64748b",
+          ],
+          "line-width": ["case", ["==", ["get", "selected"], true], 2, 1],
+          "line-opacity": 0.55,
+          "line-dasharray": [2, 2],
+        },
+      });
+
+      map.addLayer({
+        id: "railmap-transfer-group-hit",
+        type: "circle",
+        source: "railmap-transfer-group-icons",
+        maxzoom: 12,
+        paint: {
+          "circle-radius": 17,
+          "circle-color": "#000000",
+          "circle-opacity": 0.01,
+        },
+      });
+
+      map.addLayer({
+        id: "railmap-transfer-group-casing",
+        type: "circle",
+        source: "railmap-transfer-group-icons",
+        maxzoom: 12,
+        paint: {
+          "circle-color": "#ffffff",
+          "circle-radius": ["case", ["==", ["get", "selected"], true], 12, 10],
+          "circle-stroke-color": [
+            "case",
+            ["==", ["get", "selected"], true],
+            "#2563eb",
+            "#475569",
+          ],
+          "circle-stroke-width": [
+            "case",
+            ["==", ["get", "selected"], true],
+            2.4,
+            1.4,
+          ],
+          "circle-opacity": [
+            "step",
+            ["zoom"],
+            ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
+            12,
+            0.96,
+          ],
+        },
+      });
+
+      map.addLayer({
+        id: "railmap-transfer-group-icon",
+        type: "symbol",
+        source: "railmap-transfer-group-icons",
+        maxzoom: 12,
+        layout: {
+          "text-field": "☯",
+          "text-size": 15,
+          "text-font": ["Open Sans Regular"],
+          "text-allow-overlap": true,
+          "text-ignore-placement": true,
+        },
+        paint: {
+          "text-color": "#0f172a",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 0.8,
+        },
+      });
+
+      map.addLayer({
+        id: "railmap-transfer-group-label",
+        type: "symbol",
+        source: "railmap-transfer-group-icons",
+        minzoom: 9,
+        maxzoom: 12,
+        layout: {
+          "text-field": ["get", "nameKo"],
+          "text-size": 11,
+          "text-font": ["Open Sans Regular"],
+          "text-offset": [0, 1.45],
+          "text-anchor": "top",
+          "text-allow-overlap": false,
+          "text-ignore-placement": false,
+        },
+        paint: {
+          "text-color": "#0f172a",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 1.5,
+        },
+      });
+
+      map.addLayer({
         id: "railmap-stations-circle",
         type: "circle",
         source: "railmap-stations",
         paint: {
           "circle-color": ["get", "colorHex"],
-          "circle-radius": ["case", ["boolean", ["get", "selected"], false], 7, 4.5],
-          "circle-stroke-color": ["case", ["boolean", ["get", "selected"], false], "#111827", "#ffffff"],
-          "circle-stroke-width": ["case", ["boolean", ["get", "selected"], false], 3, 1.5],
+          "circle-radius": [
+            "case",
+            ["boolean", ["get", "selected"], false],
+            7,
+            4.5,
+          ],
+          "circle-stroke-color": [
+            "case",
+            ["boolean", ["get", "selected"], false],
+            "#111827",
+            "#ffffff",
+          ],
+          "circle-stroke-width": [
+            "case",
+            ["boolean", ["get", "selected"], false],
+            3,
+            1.5,
+          ],
           "circle-opacity": 0.96,
         },
       });
-
-
 
       map.addLayer({
         id: "railmap-stations-hit",
         type: "circle",
         source: "railmap-stations",
         paint: {
-          "circle-radius": 12,
+          "circle-radius": [
+            "step",
+            ["zoom"],
+            ["case", ["==", ["get", "isTransferChild"], true], 0, 12],
+            12,
+            12,
+          ],
           "circle-color": "#000000",
           "circle-opacity": 0.01,
           "circle-stroke-width": 0,
@@ -703,7 +1288,7 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
         minzoom: 11,
         filter: ["!=", ["get", "selected"], true],
         layout: {
-          "text-field": ["get", "nameKo"],
+          "text-field": ["get", "labelNameKo"],
           "text-size": 12,
           "text-font": ["Open Sans Regular"],
           "text-offset": [0, 1.05],
@@ -725,7 +1310,7 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
         source: "railmap-stations",
         filter: ["==", ["get", "selected"], true],
         layout: {
-          "text-field": ["get", "nameKo"],
+          "text-field": ["get", "labelNameKo"],
           "text-size": 13,
           "text-font": ["Open Sans Regular"],
           "text-offset": [0, -1.2],
@@ -744,20 +1329,55 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
     });
 
     map.on("mousemove", (event) => {
-      pendingCursorLngLatRef.current = { lng: event.lngLat.lng, lat: event.lngLat.lat };
+      pendingCursorLngLatRef.current = {
+        lng: event.lngLat.lng,
+        lat: event.lngLat.lat,
+      };
 
       if (!selectionBoxStartRef.current) {
-        const queryLayers = ["railmap-stations-hit", "railmap-stations-circle", "railmap-selected-branches-line", "railmap-branches-line"].filter((layerId) => map.getLayer(layerId));
-        const features = queryLayers.length > 0 ? map.queryRenderedFeatures(event.point, { layers: queryLayers }) : [];
-        const hasStation = Boolean(firstFeatureId(features, ["railmap-stations-hit", "railmap-stations-circle"]));
-        const hasBranch = Boolean(firstFeatureId(features, ["railmap-selected-branches-line", "railmap-branches-line"]));
-        map.getCanvas().style.cursor = hasStation ? "pointer" : hasBranch ? "crosshair" : "grab";
+        const queryLayers = [
+          "railmap-transfer-group-hit",
+          "railmap-transfer-group-area-fill",
+          "railmap-stations-hit",
+          "railmap-stations-circle",
+          "railmap-selected-branches-line",
+          "railmap-branches-line",
+        ].filter((layerId) => map.getLayer(layerId));
+        const features =
+          queryLayers.length > 0
+            ? map.queryRenderedFeatures(event.point, { layers: queryLayers })
+            : [];
+        const hasTransferGroup = Boolean(
+          firstFeatureId(features, [
+            "railmap-transfer-group-hit",
+            "railmap-transfer-group-area-fill",
+          ]),
+        );
+        const hasStation = Boolean(
+          firstFeatureId(features, [
+            "railmap-stations-hit",
+            "railmap-stations-circle",
+          ]),
+        );
+        const hasBranch = Boolean(
+          firstFeatureId(features, [
+            "railmap-selected-branches-line",
+            "railmap-branches-line",
+          ]),
+        );
+        map.getCanvas().style.cursor =
+          hasTransferGroup || hasStation
+            ? "pointer"
+            : hasBranch
+              ? "crosshair"
+              : "grab";
       }
 
       if (cursorFrameRef.current !== null) return;
       cursorFrameRef.current = window.requestAnimationFrame(() => {
         cursorFrameRef.current = null;
-        if (pendingCursorLngLatRef.current) setCursorLngLat(pendingCursorLngLatRef.current);
+        if (pendingCursorLngLatRef.current)
+          setCursorLngLat(pendingCursorLngLatRef.current);
       });
     });
     map.on("zoomend", () => setZoom(map.getZoom()));
@@ -771,38 +1391,91 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
         return;
       }
 
-      const queryLayers = ["railmap-stations-hit", "railmap-stations-circle", "railmap-selected-branches-line", "railmap-branches-line"].filter((layerId) => map.getLayer(layerId));
-      const features = queryLayers.length > 0 ? map.queryRenderedFeatures(event.point, { layers: queryLayers }) : [];
-      const stationId = firstFeatureId(features, ["railmap-stations-hit", "railmap-stations-circle"]);
-      if (stationId) {
-        selectStationFromMapRef.current(stationId);
+      const queryLayers = [
+        "railmap-transfer-group-hit",
+        "railmap-transfer-group-area-fill",
+        "railmap-stations-hit",
+        "railmap-stations-circle",
+        "railmap-selected-branches-line",
+        "railmap-branches-line",
+      ].filter((layerId) => map.getLayer(layerId));
+      const features =
+        queryLayers.length > 0
+          ? map.queryRenderedFeatures(event.point, { layers: queryLayers })
+          : [];
+      const transferGroupId = firstFeatureId(features, [
+        "railmap-transfer-group-hit",
+        "railmap-transfer-group-area-fill",
+      ]);
+      if (transferGroupId) {
+        selectTransferGroupFromMapRef.current(transferGroupId);
         return;
       }
 
-      const branchId = firstFeatureId(features, ["railmap-selected-branches-line", "railmap-branches-line"]);
+      const stationId = firstFeatureId(features, [
+        "railmap-stations-hit",
+        "railmap-stations-circle",
+      ]);
+      if (stationId) {
+        const transferGroup = stationTransferGroupIndex.get(stationId);
+        if (transferGroup)
+          selectTransferGroupFromMapRef.current(transferGroup.id);
+        else selectStationFromMapRef.current(stationId);
+        return;
+      }
+
+      const branchId = firstFeatureId(features, [
+        "railmap-selected-branches-line",
+        "railmap-branches-line",
+      ]);
       if (branchId) selectBranchFromMapRef.current(branchId);
     });
 
     map.on("contextmenu", (event) => {
       event.preventDefault();
-      const queryLayers = ["railmap-stations-hit", "railmap-stations-circle", "railmap-selected-branches-line", "railmap-branches-line"].filter((layerId) => map.getLayer(layerId));
-      const features = queryLayers.length > 0 ? map.queryRenderedFeatures(event.point, { layers: queryLayers }) : [];
+      const queryLayers = [
+        "railmap-transfer-group-hit",
+        "railmap-transfer-group-area-fill",
+        "railmap-stations-hit",
+        "railmap-stations-circle",
+        "railmap-selected-branches-line",
+        "railmap-branches-line",
+      ].filter((layerId) => map.getLayer(layerId));
+      const features =
+        queryLayers.length > 0
+          ? map.queryRenderedFeatures(event.point, { layers: queryLayers })
+          : [];
       setContextMenu({
         x: event.point.x,
         y: event.point.y,
-        stationId: firstFeatureId(features, ["railmap-stations-hit", "railmap-stations-circle"]),
-        branchId: firstFeatureId(features, ["railmap-selected-branches-line", "railmap-branches-line"]),
+        stationId: firstFeatureId(features, [
+          "railmap-stations-hit",
+          "railmap-stations-circle",
+        ]),
+        branchId: firstFeatureId(features, [
+          "railmap-selected-branches-line",
+          "railmap-branches-line",
+        ]),
       });
     });
 
     map.on("mousedown", (event) => {
       const original = event.originalEvent as MouseEvent;
-      if (!(original.metaKey || original.ctrlKey) && toolModeRef.current !== "box") return;
+      if (
+        !(original.metaKey || original.ctrlKey) &&
+        toolModeRef.current !== "box"
+      )
+        return;
       original.preventDefault();
       map.getCanvas().style.cursor = "crosshair";
       map.dragPan.disable();
       selectionBoxStartRef.current = { x: event.point.x, y: event.point.y };
-      setSelectionBox({ left: event.point.x, top: event.point.y, width: 0, height: 0 });
+      setSelectionBox({
+        left: event.point.x,
+        top: event.point.y,
+        width: 0,
+        height: 0,
+      });
     });
 
     map.on("mousemove", (event) => {
@@ -810,7 +1483,12 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
       if (!start) return;
       const left = Math.min(start.x, event.point.x);
       const top = Math.min(start.y, event.point.y);
-      setSelectionBox({ left, top, width: Math.abs(event.point.x - start.x), height: Math.abs(event.point.y - start.y) });
+      setSelectionBox({
+        left,
+        top,
+        width: Math.abs(event.point.x - start.x),
+        height: Math.abs(event.point.y - start.y),
+      });
     });
 
     map.on("mouseup", (event) => {
@@ -820,7 +1498,10 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
         [Math.min(start.x, event.point.x), Math.min(start.y, event.point.y)],
         [Math.max(start.x, event.point.x), Math.max(start.y, event.point.y)],
       ] as [[number, number], [number, number]];
-      const selected = map.queryRenderedFeatures(box, { layers: ["railmap-stations-hit", "railmap-stations-circle"] })
+      const selected = map
+        .queryRenderedFeatures(box, {
+          layers: ["railmap-stations-hit", "railmap-stations-circle"],
+        })
         .map((feature) => feature.properties?.id as string | undefined)
         .filter((id): id is string => Boolean(id));
       const ids = [...new Set(selected)];
@@ -833,7 +1514,8 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
     });
 
     return () => {
-      if (cursorFrameRef.current !== null) window.cancelAnimationFrame(cursorFrameRef.current);
+      if (cursorFrameRef.current !== null)
+        window.cancelAnimationFrame(cursorFrameRef.current);
       map.remove();
       mapRef.current = null;
     };
@@ -845,9 +1527,18 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
     let cancelled = false;
     const idleId = scheduleIdle(() => {
       void (async () => {
-        const features = await buildStationFeaturesChunked(data.stations, selectedStationIds, nonTransferIds, layers.stations, layers.nonTransfer, () => cancelled);
+        const features = await buildStationFeaturesChunked(
+          data.stations,
+          selectedStationIds,
+          nonTransferIds,
+          stationTransferGroupIndex,
+          layers.stations,
+          layers.nonTransfer,
+          () => cancelled,
+        );
         if (cancelled || !features) return;
-        const source = mapRef.current?.getSource("railmap-stations") as GeoJSONSource | undefined;
+        const source = mapRef.current?.getSource("railmap-stations") as
+          GeoJSONSource | undefined;
         source?.setData(features);
       })();
     });
@@ -856,7 +1547,16 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
       cancelled = true;
       cancelIdle(idleId);
     };
-  }, [data.stations, dataLoading, layers.nonTransfer, layers.stations, mapLoaded, nonTransferIds, selectedStationIds]);
+  }, [
+    data.stations,
+    dataLoading,
+    layers.nonTransfer,
+    layers.stations,
+    mapLoaded,
+    nonTransferIds,
+    selectedStationIds,
+    stationTransferGroupIndex,
+  ]);
 
   useEffect(() => {
     if (!mapLoaded || dataLoading) return;
@@ -864,9 +1564,14 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
     let cancelled = false;
     const idleId = scheduleIdle(() => {
       void (async () => {
-        const features = await buildBranchFeaturesChunked(data.branches, layers.lines, () => cancelled);
+        const features = await buildBranchFeaturesChunked(
+          data.branches,
+          layers.lines,
+          () => cancelled,
+        );
         if (cancelled || !features) return;
-        const source = mapRef.current?.getSource("railmap-branches") as GeoJSONSource | undefined;
+        const source = mapRef.current?.getSource("railmap-branches") as
+          GeoJSONSource | undefined;
         source?.setData(features);
       })();
     });
@@ -878,17 +1583,71 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
   }, [data.branches, dataLoading, layers.lines, mapLoaded]);
 
   useEffect(() => {
+    if (!mapLoaded || dataLoading) return;
+
+    let cancelled = false;
+    const idleId = scheduleIdle(() => {
+      void (async () => {
+        const [areaFeatures, iconFeatures] = await Promise.all([
+          buildTransferGroupAreaFeaturesChunked(
+            overlays.manualTransferGroups,
+            stationById,
+            selectedTransferGroupId,
+            () => cancelled,
+          ),
+          buildTransferGroupIconFeaturesChunked(
+            overlays.manualTransferGroups,
+            stationById,
+            selectedTransferGroupId,
+            () => cancelled,
+          ),
+        ]);
+        if (cancelled || !areaFeatures || !iconFeatures) return;
+        const areaSource = mapRef.current?.getSource(
+          "railmap-transfer-group-areas",
+        ) as GeoJSONSource | undefined;
+        const iconSource = mapRef.current?.getSource(
+          "railmap-transfer-group-icons",
+        ) as GeoJSONSource | undefined;
+        areaSource?.setData(areaFeatures);
+        iconSource?.setData(iconFeatures);
+      })();
+    });
+
+    return () => {
+      cancelled = true;
+      cancelIdle(idleId);
+    };
+  }, [
+    dataLoading,
+    mapLoaded,
+    overlays.manualTransferGroups,
+    selectedTransferGroupId,
+    stationById,
+  ]);
+
+  useEffect(() => {
     const map = mapRef.current;
     if (!mapLoaded || !map?.getLayer("railmap-selected-branches-line")) return;
-    map.setFilter("railmap-selected-branches-line", ["==", ["get", "id"], selectedBranchId ?? "__none__"]);
+    map.setFilter("railmap-selected-branches-line", [
+      "==",
+      ["get", "id"],
+      selectedBranchId ?? "__none__",
+    ]);
   }, [mapLoaded, selectedBranchId]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const visibility = layers.labels ? "visible" : "none";
-    if (map.getLayer("railmap-stations-label")) map.setLayoutProperty("railmap-stations-label", "visibility", visibility);
-    if (map.getLayer("railmap-selected-stations-label")) map.setLayoutProperty("railmap-selected-stations-label", "visibility", visibility);
+    if (map.getLayer("railmap-stations-label"))
+      map.setLayoutProperty("railmap-stations-label", "visibility", visibility);
+    if (map.getLayer("railmap-selected-stations-label"))
+      map.setLayoutProperty(
+        "railmap-selected-stations-label",
+        "visibility",
+        visibility,
+      );
   }, [layers.labels]);
 
   async function persist(next: ManualOverlayBundle, message: string) {
@@ -903,7 +1662,11 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
     }
   }
 
-  async function executeOverlayCommand(label: string, next: ManualOverlayBundle, message: string) {
+  async function executeOverlayCommand(
+    label: string,
+    next: ManualOverlayBundle,
+    message: string,
+  ) {
     const command = makeCommandRecord(label, overlays, next);
     undoStackRef.current = [...undoStackRef.current, command].slice(-80);
     redoStackRef.current = [];
@@ -934,23 +1697,39 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
     const next: ManualOverlayBundle = {
       ...overlays,
       stationOverrides: [
-        ...overlays.stationOverrides.filter((override) => override.stationId !== stationDraft.stationId),
+        ...overlays.stationOverrides.filter(
+          (override) => override.stationId !== stationDraft.stationId,
+        ),
         stationDraft,
       ],
     };
-    const saved = await executeOverlayCommand("역 보정", next, "역 보정 저장 완료");
+    const saved = await executeOverlayCommand(
+      "역 보정",
+      next,
+      "역 보정 저장 완료",
+    );
     if (!saved) return;
 
     setData((previous) => ({
       ...previous,
-      stations: previous.stations.map((station) => station.id === stationDraft.stationId
-        ? {
-            ...station,
-            nameKo: stationDraft.nameKo?.trim() || station.nameKo,
-            lat: typeof stationDraft.lat === "number" && Number.isFinite(stationDraft.lat) ? stationDraft.lat : station.lat,
-            lng: typeof stationDraft.lng === "number" && Number.isFinite(stationDraft.lng) ? stationDraft.lng : station.lng,
-          }
-        : station),
+      stations: previous.stations.map((station) =>
+        station.id === stationDraft.stationId
+          ? {
+              ...station,
+              nameKo: stationDraft.nameKo?.trim() || station.nameKo,
+              lat:
+                typeof stationDraft.lat === "number" &&
+                Number.isFinite(stationDraft.lat)
+                  ? stationDraft.lat
+                  : station.lat,
+              lng:
+                typeof stationDraft.lng === "number" &&
+                Number.isFinite(stationDraft.lng)
+                  ? stationDraft.lng
+                  : station.lng,
+            }
+          : station,
+      ),
     }));
   }
 
@@ -965,12 +1744,18 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
     const next: ManualOverlayBundle = {
       ...overlays,
       manualTransferGroups: [
-        ...overlays.manualTransferGroups.filter((candidate) => candidate.id !== group.id),
+        ...overlays.manualTransferGroups.filter(
+          (candidate) => candidate.id !== group.id,
+        ),
         group,
       ],
     };
 
-    await executeOverlayCommand(transferDraft.id ? "환승 그룹 수정" : "환승 그룹 생성", next, "환승 그룹 저장 완료");
+    await executeOverlayCommand(
+      transferDraft.id ? "환승 그룹 수정" : "환승 그룹 생성",
+      next,
+      "환승 그룹 저장 완료",
+    );
     setSelection({ type: "transferGroup", id: group.id });
     setTransferDraft(makeTransferDraftFromGroup(group));
   }
@@ -978,7 +1763,9 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
   async function deleteTransferGroup(groupId: string) {
     const next: ManualOverlayBundle = {
       ...overlays,
-      manualTransferGroups: overlays.manualTransferGroups.filter((group) => group.id !== groupId),
+      manualTransferGroups: overlays.manualTransferGroups.filter(
+        (group) => group.id !== groupId,
+      ),
     };
     await executeOverlayCommand("환승 그룹 삭제", next, "환승 그룹 삭제 완료");
     setTransferDraft(null);
@@ -996,30 +1783,44 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
     const next: ManualOverlayBundle = {
       ...overlays,
       geometryOverrides: [
-        ...overlays.geometryOverrides.filter((candidate) => candidate.branchId !== override.branchId),
+        ...overlays.geometryOverrides.filter(
+          (candidate) => candidate.branchId !== override.branchId,
+        ),
         override,
       ],
     };
 
-    const saved = await executeOverlayCommand("선형 보정", next, "선형 보정 저장 완료");
+    const saved = await executeOverlayCommand(
+      "선형 보정",
+      next,
+      "선형 보정 저장 완료",
+    );
     if (!saved) return;
 
     setData((previous) => ({
       ...previous,
-      branches: previous.branches.map((branch) => branch.id === override.branchId
-        ? {
-            ...branch,
-            geometryOverrideCoordinates: override.points.map((point) => [point.lng, point.lat] as [number, number]),
-            geometryCoordinates: override.points.map((point) => [point.lng, point.lat] as [number, number]),
-          }
-        : branch),
+      branches: previous.branches.map((branch) =>
+        branch.id === override.branchId
+          ? {
+              ...branch,
+              geometryOverrideCoordinates: override.points.map(
+                (point) => [point.lng, point.lat] as [number, number],
+              ),
+              geometryCoordinates: override.points.map(
+                (point) => [point.lng, point.lat] as [number, number],
+              ),
+            }
+          : branch,
+      ),
     }));
   }
 
   async function clearGeometryOverride(branchId: string) {
     const next: ManualOverlayBundle = {
       ...overlays,
-      geometryOverrides: overlays.geometryOverrides.filter((override) => override.branchId !== branchId),
+      geometryOverrides: overlays.geometryOverrides.filter(
+        (override) => override.branchId !== branchId,
+      ),
     };
     await executeOverlayCommand("선형 보정 제거", next, "선형 보정 제거 완료");
     const branch = branchById.get(branchId);
@@ -1043,14 +1844,26 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
       if (enabled) nextSet.add(id);
       else nextSet.delete(id);
     }
-    await executeOverlayCommand(enabled ? "미환승역 설정" : "환승 가능역 설정", { ...overlays, nonTransferStationIds: [...nextSet] }, enabled ? "미환승역 설정 완료" : "환승 가능역 설정 완료");
+    await executeOverlayCommand(
+      enabled ? "미환승역 설정" : "환승 가능역 설정",
+      { ...overlays, nonTransferStationIds: [...nextSet] },
+      enabled ? "미환승역 설정 완료" : "환승 가능역 설정 완료",
+    );
     if (selection.type === "multiStation") setSelection({ type: "none" });
   }
 
-  const selectedStation = selection.type === "station" ? stationById.get(selection.id) ?? null : null;
-  const selectedBranch = selection.type === "branch" ? branchById.get(selection.id) ?? null : null;
-  const selectedGroup = selection.type === "transferGroup" ? groupById.get(selection.id) ?? null : null;
-  const multiStationIds = selection.type === "multiStation" ? selection.ids : [];
+  const selectedStation =
+    selection.type === "station"
+      ? (stationById.get(selection.id) ?? null)
+      : null;
+  const selectedBranch =
+    selection.type === "branch" ? (branchById.get(selection.id) ?? null) : null;
+  const selectedGroup =
+    selection.type === "transferGroup"
+      ? (groupById.get(selection.id) ?? null)
+      : null;
+  const multiStationIds =
+    selection.type === "multiStation" ? selection.ids : [];
   const canUndo = historyVersion >= 0 && undoStackRef.current.length > 0;
   const canRedo = historyVersion >= 0 && redoStackRef.current.length > 0;
 
@@ -1061,30 +1874,81 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
           <PanelHeader>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Railmap</p>
-                <h1 className="mt-1 text-lg font-semibold tracking-[-0.03em]">통합 맵 에디터</h1>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  Railmap
+                </p>
+                <h1 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+                  통합 맵 에디터
+                </h1>
               </div>
               <div className="flex items-center gap-1">
-                <Button size="icon" variant="outline" onClick={() => void undoOverlayCommand()} disabled={!canUndo} aria-label="되돌리기">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => void undoOverlayCommand()}
+                  disabled={!canUndo}
+                  aria-label="되돌리기"
+                >
                   <Undo2 className="size-4" />
                 </Button>
-                <Button size="icon" variant="outline" onClick={() => void redoOverlayCommand()} disabled={!canRedo} aria-label="다시 실행">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => void redoOverlayCommand()}
+                  disabled={!canRedo}
+                  aria-label="다시 실행"
+                >
                   <Redo2 className="size-4" />
                 </Button>
-                <Button size="icon" variant="outline" onClick={() => setCommandOpen(true)} aria-label="명령 팔레트 열기">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setCommandOpen(true)}
+                  aria-label="명령 팔레트 열기"
+                >
                   <Command className="size-4" />
                 </Button>
               </div>
             </div>
             <TabList className="mt-4 grid grid-cols-3">
-              <TabButton active={sidebarTab === "search"} onClick={() => setSidebarTab("search")}>검색</TabButton>
-              <TabButton active={sidebarTab === "layers"} onClick={() => setSidebarTab("layers")}>레이어</TabButton>
-              <TabButton active={sidebarTab === "transfers"} onClick={() => setSidebarTab("transfers")}>환승</TabButton>
+              <TabButton
+                active={sidebarTab === "search"}
+                onClick={() => setSidebarTab("search")}
+              >
+                검색
+              </TabButton>
+              <TabButton
+                active={sidebarTab === "layers"}
+                onClick={() => setSidebarTab("layers")}
+              >
+                레이어
+              </TabButton>
+              <TabButton
+                active={sidebarTab === "transfers"}
+                onClick={() => setSidebarTab("transfers")}
+              >
+                환승
+              </TabButton>
             </TabList>
             <TabList className="mt-2 grid grid-cols-3">
-              <TabButton active={sidebarTab === "geometry"} onClick={() => setSidebarTab("geometry")}>선형</TabButton>
-              <TabButton active={sidebarTab === "validation"} onClick={() => setSidebarTab("validation")}>검증</TabButton>
-              <TabButton active={sidebarTab === "history"} onClick={() => setSidebarTab("history")}>기록</TabButton>
+              <TabButton
+                active={sidebarTab === "geometry"}
+                onClick={() => setSidebarTab("geometry")}
+              >
+                선형
+              </TabButton>
+              <TabButton
+                active={sidebarTab === "validation"}
+                onClick={() => setSidebarTab("validation")}
+              >
+                검증
+              </TabButton>
+              <TabButton
+                active={sidebarTab === "history"}
+                onClick={() => setSidebarTab("history")}
+              >
+                기록
+              </TabButton>
             </TabList>
           </PanelHeader>
 
@@ -1093,7 +1957,12 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
               <div className="grid gap-3">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                  <Input className="pl-9" placeholder="역명, 노선명, 역번호 검색" value={query} onChange={(event) => setQuery(event.target.value)} />
+                  <Input
+                    className="pl-9"
+                    placeholder="역명, 노선명, 역번호 검색"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
                 </div>
                 <div className="grid gap-2">
                   {filteredStations.map((station) => (
@@ -1102,15 +1971,26 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
                       type="button"
                       className={cn(
                         "rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50",
-                        selectedStationIds.has(station.id) ? "border-blue-300 bg-blue-50" : null,
+                        selectedStationIds.has(station.id)
+                          ? "border-blue-300 bg-blue-50"
+                          : null,
                       )}
                       onClick={() => selectStation(station.id)}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="size-2.5 rounded-full" style={{ backgroundColor: station.colorHex ?? "#64748b" }} />
-                        <strong className="truncate text-sm font-semibold">{station.nameKo}</strong>
+                        <span
+                          className="size-2.5 rounded-full"
+                          style={{
+                            backgroundColor: station.colorHex ?? "#64748b",
+                          }}
+                        />
+                        <strong className="truncate text-sm font-semibold">
+                          {station.nameKo}
+                        </strong>
                       </div>
-                      <p className="mt-1 truncate text-xs font-medium text-slate-500">{formatStationSubLabel(station)}</p>
+                      <p className="mt-1 truncate text-xs font-medium text-slate-500">
+                        {formatStationSubLabel(station)}
+                      </p>
                     </button>
                   ))}
                 </div>
@@ -1120,11 +2000,19 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
             {sidebarTab === "layers" ? (
               <div className="grid gap-2">
                 {layerOptions.map(({ key, label, Icon }) => (
-                  <label key={String(key)} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm font-semibold">
+                  <label
+                    key={String(key)}
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm font-semibold"
+                  >
                     <input
                       type="checkbox"
                       checked={layers[key]}
-                      onChange={(event) => setLayers((previous) => ({ ...previous, [key]: event.target.checked }))}
+                      onChange={(event) =>
+                        setLayers((previous) => ({
+                          ...previous,
+                          [key]: event.target.checked,
+                        }))
+                      }
                     />
                     <Icon className="size-4 text-slate-400" />
                     {label}
@@ -1136,14 +2024,29 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
             {sidebarTab === "transfers" ? (
               <div className="grid gap-2">
                 {multiStationIds.length >= 2 ? (
-                  <Button variant="outline" onClick={() => createTransferGroupFromSelection(multiStationIds)}>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      createTransferGroupFromSelection(multiStationIds)
+                    }
+                  >
                     선택한 역으로 환승 그룹 생성
                   </Button>
                 ) : null}
                 {overlays.manualTransferGroups.map((group) => (
-                  <button key={group.id} type="button" className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50" onClick={() => selectTransferGroup(group.id)}>
-                    <strong className="text-sm font-semibold">{group.nameKo}</strong>
-                    <p className="mt-1 text-xs font-medium text-slate-500">{group.stationIds.length}개 역 · {group.note || "메모 없음"}</p>
+                  <button
+                    key={group.id}
+                    type="button"
+                    className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50"
+                    onClick={() => selectTransferGroup(group.id)}
+                  >
+                    <strong className="text-sm font-semibold">
+                      {group.nameKo}
+                    </strong>
+                    <p className="mt-1 text-xs font-medium text-slate-500">
+                      {group.stationIds.length}개 역 ·{" "}
+                      {group.note || "메모 없음"}
+                    </p>
                   </button>
                 ))}
               </div>
@@ -1152,35 +2055,71 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
             {sidebarTab === "geometry" ? (
               <div className="grid gap-2">
                 {data.branches.slice(0, 200).map((branch) => (
-                  <button key={branch.id} type="button" className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50" onClick={() => selectBranch(branch.id)}>
+                  <button
+                    key={branch.id}
+                    type="button"
+                    className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50"
+                    onClick={() => selectBranch(branch.id)}
+                  >
                     <div className="flex items-center gap-2">
-                      <span className="h-1.5 w-8 rounded-full" style={{ backgroundColor: branch.colorHex }} />
-                      <strong className="truncate text-sm font-semibold">{branch.canonicalLineNameKo}</strong>
+                      <span
+                        className="h-1.5 w-8 rounded-full"
+                        style={{ backgroundColor: branch.colorHex }}
+                      />
+                      <strong className="truncate text-sm font-semibold">
+                        {branch.canonicalLineNameKo}
+                      </strong>
                     </div>
-                    <p className="mt-1 truncate text-xs font-medium text-slate-500">{branch.sourceLineName} · {branch.routeStopCount} stops</p>
+                    <p className="mt-1 truncate text-xs font-medium text-slate-500">
+                      {branch.sourceLineName} · {branch.routeStopCount} stops
+                    </p>
                   </button>
                 ))}
               </div>
             ) : null}
 
-            {sidebarTab === "validation" ? <Placeholder title="Validation" description="다음 단계에서 Validator 결과와 Inspector 이동을 연결합니다." /> : null}
-            {sidebarTab === "history" ? <CommandHistoryPanel undoCount={undoStackRef.current.length} redoCount={redoStackRef.current.length} latest={undoStackRef.current.at(-1)} /> : null}
+            {sidebarTab === "validation" ? (
+              <Placeholder
+                title="Validation"
+                description="다음 단계에서 Validator 결과와 Inspector 이동을 연결합니다."
+              />
+            ) : null}
+            {sidebarTab === "history" ? (
+              <CommandHistoryPanel
+                undoCount={undoStackRef.current.length}
+                redoCount={redoStackRef.current.length}
+                latest={undoStackRef.current.at(-1)}
+              />
+            ) : null}
           </PanelBody>
         </Panel>
 
         <main className="relative min-h-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-xl">
           <div ref={mapContainerRef} className="absolute inset-0" />
           <div className="pointer-events-none absolute left-4 top-4 flex flex-wrap gap-2">
-            <Badge className="bg-white/90 text-slate-700">{selectionLabel(selection)}</Badge>
-            <Badge className="bg-white/90 text-slate-700">Zoom {zoom.toFixed(1)}</Badge>
-            {dataLoading ? <Badge className="bg-white/90 text-slate-700">데이터 로딩 중</Badge> : null}
+            <Badge className="bg-white/90 text-slate-700">
+              {selectionLabel(selection)}
+            </Badge>
+            <Badge className="bg-white/90 text-slate-700">
+              Zoom {zoom.toFixed(1)}
+            </Badge>
+            {dataLoading ? (
+              <Badge className="bg-white/90 text-slate-700">
+                데이터 로딩 중
+              </Badge>
+            ) : null}
           </div>
           <div className="absolute left-1/2 top-4 flex -translate-x-1/2 gap-2 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
             {toolOptions.map(({ mode, label, description, Icon }) => (
               <button
                 key={mode}
                 type="button"
-                className={cn("flex items-center gap-1 rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-500", toolMode === mode ? "bg-blue-600 text-white" : "hover:bg-slate-100")}
+                className={cn(
+                  "flex items-center gap-1 rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-500",
+                  toolMode === mode
+                    ? "bg-blue-600 text-white"
+                    : "hover:bg-slate-100",
+                )}
                 onClick={() => setToolMode(mode)}
                 title={description}
               >
@@ -1189,9 +2128,16 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
               </button>
             ))}
           </div>
-          {selectionBox ? <div className="pointer-events-none absolute border-2 border-blue-500 bg-blue-500/15" style={selectionBox} /> : null}
+          {selectionBox ? (
+            <div
+              className="pointer-events-none absolute border-2 border-blue-500 bg-blue-500/15"
+              style={selectionBox}
+            />
+          ) : null}
           <div className="absolute bottom-3 right-3 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium text-slate-600 shadow-lg backdrop-blur">
-            {cursorLngLat ? `${cursorLngLat.lng.toFixed(6)}, ${cursorLngLat.lat.toFixed(6)}` : "좌표 없음"}
+            {cursorLngLat
+              ? `${cursorLngLat.lng.toFixed(6)}, ${cursorLngLat.lat.toFixed(6)}`
+              : "좌표 없음"}
           </div>
           {contextMenu ? (
             <ContextMenu
@@ -1199,17 +2145,30 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
               stationById={stationById}
               branchById={branchById}
               onClose={() => setContextMenu(null)}
-              onSelectStation={(id) => { selectStation(id, false); setContextMenu(null); }}
-              onSelectBranch={(id) => { selectBranch(id); setContextMenu(null); }}
-              onSetNonTransfer={(id, enabled) => { void setStationsNonTransfer([id], enabled); setContextMenu(null); }}
+              onSelectStation={(id) => {
+                selectStation(id, false);
+                setContextMenu(null);
+              }}
+              onSelectBranch={(id) => {
+                selectBranch(id);
+                setContextMenu(null);
+              }}
+              onSetNonTransfer={(id, enabled) => {
+                void setStationsNonTransfer([id], enabled);
+                setContextMenu(null);
+              }}
             />
           ) : null}
         </main>
 
         <Panel className="flex min-h-0 flex-col overflow-hidden">
           <PanelHeader>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Inspector</p>
-            <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">{selectionLabel(selection)}</h2>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              Inspector
+            </p>
+            <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+              {selectionLabel(selection)}
+            </h2>
           </PanelHeader>
           <PanelBody className="min-h-0 flex-1 overflow-y-auto">
             {selectedStation && stationDraft ? (
@@ -1219,17 +2178,61 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
                 nonTransfer={nonTransferIds.has(selectedStation.id)}
                 onChange={setStationDraft}
                 onSave={() => void saveStationDraft()}
-                onSetNonTransfer={(enabled) => void setStationsNonTransfer([selectedStation.id], enabled)}
+                onSetNonTransfer={(enabled) =>
+                  void setStationsNonTransfer([selectedStation.id], enabled)
+                }
                 onStartMapPick={() => setStationLocationPickMode(true)}
                 onFocus={() => focusStation(selectedStation.id)}
                 pickMode={stationLocationPickMode}
               />
             ) : null}
-            {selectedBranch && geometryDraft ? <BranchInspector branch={selectedBranch} draft={geometryDraft} onChange={setGeometryDraft} onSave={() => void saveGeometryDraft()} onClear={() => void clearGeometryOverride(selectedBranch.id)} /> : null}
-            {selectedGroup && transferDraft ? <TransferGroupInspector group={selectedGroup} draft={transferDraft} stationById={stationById} onChange={setTransferDraft} onSave={() => void saveTransferDraft()} onDelete={() => void deleteTransferGroup(selectedGroup.id)} /> : null}
-            {!selectedGroup && transferDraft ? <NewTransferGroupInspector draft={transferDraft} stationById={stationById} onChange={setTransferDraft} onSave={() => void saveTransferDraft()} onCancel={() => setTransferDraft(null)} /> : null}
-            {multiStationIds.length > 0 && !transferDraft ? <MultiStationInspector ids={multiStationIds} stationById={stationById} nonTransferIds={nonTransferIds} onSetNonTransfer={(enabled) => void setStationsNonTransfer(multiStationIds, enabled)} onCreateTransferGroup={() => createTransferGroupFromSelection(multiStationIds)} /> : null}
-            {selection.type === "none" ? <Placeholder title="객체를 선택하세요" description="지도에서 역/노선선을 클릭하거나 Cmd/Ctrl+K로 검색하세요." /> : null}
+            {selectedBranch && geometryDraft ? (
+              <BranchInspector
+                branch={selectedBranch}
+                draft={geometryDraft}
+                onChange={setGeometryDraft}
+                onSave={() => void saveGeometryDraft()}
+                onClear={() => void clearGeometryOverride(selectedBranch.id)}
+              />
+            ) : null}
+            {selectedGroup && transferDraft ? (
+              <TransferGroupInspector
+                group={selectedGroup}
+                draft={transferDraft}
+                stationById={stationById}
+                onChange={setTransferDraft}
+                onSave={() => void saveTransferDraft()}
+                onDelete={() => void deleteTransferGroup(selectedGroup.id)}
+              />
+            ) : null}
+            {!selectedGroup && transferDraft ? (
+              <NewTransferGroupInspector
+                draft={transferDraft}
+                stationById={stationById}
+                onChange={setTransferDraft}
+                onSave={() => void saveTransferDraft()}
+                onCancel={() => setTransferDraft(null)}
+              />
+            ) : null}
+            {multiStationIds.length > 0 && !transferDraft ? (
+              <MultiStationInspector
+                ids={multiStationIds}
+                stationById={stationById}
+                nonTransferIds={nonTransferIds}
+                onSetNonTransfer={(enabled) =>
+                  void setStationsNonTransfer(multiStationIds, enabled)
+                }
+                onCreateTransferGroup={() =>
+                  createTransferGroupFromSelection(multiStationIds)
+                }
+              />
+            ) : null}
+            {selection.type === "none" ? (
+              <Placeholder
+                title="객체를 선택하세요"
+                description="지도에서 역/노선선을 클릭하거나 Cmd/Ctrl+K로 검색하세요."
+              />
+            ) : null}
           </PanelBody>
         </Panel>
       </InspectorGrid>
@@ -1238,12 +2241,27 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
         <div className="shrink-0 border-b border-slate-200 p-3">
           <div className="flex items-center gap-3">
             <Command className="size-5 text-slate-400" />
-            <Input autoFocus placeholder="역, 노선, 환승 그룹 검색" value={commandQuery} onChange={(event) => setCommandQuery(event.target.value)} />
-            <Button variant="ghost" size="icon" onClick={() => setCommandOpen(false)}><X className="size-4" /></Button>
+            <Input
+              autoFocus
+              placeholder="역, 노선, 환승 그룹 검색"
+              value={commandQuery}
+              onChange={(event) => setCommandQuery(event.target.value)}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setCommandOpen(false)}
+            >
+              <X className="size-4" />
+            </Button>
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
-          {commandResults.length === 0 ? <p className="px-3 py-8 text-center text-xs font-normal text-slate-400">검색 결과가 없습니다.</p> : null}
+          {commandResults.length === 0 ? (
+            <p className="px-3 py-8 text-center text-xs font-normal text-slate-400">
+              검색 결과가 없습니다.
+            </p>
+          ) : null}
           {commandResults.map((item) => (
             <button
               key={`${item.type}:${item.id}`}
@@ -1257,8 +2275,12 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
               }}
             >
               <span>
-                <strong className="block text-sm font-semibold">{item.title}</strong>
-                <span className="text-xs font-medium text-slate-500">{item.subtitle}</span>
+                <strong className="block text-sm font-semibold">
+                  {item.title}
+                </strong>
+                <span className="text-xs font-medium text-slate-500">
+                  {item.subtitle}
+                </span>
               </span>
               <ChevronRight className="size-4 text-slate-400" />
             </button>
@@ -1271,23 +2293,50 @@ export default function UnifiedMapEditor({ data: initialData }: { data?: Unified
   );
 }
 
-function CommandHistoryPanel({ undoCount, redoCount, latest }: { undoCount: number; redoCount: number; latest?: OverlayCommandRecord }) {
+function CommandHistoryPanel({
+  undoCount,
+  redoCount,
+  latest,
+}: {
+  undoCount: number;
+  redoCount: number;
+  latest?: OverlayCommandRecord;
+}) {
   return (
     <div className="grid gap-3">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-        <strong className="text-sm font-semibold text-slate-700">Command History</strong>
-        <p className="mt-2 text-xs font-medium text-slate-500">Undo {undoCount} · Redo {redoCount}</p>
+        <strong className="text-sm font-semibold text-slate-700">
+          Command History
+        </strong>
+        <p className="mt-2 text-xs font-medium text-slate-500">
+          Undo {undoCount} · Redo {redoCount}
+        </p>
       </div>
-      {latest ? <InfoRow label="최근 작업" value={latest.label} /> : <Placeholder title="작업 기록 없음" description="저장 작업을 실행하면 command history에 기록됩니다." />}
+      {latest ? (
+        <InfoRow label="최근 작업" value={latest.label} />
+      ) : (
+        <Placeholder
+          title="작업 기록 없음"
+          description="저장 작업을 실행하면 command history에 기록됩니다."
+        />
+      )}
     </div>
   );
 }
 
-function Placeholder({ title, description }: { title: string; description: string }) {
+function Placeholder({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
     <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
       <strong className="text-sm font-semibold text-slate-700">{title}</strong>
-      <p className="mt-2 text-xs font-medium leading-5 text-slate-500">{description}</p>
+      <p className="mt-2 text-xs font-medium leading-5 text-slate-500">
+        {description}
+      </p>
     </div>
   );
 }
@@ -1301,7 +2350,17 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function StationInspector({ station, draft, nonTransfer, pickMode, onChange, onSave, onSetNonTransfer, onStartMapPick, onFocus }: {
+function StationInspector({
+  station,
+  draft,
+  nonTransfer,
+  pickMode,
+  onChange,
+  onSave,
+  onSetNonTransfer,
+  onStartMapPick,
+  onFocus,
+}: {
   station: EditorStation;
   draft: ManualStationOverride;
   nonTransfer: boolean;
@@ -1316,99 +2375,231 @@ function StationInspector({ station, draft, nonTransfer, pickMode, onChange, onS
     <div className="grid gap-4">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
         <div className="flex items-center gap-2">
-          <span className="size-3 rounded-full" style={{ backgroundColor: station.colorHex ?? "#64748b" }} />
+          <span
+            className="size-3 rounded-full"
+            style={{ backgroundColor: station.colorHex ?? "#64748b" }}
+          />
           <strong className="text-base font-semibold">{station.nameKo}</strong>
         </div>
-        <p className="mt-1 text-xs font-medium text-slate-500">{formatStationSubLabel(station)}</p>
-        <p className="mt-2 break-all text-[11px] font-medium text-slate-400">{station.id}</p>
+        <p className="mt-1 text-xs font-medium text-slate-500">
+          {formatStationSubLabel(station)}
+        </p>
+        <p className="mt-2 break-all text-[11px] font-medium text-slate-400">
+          {station.id}
+        </p>
       </div>
       <Field label="표시명 보정">
-        <Input value={draft.nameKo ?? ""} onChange={(event) => onChange({ ...draft, nameKo: event.target.value })} />
+        <Input
+          value={draft.nameKo ?? ""}
+          onChange={(event) =>
+            onChange({ ...draft, nameKo: event.target.value })
+          }
+        />
       </Field>
       <div className="grid grid-cols-2 gap-2">
         <Field label="위도">
-          <Input value={draft.lat ?? ""} onChange={(event) => onChange({ ...draft, lat: Number(event.target.value) })} />
+          <Input
+            value={draft.lat ?? ""}
+            onChange={(event) =>
+              onChange({ ...draft, lat: Number(event.target.value) })
+            }
+          />
         </Field>
         <Field label="경도">
-          <Input value={draft.lng ?? ""} onChange={(event) => onChange({ ...draft, lng: Number(event.target.value) })} />
+          <Input
+            value={draft.lng ?? ""}
+            onChange={(event) =>
+              onChange({ ...draft, lng: Number(event.target.value) })
+            }
+          />
         </Field>
       </div>
       <Field label="메모">
-        <Textarea value={draft.note ?? ""} onChange={(event) => onChange({ ...draft, note: event.target.value || null })} />
+        <Textarea
+          value={draft.note ?? ""}
+          onChange={(event) =>
+            onChange({ ...draft, note: event.target.value || null })
+          }
+        />
       </Field>
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline" onClick={onFocus}><LocateFixed className="mr-1 size-4" />이동</Button>
-        <Button variant={pickMode ? "secondary" : "outline"} onClick={onStartMapPick}>지도에서 위치 지정</Button>
-        <Button variant={nonTransfer ? "secondary" : "outline"} onClick={() => onSetNonTransfer(!nonTransfer)}>{nonTransfer ? "환승 가능역" : "미환승역"}</Button>
-        <Button onClick={onSave}><Save className="mr-1 size-4" />저장</Button>
+        <Button variant="outline" onClick={onFocus}>
+          <LocateFixed className="mr-1 size-4" />
+          이동
+        </Button>
+        <Button
+          variant={pickMode ? "secondary" : "outline"}
+          onClick={onStartMapPick}
+        >
+          지도에서 위치 지정
+        </Button>
+        <Button
+          variant={nonTransfer ? "secondary" : "outline"}
+          onClick={() => onSetNonTransfer(!nonTransfer)}
+        >
+          {nonTransfer ? "환승 가능역" : "미환승역"}
+        </Button>
+        <Button onClick={onSave}>
+          <Save className="mr-1 size-4" />
+          저장
+        </Button>
       </div>
     </div>
   );
 }
 
-function BranchInspector({ branch, draft, onChange, onSave, onClear }: { branch: EditorMapBranch; draft: GeometryDraft; onChange: (draft: GeometryDraft) => void; onSave: () => void; onClear: () => void }) {
-  function updatePoint(index: number, patch: Partial<ManualGeometryOverridePoint>) {
+function BranchInspector({
+  branch,
+  draft,
+  onChange,
+  onSave,
+  onClear,
+}: {
+  branch: EditorMapBranch;
+  draft: GeometryDraft;
+  onChange: (draft: GeometryDraft) => void;
+  onSave: () => void;
+  onClear: () => void;
+}) {
+  function updatePoint(
+    index: number,
+    patch: Partial<ManualGeometryOverridePoint>,
+  ) {
     onChange({
       ...draft,
-      points: draft.points.map((point, pointIndex) => pointIndex === index ? { ...point, ...patch } : point),
+      points: draft.points.map((point, pointIndex) =>
+        pointIndex === index ? { ...point, ...patch } : point,
+      ),
     });
   }
 
   function removePoint(index: number) {
-    onChange({ ...draft, points: draft.points.filter((_, pointIndex) => pointIndex !== index) });
+    onChange({
+      ...draft,
+      points: draft.points.filter((_, pointIndex) => pointIndex !== index),
+    });
   }
 
   function addControlPoint() {
-    const last = draft.points.at(-1) ?? { lng: 127.3, lat: 36.35, kind: "control" as const };
-    onChange({ ...draft, points: [...draft.points, { lng: last.lng, lat: last.lat, kind: "control" }] });
+    const last = draft.points.at(-1) ?? {
+      lng: 127.3,
+      lat: 36.35,
+      kind: "control" as const,
+    };
+    onChange({
+      ...draft,
+      points: [
+        ...draft.points,
+        { lng: last.lng, lat: last.lat, kind: "control" },
+      ],
+    });
   }
 
   return (
     <div className="grid gap-3">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-        <span className="block h-2 w-16 rounded-full" style={{ backgroundColor: branch.colorHex }} />
-        <h3 className="mt-3 text-base font-semibold">{branch.canonicalLineNameKo}</h3>
-        <p className="mt-1 text-xs font-medium text-slate-500">{branch.sourceLineName} · {branch.role}</p>
+        <span
+          className="block h-2 w-16 rounded-full"
+          style={{ backgroundColor: branch.colorHex }}
+        />
+        <h3 className="mt-3 text-base font-semibold">
+          {branch.canonicalLineNameKo}
+        </h3>
+        <p className="mt-1 text-xs font-medium text-slate-500">
+          {branch.sourceLineName} · {branch.role}
+        </p>
       </div>
       <InfoRow label="Branch ID" value={branch.id} />
       <InfoRow label="기점" value={branch.origin ?? "-"} />
       <InfoRow label="종점" value={branch.terminal ?? "-"} />
       <InfoRow label="Route stops" value={`${branch.routeStopCount}개`} />
       <Field label="선형 메모">
-        <Textarea value={draft.note} onChange={(event) => onChange({ ...draft, note: event.target.value })} />
+        <Textarea
+          value={draft.note}
+          onChange={(event) => onChange({ ...draft, note: event.target.value })}
+        />
       </Field>
       <div className="grid gap-2 rounded-3xl border border-slate-200 p-2">
         <div className="flex items-center justify-between px-1">
-          <strong className="text-xs font-medium text-slate-600">Geometry Points</strong>
-          <Button size="sm" variant="outline" onClick={addControlPoint}><Plus className="mr-1 size-3" />추가</Button>
+          <strong className="text-xs font-medium text-slate-600">
+            Geometry Points
+          </strong>
+          <Button size="sm" variant="outline" onClick={addControlPoint}>
+            <Plus className="mr-1 size-3" />
+            추가
+          </Button>
         </div>
         <div className="grid max-h-80 gap-2 overflow-y-auto">
           {draft.points.map((point, index) => (
-            <div key={`${index}:${point.lng}:${point.lat}`} className="grid gap-2 rounded-2xl bg-slate-50 p-2">
+            <div
+              key={`${index}:${point.lng}:${point.lat}`}
+              className="grid gap-2 rounded-2xl bg-slate-50 p-2"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-medium text-slate-500">#{index + 1} · {point.kind}</span>
-                <Button size="icon" variant="ghost" onClick={() => removePoint(index)} disabled={draft.points.length <= 2}><Trash2 className="size-3" /></Button>
+                <span className="text-[11px] font-medium text-slate-500">
+                  #{index + 1} · {point.kind}
+                </span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => removePoint(index)}
+                  disabled={draft.points.length <= 2}
+                >
+                  <Trash2 className="size-3" />
+                </Button>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Input value={point.lng} onChange={(event) => updatePoint(index, { lng: Number(event.target.value) })} />
-                <Input value={point.lat} onChange={(event) => updatePoint(index, { lat: Number(event.target.value) })} />
+                <Input
+                  value={point.lng}
+                  onChange={(event) =>
+                    updatePoint(index, { lng: Number(event.target.value) })
+                  }
+                />
+                <Input
+                  value={point.lat}
+                  onChange={(event) =>
+                    updatePoint(index, { lat: Number(event.target.value) })
+                  }
+                />
               </div>
             </div>
           ))}
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline" onClick={onClear}>보정 제거</Button>
-        <Button onClick={onSave}><Save className="mr-1 size-4" />선형 저장</Button>
+        <Button variant="outline" onClick={onClear}>
+          보정 제거
+        </Button>
+        <Button onClick={onSave}>
+          <Save className="mr-1 size-4" />
+          선형 저장
+        </Button>
       </div>
     </div>
   );
 }
 
-function TransferGroupInspector({ group, draft, stationById, onChange, onSave, onDelete }: { group: ManualTransferGroup; draft: TransferGroupDraft; stationById: Map<string, EditorStation>; onChange: (draft: TransferGroupDraft) => void; onSave: () => void; onDelete: () => void }) {
+function TransferGroupInspector({
+  group,
+  draft,
+  stationById,
+  onChange,
+  onSave,
+  onDelete,
+}: {
+  group: ManualTransferGroup;
+  draft: TransferGroupDraft;
+  stationById: Map<string, EditorStation>;
+  onChange: (draft: TransferGroupDraft) => void;
+  onSave: () => void;
+  onDelete: () => void;
+}) {
   function updateMinute(pairKey: string, value: string) {
     const numberValue = value === "" ? null : Number(value);
-    const nextValue = numberValue === null || !Number.isFinite(numberValue) ? null : Math.max(0, Math.round(numberValue));
+    const nextValue =
+      numberValue === null || !Number.isFinite(numberValue)
+        ? null
+        : Math.max(0, Math.round(numberValue));
     onChange({
       ...draft,
       transferMinutesByPair: {
@@ -1423,7 +2614,10 @@ function TransferGroupInspector({ group, draft, stationById, onChange, onSave, o
     onChange({
       ...draft,
       stationIds,
-      transferMinutesByPair: normalizeTransferGroupDraftPairs(stationIds, draft.transferMinutesByPair),
+      transferMinutesByPair: normalizeTransferGroupDraftPairs(
+        stationIds,
+        draft.transferMinutesByPair,
+      ),
     });
   }
 
@@ -1431,43 +2625,89 @@ function TransferGroupInspector({ group, draft, stationById, onChange, onSave, o
     <div className="grid gap-3">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
         <h3 className="text-base font-semibold">{group.nameKo}</h3>
-        <p className="mt-1 text-xs font-medium text-slate-500">{group.stationIds.length}개 역 · {group.note || "메모 없음"}</p>
+        <p className="mt-1 text-xs font-medium text-slate-500">
+          {group.stationIds.length}개 역 · {group.note || "메모 없음"}
+        </p>
       </div>
       <Field label="그룹 이름">
-        <Input value={draft.nameKo} onChange={(event) => onChange({ ...draft, nameKo: event.target.value })} />
+        <Input
+          value={draft.nameKo}
+          onChange={(event) =>
+            onChange({ ...draft, nameKo: event.target.value })
+          }
+        />
       </Field>
       <Field label="메모">
-        <Textarea value={draft.note} onChange={(event) => onChange({ ...draft, note: event.target.value })} />
+        <Textarea
+          value={draft.note}
+          onChange={(event) => onChange({ ...draft, note: event.target.value })}
+        />
       </Field>
       <div className="grid gap-2 rounded-3xl border border-slate-200 p-2">
-        <strong className="px-1 text-xs font-medium text-slate-600">환승 그룹 역 목록</strong>
+        <strong className="px-1 text-xs font-medium text-slate-600">
+          환승 그룹 역 목록
+        </strong>
         {draft.stationIds.map((stationId) => {
           const station = stationById.get(stationId);
           return (
-            <div key={stationId} className="flex items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+            <div
+              key={stationId}
+              className="flex items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2"
+            >
               <span className="min-w-0 text-xs font-medium text-slate-700">
-                <span className="block truncate">{station?.nameKo ?? stationId}</span>
-                <span className="block truncate text-[11px] text-slate-400">{station ? formatStationSubLabel(station) : "존재하지 않는 역"}</span>
+                <span className="block truncate">
+                  {station?.nameKo ?? stationId}
+                </span>
+                <span className="block truncate text-[11px] text-slate-400">
+                  {station
+                    ? formatStationSubLabel(station)
+                    : "존재하지 않는 역"}
+                </span>
               </span>
-              <Button size="icon" variant="ghost" onClick={() => removeStation(stationId)} disabled={draft.stationIds.length <= 2}><Trash2 className="size-3" /></Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => removeStation(stationId)}
+                disabled={draft.stationIds.length <= 2}
+              >
+                <Trash2 className="size-3" />
+              </Button>
             </div>
           );
         })}
       </div>
       <div className="grid gap-2 rounded-3xl border border-slate-200 p-2">
-        <strong className="px-1 text-xs font-medium text-slate-600">역간 환승 시간표</strong>
+        <strong className="px-1 text-xs font-medium text-slate-600">
+          역간 환승 시간표
+        </strong>
         <div className="max-h-80 overflow-auto">
           <table className="w-full border-separate border-spacing-1 text-[11px]">
             <tbody>
               {draft.stationIds.map((rowId, rowIndex) => (
                 <tr key={rowId}>
-                  <th className="sticky left-0 max-w-24 truncate rounded-xl bg-white px-2 py-1 text-left font-medium text-slate-500">{stationById.get(rowId)?.nameKo ?? rowId}</th>
+                  <th className="sticky left-0 max-w-24 truncate rounded-xl bg-white px-2 py-1 text-left font-medium text-slate-500">
+                    {stationById.get(rowId)?.nameKo ?? rowId}
+                  </th>
                   {draft.stationIds.map((colId, colIndex) => {
-                    if (colIndex <= rowIndex) return <td key={colId} className="rounded-xl bg-slate-50 px-2 py-1 text-center text-slate-300">-</td>;
+                    if (colIndex <= rowIndex)
+                      return (
+                        <td
+                          key={colId}
+                          className="rounded-xl bg-slate-50 px-2 py-1 text-center text-slate-300"
+                        >
+                          -
+                        </td>
+                      );
                     const pairKey = makeTransferPairKey(rowId, colId);
                     return (
                       <td key={colId} className="rounded-xl bg-slate-50 p-1">
-                        <Input className="h-7 px-2 text-[11px]" value={draft.transferMinutesByPair[pairKey] ?? ""} onChange={(event) => updateMinute(pairKey, event.target.value)} />
+                        <Input
+                          className="h-7 px-2 text-[11px]"
+                          value={draft.transferMinutesByPair[pairKey] ?? ""}
+                          onChange={(event) =>
+                            updateMinute(pairKey, event.target.value)
+                          }
+                        />
                       </td>
                     );
                   })}
@@ -1478,46 +2718,108 @@ function TransferGroupInspector({ group, draft, stationById, onChange, onSave, o
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline" onClick={onDelete}><Trash2 className="mr-1 size-4" />삭제</Button>
-        <Button onClick={onSave}><Save className="mr-1 size-4" />저장</Button>
+        <Button variant="outline" onClick={onDelete}>
+          <Trash2 className="mr-1 size-4" />
+          삭제
+        </Button>
+        <Button onClick={onSave}>
+          <Save className="mr-1 size-4" />
+          저장
+        </Button>
       </div>
     </div>
   );
 }
 
-function NewTransferGroupInspector({ draft, stationById, onChange, onSave, onCancel }: { draft: TransferGroupDraft; stationById: Map<string, EditorStation>; onChange: (draft: TransferGroupDraft) => void; onSave: () => void; onCancel: () => void }) {
+function NewTransferGroupInspector({
+  draft,
+  stationById,
+  onChange,
+  onSave,
+  onCancel,
+}: {
+  draft: TransferGroupDraft;
+  stationById: Map<string, EditorStation>;
+  onChange: (draft: TransferGroupDraft) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
   const previewGroup = toTransferGroup(draft);
 
   return (
     <div className="grid gap-3">
       <div className="rounded-3xl border border-blue-200 bg-blue-50 p-4">
         <h3 className="text-base font-semibold text-blue-950">새 환승 그룹</h3>
-        <p className="mt-1 text-xs font-medium text-blue-700">선택한 환승 가능역으로 그룹을 생성합니다.</p>
+        <p className="mt-1 text-xs font-medium text-blue-700">
+          선택한 환승 가능역으로 그룹을 생성합니다.
+        </p>
       </div>
-      <TransferGroupInspector group={previewGroup} draft={draft} stationById={stationById} onChange={onChange} onSave={onSave} onDelete={onCancel} />
+      <TransferGroupInspector
+        group={previewGroup}
+        draft={draft}
+        stationById={stationById}
+        onChange={onChange}
+        onSave={onSave}
+        onDelete={onCancel}
+      />
     </div>
   );
 }
 
-function MultiStationInspector({ ids, stationById, nonTransferIds, onSetNonTransfer, onCreateTransferGroup }: { ids: string[]; stationById: Map<string, EditorStation>; nonTransferIds: Set<string>; onSetNonTransfer: (enabled: boolean) => void; onCreateTransferGroup: () => void }) {
-  const allNonTransfer = ids.length > 0 && ids.every((id) => nonTransferIds.has(id));
-  const allTransfer = ids.length > 0 && ids.every((id) => !nonTransferIds.has(id));
+function MultiStationInspector({
+  ids,
+  stationById,
+  nonTransferIds,
+  onSetNonTransfer,
+  onCreateTransferGroup,
+}: {
+  ids: string[];
+  stationById: Map<string, EditorStation>;
+  nonTransferIds: Set<string>;
+  onSetNonTransfer: (enabled: boolean) => void;
+  onCreateTransferGroup: () => void;
+}) {
+  const allNonTransfer =
+    ids.length > 0 && ids.every((id) => nonTransferIds.has(id));
+  const allTransfer =
+    ids.length > 0 && ids.every((id) => !nonTransferIds.has(id));
 
   return (
     <div className="grid gap-3">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
         <h3 className="text-base font-semibold">{ids.length}개 역 선택</h3>
-        <p className="mt-1 text-xs font-normal text-slate-500">선택한 역에 일괄 작업을 적용합니다.</p>
+        <p className="mt-1 text-xs font-normal text-slate-500">
+          선택한 역에 일괄 작업을 적용합니다.
+        </p>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {!allNonTransfer ? <Button variant="outline" onClick={() => onSetNonTransfer(true)}>미환승역</Button> : null}
-        {!allTransfer ? <Button variant="outline" onClick={() => onSetNonTransfer(false)}>환승 가능역</Button> : null}
-        {ids.length >= 2 && !allNonTransfer ? <Button className="col-span-2" onClick={onCreateTransferGroup}>환승 그룹 생성</Button> : null}
+        {!allNonTransfer ? (
+          <Button variant="outline" onClick={() => onSetNonTransfer(true)}>
+            미환승역
+          </Button>
+        ) : null}
+        {!allTransfer ? (
+          <Button variant="outline" onClick={() => onSetNonTransfer(false)}>
+            환승 가능역
+          </Button>
+        ) : null}
+        {ids.length >= 2 && !allNonTransfer ? (
+          <Button className="col-span-2" onClick={onCreateTransferGroup}>
+            환승 그룹 생성
+          </Button>
+        ) : null}
       </div>
       <div className="max-h-72 overflow-y-auto rounded-3xl border border-slate-200 p-2">
         {ids.map((id) => {
           const station = stationById.get(id);
-          return <p key={id} className="rounded-2xl px-3 py-2 text-xs font-medium text-slate-600">{station ? `${station.nameKo} · ${station.lineNameKo}` : id}</p>;
+          return (
+            <p
+              key={id}
+              className="rounded-2xl px-3 py-2 text-xs font-medium text-slate-600"
+            >
+              {station ? `${station.nameKo} · ${station.lineNameKo}` : id}
+            </p>
+          );
         })}
       </div>
     </div>
@@ -1528,12 +2830,22 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-3">
       <p className="text-[11px] font-semibold text-slate-400">{label}</p>
-      <p className="mt-1 break-all text-sm font-medium text-slate-700">{value}</p>
+      <p className="mt-1 break-all text-sm font-medium text-slate-700">
+        {value}
+      </p>
     </div>
   );
 }
 
-function ContextMenu({ state, stationById, branchById, onClose, onSelectStation, onSelectBranch, onSetNonTransfer }: {
+function ContextMenu({
+  state,
+  stationById,
+  branchById,
+  onClose,
+  onSelectStation,
+  onSelectBranch,
+  onSetNonTransfer,
+}: {
   state: NonNullable<ContextMenuState>;
   stationById: Map<string, EditorStation>;
   branchById: Map<string, EditorMapBranch>;
@@ -1546,17 +2858,56 @@ function ContextMenu({ state, stationById, branchById, onClose, onSelectStation,
   const branch = state.branchId ? branchById.get(state.branchId) : null;
 
   return (
-    <div className="absolute z-40 min-w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-2xl" style={{ left: state.x, top: state.y }}>
+    <div
+      className="absolute z-40 min-w-48 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-2xl"
+      style={{ left: state.x, top: state.y }}
+    >
       {station ? (
         <>
-          <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50" onClick={() => onSelectStation(station.id)}>역 선택: {station.nameKo}</button>
-          <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50" onClick={() => onSetNonTransfer(station.id, true)}>미환승역으로 설정</button>
-          <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50" onClick={() => onSetNonTransfer(station.id, false)}>환승 가능역으로 설정</button>
+          <button
+            type="button"
+            className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50"
+            onClick={() => onSelectStation(station.id)}
+          >
+            역 선택: {station.nameKo}
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50"
+            onClick={() => onSetNonTransfer(station.id, true)}
+          >
+            미환승역으로 설정
+          </button>
+          <button
+            type="button"
+            className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50"
+            onClick={() => onSetNonTransfer(station.id, false)}
+          >
+            환승 가능역으로 설정
+          </button>
         </>
       ) : null}
-      {branch ? <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50" onClick={() => onSelectBranch(branch.id)}>노선 선택: {branch.canonicalLineNameKo}</button> : null}
-      {!station && !branch ? <p className="px-3 py-2 text-xs font-medium text-slate-400">선택 가능한 객체 없음</p> : null}
-      <button type="button" className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-500 hover:bg-slate-100" onClick={onClose}>닫기</button>
+      {branch ? (
+        <button
+          type="button"
+          className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold hover:bg-blue-50"
+          onClick={() => onSelectBranch(branch.id)}
+        >
+          노선 선택: {branch.canonicalLineNameKo}
+        </button>
+      ) : null}
+      {!station && !branch ? (
+        <p className="px-3 py-2 text-xs font-medium text-slate-400">
+          선택 가능한 객체 없음
+        </p>
+      ) : null}
+      <button
+        type="button"
+        className="block w-full rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-500 hover:bg-slate-100"
+        onClick={onClose}
+      >
+        닫기
+      </button>
     </div>
   );
 }

@@ -1,7 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import RailExplorer from "./RailExplorer";
-import { type RailMapBranch, type RailMapStation } from "./RailMap";
+import {
+  type RailMapBranch,
+  type RailMapStation,
+  type RailMapTransferGroup,
+} from "./RailMap";
 
 type MatchConfidence = "high" | "medium" | "low" | "none" | string;
 
@@ -67,8 +71,6 @@ interface ManualStationOverride {
   note?: string | null;
 }
 
-
-
 interface ManualGeometryOverridePoint {
   lng: number;
   lat: number;
@@ -87,7 +89,7 @@ interface ManualTransferGroup {
   id: string;
   nameKo: string;
   stationIds: string[];
-  transferMinutesByPair?: Record<string, number | null>;
+  transferMinutesByPair: Record<string, number | null>;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;
@@ -118,6 +120,7 @@ interface CanonicalBundle {
     missingCanonicalLines: number;
   };
   lines: CanonicalLine[];
+  manualTransferGroups?: ManualTransferGroup[];
   manualTransferEdges?: ManualTransferEdge[];
   stations: CanonicalStation[];
   routeStops: CanonicalRouteStop[];
@@ -138,7 +141,9 @@ function makeTransferPairKey(stationIdA: string, stationIdB: string) {
   return [stationIdA, stationIdB].slice().sort().join("<->");
 }
 
-function deriveTransferEdgesFromGroups(groups: ManualTransferGroup[]): ManualTransferEdge[] {
+function deriveTransferEdgesFromGroups(
+  groups: ManualTransferGroup[],
+): ManualTransferEdge[] {
   const edges: ManualTransferEdge[] = [];
 
   for (const group of groups) {
@@ -149,7 +154,8 @@ function deriveTransferEdgesFromGroups(groups: ManualTransferGroup[]): ManualTra
       for (let j = i + 1; j < stationIds.length; j += 1) {
         const fromStationId = stationIds[i];
         const toStationId = stationIds[j];
-        if (!fromStationId || !toStationId || fromStationId === toStationId) continue;
+        if (!fromStationId || !toStationId || fromStationId === toStationId)
+          continue;
 
         const pairKey = makeTransferPairKey(fromStationId, toStationId);
 
@@ -180,20 +186,35 @@ function readManualOverlays(): ManualOverlays {
   for (const candidate of candidates) {
     if (!fs.existsSync(candidate)) continue;
 
-    const parsed = JSON.parse(fs.readFileSync(candidate, "utf8")) as Partial<ManualOverlays>;
+    const parsed = JSON.parse(
+      fs.readFileSync(candidate, "utf8"),
+    ) as Partial<ManualOverlays>;
 
-    const manualTransferGroups = Array.isArray(parsed.manualTransferGroups) ? parsed.manualTransferGroups : [];
+    const manualTransferGroups = Array.isArray(parsed.manualTransferGroups)
+      ? parsed.manualTransferGroups
+      : [];
     const legacyEdges = Array.isArray(parsed.manualTransferEdges)
-      ? parsed.manualTransferEdges.filter((edge) => edge.source !== "editor-group")
+      ? parsed.manualTransferEdges.filter(
+          (edge) => edge.source !== "editor-group",
+        )
       : [];
 
     return {
       schemaVersion: 1,
       manualTransferGroups,
-      manualTransferEdges: [...legacyEdges, ...deriveTransferEdgesFromGroups(manualTransferGroups)],
-      nonTransferStationIds: Array.isArray(parsed.nonTransferStationIds) ? parsed.nonTransferStationIds : [],
-      stationOverrides: Array.isArray(parsed.stationOverrides) ? parsed.stationOverrides : [],
-      geometryOverrides: Array.isArray(parsed.geometryOverrides) ? parsed.geometryOverrides : [],
+      manualTransferEdges: [
+        ...legacyEdges,
+        ...deriveTransferEdgesFromGroups(manualTransferGroups),
+      ],
+      nonTransferStationIds: Array.isArray(parsed.nonTransferStationIds)
+        ? parsed.nonTransferStationIds
+        : [],
+      stationOverrides: Array.isArray(parsed.stationOverrides)
+        ? parsed.stationOverrides
+        : [],
+      geometryOverrides: Array.isArray(parsed.geometryOverrides)
+        ? parsed.geometryOverrides
+        : [],
     };
   }
 
@@ -207,7 +228,10 @@ function readManualOverlays(): ManualOverlays {
   };
 }
 
-function applyStationOverrides(stations: CanonicalStation[], overrides: ManualStationOverride[]): CanonicalStation[] {
+function applyStationOverrides(
+  stations: CanonicalStation[],
+  overrides: ManualStationOverride[],
+): CanonicalStation[] {
   const overrideByStationId = new Map(
     overrides
       .filter((override) => override.enabled !== false)
@@ -221,8 +245,14 @@ function applyStationOverrides(stations: CanonicalStation[], overrides: ManualSt
     return {
       ...station,
       nameKo: override.nameKo?.trim() || station.nameKo,
-      lat: typeof override.lat === "number" && Number.isFinite(override.lat) ? override.lat : station.lat,
-      lng: typeof override.lng === "number" && Number.isFinite(override.lng) ? override.lng : station.lng,
+      lat:
+        typeof override.lat === "number" && Number.isFinite(override.lat)
+          ? override.lat
+          : station.lat,
+      lng:
+        typeof override.lng === "number" && Number.isFinite(override.lng)
+          ? override.lng
+          : station.lng,
     };
   });
 }
@@ -233,14 +263,20 @@ function readBundle(): CanonicalBundle {
     "public/data/kric-canonical-app-bundle.json",
   );
 
-  const bundle = JSON.parse(fs.readFileSync(bundlePath, "utf8")) as CanonicalBundle;
+  const bundle = JSON.parse(
+    fs.readFileSync(bundlePath, "utf8"),
+  ) as CanonicalBundle;
   const manualOverlays = readManualOverlays();
 
-  const stations = applyStationOverrides(bundle.stations, manualOverlays.stationOverrides);
+  const stations = applyStationOverrides(
+    bundle.stations,
+    manualOverlays.stationOverrides,
+  );
 
   return {
     ...bundle,
     stations,
+    manualTransferGroups: manualOverlays.manualTransferGroups,
     manualTransferEdges: [
       ...(bundle.manualTransferEdges ?? []),
       ...manualOverlays.manualTransferEdges,
@@ -258,7 +294,10 @@ function toMapStations(stations: CanonicalStation[]): RailMapStation[] {
   }));
 }
 
-function toMapBranches(bundle: CanonicalBundle, geometryOverrides: ManualGeometryOverride[]): RailMapBranch[] {
+function toMapBranches(
+  bundle: CanonicalBundle,
+  geometryOverrides: ManualGeometryOverride[],
+): RailMapBranch[] {
   const stationById = new Map(
     bundle.stations.map((station) => [
       station.id,
@@ -273,7 +312,9 @@ function toMapBranches(bundle: CanonicalBundle, geometryOverrides: ManualGeometr
   );
   const overrideByBranchId = new Map(
     geometryOverrides
-      .filter((override) => override.enabled !== false && override.points.length >= 2)
+      .filter(
+        (override) => override.enabled !== false && override.points.length >= 2,
+      )
       .map((override) => [override.branchId, override]),
   );
 
@@ -290,7 +331,9 @@ function toMapBranches(bundle: CanonicalBundle, geometryOverrides: ManualGeometr
         sourceLineNumber: branch.sourceLineNumber,
         sourceLineName: branch.sourceLineName,
         geometryOverrideCoordinates: override?.points
-          .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
+          .filter(
+            (point) => Number.isFinite(point.lng) && Number.isFinite(point.lat),
+          )
           .map((point) => [point.lng, point.lat] as [number, number]),
         routeStops: branch.routeStops.map((stop) => ({
           id: stop.id,
@@ -304,6 +347,19 @@ function toMapBranches(bundle: CanonicalBundle, geometryOverrides: ManualGeometr
   );
 }
 
+function toMapTransferGroups(
+  groups: ManualTransferGroup[],
+): RailMapTransferGroup[] {
+  return groups
+    .filter((group) => group.enabled !== false && group.stationIds.length >= 2)
+    .map((group) => ({
+      id: group.id,
+      nameKo: group.nameKo,
+      stationIds: group.stationIds,
+      enabled: group.enabled,
+      note: group.note ?? null,
+    }));
+}
 
 export default function Home() {
   const bundle = readBundle();
@@ -315,6 +371,9 @@ export default function Home() {
         bundle={bundle}
         mapStations={toMapStations(bundle.stations)}
         mapBranches={toMapBranches(bundle, manualOverlays.geometryOverrides)}
+        transferGroups={toMapTransferGroups(
+          manualOverlays.manualTransferGroups,
+        )}
       />
     </main>
   );
