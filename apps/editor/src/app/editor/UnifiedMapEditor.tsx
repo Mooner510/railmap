@@ -555,6 +555,91 @@ function smoothCoordinateRange(
   return startIndex <= endIndex ? result : [...result].reverse();
 }
 
+
+function cubicBezierPoint(
+  start: LngLatTuple,
+  control1: LngLatTuple,
+  control2: LngLatTuple,
+  end: LngLatTuple,
+  t: number,
+): LngLatTuple {
+  const inverse = 1 - t;
+  const inverse2 = inverse * inverse;
+  const inverse3 = inverse2 * inverse;
+  const t2 = t * t;
+  const t3 = t2 * t;
+
+  return [
+    inverse3 * start[0] +
+      3 * inverse2 * t * control1[0] +
+      3 * inverse * t2 * control2[0] +
+      t3 * end[0],
+    inverse3 * start[1] +
+      3 * inverse2 * t * control1[1] +
+      3 * inverse * t2 * control2[1] +
+      t3 * end[1],
+  ];
+}
+
+function getCoordinateDistance(a: LngLatTuple, b: LngLatTuple) {
+  const lngScale = Math.max(
+    0.35,
+    Math.cos((((a[1] + b[1]) / 2) * Math.PI) / 180),
+  );
+  const dx = (b[0] - a[0]) * lngScale;
+  const dy = b[1] - a[1];
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function normalizeCoordinateVector(
+  from: LngLatTuple,
+  to: LngLatTuple,
+): LngLatTuple | null {
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  const length = Math.sqrt(dx * dx + dy * dy);
+  if (!Number.isFinite(length) || length <= 0) return null;
+  return [dx / length, dy / length];
+}
+
+function buildSmoothConnectionCurve(
+  start: LngLatTuple,
+  end: LngLatTuple,
+  startContext: LngLatTuple | null,
+  endContext: LngLatTuple | null,
+): LngLatTuple[] {
+  const distance = getCoordinateDistance(start, end);
+  if (!Number.isFinite(distance) || distance <= 0) return [start, end];
+
+  const controlDistance = Math.min(Math.max(distance * 0.42, 0.0012), 0.08);
+  const startDirection = startContext
+    ? normalizeCoordinateVector(startContext, start)
+    : normalizeCoordinateVector(start, end);
+  const endDirection = endContext
+    ? normalizeCoordinateVector(end, endContext)
+    : normalizeCoordinateVector(start, end);
+
+  const control1: LngLatTuple = startDirection
+    ? [
+        start[0] + startDirection[0] * controlDistance,
+        start[1] + startDirection[1] * controlDistance,
+      ]
+    : [start[0] + (end[0] - start[0]) * 0.33, start[1] + (end[1] - start[1]) * 0.33];
+  const control2: LngLatTuple = endDirection
+    ? [
+        end[0] - endDirection[0] * controlDistance,
+        end[1] - endDirection[1] * controlDistance,
+      ]
+    : [start[0] + (end[0] - start[0]) * 0.66, start[1] + (end[1] - start[1]) * 0.66];
+
+  const coordinates: LngLatTuple[] = [start];
+  const segments = 28;
+  for (let step = 1; step <= segments; step += 1) {
+    coordinates.push(cubicBezierPoint(start, control1, control2, end, step / segments));
+  }
+  return coordinates;
+}
+
 function getBranchStationIds(branch: EditorMapBranch): string[] {
   return branch.routeStops
     .map((stop) => stop.station?.id ?? null)
@@ -783,15 +868,30 @@ function buildAddStationLineBranchCoordinates(
   return smoothCoordinateRange(context, anchorIndex, context.length - 1);
 }
 
-function getParentBranchCoordinatesToStation(
+function getBranchStationCoordinatePoint(
   branch: EditorMapBranch,
   stationId: string,
 ) {
   const points = getBranchStopCoordinatePoints(branch);
   const index = points.findIndex((point) => point.stationId === stationId);
-  if (index < 0) return [];
+  if (index < 0) return null;
+  const point = points[index];
+  if (!point) return null;
+  return { point, points, index };
+}
 
-  return points.slice(0, index + 1).map((point) => point.coordinate);
+function getParentBranchTangentCoordinate(
+  branch: EditorMapBranch,
+  stationId: string,
+) {
+  const context = getBranchStationCoordinatePoint(branch, stationId);
+  if (!context) return null;
+
+  return (
+    context.points[context.index - 1]?.coordinate ??
+    context.points[context.index + 1]?.coordinate ??
+    null
+  );
 }
 
 function getBranchDirectionOptions(
@@ -832,12 +932,11 @@ function getConnectedBranchTangentCoordinate(
   stationId: string,
   direction: LineBranchDirection,
 ) {
-  const points = getBranchStopCoordinatePoints(branch);
-  const index = points.findIndex((point) => point.stationId === stationId);
-  if (index < 0) return null;
+  const context = getBranchStationCoordinatePoint(branch, stationId);
+  if (!context) return null;
 
-  const nextIndex = direction === "toward-start" ? index - 1 : index + 1;
-  return points[nextIndex]?.coordinate ?? null;
+  const nextIndex = direction === "toward-start" ? context.index - 1 : context.index + 1;
+  return context.points[nextIndex]?.coordinate ?? null;
 }
 
 function buildConnectLineBranchCoordinates(
@@ -848,28 +947,33 @@ function buildConnectLineBranchCoordinates(
   if (!parentBranch || !connectedBranch || !override.connectedEndpointStationId)
     return [];
 
-  const parentCoordinates = getParentBranchCoordinatesToStation(
+  const anchor = getBranchStationCoordinatePoint(
     parentBranch,
     override.anchorStationId,
   );
-
-  const target = getBranchStopCoordinatePoints(connectedBranch).find(
-    (point) => point.stationId === override.connectedEndpointStationId,
+  const target = getBranchStationCoordinatePoint(
+    connectedBranch,
+    override.connectedEndpointStationId,
   );
-  if (parentCoordinates.length < 1 || !target) return [];
+  if (!anchor || !target) return [];
 
   const direction = override.connectedDirection ?? "toward-end";
-  const tangent = getConnectedBranchTangentCoordinate(
+  const parentTangent = getParentBranchTangentCoordinate(
+    parentBranch,
+    override.anchorStationId,
+  );
+  const connectedTangent = getConnectedBranchTangentCoordinate(
     connectedBranch,
     override.connectedEndpointStationId,
     direction,
   );
 
-  const context = tangent
-    ? [...parentCoordinates, target.coordinate, tangent]
-    : [...parentCoordinates, target.coordinate];
-
-  return smoothCoordinateRange(context, 0, parentCoordinates.length);
+  return buildSmoothConnectionCurve(
+    anchor.point.coordinate,
+    target.point.coordinate,
+    parentTangent,
+    connectedTangent,
+  );
 }
 
 function buildLineBranchCoordinates(
@@ -1275,6 +1379,7 @@ export default function UnifiedMapEditor({
     null,
   );
   const selectionBoxStartRef = useRef<{ x: number; y: number } | null>(null);
+  const mapPointerDownPointRef = useRef<{ x: number; y: number } | null>(null);
   const selectStationFromMapRef = useRef<(stationId: string) => void>(
     () => undefined,
   );
@@ -1919,6 +2024,24 @@ export default function UnifiedMapEditor({
       window.requestAnimationFrame(() => setMapLoaded(true));
     });
 
+    const isClickAfterDrag = (point: { x: number; y: number }) => {
+      const start = mapPointerDownPointRef.current;
+      if (!start) return false;
+      const dx = point.x - start.x;
+      const dy = point.y - start.y;
+      return Math.sqrt(dx * dx + dy * dy) > 4;
+    };
+
+    const clearMapSelection = () => {
+      setSelection({ type: "none" });
+      setStationDraft(null);
+      setTransferDraft(null);
+      setGeometryDraft(null);
+      setStationLocationPickMode(false);
+      stationLocationPickModeRef.current = false;
+      setContextMenu(null);
+    };
+
     map.on("mousemove", (event) => {
       pendingCursorLngLatRef.current = {
         lng: event.lngLat.lng,
@@ -1977,6 +2100,8 @@ export default function UnifiedMapEditor({
     map.on("zoomend", () => setZoom(map.getZoom()));
 
     map.on("click", (event) => {
+      if (isClickAfterDrag(event.point)) return;
+
       if (stationLocationPickModeRef.current) {
         const original = event.originalEvent as MouseEvent;
         if (original.shiftKey) return;
@@ -2021,7 +2146,12 @@ export default function UnifiedMapEditor({
         "railmap-selected-branches-line",
         "railmap-branches-line",
       ]);
-      if (branchId) selectBranchFromMapRef.current(branchId);
+      if (branchId) {
+        selectBranchFromMapRef.current(branchId);
+        return;
+      }
+
+      clearMapSelection();
     });
 
     map.on("contextmenu", (event) => {
@@ -2053,6 +2183,7 @@ export default function UnifiedMapEditor({
     });
 
     map.on("mousedown", (event) => {
+      mapPointerDownPointRef.current = { x: event.point.x, y: event.point.y };
       const original = event.originalEvent as MouseEvent;
       if (
         !(original.metaKey || original.ctrlKey) &&
