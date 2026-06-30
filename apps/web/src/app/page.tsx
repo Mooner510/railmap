@@ -268,6 +268,84 @@ function readManualOverlays(): ManualOverlays {
   };
 }
 
+
+function makeLineScopedStationId(stationId: string, lineKey: string) {
+  const safeLineKey = lineKey.trim().replace(/[^\w가-힣:.-]+/g, "_") || "unknown";
+  return `${stationId}::line:${safeLineKey}`;
+}
+
+function getLineKey(line: CanonicalLine, branch: CanonicalBranch) {
+  return line.canonicalKey ?? line.id ?? branch.sourceLineNumber ?? line.nameKo;
+}
+
+function shouldScopeStationToLine(station: CanonicalStation | undefined, usageLineKeys: Set<string> | undefined, branch: CanonicalBranch) {
+  if (!station) return false;
+  if (station.lineNumber && branch.sourceLineNumber) return station.lineNumber !== branch.sourceLineNumber;
+  return (usageLineKeys?.size ?? 0) > 1;
+}
+
+function normalizeSingleLineStationMappings(bundle: CanonicalBundle): CanonicalBundle {
+  const stationById = new Map(bundle.stations.map((station) => [station.id, station]));
+  const usageByStationId = new Map<string, Set<string>>();
+
+  for (const line of bundle.lines) {
+    for (const branch of line.branches) {
+      const lineKey = getLineKey(line, branch);
+      for (const stop of branch.routeStops) {
+        const set = usageByStationId.get(stop.stationId) ?? new Set<string>();
+        set.add(lineKey);
+        usageByStationId.set(stop.stationId, set);
+      }
+    }
+  }
+
+  const nextStationById = new Map(bundle.stations.map((station) => [station.id, station]));
+
+  const lines = bundle.lines.map((line) => ({
+    ...line,
+    branches: line.branches.map((branch) => {
+      const lineKey = getLineKey(line, branch);
+      return {
+        ...branch,
+        routeStops: branch.routeStops.map((stop) => {
+          const station = stationById.get(stop.stationId);
+          if (!station || !shouldScopeStationToLine(station, usageByStationId.get(stop.stationId), branch)) {
+            return stop;
+          }
+
+          const scopedStationId = makeLineScopedStationId(stop.stationId, lineKey);
+          if (!nextStationById.has(scopedStationId)) {
+            nextStationById.set(scopedStationId, {
+              ...station,
+              id: scopedStationId,
+              stationNumber: stop.sourceStationCode || station.stationNumber,
+              lineNumber: branch.sourceLineNumber || station.lineNumber,
+              lineNameKo: line.nameKo || branch.sourceLineName || station.lineNameKo,
+            });
+          }
+
+          return {
+            ...stop,
+            stationId: scopedStationId,
+          };
+        }),
+      };
+    }),
+  }));
+
+  const routeStops = lines.flatMap((line) => line.branches.flatMap((branch) => branch.routeStops));
+  const referencedStationIds = new Set(routeStops.map((stop) => stop.stationId));
+
+  return {
+    ...bundle,
+    stations: [...nextStationById.values()].filter(
+      (station) => referencedStationIds.has(station.id) || !usageByStationId.has(station.id),
+    ),
+    lines,
+    routeStops,
+  };
+}
+
 function buildBranchStationExclusionIndex(exclusions: ManualBranchStationExclusion[]) {
   const index = new Map<string, Set<string>>();
 
@@ -351,7 +429,7 @@ function readBundle(): CanonicalBundle {
     manualOverlays.stationOverrides,
   );
 
-  return applyBranchStationExclusions({
+  return normalizeSingleLineStationMappings(applyBranchStationExclusions({
     ...bundle,
     stations,
     manualTransferGroups: manualOverlays.manualTransferGroups,
@@ -359,7 +437,7 @@ function readBundle(): CanonicalBundle {
       ...(bundle.manualTransferEdges ?? []),
       ...manualOverlays.manualTransferEdges,
     ].filter((edge) => edge.enabled),
-  }, manualOverlays.branchStationExclusions);
+  }, manualOverlays.branchStationExclusions));
 }
 
 function toMapStations(stations: CanonicalStation[]): RailMapStation[] {
