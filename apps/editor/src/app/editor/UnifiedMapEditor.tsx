@@ -1672,8 +1672,8 @@ export default function UnifiedMapEditor({
         maxzoom: 14.5,
         paint: {
           "circle-radius": 22,
-          "circle-color": "#000000",
-          "circle-opacity": 0.01,
+          "circle-color": "rgba(0,0,0,0)",
+          "circle-opacity": 0,
         },
       });
 
@@ -1770,8 +1770,8 @@ export default function UnifiedMapEditor({
             14.5,
             12,
           ],
-          "circle-color": "#000000",
-          "circle-opacity": 0.01,
+          "circle-color": "rgba(0,0,0,0)",
+          "circle-opacity": 0,
           "circle-stroke-width": 0,
         },
       });
