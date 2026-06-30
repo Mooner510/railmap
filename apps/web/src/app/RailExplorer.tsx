@@ -23,6 +23,7 @@ import {
   type CanonicalBranch,
   type CanonicalBundle,
   type CanonicalLine,
+  type ManualLineBranchOverride,
   type ManualTransferEdge,
   type ManualTransferGroup,
 } from "./railExplorerModel";
@@ -31,6 +32,7 @@ interface RailExplorerProps {
   bundle: CanonicalBundle;
   mapStations: RailMapStation[];
   mapBranches: RailMapBranch[];
+  lineBranchOverrides: ManualLineBranchOverride[];
   transferGroups: RailMapTransferGroup[];
 }
 
@@ -143,6 +145,7 @@ export default function RailExplorer({
   bundle,
   mapStations,
   mapBranches,
+  lineBranchOverrides,
   transferGroups,
 }: RailExplorerProps) {
   const areaCodes = useMemo(
@@ -839,6 +842,7 @@ export default function RailExplorer({
           highlightedRouteStationIds={routeResultStationIds}
           highlightedRouteBranchIds={routeResultBranchIds}
           transferGroups={transferGroups}
+          lineBranchOverrides={lineBranchOverrides}
           selectedTransferGroupId={selectedTransferGroupId}
           focusVersion={mapFocusVersion}
           showBranches={showMapLines}

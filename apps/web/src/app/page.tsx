@@ -85,6 +85,27 @@ interface ManualGeometryOverride {
   note?: string | null;
 }
 
+interface ManualLineBranchGeometryPoint {
+  lng: number;
+  lat: number;
+  kind: "station" | "control";
+  stationId?: string;
+}
+
+interface ManualLineBranchOverride {
+  id: string;
+  mode: "add-station" | "connect-line";
+  parentBranchId: string;
+  anchorStationId: string;
+  branchStationId?: string;
+  connectedBranchId?: string;
+  connectedEndpointStationId?: string;
+  geometry?: ManualLineBranchGeometryPoint[];
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 interface ManualTransferGroup {
   id: string;
   nameKo: string;
@@ -134,6 +155,7 @@ interface ManualOverlays {
   manualTransferEdges: ManualTransferEdge[];
   nonTransferStationIds?: string[];
   stationOverrides: ManualStationOverride[];
+  lineBranchOverrides: ManualLineBranchOverride[];
   geometryOverrides: ManualGeometryOverride[];
 }
 
@@ -212,6 +234,9 @@ function readManualOverlays(): ManualOverlays {
       stationOverrides: Array.isArray(parsed.stationOverrides)
         ? parsed.stationOverrides
         : [],
+      lineBranchOverrides: Array.isArray((parsed as { lineBranchOverrides?: unknown }).lineBranchOverrides)
+        ? ((parsed as { lineBranchOverrides: ManualLineBranchOverride[] }).lineBranchOverrides)
+        : [],
       geometryOverrides: Array.isArray(parsed.geometryOverrides)
         ? parsed.geometryOverrides
         : [],
@@ -224,6 +249,7 @@ function readManualOverlays(): ManualOverlays {
     manualTransferEdges: [],
     nonTransferStationIds: [],
     stationOverrides: [],
+    lineBranchOverrides: [],
     geometryOverrides: [],
   };
 }
@@ -371,6 +397,7 @@ export default function Home() {
         bundle={bundle}
         mapStations={toMapStations(bundle.stations)}
         mapBranches={toMapBranches(bundle, manualOverlays.geometryOverrides)}
+        lineBranchOverrides={manualOverlays.lineBranchOverrides}
         transferGroups={toMapTransferGroups(
           manualOverlays.manualTransferGroups,
         )}
