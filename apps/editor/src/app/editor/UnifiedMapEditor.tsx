@@ -11,6 +11,7 @@ import { Panel, PanelBody, PanelHeader } from "@repo/ui/panel";
 import { TabButton, TabList } from "@repo/ui/tabs";
 import { Toast, type ToastTone } from "@repo/ui/toast";
 import { cn } from "@repo/ui/utils";
+import Link from "next/link";
 import {
   ChevronRight,
   Command,
@@ -2349,21 +2350,6 @@ function applyDisplayStationAnchorsToLineBranchOverrides(
   );
 }
 
-function applyStationDraftToBranches(
-  branches: EditorMapBranch[],
-  draft: ManualStationOverride | null,
-): EditorMapBranch[] {
-  if (!draft) return branches;
-
-  const lng = draft.lng;
-  const lat = draft.lat;
-
-  if (typeof lng !== "number" || typeof lat !== "number") return branches;
-  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return branches;
-
-  return applyStationCoordinateToBranches(branches, draft.stationId, lng, lat);
-}
-
 function mergeStationOverrides(
   current: ManualStationOverride[],
   updates: ManualStationOverride[],
@@ -2610,6 +2596,7 @@ export default function UnifiedMapEditor({
   const setStationDraftFromMapRef = useRef<(lng: number, lat: number) => void>(
     () => undefined,
   );
+  const stationDraftRef = useRef<ManualStationOverride | null>(null);
   const undoStackRef = useRef<OverlayCommandRecord[]>([]);
   const redoStackRef = useRef<OverlayCommandRecord[]>([]);
   const [data, setData] = useState<UnifiedEditorData>(
@@ -2703,17 +2690,13 @@ export default function UnifiedMapEditor({
       overlays.geometryOverrides,
       displayStationById,
     );
-    const branchesWithStationDraft = applyStationDraftToBranches(
-      branchesWithSavedGeometry,
-      stationDraft,
-    );
     const branchesWithGeometryStationPreview =
       toolMode === "geometry"
         ? applyGeometryDraftStationPointsToBranches(
-            branchesWithStationDraft,
+            branchesWithSavedGeometry,
             geometryDraft,
           )
-        : branchesWithStationDraft;
+        : branchesWithSavedGeometry;
 
     return applyGeometryDraftToBranches(
       branchesWithGeometryStationPreview,
@@ -2725,7 +2708,6 @@ export default function UnifiedMapEditor({
     geometryDraft,
     overlays.geometryOverrides,
     overlays.stationOverrides,
-    stationDraft,
     toolMode,
   ]);
   const displayLineBranchOverrides = useMemo(
@@ -2934,11 +2916,14 @@ export default function UnifiedMapEditor({
   }, [stationLocationPickMode]);
 
   useEffect(() => {
-    setStationDraftFromMapRef.current = (lng, lat) =>
-      setStationDraft((previous) =>
-        previous ? { ...previous, lng, lat } : previous,
-      );
-  }, []);
+    stationDraftRef.current = stationDraft;
+  }, [stationDraft]);
+
+  useEffect(() => {
+    setStationDraftFromMapRef.current = (lng, lat) => {
+      void saveSelectedStationLocationFromMap(lng, lat);
+    };
+  });
 
   const focusStation = useCallback(
     (stationId: string) => {
@@ -3996,7 +3981,7 @@ export default function UnifiedMapEditor({
         setStationDraftFromMapRef.current(event.lngLat.lng, event.lngLat.lat);
         stationLocationPickModeRef.current = false;
         setStationLocationPickMode(false);
-        showToastRef.current("지도 좌표가 입력되었습니다", "success");
+        showToastRef.current("역 위치를 즉시 저장했습니다", "success");
         return;
       }
 
@@ -4379,30 +4364,83 @@ export default function UnifiedMapEditor({
     }
   }
 
-  async function saveStationDraft() {
-    if (!stationDraft) return;
+  async function saveStationOverrideAndSyncAnchors(
+    nextOverride: ManualStationOverride,
+    label: string,
+    message: string,
+  ) {
+    const baseOverlays = overlaysRef.current;
     const next: ManualOverlayBundle = {
-      ...overlays,
+      ...baseOverlays,
       stationOverrides: [
-        ...overlays.stationOverrides.filter(
-          (override) => override.stationId !== stationDraft.stationId,
+        ...baseOverlays.stationOverrides.filter(
+          (override) => override.stationId !== nextOverride.stationId,
         ),
-        stationDraft,
+        nextOverride,
       ],
     };
-    const saved = await executeOverlayCommand(
+
+    const saved = await executeOverlayCommand(label, next, message);
+    if (!saved) return null;
+
+    let nextData = await reloadEditorData();
+    if (!nextData) return null;
+
+    const nextStationById = new Map(
+      nextData.stations.map((station) => [station.id, station]),
+    );
+    const syncResult = syncSavedGeometryAnchorsForStation(
+      nextData.overlays,
+      nextOverride.stationId,
+      nextStationById,
+    );
+
+    if (syncResult.changedCount > 0) {
+      const synced = await persist(
+        syncResult.overlays,
+        `저장 선형 anchor ${syncResult.changedCount}개를 현재 역 위치로 맞췄습니다`,
+      );
+      if (synced) {
+        nextData = await reloadEditorData();
+      }
+    }
+
+    const nextStation = nextData?.stations.find(
+      (station) => station.id === nextOverride.stationId,
+    );
+    if (nextStation) {
+      const nextStationOverride = nextData?.overlays.stationOverrides.find(
+        (override) => override.stationId === nextStation.id,
+      );
+      setStationDraft(emptyStationOverride(nextStation, nextStationOverride));
+    }
+
+    return nextData;
+  }
+
+  async function saveSelectedStationLocationFromMap(lng: number, lat: number) {
+    const draft = stationDraftRef.current;
+    if (!draft) {
+      showToast("위치를 지정할 역을 먼저 선택하세요", "error");
+      return;
+    }
+
+    const nextDraft = { ...draft, lng, lat };
+    setStationDraft(nextDraft);
+    await saveStationOverrideAndSyncAnchors(
+      nextDraft,
+      "역 위치 지정",
+      "역 위치를 즉시 저장했습니다",
+    );
+  }
+
+  async function saveStationDraft() {
+    if (!stationDraft) return;
+    await saveStationOverrideAndSyncAnchors(
+      stationDraft,
       "역 보정",
-      next,
       "역 보정 저장 완료",
     );
-    if (!saved) return;
-
-    const nextData = await reloadEditorData();
-    const nextStation = nextData?.stations.find(
-      (station) => station.id === stationDraft.stationId,
-    );
-    if (nextStation)
-      setStationDraft(emptyStationOverride(nextStation, stationDraft));
   }
 
   async function rollbackSelectedStationPosition() {
@@ -5002,6 +5040,12 @@ export default function UnifiedMapEditor({
                 </h1>
               </div>
               <div className="flex items-center gap-1">
+                <Button variant="outline" asChild>
+                  <Link href="/">메인</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/changes">변경</Link>
+                </Button>
                 <Button
                   size="icon"
                   variant="outline"
@@ -6585,7 +6629,6 @@ function BranchInspector({
                   {formatStationDisplayName(station)}
                 </span>
                 <Button
-                  size="sm"
                   variant="outline"
                   onClick={() => onRestoreBranchStation(exclusion.id)}
                 >
@@ -6629,7 +6672,6 @@ function BranchInspector({
                   </p>
                 </div>
                 <Button
-                  size="sm"
                   variant="outline"
                   onClick={() => onDeleteLineBranch(override.id)}
                 >
