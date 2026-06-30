@@ -76,6 +76,8 @@ type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
 
 const TRANSFER_GROUP_EXPANDED_ZOOM = 13.8;
+const STATION_GEOMETRY_ANCHOR_TOLERANCE = 0.00015;
+const SAVED_STATION_ANCHOR_TOLERANCE = 0.0000001;
 
 type ContextMenuState = {
   x: number;
@@ -794,6 +796,159 @@ function validateBranchStationExclusions(
   }
 
   return issues;
+}
+
+function stationGeometryDistance(
+  left: LngLatTuple,
+  right: LngLatTuple,
+) {
+  return getCoordinateDistance(left, right);
+}
+
+function distanceToCoordinatePolyline(
+  point: LngLatTuple,
+  coordinates: LngLatTuple[],
+) {
+  if (coordinates.length < 1) return Number.POSITIVE_INFINITY;
+  if (coordinates.length === 1) return stationGeometryDistance(point, coordinates[0] ?? point);
+
+  let best = Number.POSITIVE_INFINITY;
+  const probe: ManualGeometryOverridePoint = {
+    lng: point[0],
+    lat: point[1],
+    kind: "control",
+  };
+
+  for (let index = 0; index < coordinates.length - 1; index += 1) {
+    const startCoordinate = coordinates[index];
+    const endCoordinate = coordinates[index + 1];
+    if (!startCoordinate || !endCoordinate) continue;
+
+    const start: ManualGeometryOverridePoint = {
+      lng: startCoordinate[0],
+      lat: startCoordinate[1],
+      kind: "control",
+    };
+    const end: ManualGeometryOverridePoint = {
+      lng: endCoordinate[0],
+      lat: endCoordinate[1],
+      kind: "control",
+    };
+    const distanceSquared = distanceToCoordinateSegmentSquared(probe, start, end);
+    if (distanceSquared < best) best = distanceSquared;
+  }
+
+  return Math.sqrt(best);
+}
+
+function validateSavedGeometryStationAnchors(
+  geometryOverrides: ManualGeometryOverride[],
+  lineBranchOverrides: ManualLineBranchOverride[],
+  stationById: Map<string, EditorStation>,
+): LineBranchValidationIssue[] {
+  const issues: LineBranchValidationIssue[] = [];
+
+  for (const override of geometryOverrides) {
+    if (override.enabled === false) continue;
+    for (const point of override.points) {
+      if (point.kind !== "station" || !point.stationId) continue;
+      const coordinate = getStationCoordinate(stationById.get(point.stationId));
+      if (!coordinate) continue;
+      const distance = stationGeometryDistance(coordinate, [point.lng, point.lat]);
+      if (distance <= SAVED_STATION_ANCHOR_TOLERANCE) continue;
+      issues.push({
+        id: `${override.branchId}:${point.stationId}:stale-anchor`,
+        message: `저장된 선형 보정의 역 anchor가 현재 역 위치와 다름: ${formatStationDisplayName(stationById.get(point.stationId))}`,
+      });
+    }
+  }
+
+  for (const override of lineBranchOverrides) {
+    if (override.enabled === false || !override.geometry?.length) continue;
+    for (const point of override.geometry) {
+      if (point.kind !== "station" || !point.stationId) continue;
+      const coordinate = getStationCoordinate(stationById.get(point.stationId));
+      if (!coordinate) continue;
+      const distance = stationGeometryDistance(coordinate, [point.lng, point.lat]);
+      if (distance <= SAVED_STATION_ANCHOR_TOLERANCE) continue;
+      issues.push({
+        id: `${override.id}:${point.stationId}:stale-line-branch-anchor`,
+        message: `저장된 지선 선형의 역 anchor가 현재 역 위치와 다름: ${formatStationDisplayName(stationById.get(point.stationId))}`,
+      });
+    }
+  }
+
+  return issues;
+}
+
+function validateStationGeometryAlignment(
+  branches: EditorMapBranch[],
+  lineBranchOverrides: ManualLineBranchOverride[],
+  stationById: Map<string, EditorStation>,
+): LineBranchValidationIssue[] {
+  const issues: LineBranchValidationIssue[] = [];
+
+  for (const branch of branches) {
+    const coordinates = branchCoordinates(branch);
+    if (coordinates.length < 2) continue;
+
+    const reportedStationIds = new Set<string>();
+    for (const stop of branch.routeStops) {
+      const station = stop.station;
+      const coordinate = getStationCoordinate(station);
+      if (!station || !coordinate || reportedStationIds.has(station.id)) continue;
+      const distance = distanceToCoordinatePolyline(coordinate, coordinates);
+      if (distance <= STATION_GEOMETRY_ANCHOR_TOLERANCE) continue;
+      reportedStationIds.add(station.id);
+      issues.push({
+        id: `${branch.id}:${station.id}:detached-station`,
+        message: `역 위치와 본선 선형이 떨어져 있음: ${formatStationDisplayName(station)} · ${formatBranchDisplayName(branch)}`,
+      });
+    }
+  }
+
+  for (const override of lineBranchOverrides) {
+    if (override.enabled === false) continue;
+    const coordinates = buildLineBranchCoordinates(override, null, null, stationById);
+    if (coordinates.length < 2) continue;
+
+    const stationIds = [
+      override.anchorStationId,
+      override.mode === "add-station"
+        ? override.branchStationId
+        : override.connectedEndpointStationId,
+    ].filter((stationId): stationId is string => Boolean(stationId));
+
+    for (const stationId of stationIds) {
+      const stationCoordinate = getStationCoordinate(stationById.get(stationId));
+      if (!stationCoordinate) continue;
+      const distance = distanceToCoordinatePolyline(stationCoordinate, coordinates);
+      if (distance <= STATION_GEOMETRY_ANCHOR_TOLERANCE) continue;
+      issues.push({
+        id: `${override.id}:${stationId}:detached-line-branch-station`,
+        message: `역 위치와 지선 선형이 떨어져 있음: ${formatStationDisplayName(stationById.get(stationId))}`,
+      });
+    }
+  }
+
+  return issues;
+}
+
+function validateGeometryConsistency(
+  branches: EditorMapBranch[],
+  lineBranchOverrides: ManualLineBranchOverride[],
+  geometryOverrides: ManualGeometryOverride[],
+  storedLineBranchOverrides: ManualLineBranchOverride[],
+  stationById: Map<string, EditorStation>,
+): LineBranchValidationIssue[] {
+  return [
+    ...validateSavedGeometryStationAnchors(
+      geometryOverrides,
+      storedLineBranchOverrides,
+      stationById,
+    ),
+    ...validateStationGeometryAlignment(branches, lineBranchOverrides, stationById),
+  ];
 }
 
 function formatBranchDisplayName(branch: EditorMapBranch | null | undefined) {
@@ -2312,8 +2467,22 @@ export default function UnifiedMapEditor({
     () => [
       ...validateLineBranchOverrides(overlays, data.branches, stationById),
       ...validateBranchStationExclusions(overlays, data.branches, stationById),
+      ...validateGeometryConsistency(
+        displayBranches,
+        displayLineBranchOverrides,
+        overlays.geometryOverrides,
+        overlays.lineBranchOverrides ?? [],
+        displayStationById,
+      ),
     ],
-    [data.branches, overlays, stationById],
+    [
+      data.branches,
+      displayBranches,
+      displayLineBranchOverrides,
+      displayStationById,
+      overlays,
+      stationById,
+    ],
   );
   const geometryTargets = useMemo<GeometryEditTarget[]>(() => {
     const geometryOverrideByBranchId = new Map(
@@ -5698,16 +5867,16 @@ function LineBranchValidationPanel({
     <div className="grid gap-3">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
         <strong className="text-sm font-semibold text-slate-700">
-          지선 오버레이
+          오버레이/선형 검증
         </strong>
         <p className="mt-2 text-xs font-medium text-slate-500">
-          등록 {count}개 · 오류 {issues.length}개
+          지선 등록 {count}개 · 검증 항목 {issues.length}개
         </p>
       </div>
       {issues.length === 0 ? (
         <Placeholder
-          title="지선 검증 통과"
-          description="현재 저장된 지선 오버레이에서 기본 검증 오류가 없습니다."
+          title="선형 검증 통과"
+          description="역 위치, 본선/지선 선형, 저장된 anchor에서 감지된 불일치가 없습니다."
         />
       ) : (
         <div className="grid gap-2">
