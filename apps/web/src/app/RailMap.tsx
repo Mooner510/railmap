@@ -1388,7 +1388,8 @@ export default function RailMap({
             id: "transfer-group-collapsed-label",
             type: "symbol",
             source: "transfer-group-icons",
-            minzoom: 14.5,
+            minzoom: 12,
+            maxzoom: 14.5,
             layout: {
               "text-field": ["get", "nameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
@@ -1498,6 +1499,7 @@ export default function RailMap({
             id: "branch-preview-station-labels-emphasized",
             type: "symbol",
             source: "branch-preview-stations",
+            minzoom: 12,
             filter: ["==", ["get", "isEmphasized"], true],
             layout: {
               "text-field": ["get", "nameKo"],
@@ -1512,6 +1514,13 @@ export default function RailMap({
               "text-color": "#0f172a",
               "text-halo-color": "#ffffff",
               "text-halo-width": 1.6,
+              "text-opacity": [
+                "step",
+                ["zoom"],
+                ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
+                14.5,
+                1,
+              ],
             },
           });
 
