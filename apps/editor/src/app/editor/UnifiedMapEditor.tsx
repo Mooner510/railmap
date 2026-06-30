@@ -1510,6 +1510,55 @@ function emptyStationOverride(
   };
 }
 
+function hasStationPositionOverride(
+  station: EditorStation,
+  override?: ManualStationOverride,
+) {
+  if (!override) return false;
+  const stationLng = station.lng;
+  const stationLat = station.lat;
+  if (typeof stationLng !== "number" || typeof stationLat !== "number") {
+    return false;
+  }
+  const overrideLng = override.lng ?? stationLng;
+  const overrideLat = override.lat ?? stationLat;
+  if (typeof overrideLng !== "number" || typeof overrideLat !== "number") {
+    return false;
+  }
+  return (
+    Math.abs(overrideLng - stationLng) > SAVED_STATION_ANCHOR_TOLERANCE ||
+    Math.abs(overrideLat - stationLat) > SAVED_STATION_ANCHOR_TOLERANCE
+  );
+}
+
+function shouldKeepStationOverride(
+  station: EditorStation,
+  override: ManualStationOverride,
+) {
+  if ((override.nameKo ?? station.nameKo) !== station.nameKo) return true;
+  if ((override.enabled ?? true) !== true) return true;
+  if (override.note) return true;
+  return hasStationPositionOverride(station, override);
+}
+
+function rollbackStationOverridePosition(
+  station: EditorStation,
+  override?: ManualStationOverride,
+) {
+  if (!override) return null;
+  const stationLng = station.lng;
+  const stationLat = station.lat;
+  if (typeof stationLng !== "number" || typeof stationLat !== "number") {
+    return null;
+  }
+  const next: ManualStationOverride = {
+    ...override,
+    lng: stationLng,
+    lat: stationLat,
+  };
+  return shouldKeepStationOverride(station, next) ? next : null;
+}
+
 function defaultTransferGroupName(
   stationIds: string[],
   stationById: Map<string, EditorStation>,
@@ -4162,6 +4211,51 @@ export default function UnifiedMapEditor({
       setStationDraft(emptyStationOverride(nextStation, stationDraft));
   }
 
+  async function rollbackSelectedStationPosition() {
+    if (!selectedStation) return;
+
+    const previous = overlays.stationOverrides.find(
+      (override) => override.stationId === selectedStation.id,
+    );
+    if (!hasStationPositionOverride(selectedStation, previous)) {
+      showToast("원래 데이터와 같은 위치입니다", "info");
+      return;
+    }
+
+    const rolledBack = rollbackStationOverridePosition(
+      selectedStation,
+      previous,
+    );
+    const next: ManualOverlayBundle = {
+      ...overlays,
+      stationOverrides: [
+        ...overlays.stationOverrides.filter(
+          (override) => override.stationId !== selectedStation.id,
+        ),
+        ...(rolledBack ? [rolledBack] : []),
+      ],
+    };
+
+    const saved = await executeOverlayCommand(
+      "역 위치 롤백",
+      next,
+      "역 위치를 원래 데이터로 되돌렸습니다",
+    );
+    if (!saved) return;
+
+    const nextData = await reloadEditorData();
+    const nextStation = nextData?.stations.find(
+      (station) => station.id === selectedStation.id,
+    );
+    if (nextStation) {
+      const nextOverride = nextData?.overlays.stationOverrides.find(
+        (override) => override.stationId === nextStation.id,
+      );
+      setStationDraft(emptyStationOverride(nextStation, nextOverride));
+    }
+    setStationLocationPickMode(false);
+  }
+
   async function saveTransferDraft() {
     if (!transferDraft) return;
     const group = toTransferGroup(transferDraft);
@@ -4602,6 +4696,14 @@ export default function UnifiedMapEditor({
     selection.type === "station"
       ? (stationById.get(selection.id) ?? null)
       : null;
+  const selectedStationOverride = selectedStation
+    ? overlays.stationOverrides.find(
+        (override) => override.stationId === selectedStation.id,
+      )
+    : undefined;
+  const selectedStationHasPositionOverride = selectedStation
+    ? hasStationPositionOverride(selectedStation, selectedStationOverride)
+    : false;
   const selectedStationBranches = selectedStation
     ? getBranchesServingStation(data.branches, selectedStation.id)
     : [];
@@ -4991,6 +5093,10 @@ export default function UnifiedMapEditor({
                 nonTransfer={nonTransferIds.has(selectedStation.id)}
                 onChange={setStationDraft}
                 onSave={() => void saveStationDraft()}
+                onRollbackPosition={() =>
+                  void rollbackSelectedStationPosition()
+                }
+                canRollbackPosition={selectedStationHasPositionOverride}
                 onSetNonTransfer={(enabled) =>
                   void setStationsNonTransfer([selectedStation.id], enabled)
                 }
@@ -5558,6 +5664,8 @@ function StationInspector({
   pickMode,
   onChange,
   onSave,
+  onRollbackPosition,
+  canRollbackPosition,
   onSetNonTransfer,
   onStartMapPick,
   onFocus,
@@ -5573,6 +5681,8 @@ function StationInspector({
   pickMode: boolean;
   onChange: (next: ManualStationOverride) => void;
   onSave: () => void;
+  onRollbackPosition: () => void;
+  canRollbackPosition: boolean;
   onSetNonTransfer: (enabled: boolean) => void;
   onStartMapPick: () => void;
   onFocus: () => void;
@@ -5755,6 +5865,14 @@ function StationInspector({
           onClick={onStartMapPick}
         >
           지도에서 위치 지정
+        </Button>
+        <Button
+          variant="outline"
+          disabled={!canRollbackPosition}
+          onClick={onRollbackPosition}
+        >
+          <Undo2 className="mr-1 size-4" />
+          위치 롤백
         </Button>
         <Button
           variant={nonTransfer ? "secondary" : "outline"}
