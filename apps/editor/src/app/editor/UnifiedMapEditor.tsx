@@ -1637,6 +1637,141 @@ function toLineBranchGeometryPoints(draft: GeometryDraft) {
   );
 }
 
+function coordinatesEqual(
+  left: LngLatTuple | null,
+  right: { lng: number; lat: number } | null | undefined,
+) {
+  if (!left || !right) return false;
+  return Math.abs(left[0] - right.lng) < 0.0000001 && Math.abs(left[1] - right.lat) < 0.0000001;
+}
+
+function replaceCoordinateIfStationMatch(
+  coordinate: ReadonlyArray<number>,
+  previous: LngLatTuple | null,
+  next: { lng: number; lat: number },
+): LngLatTuple {
+  const lng = coordinate[0];
+  const lat = coordinate[1];
+
+  if (typeof lng !== "number" || typeof lat !== "number") {
+    return previous ?? [next.lng, next.lat];
+  }
+
+  if (
+    previous &&
+    Number.isFinite(lng) &&
+    Number.isFinite(lat) &&
+    Math.abs(lng - previous[0]) < 0.0000001 &&
+    Math.abs(lat - previous[1]) < 0.0000001
+  ) {
+    return [next.lng, next.lat];
+  }
+
+  return [lng, lat];
+}
+
+function applyStationCoordinateToBranches(
+  branches: EditorMapBranch[],
+  stationId: string,
+  lng: number,
+  lat: number,
+): EditorMapBranch[] {
+  return branches.map((branch) => {
+    const stopWithStation = branch.routeStops.find(
+      (stop) => stop.station?.id === stationId,
+    );
+    if (!stopWithStation?.station) return branch;
+
+    const previousCoordinate = getStationCoordinate(stopWithStation.station);
+    const routeStops = branch.routeStops.map((stop) =>
+      stop.station?.id === stationId
+        ? {
+            ...stop,
+            station: {
+              ...stop.station,
+              lng,
+              lat,
+            },
+          }
+        : stop,
+    );
+
+    return {
+      ...branch,
+      routeStops,
+      geometryCoordinates: branch.geometryCoordinates?.map((coordinate) =>
+        replaceCoordinateIfStationMatch(coordinate, previousCoordinate, { lng, lat }),
+      ),
+      geometryOverrideCoordinates: branch.geometryOverrideCoordinates?.map(
+        (coordinate) =>
+          replaceCoordinateIfStationMatch(coordinate, previousCoordinate, {
+            lng,
+            lat,
+          }),
+      ),
+    };
+  });
+}
+
+function applyStationDraftToBranches(
+  branches: EditorMapBranch[],
+  draft: ManualStationOverride | null,
+): EditorMapBranch[] {
+  if (!draft) return branches;
+
+  const lng = draft.lng;
+  const lat = draft.lat;
+
+  if (typeof lng !== "number" || typeof lat !== "number") return branches;
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return branches;
+
+  return applyStationCoordinateToBranches(branches, draft.stationId, lng, lat);
+}
+
+function mergeStationOverrides(
+  current: ManualStationOverride[],
+  updates: ManualStationOverride[],
+) {
+  if (updates.length < 1) return current;
+  const updateIds = new Set(updates.map((override) => override.stationId));
+  return [
+    ...current.filter((override) => !updateIds.has(override.stationId)),
+    ...updates,
+  ];
+}
+
+function getMovedStationOverridesFromGeometryDraft(
+  draft: GeometryDraft,
+  stationById: Map<string, EditorStation>,
+  currentOverrides: ManualStationOverride[],
+): ManualStationOverride[] {
+  const updates = new Map<string, ManualStationOverride>();
+
+  for (const point of draft.points) {
+    if (point.kind !== "station" || !point.stationId) continue;
+    if (!Number.isFinite(point.lng) || !Number.isFinite(point.lat)) continue;
+
+    const station = stationById.get(point.stationId);
+    if (!station) continue;
+    const current = getStationCoordinate(station);
+    if (coordinatesEqual(current, point)) continue;
+
+    const previous = currentOverrides.find(
+      (override) => override.stationId === point.stationId,
+    );
+    updates.set(point.stationId, {
+      stationId: point.stationId,
+      nameKo: previous?.nameKo ?? station.nameKo,
+      lng: point.lng,
+      lat: point.lat,
+      enabled: previous?.enabled ?? true,
+      note: previous?.note ?? null,
+    });
+  }
+
+  return [...updates.values()];
+}
+
 function applyGeometryDraftToBranches(
   branches: EditorMapBranch[],
   draft: GeometryDraft | null,
@@ -1701,7 +1836,7 @@ function buildGeometryEditPointFeatures(
             branchId: draft.branchId,
             pointIndex: index,
             kind: point.kind,
-            draggable: point.kind !== "station",
+            draggable: true,
           },
           geometry: {
             type: "Point" as const,
@@ -1907,10 +2042,10 @@ export default function UnifiedMapEditor({
   const displayBranches = useMemo(
     () =>
       applyGeometryDraftToBranches(
-        data.branches,
+        applyStationDraftToBranches(data.branches, stationDraft),
         toolMode === "geometry" ? geometryDraft : null,
       ),
-    [data.branches, geometryDraft, toolMode],
+    [data.branches, geometryDraft, stationDraft, toolMode],
   );
   const displayLineBranchOverrides = useMemo(
     () =>
@@ -2480,10 +2615,19 @@ export default function UnifiedMapEditor({
         id: "railmap-geometry-points",
         type: "circle",
         source: "railmap-geometry-edit-points",
-        filter: ["==", ["get", "kind"], "control"],
         paint: {
-          "circle-color": "#64748b",
-          "circle-radius": 5.5,
+          "circle-color": [
+            "case",
+            ["==", ["get", "kind"], "station"],
+            "#2563eb",
+            "#64748b",
+          ],
+          "circle-radius": [
+            "case",
+            ["==", ["get", "kind"], "station"],
+            4.8,
+            5.5,
+          ],
           "circle-stroke-color": "#ffffff",
           "circle-stroke-width": 2,
           "circle-opacity": 0.98,
@@ -2494,7 +2638,6 @@ export default function UnifiedMapEditor({
         id: "railmap-geometry-points-hit",
         type: "circle",
         source: "railmap-geometry-edit-points",
-        filter: ["==", ["get", "kind"], "control"],
         paint: {
           "circle-color": "rgba(0,0,0,0)",
           "circle-radius": 13,
@@ -2977,7 +3120,7 @@ export default function UnifiedMapEditor({
           )
             return previous;
           const target = previous.points[geometryDrag.pointIndex];
-          if (!target || target.kind === "station") return previous;
+          if (!target) return previous;
 
           return {
             ...previous,
@@ -3538,8 +3681,17 @@ export default function UnifiedMapEditor({
         return;
       }
 
+      const stationPositionOverrides = getMovedStationOverridesFromGeometryDraft(
+        geometryDraft,
+        stationById,
+        overlays.stationOverrides,
+      );
       const next: ManualOverlayBundle = {
         ...overlays,
+        stationOverrides: mergeStationOverrides(
+          overlays.stationOverrides,
+          stationPositionOverrides,
+        ),
         geometryOverrides: [
           ...overlays.geometryOverrides.filter(
             (candidate) => candidate.branchId !== override.branchId,
@@ -3581,8 +3733,17 @@ export default function UnifiedMapEditor({
       return;
     }
 
+    const stationPositionOverrides = getMovedStationOverridesFromGeometryDraft(
+      geometryDraft,
+      stationById,
+      overlays.stationOverrides,
+    );
     const next: ManualOverlayBundle = {
       ...overlays,
+      stationOverrides: mergeStationOverrides(
+        overlays.stationOverrides,
+        stationPositionOverrides,
+      ),
       lineBranchOverrides: (overlays.lineBranchOverrides ?? []).map(
         (override) =>
           override.id === geometryDraft.targetId
@@ -4203,12 +4364,6 @@ export default function UnifiedMapEditor({
                 className="absolute left-0 right-0 h-px bg-blue-500/70 shadow-[0_0_0_1px_rgba(255,255,255,0.85)]"
                 style={{ top: cursorPoint.y }}
               />
-              <div
-                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-blue-600 bg-white/80 px-2 py-1 text-[10px] font-bold text-blue-700 shadow"
-                style={{ left: cursorPoint.x, top: cursorPoint.y }}
-              >
-                위치 지정
-              </div>
             </div>
           ) : null}
           <div className="absolute bottom-3 right-3 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium text-slate-600 shadow-lg backdrop-blur">
