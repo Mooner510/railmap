@@ -101,6 +101,7 @@ type TransferGroupDraft = {
 };
 
 type GeometryTargetType = "branch" | "lineBranch";
+type GeometryTargetFilter = "all" | "branch" | "add-station" | "connect-line";
 
 type GeometryDraft = {
   targetType: GeometryTargetType;
@@ -133,6 +134,7 @@ type GeometryEditTarget = {
   subtitle: string;
   colorHex: string;
   meta: string;
+  kind: GeometryTargetFilter;
 };
 
 type LineBranchValidationIssue = {
@@ -1993,6 +1995,9 @@ export default function UnifiedMapEditor({
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("search");
   const [toolMode, setToolMode] = useState<ToolMode>("select");
   const [query, setQuery] = useState("");
+  const [geometryTargetQuery, setGeometryTargetQuery] = useState("");
+  const [geometryTargetFilter, setGeometryTargetFilter] =
+    useState<GeometryTargetFilter>("all");
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [contextMenu, setContextMenu] = useState<ContextMenuState>(null);
@@ -2082,6 +2087,7 @@ export default function UnifiedMapEditor({
       subtitle: branch.sourceLineName,
       colorHex: branch.colorHex ?? "#64748b",
       meta: `${branch.routeStopCount.toLocaleString("ko-KR")} stops`,
+      kind: "branch",
     }));
 
     const lineBranchTargets: GeometryEditTarget[] = (
@@ -2100,11 +2106,27 @@ export default function UnifiedMapEditor({
           colorHex: parentBranch?.colorHex ?? "#0f766e",
           meta:
             override.mode === "add-station" ? "지선 역 추가" : "지선 노선 결합",
+          kind: override.mode,
         };
       });
 
     return [...branchTargets, ...lineBranchTargets];
   }, [branchById, data.branches, overlays.lineBranchOverrides, stationById]);
+  const filteredGeometryTargets = useMemo(() => {
+    const normalizedQuery = normalizeSearchText(geometryTargetQuery);
+
+    return geometryTargets.filter((target) => {
+      if (geometryTargetFilter !== "all" && target.kind !== geometryTargetFilter) {
+        return false;
+      }
+
+      if (!normalizedQuery) return true;
+
+      return normalizeSearchText(
+        `${target.title} ${target.subtitle} ${target.meta}`,
+      ).includes(normalizedQuery);
+    });
+  }, [geometryTargetFilter, geometryTargetQuery, geometryTargets]);
   const groupById = useMemo(
     () =>
       new Map(overlays.manualTransferGroups.map((group) => [group.id, group])),
@@ -4195,9 +4217,14 @@ export default function UnifiedMapEditor({
           <PanelBody className="min-h-0 flex-1 overflow-y-auto">
             {isGeometryMode ? (
               <GeometryModeSidebar
-                targets={geometryTargets}
+                targets={filteredGeometryTargets}
+                totalTargetCount={geometryTargets.length}
                 activeTargetKey={getGeometryDraftTargetKey(geometryDraft)}
+                query={geometryTargetQuery}
+                filter={geometryTargetFilter}
                 shortcutsOpen={shortcutHelpOpen}
+                onQueryChange={setGeometryTargetQuery}
+                onFilterChange={setGeometryTargetFilter}
                 onToggleShortcuts={() => setShortcutHelpOpen((open) => !open)}
                 onSelectTarget={selectGeometryTarget}
               />
@@ -4644,21 +4671,33 @@ function CommandHistoryPanel({
 
 function GeometryModeSidebar({
   targets,
+  totalTargetCount,
   activeTargetKey,
+  query,
+  filter,
   shortcutsOpen,
+  onQueryChange,
+  onFilterChange,
   onToggleShortcuts,
   onSelectTarget,
 }: {
   targets: GeometryEditTarget[];
+  totalTargetCount: number;
   activeTargetKey: string | null;
+  query: string;
+  filter: GeometryTargetFilter;
   shortcutsOpen: boolean;
+  onQueryChange: (query: string) => void;
+  onFilterChange: (filter: GeometryTargetFilter) => void;
   onToggleShortcuts: () => void;
   onSelectTarget: (target: GeometryEditTarget) => void;
 }) {
-  const branchCount = targets.filter(
-    (target) => target.type === "branch",
-  ).length;
-  const overlayCount = targets.length - branchCount;
+  const filters: Array<{ value: GeometryTargetFilter; label: string }> = [
+    { value: "all", label: "전체" },
+    { value: "branch", label: "일반" },
+    { value: "add-station", label: "역 추가" },
+    { value: "connect-line", label: "노선 결합" },
+  ];
 
   return (
     <div className="flex min-h-0 h-full flex-col gap-2">
@@ -4667,20 +4706,43 @@ function GeometryModeSidebar({
           선형 편집 대상
         </strong>
         <span className="text-[11px] font-semibold text-slate-400">
-          {targets.length.toLocaleString("ko-KR")}
+          {targets.length.toLocaleString("ko-KR")} / {totalTargetCount.toLocaleString("ko-KR")}
         </span>
       </div>
-      <div className="grid grid-cols-2 gap-1 px-1 text-[10px] font-semibold text-slate-500">
-        <span className="rounded-full bg-slate-100 px-2 py-1 text-center">
-          일반 {branchCount.toLocaleString("ko-KR")}
-        </span>
-        <span className="rounded-full bg-slate-100 px-2 py-1 text-center">
-          지선 {overlayCount.toLocaleString("ko-KR")}
-        </span>
+      <div className="relative px-1">
+        <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-slate-400" />
+        <Input
+          className="h-8 pl-8 text-xs"
+          placeholder="노선명, 지선명 검색"
+          value={query}
+          onChange={(event) => onQueryChange(event.target.value)}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-1 px-1">
+        {filters.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={cn(
+              "rounded-full px-2 py-1 text-[10px] font-semibold transition",
+              filter === option.value
+                ? "bg-slate-900 text-white"
+                : "bg-slate-100 text-slate-500 hover:bg-slate-200",
+            )}
+            onClick={() => onFilterChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-        <div className="grid gap-1.5">
-          {targets.map((target) => {
+        {targets.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-3 py-6 text-center text-xs font-medium text-slate-400">
+            조건에 맞는 선형이 없습니다.
+          </div>
+        ) : (
+          <div className="grid gap-1.5">
+            {targets.map((target) => {
             const targetKey = getGeometryTargetKey(target.type, target.id);
             const active = activeTargetKey === targetKey;
             return (
@@ -4712,8 +4774,9 @@ function GeometryModeSidebar({
                 </p>
               </button>
             );
-          })}
-        </div>
+            })}
+          </div>
+        )}
       </div>
       <div className="shrink-0 rounded-2xl border border-slate-200 bg-white">
         <button
