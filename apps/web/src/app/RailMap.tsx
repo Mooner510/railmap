@@ -119,6 +119,113 @@ function getBranchDisplayName(branch: RailMapBranch | null | undefined) {
   return `${branch.canonicalLineNameKo}${sourceName}`;
 }
 
+function getBranchStopCoordinatePoints(branch: RailMapBranch) {
+  return branch.routeStops
+    .map((stop) => {
+      const station = stop.station;
+      if (!isValidCoordinate(station)) return null;
+
+      return {
+        stationId: station.id,
+        coordinate: [station.lng, station.lat] as LngLatTuple,
+      };
+    })
+    .filter(
+      (point): point is { stationId: string; coordinate: LngLatTuple } =>
+        point !== null,
+    );
+}
+
+function getLineBranchExplicitGeometry(
+  override: RailMapLineBranchOverride,
+): LngLatTuple[] {
+  const points = (override.geometry ?? [])
+    .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
+    .map((point) => [point.lng, point.lat] as LngLatTuple);
+
+  const hasEditableShape =
+    points.length >= 3 || (override.geometry ?? []).some((point) => point.kind === "control");
+
+  return hasEditableShape ? smoothCoordinates(points) : [];
+}
+
+function buildAddStationLineBranchCoordinates(
+  override: RailMapLineBranchOverride,
+  parentBranch: RailMapBranch | null,
+  stationById: Map<string, RailMapStation>,
+) {
+  if (!parentBranch || !override.branchStationId) return [];
+
+  const parentPoints = getBranchStopCoordinatePoints(parentBranch);
+  const anchorIndex = parentPoints.findIndex(
+    (point) => point.stationId === override.anchorStationId,
+  );
+  const branchStation = stationById.get(override.branchStationId) ?? null;
+  if (anchorIndex < 0 || !isValidCoordinate(branchStation)) return [];
+
+  const context = [
+    ...parentPoints.slice(0, anchorIndex + 1).map((point) => point.coordinate),
+    [branchStation.lng, branchStation.lat] as LngLatTuple,
+  ];
+
+  return smoothCoordinateRange(context, anchorIndex, context.length - 1);
+}
+
+function orientBranchCoordinatesFromEndpoint(
+  branch: RailMapBranch,
+  endpointStationId: string,
+  endpointRole: "start" | "end",
+) {
+  const points = getBranchStopCoordinatePoints(branch);
+  if (points.length < 2) return [];
+
+  const index = points.findIndex((point) => point.stationId === endpointStationId);
+  if (index < 0) return [];
+
+  const coordinates = points.map((point) => point.coordinate);
+  if (endpointRole === "end") return index === 0 ? [...coordinates].reverse() : coordinates;
+  return index === points.length - 1 ? [...coordinates].reverse() : coordinates;
+}
+
+function buildConnectLineBranchCoordinates(
+  override: RailMapLineBranchOverride,
+  parentBranch: RailMapBranch | null,
+  connectedBranch: RailMapBranch | null,
+) {
+  if (!parentBranch || !connectedBranch || !override.connectedEndpointStationId) return [];
+
+  const parentCoordinates = orientBranchCoordinatesFromEndpoint(
+    parentBranch,
+    override.anchorStationId,
+    "end",
+  );
+  const connectedCoordinates = orientBranchCoordinatesFromEndpoint(
+    connectedBranch,
+    override.connectedEndpointStationId,
+    "start",
+  );
+
+  if (parentCoordinates.length < 2 || connectedCoordinates.length < 2) return [];
+
+  return smoothCoordinates([...parentCoordinates, ...connectedCoordinates]);
+}
+
+function buildLineBranchCoordinates(
+  override: RailMapLineBranchOverride,
+  parentBranch: RailMapBranch | null,
+  connectedBranch: RailMapBranch | null,
+  stationById: Map<string, RailMapStation>,
+) {
+  const explicitGeometry = getLineBranchExplicitGeometry(override);
+  if (explicitGeometry.length >= 2) return explicitGeometry;
+
+  if (override.mode === "add-station") {
+    return buildAddStationLineBranchCoordinates(override, parentBranch, stationById);
+  }
+
+  return buildConnectLineBranchCoordinates(override, parentBranch, connectedBranch);
+}
+
 function buildLineBranchFeatures(
   overrides: RailMapLineBranchOverride[],
   branches: RailMapBranch[],
@@ -138,14 +245,12 @@ function buildLineBranchFeatures(
         const targetStationId = override.mode === "add-station" ? override.branchStationId : override.connectedEndpointStationId;
         const targetStation = targetStationId ? stationById.get(targetStationId) ?? null : null;
         const connectedBranch = override.connectedBranchId ? branchById.get(override.connectedBranchId) ?? null : null;
-        const geometryCoordinates = (override.geometry ?? [])
-          .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
-          .map((point) => [point.lng, point.lat] as LngLatTuple);
-
-        let coordinates = geometryCoordinates;
-        if (coordinates.length < 2 && isValidCoordinate(anchorStation) && isValidCoordinate(targetStation)) {
-          coordinates = [[anchorStation.lng, anchorStation.lat], [targetStation.lng, targetStation.lat]];
-        }
+        const coordinates = buildLineBranchCoordinates(
+          override,
+          parentBranch,
+          connectedBranch,
+          stationById,
+        );
         if (coordinates.length < 2) return null;
 
         const title = override.mode === "add-station" ? "지선 역 추가" : "지선 노선 결합";
@@ -163,7 +268,7 @@ function buildLineBranchFeatures(
           },
           geometry: {
             type: "LineString" as const,
-            coordinates: smoothCoordinates(coordinates),
+            coordinates,
           },
         };
       })
@@ -393,6 +498,32 @@ function buildStationTransferGroupIndex(
   return index;
 }
 
+function buildTransferGroupCircleCoordinates(members: ValidRailMapStation[]) {
+  const centerLng = members.reduce((sum, station) => sum + station.lng, 0) / members.length;
+  const centerLat = members.reduce((sum, station) => sum + station.lat, 0) / members.length;
+  const lngScale = Math.max(0.35, Math.cos((centerLat * Math.PI) / 180));
+  const radius = Math.max(
+    0.0022,
+    ...members.map((station) => {
+      const dx = (station.lng - centerLng) * lngScale;
+      const dy = station.lat - centerLat;
+      return Math.sqrt(dx * dx + dy * dy) * 1.45;
+    }),
+  );
+
+  const coordinates: LngLatTuple[] = [];
+  const segments = 48;
+  for (let index = 0; index <= segments; index += 1) {
+    const angle = (Math.PI * 2 * index) / segments;
+    coordinates.push([
+      centerLng + (Math.cos(angle) * radius) / lngScale,
+      centerLat + Math.sin(angle) * radius,
+    ]);
+  }
+
+  return coordinates;
+}
+
 function buildTransferGroupAreaFeatures(
   transferGroups: RailMapTransferGroup[],
   stationIndex: Map<string, ValidRailMapStation>,
@@ -410,21 +541,7 @@ function buildTransferGroupAreaFeatures(
           );
         if (members.length < 2) return null;
 
-        const lngs = members.map((station) => station.lng);
-        const lats = members.map((station) => station.lat);
-        const minLng = Math.min(...lngs);
-        const maxLng = Math.max(...lngs);
-        const minLat = Math.min(...lats);
-        const maxLat = Math.max(...lats);
-        const lngPadding = Math.max(0.0018, (maxLng - minLng) * 0.35);
-        const latPadding = Math.max(0.0018, (maxLat - minLat) * 0.35);
-        const coordinates: LngLatTuple[] = [
-          [minLng - lngPadding, minLat - latPadding],
-          [maxLng + lngPadding, minLat - latPadding],
-          [maxLng + lngPadding, maxLat + latPadding],
-          [minLng - lngPadding, maxLat + latPadding],
-          [minLng - lngPadding, minLat - latPadding],
-        ];
+        const coordinates = buildTransferGroupCircleCoordinates(members);
 
         return {
           type: "Feature" as const,
@@ -575,7 +692,7 @@ function catmullRomPoint(
   return [lng, lat];
 }
 
-function toLngLatTuple(point: number[]): LngLatTuple | null {
+function toLngLatTuple(point: ReadonlyArray<number>): LngLatTuple | null {
   const [lng, lat] = point;
 
   if (typeof lng !== "number" || typeof lat !== "number") return null;
@@ -591,7 +708,7 @@ function getHash(value: string) {
   return Math.abs(hash);
 }
 
-function smoothCoordinates(coordinates: number[][]): LngLatTuple[] {
+function smoothCoordinates(coordinates: ReadonlyArray<ReadonlyArray<number>>): LngLatTuple[] {
   const points = coordinates
     .map(toLngLatTuple)
     .filter((point): point is LngLatTuple => point !== null);
@@ -933,6 +1050,15 @@ export default function RailMap({
         map.on("load", () => {
           setMapReady(true);
           setMapError(null);
+
+          const transferIconImage = new Image(64, 64);
+          transferIconImage.onload = () => {
+            if (!map.hasImage("transfer-icon")) {
+              map.addImage("transfer-icon", transferIconImage, { pixelRatio: 2 });
+            }
+          };
+          transferIconImage.src = "/transfer.svg";
+
           map.addSource("branch-preview-lines", {
             type: "geojson",
             data: branchFeaturesRef.current,
@@ -1000,8 +1126,8 @@ export default function RailMap({
             source: "line-branch-lines",
             paint: {
               "line-color": "#ffffff",
-              "line-width": 6.8,
-              "line-opacity": 0.9,
+              "line-width": 4.2,
+              "line-opacity": 0.88,
             },
             layout: { "line-cap": "round", "line-join": "round" },
           });
@@ -1012,9 +1138,8 @@ export default function RailMap({
             source: "line-branch-lines",
             paint: {
               "line-color": ["get", "colorHex"],
-              "line-width": 3.8,
-              "line-opacity": 0.9,
-              "line-dasharray": [1.2, 1.2],
+              "line-width": 2.4,
+              "line-opacity": 0.78,
             },
             layout: { "line-cap": "round", "line-join": "round" },
           });
@@ -1074,8 +1199,8 @@ export default function RailMap({
               "fill-opacity": [
                 "case",
                 ["==", ["get", "isSelected"], true],
-                0.15,
-                0.08,
+                0.34,
+                0.22,
               ],
             },
           });
@@ -1092,9 +1217,8 @@ export default function RailMap({
                 "#2563eb",
                 "#64748b",
               ],
-              "line-width": ["case", ["==", ["get", "isSelected"], true], 2, 1],
-              "line-opacity": 0.55,
-              "line-dasharray": [2, 2],
+              "line-width": ["case", ["==", ["get", "isSelected"], true], 3.4, 2.2],
+              "line-opacity": 0.9,
             },
           });
 
@@ -1102,9 +1226,9 @@ export default function RailMap({
             id: "transfer-group-collapsed-hit",
             type: "circle",
             source: "transfer-group-icons",
-            maxzoom: 12,
+            maxzoom: 14.5,
             paint: {
-              "circle-radius": 17,
+              "circle-radius": 22,
               "circle-color": "#000000",
               "circle-opacity": 0.01,
             },
@@ -1114,14 +1238,14 @@ export default function RailMap({
             id: "transfer-group-collapsed-casing",
             type: "circle",
             source: "transfer-group-icons",
-            maxzoom: 12,
+            maxzoom: 14.5,
             paint: {
               "circle-color": "#ffffff",
               "circle-radius": [
                 "case",
                 ["==", ["get", "isSelected"], true],
-                12,
-                10,
+                15,
+                13,
               ],
               "circle-stroke-color": [
                 "case",
@@ -1143,18 +1267,12 @@ export default function RailMap({
             id: "transfer-group-collapsed-icon",
             type: "symbol",
             source: "transfer-group-icons",
-            maxzoom: 12,
+            maxzoom: 14.5,
             layout: {
-              "text-field": "☯",
-              "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
-              "text-size": 15,
-              "text-allow-overlap": true,
-              "text-ignore-placement": true,
-            },
-            paint: {
-              "text-color": "#0f172a",
-              "text-halo-color": "#ffffff",
-              "text-halo-width": 0.8,
+              "icon-image": "transfer-icon",
+              "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.07, 0.058],
+              "icon-allow-overlap": true,
+              "icon-ignore-placement": true,
             },
           });
 
@@ -1162,8 +1280,8 @@ export default function RailMap({
             id: "transfer-group-collapsed-label",
             type: "symbol",
             source: "transfer-group-icons",
-            minzoom: 9,
-            maxzoom: 12,
+            minzoom: 12,
+            maxzoom: 14.5,
             layout: {
               "text-field": ["get", "nameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
@@ -1201,7 +1319,7 @@ export default function RailMap({
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-                12,
+                14.5,
                 0.96,
               ],
             },
@@ -1235,7 +1353,7 @@ export default function RailMap({
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-                12,
+                14.5,
                 0.96,
               ],
             },
@@ -1259,6 +1377,13 @@ export default function RailMap({
               "text-color": "#0f172a",
               "text-halo-color": "#ffffff",
               "text-halo-width": 1.4,
+              "text-opacity": [
+                "step",
+                ["zoom"],
+                ["case", ["==", ["get", "isTransferChild"], true], 0, 0.92],
+                14.5,
+                0.92,
+              ],
             },
           });
 
@@ -1282,6 +1407,15 @@ export default function RailMap({
               "text-halo-width": 1.6,
             },
           });
+
+          for (const layerId of [
+            "transfer-group-collapsed-hit",
+            "transfer-group-collapsed-casing",
+            "transfer-group-collapsed-icon",
+            "transfer-group-collapsed-label",
+          ]) {
+            if (map.getLayer(layerId)) map.moveLayer(layerId);
+          }
 
           map.on("mouseenter", "branch-preview-lines", () => {
             map.getCanvas().style.cursor = "pointer";

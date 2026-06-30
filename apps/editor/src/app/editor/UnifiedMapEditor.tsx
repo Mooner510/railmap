@@ -296,6 +296,32 @@ async function buildStationFeaturesChunked(
   return { type: "FeatureCollection", features };
 }
 
+function buildTransferGroupCircleCoordinates(members: Array<EditorStation & { lat: number; lng: number }>) {
+  const centerLng = members.reduce((sum, station) => sum + station.lng, 0) / members.length;
+  const centerLat = members.reduce((sum, station) => sum + station.lat, 0) / members.length;
+  const lngScale = Math.max(0.35, Math.cos((centerLat * Math.PI) / 180));
+  const radius = Math.max(
+    0.0022,
+    ...members.map((station) => {
+      const dx = (station.lng - centerLng) * lngScale;
+      const dy = station.lat - centerLat;
+      return Math.sqrt(dx * dx + dy * dy) * 1.45;
+    }),
+  );
+
+  const coordinates: LngLatTuple[] = [];
+  const segments = 48;
+  for (let index = 0; index <= segments; index += 1) {
+    const angle = (Math.PI * 2 * index) / segments;
+    coordinates.push([
+      centerLng + (Math.cos(angle) * radius) / lngScale,
+      centerLat + Math.sin(angle) * radius,
+    ]);
+  }
+
+  return coordinates;
+}
+
 async function buildTransferGroupAreaFeaturesChunked(
   groups: ManualTransferGroup[],
   stationById: Map<string, EditorStation>,
@@ -318,21 +344,7 @@ async function buildTransferGroupAreaFeaturesChunked(
         );
       if (members.length < 2) continue;
 
-      const lngs = members.map((station) => station.lng);
-      const lats = members.map((station) => station.lat);
-      const minLng = Math.min(...lngs);
-      const maxLng = Math.max(...lngs);
-      const minLat = Math.min(...lats);
-      const maxLat = Math.max(...lats);
-      const lngPadding = Math.max(0.0018, (maxLng - minLng) * 0.35);
-      const latPadding = Math.max(0.0018, (maxLat - minLat) * 0.35);
-      const coordinates: LngLatTuple[] = [
-        [minLng - lngPadding, minLat - latPadding],
-        [maxLng + lngPadding, minLat - latPadding],
-        [maxLng + lngPadding, maxLat + latPadding],
-        [minLng - lngPadding, maxLat + latPadding],
-        [minLng - lngPadding, minLat - latPadding],
-      ];
+      const coordinates = buildTransferGroupCircleCoordinates(members);
 
       features.push({
         type: "Feature",
@@ -501,6 +513,35 @@ function smoothCoordinates(coordinates: LngLatTuple[]): LngLatTuple[] {
   return result;
 }
 
+function smoothCoordinateRange(
+  coordinates: LngLatTuple[],
+  startIndex: number,
+  endIndex: number,
+): LngLatTuple[] {
+  if (coordinates.length < 2 || startIndex === endIndex) return [];
+
+  const start = Math.max(0, Math.min(startIndex, endIndex));
+  const end = Math.min(coordinates.length - 1, Math.max(startIndex, endIndex));
+  if (coordinates.length < 3) return coordinates.slice(start, end + 1);
+
+  const result: LngLatTuple[] = [];
+  const samplesPerSegment = 5;
+
+  for (let index = start; index < end; index += 1) {
+    const p0 = coordinates[Math.max(0, index - 1)] ?? coordinates[index];
+    const p1 = coordinates[index];
+    const p2 = coordinates[index + 1];
+    const p3 = coordinates[Math.min(coordinates.length - 1, index + 2)] ?? p2;
+    if (!p0 || !p1 || !p2 || !p3) continue;
+    if (index === start) result.push(p1);
+    for (let step = 1; step <= samplesPerSegment; step += 1) {
+      result.push(catmullRomPoint(p0, p1, p2, p3, step / samplesPerSegment));
+    }
+  }
+
+  return startIndex <= endIndex ? result : [...result].reverse();
+}
+
 function getBranchStationIds(branch: EditorMapBranch): string[] {
   return branch.routeStops
     .map((stop) => stop.station?.id ?? null)
@@ -642,6 +683,113 @@ function getLineBranchDisplay(
   };
 }
 
+function getBranchStopCoordinatePoints(branch: EditorMapBranch) {
+  return branch.routeStops
+    .map((stop) => {
+      const station = stop.station;
+      const coordinate = getStationCoordinate(station);
+      if (!station || !coordinate) return null;
+
+      return {
+        stationId: station.id,
+        coordinate,
+      };
+    })
+    .filter(
+      (point): point is { stationId: string; coordinate: LngLatTuple } =>
+        point !== null,
+    );
+}
+
+function getLineBranchExplicitGeometry(override: ManualLineBranchOverride) {
+  const points = (override.geometry ?? [])
+    .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
+    .map((point) => [point.lng, point.lat] as LngLatTuple);
+
+  const hasEditableShape =
+    points.length >= 3 || (override.geometry ?? []).some((point) => point.kind === "control");
+
+  return hasEditableShape ? smoothCoordinates(points) : [];
+}
+
+function buildAddStationLineBranchCoordinates(
+  override: ManualLineBranchOverride,
+  parentBranch: EditorMapBranch | null,
+  stationById: Map<string, EditorStation>,
+) {
+  if (!parentBranch || !override.branchStationId) return [];
+
+  const parentPoints = getBranchStopCoordinatePoints(parentBranch);
+  const anchorIndex = parentPoints.findIndex(
+    (point) => point.stationId === override.anchorStationId,
+  );
+  const branchStation = stationById.get(override.branchStationId) ?? null;
+  const branchCoordinate = getStationCoordinate(branchStation);
+  if (anchorIndex < 0 || !branchCoordinate) return [];
+
+  const context = [
+    ...parentPoints.slice(0, anchorIndex + 1).map((point) => point.coordinate),
+    branchCoordinate,
+  ];
+
+  return smoothCoordinateRange(context, anchorIndex, context.length - 1);
+}
+
+function orientBranchCoordinatesFromEndpoint(
+  branch: EditorMapBranch,
+  endpointStationId: string,
+  endpointRole: "start" | "end",
+) {
+  const points = getBranchStopCoordinatePoints(branch);
+  if (points.length < 2) return [];
+
+  const index = points.findIndex((point) => point.stationId === endpointStationId);
+  if (index < 0) return [];
+
+  const coordinates = points.map((point) => point.coordinate);
+  if (endpointRole === "end") return index === 0 ? [...coordinates].reverse() : coordinates;
+  return index === points.length - 1 ? [...coordinates].reverse() : coordinates;
+}
+
+function buildConnectLineBranchCoordinates(
+  override: ManualLineBranchOverride,
+  parentBranch: EditorMapBranch | null,
+  connectedBranch: EditorMapBranch | null,
+) {
+  if (!parentBranch || !connectedBranch || !override.connectedEndpointStationId) return [];
+
+  const parentCoordinates = orientBranchCoordinatesFromEndpoint(
+    parentBranch,
+    override.anchorStationId,
+    "end",
+  );
+  const connectedCoordinates = orientBranchCoordinatesFromEndpoint(
+    connectedBranch,
+    override.connectedEndpointStationId,
+    "start",
+  );
+
+  if (parentCoordinates.length < 2 || connectedCoordinates.length < 2) return [];
+
+  return smoothCoordinates([...parentCoordinates, ...connectedCoordinates]);
+}
+
+function buildLineBranchCoordinates(
+  override: ManualLineBranchOverride,
+  parentBranch: EditorMapBranch | null,
+  connectedBranch: EditorMapBranch | null,
+  stationById: Map<string, EditorStation>,
+) {
+  const explicitGeometry = getLineBranchExplicitGeometry(override);
+  if (explicitGeometry.length >= 2) return explicitGeometry;
+
+  if (override.mode === "add-station") {
+    return buildAddStationLineBranchCoordinates(override, parentBranch, stationById);
+  }
+
+  return buildConnectLineBranchCoordinates(override, parentBranch, connectedBranch);
+}
+
 async function buildLineBranchFeaturesChunked(
   overrides: ManualLineBranchOverride[],
   branchById: Map<string, EditorMapBranch>,
@@ -661,20 +809,14 @@ async function buildLineBranchFeaturesChunked(
       if (override.enabled === false) continue;
 
       const parentBranch = branchById.get(override.parentBranchId) ?? null;
+      const connectedBranch = override.connectedBranchId ? branchById.get(override.connectedBranchId) ?? null : null;
       const display = getLineBranchDisplay(override, branchById, stationById);
-      const geometryCoordinates = (override.geometry ?? [])
-        .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
-        .map((point) => [point.lng, point.lat] as LngLatTuple);
-
-      let coordinates = geometryCoordinates;
-      if (coordinates.length < 2) {
-        const anchor = stationById.get(override.anchorStationId) ?? null;
-        const targetStationId = override.mode === "add-station" ? override.branchStationId : override.connectedEndpointStationId;
-        const target = targetStationId ? stationById.get(targetStationId) ?? null : null;
-        const anchorCoordinate = getStationCoordinate(anchor);
-        const targetCoordinate = getStationCoordinate(target);
-        if (anchorCoordinate && targetCoordinate) coordinates = [anchorCoordinate, targetCoordinate];
-      }
+      const coordinates = buildLineBranchCoordinates(
+        override,
+        parentBranch,
+        connectedBranch,
+        stationById,
+      );
 
       if (coordinates.length < 2) continue;
 
@@ -1304,6 +1446,14 @@ export default function UnifiedMapEditor({
     );
 
     map.on("load", () => {
+      const transferIconImage = new Image(64, 64);
+      transferIconImage.onload = () => {
+        if (!map.hasImage("transfer-icon")) {
+          map.addImage("transfer-icon", transferIconImage, { pixelRatio: 2 });
+        }
+      };
+      transferIconImage.src = "/transfer.svg";
+
       map.addSource("railmap-branches", {
         type: "geojson",
         data: EMPTY_FEATURE_COLLECTION,
@@ -1356,8 +1506,8 @@ export default function UnifiedMapEditor({
         source: "railmap-line-branches",
         paint: {
           "line-color": "#ffffff",
-          "line-width": 7,
-          "line-opacity": 0.92,
+          "line-width": 4.8,
+          "line-opacity": 0.88,
         },
         layout: { "line-cap": "round", "line-join": "round" },
       });
@@ -1368,9 +1518,8 @@ export default function UnifiedMapEditor({
         source: "railmap-line-branches",
         paint: {
           "line-color": ["get", "colorHex"],
-          "line-width": 4,
-          "line-opacity": 0.92,
-          "line-dasharray": [1.2, 1.2],
+          "line-width": 3,
+          "line-opacity": 0.78,
         },
         layout: { "line-cap": "round", "line-join": "round" },
       });
@@ -1390,8 +1539,8 @@ export default function UnifiedMapEditor({
           "fill-opacity": [
             "case",
             ["==", ["get", "selected"], true],
-            0.16,
-            0.08,
+            0.34,
+            0.22,
           ],
         },
       });
@@ -1408,9 +1557,8 @@ export default function UnifiedMapEditor({
             "#2563eb",
             "#64748b",
           ],
-          "line-width": ["case", ["==", ["get", "selected"], true], 2, 1],
-          "line-opacity": 0.55,
-          "line-dasharray": [2, 2],
+          "line-width": ["case", ["==", ["get", "selected"], true], 3.4, 2.2],
+          "line-opacity": 0.9,
         },
       });
 
@@ -1418,9 +1566,9 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-hit",
         type: "circle",
         source: "railmap-transfer-group-icons",
-        maxzoom: 12,
+        maxzoom: 14.5,
         paint: {
-          "circle-radius": 17,
+          "circle-radius": 22,
           "circle-color": "#000000",
           "circle-opacity": 0.01,
         },
@@ -1430,10 +1578,10 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-casing",
         type: "circle",
         source: "railmap-transfer-group-icons",
-        maxzoom: 12,
+        maxzoom: 14.5,
         paint: {
           "circle-color": "#ffffff",
-          "circle-radius": ["case", ["==", ["get", "selected"], true], 12, 10],
+          "circle-radius": ["case", ["==", ["get", "selected"], true], 15, 13],
           "circle-stroke-color": [
             "case",
             ["==", ["get", "selected"], true],
@@ -1446,13 +1594,7 @@ export default function UnifiedMapEditor({
             2.4,
             1.4,
           ],
-          "circle-opacity": [
-            "step",
-            ["zoom"],
-            ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-            12,
-            0.96,
-          ],
+          "circle-opacity": 0.96,
         },
       });
 
@@ -1460,18 +1602,12 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-icon",
         type: "symbol",
         source: "railmap-transfer-group-icons",
-        maxzoom: 12,
+        maxzoom: 14.5,
         layout: {
-          "text-field": "☯",
-          "text-size": 15,
-          "text-font": ["Open Sans Regular"],
-          "text-allow-overlap": true,
-          "text-ignore-placement": true,
-        },
-        paint: {
-          "text-color": "#0f172a",
-          "text-halo-color": "#ffffff",
-          "text-halo-width": 0.8,
+          "icon-image": "transfer-icon",
+          "icon-size": ["case", ["==", ["get", "selected"], true], 0.07, 0.058],
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
         },
       });
 
@@ -1479,8 +1615,8 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-label",
         type: "symbol",
         source: "railmap-transfer-group-icons",
-        minzoom: 9,
-        maxzoom: 12,
+        minzoom: 12,
+        maxzoom: 14.5,
         layout: {
           "text-field": ["get", "nameKo"],
           "text-size": 11,
@@ -1521,7 +1657,13 @@ export default function UnifiedMapEditor({
             3,
             1.5,
           ],
-          "circle-opacity": 0.96,
+          "circle-opacity": [
+            "step",
+            ["zoom"],
+            ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
+            14.5,
+            0.96,
+          ],
         },
       });
 
@@ -1534,7 +1676,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 12],
-            12,
+            14.5,
             12,
           ],
           "circle-color": "#000000",
@@ -1581,7 +1723,13 @@ export default function UnifiedMapEditor({
           "text-color": "#0f172a",
           "text-halo-color": "#ffffff",
           "text-halo-width": 1.5,
-          "text-opacity": 0.92,
+          "text-opacity": [
+            "step",
+            ["zoom"],
+            ["case", ["==", ["get", "isTransferChild"], true], 0, 0.92],
+            14.5,
+            0.92,
+          ],
         },
       });
 
@@ -1605,6 +1753,15 @@ export default function UnifiedMapEditor({
           "text-halo-width": 2,
         },
       });
+
+      for (const layerId of [
+        "railmap-transfer-group-hit",
+        "railmap-transfer-group-casing",
+        "railmap-transfer-group-icon",
+        "railmap-transfer-group-label",
+      ]) {
+        if (map.getLayer(layerId)) map.moveLayer(layerId);
+      }
 
       window.requestAnimationFrame(() => setMapLoaded(true));
     });
