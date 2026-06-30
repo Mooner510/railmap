@@ -164,6 +164,94 @@ function applyStationOverrides(stations: EditorStation[], overrides: ManualStati
   });
 }
 
+
+function makeLineScopedStationId(stationId: string, lineKey: string) {
+  const safeLineKey = lineKey.trim().replace(/[^\w가-힣:.-]+/g, "_") || "unknown";
+  return `${stationId}::line:${safeLineKey}`;
+}
+
+function getLineKey(line: CanonicalLine, branch: CanonicalBranch) {
+  return line.canonicalKey ?? line.id ?? branch.sourceLineNumber ?? line.nameKo;
+}
+
+function shouldScopeStationToLine(station: EditorStation | undefined, usageLineKeys: Set<string> | undefined, branch: CanonicalBranch) {
+  if (!station) return false;
+  if (station.lineNumber && branch.sourceLineNumber) return station.lineNumber !== branch.sourceLineNumber;
+  return (usageLineKeys?.size ?? 0) > 1;
+}
+
+function normalizeSingleLineStationMappings(bundle: CanonicalBundle): CanonicalBundle {
+  const stationById = new Map(bundle.stations.map((station) => [station.id, station]));
+  const usageByStationId = new Map<string, Set<string>>();
+
+  for (const line of bundle.lines ?? []) {
+    for (const branch of line.branches ?? []) {
+      const lineKey = getLineKey(line, branch);
+      for (const stop of branch.routeStops ?? []) {
+        const stationId = getRouteStopStationId(stop);
+        if (!stationId) continue;
+        const set = usageByStationId.get(stationId) ?? new Set<string>();
+        set.add(lineKey);
+        usageByStationId.set(stationId, set);
+      }
+    }
+  }
+
+  const nextStationById = new Map(bundle.stations.map((station) => [station.id, station]));
+
+  const lines = (bundle.lines ?? []).map((line) => ({
+    ...line,
+    branches: (line.branches ?? []).map((branch) => {
+      const lineKey = getLineKey(line, branch);
+      return {
+        ...branch,
+        routeStops: (branch.routeStops ?? []).map((stop) => {
+          const stationId = getRouteStopStationId(stop);
+          const station = stationId ? stationById.get(stationId) : undefined;
+          if (!stationId || !station || !shouldScopeStationToLine(station, usageByStationId.get(stationId), branch)) {
+            return stop;
+          }
+
+          const scopedStationId = makeLineScopedStationId(stationId, lineKey);
+          if (!nextStationById.has(scopedStationId)) {
+            nextStationById.set(scopedStationId, {
+              ...station,
+              id: scopedStationId,
+              stationNumber: stop.displayNameKo ? (stop as { sourceStationCode?: string }).sourceStationCode ?? station.stationNumber : station.stationNumber,
+              lineNumber: branch.sourceLineNumber || station.lineNumber,
+              lineNameKo: line.nameKo || branch.sourceLineName || station.lineNameKo,
+            });
+          }
+
+          return {
+            ...stop,
+            stationId: scopedStationId,
+            station: stop.station ? { ...stop.station, id: scopedStationId } : { id: scopedStationId },
+          };
+        }),
+      };
+    }),
+  }));
+
+  const referencedStationIds = new Set<string>();
+  for (const line of lines) {
+    for (const branch of line.branches ?? []) {
+      for (const stop of branch.routeStops ?? []) {
+        const stationId = getRouteStopStationId(stop);
+        if (stationId) referencedStationIds.add(stationId);
+      }
+    }
+  }
+
+  return {
+    ...bundle,
+    stations: [...nextStationById.values()].filter(
+      (station) => referencedStationIds.has(station.id) || !usageByStationId.has(station.id),
+    ),
+    lines,
+  };
+}
+
 function buildBranchStationExclusionIndex(exclusions: ManualBranchStationExclusion[]) {
   const index = new Map<string, Set<string>>();
 
@@ -252,10 +340,14 @@ function toMapLines(lines: CanonicalLine[] | undefined): EditorMapLine[] {
 
 export async function readUnifiedEditorData(): Promise<UnifiedEditorData> {
   const body = await fs.readFile(getBundlePath(), "utf8");
-  const bundle = JSON.parse(body) as CanonicalBundle;
+  const rawBundle = JSON.parse(body) as CanonicalBundle;
   const overlays = await readManualOverlays();
+  const bundle = normalizeSingleLineStationMappings({
+    ...rawBundle,
+    stations: applyStationOverrides(rawBundle.stations, overlays.stationOverrides),
+  });
   const colorIndex = buildStationColorIndex(bundle.lines);
-  const stations = applyStationOverrides(bundle.stations, overlays.stationOverrides)
+  const stations = bundle.stations
     .map((station) => ({
       ...station,
       colorHex: resolveStationColor(station, colorIndex),
