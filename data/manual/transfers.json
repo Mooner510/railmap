@@ -35,6 +35,118 @@
       "enabled": true,
       "source": "editor",
       "note": null
+    },
+    {
+      "id": "manual-transfer-group:영등포구청역:candidate:kric:urban-rail-station:S1102:0236:row-770:candidate:kric:urban-rail-station:S1105:0523:row-771",
+      "nameKo": "영등포구청역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1105:0523:row-771",
+        "candidate:kric:urban-rail-station:S1102:0236:row-770"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1102:0236:row-770<->candidate:kric:urban-rail-station:S1105:0523:row-771": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    },
+    {
+      "id": "manual-transfer-group:수원역:candidate:kric:urban-rail-station:I4101:1713:row-631:candidate:kric:urban-rail-station:I4105:1846:row-632::line:01:K1",
+      "nameKo": "수원역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1846:row-632::line:01:K1",
+        "candidate:kric:urban-rail-station:I4101:1713:row-631"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4101:1713:row-631<->candidate:kric:urban-rail-station:I4105:1846:row-632::line:01:K1": 1
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    },
+    {
+      "id": "manual-transfer-group:회룡역:candidate:kric:urban-rail-station:I4102:1905:row-1093:candidate:kric:urban-rail-station:L41U1:U111:row-1094",
+      "nameKo": "회룡역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4102:1905:row-1093",
+        "candidate:kric:urban-rail-station:L41U1:U111:row-1094"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4102:1905:row-1093<->candidate:kric:urban-rail-station:L41U1:U111:row-1094": 4
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    },
+    {
+      "id": "manual-transfer-group:도봉산역:candidate:kric:urban-rail-station:I4102:1903:row-283:candidate:kric:urban-rail-station:S1107:0710:row-284",
+      "nameKo": "도봉산역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4102:1903:row-283",
+        "candidate:kric:urban-rail-station:S1107:0710:row-284"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4102:1903:row-283<->candidate:kric:urban-rail-station:S1107:0710:row-284": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    },
+    {
+      "id": "manual-transfer-group:신길역:candidate:kric:urban-rail-station:I4101:1032:row-656:candidate:kric:urban-rail-station:S1105:0525:row-657",
+      "nameKo": "신길역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:1032:row-656",
+        "candidate:kric:urban-rail-station:S1105:0525:row-657"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4101:1032:row-656<->candidate:kric:urban-rail-station:S1105:0525:row-657": 6
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    },
+    {
+      "id": "manual-transfer-group:샛강역:candidate:kric:urban-rail-station:L11SL:S401:row-534:candidate:kric:urban-rail-station:S1109:4116:row-533",
+      "nameKo": "샛강역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L11SL:S401:row-534",
+        "candidate:kric:urban-rail-station:S1109:4116:row-533"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:L11SL:S401:row-534<->candidate:kric:urban-rail-station:S1109:4116:row-533": 4
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    },
+    {
+      "id": "manual-transfer-group:대방역:candidate:kric:urban-rail-station:I4101:1005:row-254:candidate:kric:urban-rail-station:L11SL:S402:row-255",
+      "nameKo": "대방역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:1005:row-254",
+        "candidate:kric:urban-rail-station:L11SL:S402:row-255"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4101:1005:row-254<->candidate:kric:urban-rail-station:L11SL:S402:row-255": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    },
+    {
+      "id": "manual-transfer-group:신도림역:candidate:kric:urban-rail-station:I4101:1007:row-667:candidate:kric:urban-rail-station:S1102:0234:row-668",
+      "nameKo": "신도림역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:1007:row-667",
+        "candidate:kric:urban-rail-station:S1102:0234:row-668"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4101:1007:row-667<->candidate:kric:urban-rail-station:S1102:0234:row-668": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
     }
   ],
   "manualTransferEdges": []
