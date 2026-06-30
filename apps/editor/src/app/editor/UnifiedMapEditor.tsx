@@ -1322,24 +1322,177 @@ function toTransferGroup(draft: TransferGroupDraft): ManualTransferGroup {
   };
 }
 
+function getBranchAnchorGeometryPoints(branch: EditorMapBranch): ManualGeometryOverridePoint[] {
+  return branch.routeStops
+    .map((stop): ManualGeometryOverridePoint | null => {
+      const station = stop.station;
+      const coordinate = getStationCoordinate(station);
+      if (!station || !coordinate) return null;
+
+      return {
+        lng: coordinate[0],
+        lat: coordinate[1],
+        kind: "station",
+        stationId: station.id,
+      };
+    })
+    .filter((point): point is ManualGeometryOverridePoint => point !== null);
+}
+
+function distanceToCoordinateSegmentSquared(
+  point: ManualGeometryOverridePoint,
+  start: ManualGeometryOverridePoint,
+  end: ManualGeometryOverridePoint,
+) {
+  const dx = end.lng - start.lng;
+  const dy = end.lat - start.lat;
+  const lengthSquared = dx * dx + dy * dy;
+
+  if (lengthSquared === 0) {
+    const px = point.lng - start.lng;
+    const py = point.lat - start.lat;
+    return px * px + py * py;
+  }
+
+  const t = Math.max(
+    0,
+    Math.min(
+      1,
+      ((point.lng - start.lng) * dx + (point.lat - start.lat) * dy) /
+        lengthSquared,
+    ),
+  );
+  const projectedLng = start.lng + t * dx;
+  const projectedLat = start.lat + t * dy;
+  const px = point.lng - projectedLng;
+  const py = point.lat - projectedLat;
+  return px * px + py * py;
+}
+
+function findNearestAnchorSegmentIndex(
+  point: ManualGeometryOverridePoint,
+  anchors: ManualGeometryOverridePoint[],
+) {
+  if (anchors.length < 2) return 0;
+
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+
+  for (let index = 0; index < anchors.length - 1; index += 1) {
+    const start = anchors[index];
+    const end = anchors[index + 1];
+    if (!start || !end) continue;
+
+    const distance = distanceToCoordinateSegmentSquared(point, start, end);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+
+  return bestIndex;
+}
+
+function coordinateSegmentProgress(
+  point: ManualGeometryOverridePoint,
+  start: ManualGeometryOverridePoint,
+  end: ManualGeometryOverridePoint,
+) {
+  const dx = end.lng - start.lng;
+  const dy = end.lat - start.lat;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) return 0;
+  return Math.max(
+    0,
+    Math.min(
+      1,
+      ((point.lng - start.lng) * dx + (point.lat - start.lat) * dy) /
+        lengthSquared,
+    ),
+  );
+}
+
+function getReusableManualControlPoints(
+  previous: ManualGeometryOverride | undefined,
+  anchors: ManualGeometryOverridePoint[],
+) {
+  if (!previous?.points.length || anchors.length < 2) return [];
+
+  const stationPointIds = new Set(
+    previous.points
+      .filter((point) => point.kind === "station" && point.stationId)
+      .map((point) => point.stationId),
+  );
+  const anchorIds = new Set(
+    anchors
+      .map((point) => point.stationId)
+      .filter((stationId): stationId is string => Boolean(stationId)),
+  );
+  const hasRecognizableStationAnchors = [...anchorIds].some((stationId) =>
+    stationPointIds.has(stationId),
+  );
+
+  // 13.11 initially converted auto-smoothed render samples into editable
+  // control points. Those legacy overrides have no stationId-backed anchors,
+  // so they are intentionally reset to route-stop station anchors here.
+  if (!hasRecognizableStationAnchors) return [];
+
+  return previous.points.filter(
+    (point) =>
+      point.kind === "control" &&
+      Number.isFinite(point.lng) &&
+      Number.isFinite(point.lat),
+  );
+}
+
+function insertManualControlsBetweenAnchors(
+  anchors: ManualGeometryOverridePoint[],
+  controls: ManualGeometryOverridePoint[],
+) {
+  if (anchors.length < 2 || controls.length < 1) return anchors;
+
+  const controlsBySegment = new Map<number, ManualGeometryOverridePoint[]>();
+
+  for (const control of controls) {
+    const segmentIndex = findNearestAnchorSegmentIndex(control, anchors);
+    const segmentControls = controlsBySegment.get(segmentIndex) ?? [];
+    segmentControls.push(control);
+    controlsBySegment.set(segmentIndex, segmentControls);
+  }
+
+  const result: ManualGeometryOverridePoint[] = [];
+
+  for (let index = 0; index < anchors.length; index += 1) {
+    const anchor = anchors[index];
+    if (!anchor) continue;
+    result.push(anchor);
+
+    const nextAnchor = anchors[index + 1];
+    const segmentControls = controlsBySegment.get(index);
+    if (!nextAnchor || !segmentControls?.length) continue;
+
+    segmentControls.sort(
+      (left, right) =>
+        coordinateSegmentProgress(left, anchor, nextAnchor) -
+        coordinateSegmentProgress(right, anchor, nextAnchor),
+    );
+    result.push(...segmentControls);
+  }
+
+  return result;
+}
+
 function makeGeometryDraftFromBranch(
   branch: EditorMapBranch,
   previous?: ManualGeometryOverride,
 ): GeometryDraft {
-  const points = previous?.points.length
-    ? previous.points
-    : branchCoordinates(branch).map((coordinates, index, array) => ({
-        lng: coordinates[0],
-        lat: coordinates[1],
-        kind:
-          index === 0 || index === array.length - 1
-            ? ("station" as const)
-            : ("control" as const),
-      }));
+  const anchors = getBranchAnchorGeometryPoints(branch);
+  const controls = getReusableManualControlPoints(previous, anchors);
+  const points = insertManualControlsBetweenAnchors(anchors, controls);
 
   return {
     branchId: branch.id,
-    points,
+    points: points.length >= 2 ? points : anchors,
     note: previous?.note ?? "",
   };
 }
@@ -4397,6 +4550,9 @@ function BranchInspector({
   }
 
   function removePoint(index: number) {
+    const target = draft.points[index];
+    if (!target || target.kind === "station") return;
+
     onChange({
       ...draft,
       points: draft.points.filter((_, pointIndex) => pointIndex !== index),
@@ -4404,19 +4560,30 @@ function BranchInspector({
   }
 
   function addControlPoint() {
-    const last = draft.points.at(-1) ?? {
-      lng: 127.3,
-      lat: 36.35,
-      kind: "control" as const,
-    };
+    const insertIndex = Math.max(1, draft.points.length - 1);
+    const previousPoint = draft.points[insertIndex - 1] ?? draft.points[0];
+    const nextPoint = draft.points[insertIndex] ?? previousPoint;
+
+    const lng = previousPoint && nextPoint
+      ? (previousPoint.lng + nextPoint.lng) / 2
+      : 127.3;
+    const lat = previousPoint && nextPoint
+      ? (previousPoint.lat + nextPoint.lat) / 2
+      : 36.35;
+
     onChange({
       ...draft,
       points: [
-        ...draft.points,
-        { lng: last.lng, lat: last.lat, kind: "control" },
+        ...draft.points.slice(0, insertIndex),
+        { lng, lat, kind: "control" as const },
+        ...draft.points.slice(insertIndex),
       ],
     });
   }
+
+  const controlPointEntries = draft.points
+    .map((point, index) => ({ point, index }))
+    .filter((entry) => entry.point.kind === "control");
 
   return (
     <div className="grid gap-3">
@@ -4669,15 +4836,23 @@ function BranchInspector({
       <div className="grid gap-2 rounded-3xl border border-slate-200 p-2">
         <div className="flex items-center justify-between px-1">
           <strong className="text-xs font-medium text-slate-600">
-            Geometry Points
+            수동 보정 정점
           </strong>
           <Button size="sm" variant="outline" onClick={addControlPoint}>
             <Plus className="mr-1 size-3" />
             추가
           </Button>
         </div>
+        <p className="px-1 text-[11px] font-medium leading-5 text-slate-500">
+          역은 고정 anchor로만 사용됩니다. 목록과 지도에는 사용자가 추가한 회색 보정 정점만 표시됩니다.
+        </p>
         <div className="grid max-h-80 gap-2 overflow-y-auto">
-          {draft.points.map((point, index) => (
+          {controlPointEntries.length === 0 ? (
+            <p className="rounded-2xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-400">
+              아직 추가된 수동 보정 정점이 없습니다. 지도에서 노선 구간을 드래그해 추가하세요.
+            </p>
+          ) : null}
+          {controlPointEntries.map(({ point, index }) => (
             <div
               key={`${index}:${point.lng}:${point.lat}`}
               className="grid gap-2 rounded-2xl bg-slate-50 p-2"
@@ -4690,7 +4865,7 @@ function BranchInspector({
                   size="icon"
                   variant="ghost"
                   onClick={() => removePoint(index)}
-                  disabled={draft.points.length <= 2}
+                  disabled={point.kind === "station"}
                 >
                   <Trash2 className="size-3" />
                 </Button>
