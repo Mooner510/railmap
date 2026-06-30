@@ -85,6 +85,15 @@ interface ManualGeometryOverride {
   note?: string | null;
 }
 
+interface ManualBranchStationExclusion {
+  id: string;
+  branchId: string;
+  stationId: string;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 interface ManualLineBranchGeometryPoint {
   lng: number;
   lat: number;
@@ -155,6 +164,7 @@ interface ManualOverlays {
   manualTransferEdges: ManualTransferEdge[];
   nonTransferStationIds?: string[];
   stationOverrides: ManualStationOverride[];
+  branchStationExclusions: ManualBranchStationExclusion[];
   lineBranchOverrides: ManualLineBranchOverride[];
   geometryOverrides: ManualGeometryOverride[];
 }
@@ -234,6 +244,9 @@ function readManualOverlays(): ManualOverlays {
       stationOverrides: Array.isArray(parsed.stationOverrides)
         ? parsed.stationOverrides
         : [],
+      branchStationExclusions: Array.isArray((parsed as { branchStationExclusions?: unknown }).branchStationExclusions)
+        ? ((parsed as { branchStationExclusions: ManualBranchStationExclusion[] }).branchStationExclusions)
+        : [],
       lineBranchOverrides: Array.isArray((parsed as { lineBranchOverrides?: unknown }).lineBranchOverrides)
         ? ((parsed as { lineBranchOverrides: ManualLineBranchOverride[] }).lineBranchOverrides)
         : [],
@@ -249,8 +262,47 @@ function readManualOverlays(): ManualOverlays {
     manualTransferEdges: [],
     nonTransferStationIds: [],
     stationOverrides: [],
+    branchStationExclusions: [],
     lineBranchOverrides: [],
     geometryOverrides: [],
+  };
+}
+
+function buildBranchStationExclusionIndex(exclusions: ManualBranchStationExclusion[]) {
+  const index = new Map<string, Set<string>>();
+
+  for (const exclusion of exclusions) {
+    if (exclusion.enabled === false) continue;
+    const set = index.get(exclusion.branchId) ?? new Set<string>();
+    set.add(exclusion.stationId);
+    index.set(exclusion.branchId, set);
+  }
+
+  return index;
+}
+
+function filterBranchRouteStops(branch: CanonicalBranch, exclusionIndex: Map<string, Set<string>>) {
+  const excludedStationIds = exclusionIndex.get(branch.id);
+  if (!excludedStationIds || excludedStationIds.size === 0) return branch.routeStops;
+  return branch.routeStops.filter((stop) => !excludedStationIds.has(stop.stationId));
+}
+
+function applyBranchStationExclusions(bundle: CanonicalBundle, exclusions: ManualBranchStationExclusion[]): CanonicalBundle {
+  const exclusionIndex = buildBranchStationExclusionIndex(exclusions);
+  if (exclusionIndex.size === 0) return bundle;
+
+  const lines = bundle.lines.map((line) => ({
+    ...line,
+    branches: line.branches.map((branch) => ({
+      ...branch,
+      routeStops: filterBranchRouteStops(branch, exclusionIndex),
+    })),
+  }));
+
+  return {
+    ...bundle,
+    lines,
+    routeStops: lines.flatMap((line) => line.branches.flatMap((branch) => branch.routeStops)),
   };
 }
 
@@ -299,7 +351,7 @@ function readBundle(): CanonicalBundle {
     manualOverlays.stationOverrides,
   );
 
-  return {
+  return applyBranchStationExclusions({
     ...bundle,
     stations,
     manualTransferGroups: manualOverlays.manualTransferGroups,
@@ -307,7 +359,7 @@ function readBundle(): CanonicalBundle {
       ...(bundle.manualTransferEdges ?? []),
       ...manualOverlays.manualTransferEdges,
     ].filter((edge) => edge.enabled),
-  };
+  }, manualOverlays.branchStationExclusions);
 }
 
 function toMapStations(stations: CanonicalStation[]): RailMapStation[] {
@@ -323,6 +375,7 @@ function toMapStations(stations: CanonicalStation[]): RailMapStation[] {
 function toMapBranches(
   bundle: CanonicalBundle,
   geometryOverrides: ManualGeometryOverride[],
+  branchStationExclusions: ManualBranchStationExclusion[],
 ): RailMapBranch[] {
   const stationById = new Map(
     bundle.stations.map((station) => [
@@ -336,6 +389,7 @@ function toMapBranches(
       } satisfies RailMapStation,
     ]),
   );
+  const exclusionByBranchId = buildBranchStationExclusionIndex(branchStationExclusions);
   const overrideByBranchId = new Map(
     geometryOverrides
       .filter(
@@ -357,6 +411,7 @@ function toMapBranches(
         sourceLineNumber: branch.sourceLineNumber,
         sourceLineName: branch.sourceLineName,
         geometryOverrideCoordinates: override?.points
+          .filter((point) => !exclusionByBranchId.get(branch.id)?.has(point.stationId ?? ""))
           .filter(
             (point) => Number.isFinite(point.lng) && Number.isFinite(point.lat),
           )
@@ -396,7 +451,7 @@ export default function Home() {
       <RailExplorer
         bundle={bundle}
         mapStations={toMapStations(bundle.stations)}
-        mapBranches={toMapBranches(bundle, manualOverlays.geometryOverrides)}
+        mapBranches={toMapBranches(bundle, manualOverlays.geometryOverrides, manualOverlays.branchStationExclusions)}
         lineBranchOverrides={manualOverlays.lineBranchOverrides}
         transferGroups={toMapTransferGroups(
           manualOverlays.manualTransferGroups,

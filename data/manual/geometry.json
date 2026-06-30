@@ -1,6 +1,58 @@
 {
   "schemaVersion": 1,
   "branchOverrides": [],
-  "lineBranchOverrides": [],
-  "geometryOverrides": []
+  "lineBranchOverrides": [
+    {
+      "id": "manual-line-branch:connect-line:01:1:main:I4101:수도권 광역철도 1호선:0:candidate:kric:urban-rail-station:I4101:0124:row-993:01:1:branch:I4102:경원선:1:candidate:kric:urban-rail-station:I4102:1014:row-991",
+      "mode": "connect-line",
+      "parentBranchId": "01:1:main:I4101:수도권 광역철도 1호선:0",
+      "anchorStationId": "candidate:kric:urban-rail-station:I4101:0124:row-993",
+      "connectedBranchId": "01:1:branch:I4102:경원선:1",
+      "connectedEndpointStationId": "candidate:kric:urban-rail-station:I4102:1014:row-991",
+      "geometry": [
+        {
+          "lng": 127.045063,
+          "lat": 37.580148,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4101:0124:row-993"
+        },
+        {
+          "lng": 127.048077,
+          "lat": 37.580543,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4102:1014:row-991"
+        }
+      ],
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    },
+    {
+      "id": "manual-line-branch:connect-line:01:1:branch:I1101:경인선:2:candidate:kric:urban-rail-station:I1101:1813:row-139:01:1:branch:I4101:경부선:3:candidate:kric:urban-rail-station:I4101:1701:row-125",
+      "mode": "connect-line",
+      "parentBranchId": "01:1:branch:I1101:경인선:2",
+      "anchorStationId": "candidate:kric:urban-rail-station:I1101:1813:row-139",
+      "connectedBranchId": "01:1:branch:I4101:경부선:3",
+      "connectedEndpointStationId": "candidate:kric:urban-rail-station:I4101:1701:row-125",
+      "geometry": [
+        {
+          "lng": 126.869201,
+          "lat": 37.495973,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I1101:1813:row-139"
+        },
+        {
+          "lng": 126.882037,
+          "lat": 37.503178,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4101:1701:row-125"
+        }
+      ],
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    }
+  ],
+  "geometryOverrides": [],
+  "branchStationExclusions": []
 }

@@ -5,6 +5,7 @@ import {
   deriveTransferEdgesFromGroups,
   makeTransferPairKey,
   type ManualOverlayBundle,
+  type ManualBranchStationExclusion,
   type ManualGeometryOverride,
   type ManualGeometryOverridePoint,
   type ManualLineBranchDirection,
@@ -138,6 +139,24 @@ function normalizeStationOverride(value: unknown): ManualStationOverride | null 
   };
 }
 
+
+function normalizeBranchStationExclusion(value: unknown): ManualBranchStationExclusion | null {
+  if (!value || typeof value !== "object") return null;
+
+  const exclusion = value as Record<string, unknown>;
+  const branchId = asString(exclusion.branchId);
+  const stationId = asString(exclusion.stationId);
+  if (!branchId || !stationId) return null;
+
+  return {
+    id: asString(exclusion.id) ?? `manual-branch-station-exclusion:${branchId}:${stationId}`,
+    branchId,
+    stationId,
+    enabled: exclusion.enabled !== false,
+    source: asString(exclusion.source) ?? "editor",
+    note: asNullableString(exclusion.note),
+  };
+}
 
 function normalizeLineBranchGeometryPoint(value: unknown): ManualLineBranchGeometryPoint | null {
   if (!value || typeof value !== "object") return null;
@@ -286,6 +305,9 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
       ? data.stationOverrides.map(normalizeStationOverride).filter((override): override is ManualStationOverride => override !== null)
       : [],
     branchOverrides: Array.isArray(data.branchOverrides) ? data.branchOverrides : [],
+    branchStationExclusions: Array.isArray((data as { branchStationExclusions?: unknown }).branchStationExclusions)
+      ? (data as { branchStationExclusions: unknown[] }).branchStationExclusions.map(normalizeBranchStationExclusion).filter((exclusion): exclusion is ManualBranchStationExclusion => exclusion !== null)
+      : [],
     lineBranchOverrides: Array.isArray((data as { lineBranchOverrides?: unknown }).lineBranchOverrides)
       ? (data as { lineBranchOverrides: unknown[] }).lineBranchOverrides.map(normalizeLineBranchOverride).filter((override): override is ManualLineBranchOverride => override !== null)
       : [],
@@ -335,6 +357,7 @@ async function writeManualOverlaySplitFiles(overlays: ManualOverlayBundle) {
     writeJson(paths.geometry, {
       schemaVersion: overlays.schemaVersion,
       branchOverrides: overlays.branchOverrides,
+      branchStationExclusions: overlays.branchStationExclusions,
       lineBranchOverrides: overlays.lineBranchOverrides,
       geometryOverrides: overlays.geometryOverrides,
     }),

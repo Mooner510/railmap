@@ -45,6 +45,7 @@ import {
 } from "react";
 import type {
   EditorStation,
+  ManualBranchStationExclusion,
   ManualGeometryOverride,
   ManualGeometryOverridePoint,
   ManualLineBranchOverride,
@@ -54,6 +55,7 @@ import type {
 } from "../editorModel";
 import {
   EMPTY_MANUAL_OVERLAY_BUNDLE,
+  makeBranchStationExclusionId,
   makeLineBranchOverrideId,
   makeTransferGroupId,
   makeTransferPairKey,
@@ -640,6 +642,29 @@ function validateLineBranchOverrides(
   return issues;
 }
 
+function validateBranchStationExclusions(
+  overlays: ManualOverlayBundle,
+  branches: EditorMapBranch[],
+  stationById: Map<string, EditorStation>,
+): LineBranchValidationIssue[] {
+  const issues: LineBranchValidationIssue[] = [];
+  const branchById = new Map(branches.map((branch) => [branch.id, branch]));
+
+  for (const exclusion of overlays.branchStationExclusions ?? []) {
+    if (exclusion.enabled === false) continue;
+    const branch = branchById.get(exclusion.branchId);
+    if (!branch) {
+      issues.push({ id: `${exclusion.id}:branch`, message: `역 제거 대상 노선을 찾을 수 없음: ${exclusion.branchId}` });
+      continue;
+    }
+
+    if (!stationById.has(exclusion.stationId)) {
+      issues.push({ id: `${exclusion.id}:station`, message: `제거 대상 역을 찾을 수 없음: ${exclusion.stationId}` });
+    }
+  }
+
+  return issues;
+}
 
 function formatBranchDisplayName(branch: EditorMapBranch | null | undefined) {
   if (!branch) return "알 수 없는 노선";
@@ -1247,7 +1272,10 @@ export default function UnifiedMapEditor({
     [data.branches],
   );
   const lineBranchIssues = useMemo(
-    () => validateLineBranchOverrides(overlays, data.branches, stationById),
+    () => [
+      ...validateLineBranchOverrides(overlays, data.branches, stationById),
+      ...validateBranchStationExclusions(overlays, data.branches, stationById),
+    ],
     [data.branches, overlays, stationById],
   );
   const groupById = useMemo(
@@ -2197,6 +2225,20 @@ export default function UnifiedMapEditor({
     await persist(command.after, `다시 실행: ${command.label}`);
   }
 
+  async function reloadEditorData() {
+    try {
+      const response = await fetch("/api/editor-data", { cache: "no-store" });
+      if (!response.ok) throw new Error(await response.text());
+      const nextData = (await response.json()) as UnifiedEditorData;
+      setData(nextData);
+      setOverlays(nextData.overlays);
+      return nextData;
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "에디터 데이터 갱신 실패", "error");
+      return null;
+    }
+  }
+
   async function saveStationDraft() {
     if (!stationDraft) return;
     const next: ManualOverlayBundle = {
@@ -2467,6 +2509,56 @@ export default function UnifiedMapEditor({
     setSidebarTab("validation");
   }
 
+  async function createBranchStationExclusion(branchId: string, stationId: string) {
+    const branch = branchById.get(branchId);
+    const station = stationById.get(stationId);
+
+    if (!branch || !station) {
+      showToast("역 제거에 필요한 노선/역을 찾지 못했습니다", "error");
+      return;
+    }
+
+    if (!getBranchStationIds(branch).includes(stationId)) {
+      showToast("선택한 역이 이 노선에 없습니다", "error");
+      return;
+    }
+
+    const override: ManualBranchStationExclusion = {
+      id: makeBranchStationExclusionId(branchId, stationId),
+      branchId,
+      stationId,
+      enabled: true,
+      source: "editor",
+      note: null,
+    };
+
+    const next: ManualOverlayBundle = {
+      ...overlays,
+      branchStationExclusions: [
+        ...overlays.branchStationExclusions.filter((candidate) => candidate.id !== override.id),
+        override,
+      ],
+    };
+
+    const saved = await executeOverlayCommand("노선 역 제거", next, "노선에서 역 제거 완료");
+    if (!saved) return;
+    await reloadEditorData();
+    setSelection({ type: "branch", id: branchId });
+    setSidebarTab("validation");
+  }
+
+  async function deleteBranchStationExclusion(id: string) {
+    const next: ManualOverlayBundle = {
+      ...overlays,
+      branchStationExclusions: overlays.branchStationExclusions.filter((override) => override.id !== id),
+    };
+
+    const saved = await executeOverlayCommand("노선 역 제거 해제", next, "노선 역 제거 해제 완료");
+    if (!saved) return;
+    await reloadEditorData();
+    setSidebarTab("validation");
+  }
+
   const selectedStation =
     selection.type === "station"
       ? (stationById.get(selection.id) ?? null)
@@ -2695,7 +2787,7 @@ export default function UnifiedMapEditor({
 
             {sidebarTab === "validation" ? (
               <LineBranchValidationPanel
-                count={overlays.lineBranchOverrides?.length ?? 0}
+                count={(overlays.lineBranchOverrides?.length ?? 0) + (overlays.branchStationExclusions?.length ?? 0)}
                 issues={lineBranchIssues}
               />
             ) : null}
@@ -2807,6 +2899,7 @@ export default function UnifiedMapEditor({
                 draft={geometryDraft}
                 branches={data.branches}
                 lineBranchOverrides={overlays.lineBranchOverrides}
+                branchStationExclusions={overlays.branchStationExclusions}
                 unassignedStations={unassignedStations}
                 onChange={setGeometryDraft}
                 onSave={() => void saveGeometryDraft()}
@@ -2833,6 +2926,10 @@ export default function UnifiedMapEditor({
                   )
                 }
                 onDeleteLineBranch={(id) => void deleteLineBranchOverride(id)}
+                onExcludeBranchStation={(stationId) =>
+                  void createBranchStationExclusion(selectedBranch.id, stationId)
+                }
+                onRestoreBranchStation={(id) => void deleteBranchStationExclusion(id)}
               />
             ) : null}
             {selectedGroup && transferDraft ? (
@@ -3131,6 +3228,7 @@ function BranchInspector({
   draft,
   branches,
   lineBranchOverrides,
+  branchStationExclusions,
   unassignedStations,
   onChange,
   onSave,
@@ -3138,11 +3236,14 @@ function BranchInspector({
   onCreateAddStation,
   onCreateConnectLine,
   onDeleteLineBranch,
+  onExcludeBranchStation,
+  onRestoreBranchStation,
 }: {
   branch: EditorMapBranch;
   draft: GeometryDraft;
   branches: EditorMapBranch[];
   lineBranchOverrides: ManualLineBranchOverride[];
+  branchStationExclusions: ManualBranchStationExclusion[];
   unassignedStations: EditorStation[];
   onChange: (draft: GeometryDraft) => void;
   onSave: () => void;
@@ -3155,6 +3256,8 @@ function BranchInspector({
     connectedDirection: LineBranchDirection,
   ) => void;
   onDeleteLineBranch: (id: string) => void;
+  onExcludeBranchStation: (stationId: string) => void;
+  onRestoreBranchStation: (id: string) => void;
 }) {
   const branchStations = getBranchStopStations(branch);
   const connectAnchorStations = branchStations;
@@ -3188,6 +3291,9 @@ function BranchInspector({
   );
   const [connectDirection, setConnectDirection] = useState<LineBranchDirection>("toward-end");
   const connectDirectionOptions = getBranchDirectionOptions(selectedConnectBranch, connectEndpointStationId);
+  const branchStationExclusionsForBranch = branchStationExclusions.filter((exclusion) => exclusion.enabled !== false && exclusion.branchId === branch.id);
+  const excludedStationIds = new Set(branchStationExclusionsForBranch.map((exclusion) => exclusion.stationId));
+  const [excludeStationId, setExcludeStationId] = useState(branchStations.find((station) => !excludedStationIds.has(station.id))?.id ?? "");
 
   useEffect(() => {
     if (!branchStations.some((station) => station.id === addAnchorStationId))
@@ -3222,6 +3328,12 @@ function BranchInspector({
     if (!connectDirectionOptions.some((option) => option.value === connectDirection))
       setConnectDirection(connectDirectionOptions[0]?.value ?? "toward-end");
   }, [connectDirection, connectDirectionOptions]);
+
+  useEffect(() => {
+    if (!branchStations.some((station) => station.id === excludeStationId && !excludedStationIds.has(station.id))) {
+      setExcludeStationId(branchStations.find((station) => !excludedStationIds.has(station.id))?.id ?? "");
+    }
+  }, [branchStations, excludeStationId, excludedStationIds]);
 
   function updatePoint(
     index: number,
@@ -3275,6 +3387,58 @@ function BranchInspector({
       <InfoRow label="기점" value={branch.origin ?? "-"} />
       <InfoRow label="종점" value={branch.terminal ?? "-"} />
       <InfoRow label="Route stops" value={`${branch.routeStopCount}개`} />
+
+      <div className="grid gap-3 rounded-3xl border border-amber-100 bg-amber-50/70 p-3">
+        <div>
+          <strong className="text-xs font-semibold text-amber-800">
+            노선에서 역 제거
+          </strong>
+          <p className="mt-1 text-[11px] font-medium text-amber-700">
+            본선에 잘못 포함된 역을 이 노선에서 제외합니다. 제외된 역은 지선 역 추가 후보로 다시 사용할 수 있습니다.
+          </p>
+        </div>
+        <Field label="제거할 역">
+          <select
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+            value={excludeStationId}
+            onChange={(event) => setExcludeStationId(event.target.value)}
+            disabled={branchStations.filter((station) => !excludedStationIds.has(station.id)).length === 0}
+          >
+            {branchStations.filter((station) => !excludedStationIds.has(station.id)).length === 0 ? (
+              <option value="">제거 가능한 역 없음</option>
+            ) : (
+              branchStations
+                .filter((station) => !excludedStationIds.has(station.id))
+                .map((station) => (
+                  <option key={station.id} value={station.id}>
+                    {station.nameKo} · {station.lineNameKo}
+                  </option>
+                ))
+            )}
+          </select>
+        </Field>
+        <Button disabled={!excludeStationId} variant="outline" onClick={() => onExcludeBranchStation(excludeStationId)}>
+          <Trash2 className="mr-1 size-4" />
+          이 노선에서 역 제거
+        </Button>
+        {branchStationExclusionsForBranch.length > 0 ? (
+          <div className="grid gap-2">
+            {branchStationExclusionsForBranch.map((exclusion) => {
+              const station = [...branchStations, ...unassignedStations].find((candidate) => candidate.id === exclusion.stationId);
+              return (
+                <div key={exclusion.id} className="flex items-center justify-between gap-2 rounded-2xl bg-white/75 px-3 py-2">
+                  <span className="min-w-0 truncate text-xs font-semibold text-amber-800">
+                    제거됨 · {formatStationDisplayName(station)}
+                  </span>
+                  <Button size="sm" variant="outline" onClick={() => onRestoreBranchStation(exclusion.id)}>
+                    복원
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
 
       <div className="grid gap-3 rounded-3xl border border-blue-100 bg-blue-50/60 p-3">
         <div>
