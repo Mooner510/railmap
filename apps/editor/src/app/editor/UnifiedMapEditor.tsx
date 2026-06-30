@@ -555,7 +555,6 @@ function smoothCoordinateRange(
   return startIndex <= endIndex ? result : [...result].reverse();
 }
 
-
 function cubicBezierPoint(
   start: LngLatTuple,
   control1: LngLatTuple,
@@ -624,18 +623,26 @@ function buildSmoothConnectionCurve(
         start[0] + startDirection[0] * controlDistance,
         start[1] + startDirection[1] * controlDistance,
       ]
-    : [start[0] + (end[0] - start[0]) * 0.33, start[1] + (end[1] - start[1]) * 0.33];
+    : [
+        start[0] + (end[0] - start[0]) * 0.33,
+        start[1] + (end[1] - start[1]) * 0.33,
+      ];
   const control2: LngLatTuple = endDirection
     ? [
         end[0] - endDirection[0] * controlDistance,
         end[1] - endDirection[1] * controlDistance,
       ]
-    : [start[0] + (end[0] - start[0]) * 0.66, start[1] + (end[1] - start[1]) * 0.66];
+    : [
+        start[0] + (end[0] - start[0]) * 0.66,
+        start[1] + (end[1] - start[1]) * 0.66,
+      ];
 
   const coordinates: LngLatTuple[] = [start];
   const segments = 28;
   for (let step = 1; step <= segments; step += 1) {
-    coordinates.push(cubicBezierPoint(start, control1, control2, end, step / segments));
+    coordinates.push(
+      cubicBezierPoint(start, control1, control2, end, step / segments),
+    );
   }
   return coordinates;
 }
@@ -935,7 +942,8 @@ function getConnectedBranchTangentCoordinate(
   const context = getBranchStationCoordinatePoint(branch, stationId);
   if (!context) return null;
 
-  const nextIndex = direction === "toward-start" ? context.index - 1 : context.index + 1;
+  const nextIndex =
+    direction === "toward-start" ? context.index - 1 : context.index + 1;
   return context.points[nextIndex]?.coordinate ?? null;
 }
 
@@ -3200,6 +3208,20 @@ export default function UnifiedMapEditor({
                     selectedStation.id,
                   )
                 }
+                onCreateConnectLineBranch={(
+                  parentBranchId,
+                  connectedBranchId,
+                  connectedEndpointStationId,
+                  connectedDirection,
+                ) =>
+                  void createConnectLineBranch(
+                    parentBranchId,
+                    selectedStation.id,
+                    connectedBranchId,
+                    connectedEndpointStationId,
+                    connectedDirection,
+                  )
+                }
               />
             ) : null}
             {selectedBranch && geometryDraft ? (
@@ -3415,6 +3437,7 @@ function StationInspector({
   branchAddOptions,
   onExcludeFromBranch,
   onCreateAddStationBranch,
+  onCreateConnectLineBranch,
 }: {
   station: EditorStation;
   draft: ManualStationOverride;
@@ -3429,6 +3452,12 @@ function StationInspector({
   branchAddOptions: EditorMapBranch[];
   onExcludeFromBranch: (branchId: string) => void;
   onCreateAddStationBranch: (branchId: string, anchorStationId: string) => void;
+  onCreateConnectLineBranch: (
+    parentBranchId: string,
+    connectedBranchId: string,
+    connectedEndpointStationId: string,
+    connectedDirection: LineBranchDirection,
+  ) => void;
 }) {
   const [removeBranchId, setRemoveBranchId] = useState(
     branchRemovalOptions[0]?.id ?? "",
@@ -3446,6 +3475,38 @@ function StationInspector({
     addAnchorStations[0]?.id ?? "",
   );
   const canAddToBranch = branchRemovalOptions.length === 0;
+  const endpointConnectOptions = branchRemovalOptions.filter((branch) =>
+    getBranchEndpointStations(branch).some(
+      (candidate) => candidate.id === station.id,
+    ),
+  );
+  const [connectParentBranchId, setConnectParentBranchId] = useState(
+    endpointConnectOptions[0]?.id ?? "",
+  );
+  const connectParentBranch =
+    endpointConnectOptions.find(
+      (branch) => branch.id === connectParentBranchId,
+    ) ?? null;
+  const connectOtherBranches = branchAddOptions.filter(
+    (branch) => branch.id !== connectParentBranchId,
+  );
+  const [connectBranchId, setConnectBranchId] = useState(
+    connectOtherBranches[0]?.id ?? "",
+  );
+  const selectedConnectBranch =
+    branchAddOptions.find((branch) => branch.id === connectBranchId) ?? null;
+  const connectEndpointStations = selectedConnectBranch
+    ? getBranchStopStations(selectedConnectBranch)
+    : [];
+  const [connectEndpointStationId, setConnectEndpointStationId] = useState(
+    connectEndpointStations[0]?.id ?? "",
+  );
+  const [connectDirection, setConnectDirection] =
+    useState<LineBranchDirection>("toward-end");
+  const connectDirectionOptions = getBranchDirectionOptions(
+    selectedConnectBranch,
+    connectEndpointStationId,
+  );
 
   useEffect(() => {
     if (!branchRemovalOptions.some((branch) => branch.id === removeBranchId)) {
@@ -3468,6 +3529,42 @@ function StationInspector({
       setAddAnchorStationId(addAnchorStations[0]?.id ?? "");
     }
   }, [addAnchorStationId, addAnchorStations]);
+
+  useEffect(() => {
+    if (
+      !endpointConnectOptions.some(
+        (branch) => branch.id === connectParentBranchId,
+      )
+    ) {
+      setConnectParentBranchId(endpointConnectOptions[0]?.id ?? "");
+    }
+  }, [connectParentBranchId, endpointConnectOptions]);
+
+  useEffect(() => {
+    if (!connectOtherBranches.some((branch) => branch.id === connectBranchId)) {
+      setConnectBranchId(connectOtherBranches[0]?.id ?? "");
+    }
+  }, [connectBranchId, connectOtherBranches]);
+
+  useEffect(() => {
+    if (
+      !connectEndpointStations.some(
+        (candidate) => candidate.id === connectEndpointStationId,
+      )
+    ) {
+      setConnectEndpointStationId(connectEndpointStations[0]?.id ?? "");
+    }
+  }, [connectEndpointStationId, connectEndpointStations]);
+
+  useEffect(() => {
+    if (
+      !connectDirectionOptions.some(
+        (option) => option.value === connectDirection,
+      )
+    ) {
+      setConnectDirection(connectDirectionOptions[0]?.value ?? "toward-end");
+    }
+  }, [connectDirection, connectDirectionOptions]);
 
   return (
     <div className="grid gap-4">
@@ -3631,6 +3728,110 @@ function StationInspector({
           </Button>
         </div>
       )}
+      {endpointConnectOptions.length > 0 ? (
+        <div className="grid gap-3 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-3">
+          <div>
+            <strong className="text-xs font-semibold text-emerald-800">
+              이 역에서 노선 결합
+            </strong>
+            <p className="mt-1 text-[11px] font-medium text-emerald-700">
+              선택한 역이 노선의 시작/끝 역인 경우, 이 역을 기준으로 다른 노선과
+              지선 결합을 생성합니다.
+            </p>
+          </div>
+          <Field label="기준 노선">
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+              value={connectParentBranchId}
+              onChange={(event) => setConnectParentBranchId(event.target.value)}
+            >
+              {endpointConnectOptions.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {formatBranchDisplayName(branch)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="연결할 노선">
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+              value={connectBranchId}
+              onChange={(event) => setConnectBranchId(event.target.value)}
+              disabled={
+                !connectParentBranch || connectOtherBranches.length === 0
+              }
+            >
+              {connectOtherBranches.length === 0 ? (
+                <option value="">연결 가능한 노선 없음</option>
+              ) : (
+                connectOtherBranches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {formatBranchDisplayName(branch)}
+                  </option>
+                ))
+              )}
+            </select>
+          </Field>
+          <Field label="연결 노선 연결 역">
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+              value={connectEndpointStationId}
+              onChange={(event) =>
+                setConnectEndpointStationId(event.target.value)
+              }
+              disabled={connectEndpointStations.length === 0}
+            >
+              {connectEndpointStations.length === 0 ? (
+                <option value="">연결 역 없음</option>
+              ) : (
+                connectEndpointStations.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.nameKo} · {candidate.lineNameKo}
+                  </option>
+                ))
+              )}
+            </select>
+          </Field>
+          <Field label="연결 방향">
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+              value={connectDirection}
+              onChange={(event) =>
+                setConnectDirection(event.target.value as LineBranchDirection)
+              }
+              disabled={connectDirectionOptions.length === 0}
+            >
+              {connectDirectionOptions.length === 0 ? (
+                <option value="toward-end">선택 가능한 방향 없음</option>
+              ) : (
+                connectDirectionOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))
+              )}
+            </select>
+          </Field>
+          <Button
+            disabled={
+              !connectParentBranchId ||
+              !connectBranchId ||
+              !connectEndpointStationId ||
+              connectDirectionOptions.length === 0
+            }
+            onClick={() =>
+              onCreateConnectLineBranch(
+                connectParentBranchId,
+                connectBranchId,
+                connectEndpointStationId,
+                connectDirection,
+              )
+            }
+          >
+            <Route className="mr-1 size-4" />이 역에서 노선 결합
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
