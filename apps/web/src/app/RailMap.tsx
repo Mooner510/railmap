@@ -776,6 +776,8 @@ interface RailMapProps {
   className?: string;
 }
 
+const TRANSFER_GROUP_EXPANDED_ZOOM = 13.8;
+
 const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
   [121.4, 30.9],
   [134.3, 43.1],
@@ -1312,7 +1314,7 @@ export default function RailMap({
             id: "transfer-group-areas-fill",
             type: "fill",
             source: "transfer-group-areas",
-            minzoom: 14.5,
+            minzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
             paint: {
               "fill-color": [
                 "case",
@@ -1333,7 +1335,7 @@ export default function RailMap({
             id: "transfer-group-areas-outline",
             type: "line",
             source: "transfer-group-areas",
-            minzoom: 14.5,
+            minzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
             paint: {
               "line-color": [
                 "case",
@@ -1350,7 +1352,7 @@ export default function RailMap({
             id: "transfer-group-collapsed-hit",
             type: "circle",
             source: "transfer-group-icons",
-            maxzoom: 14.5,
+            maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
             paint: {
               "circle-radius": 22,
               "circle-color": "rgba(0,0,0,0)",
@@ -1362,7 +1364,7 @@ export default function RailMap({
             id: "transfer-group-collapsed-casing",
             type: "circle",
             source: "transfer-group-icons",
-            maxzoom: 14.5,
+            maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
             paint: {
               "circle-color": "rgba(255,255,255,0)",
               "circle-radius": 0,
@@ -1375,7 +1377,7 @@ export default function RailMap({
             id: "transfer-group-collapsed-icon",
             type: "symbol",
             source: "transfer-group-icons",
-            maxzoom: 14.5,
+            maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
             layout: {
               "icon-image": "transfer-icon",
               "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.038, 0.034],
@@ -1389,7 +1391,7 @@ export default function RailMap({
             type: "symbol",
             source: "transfer-group-icons",
             minzoom: 12,
-            maxzoom: 14.5,
+            maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
             layout: {
               "text-field": ["get", "nameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
@@ -1427,7 +1429,7 @@ export default function RailMap({
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-                14.5,
+                TRANSFER_GROUP_EXPANDED_ZOOM,
                 0.96,
               ],
             },
@@ -1461,7 +1463,7 @@ export default function RailMap({
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-                14.5,
+                TRANSFER_GROUP_EXPANDED_ZOOM,
                 0.96,
               ],
             },
@@ -1489,7 +1491,7 @@ export default function RailMap({
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 0.92],
-                14.5,
+                TRANSFER_GROUP_EXPANDED_ZOOM,
                 0.92,
               ],
             },
@@ -1518,7 +1520,7 @@ export default function RailMap({
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
-                14.5,
+                TRANSFER_GROUP_EXPANDED_ZOOM,
                 1,
               ],
             },
