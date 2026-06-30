@@ -47,6 +47,15 @@ export interface ManualBranchOverride {
   note?: string | null;
 }
 
+export interface ManualBranchStationExclusion {
+  id: string;
+  branchId: string;
+  stationId: string;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 export type ManualLineBranchMode = "add-station" | "connect-line";
 export type ManualLineBranchDirection = "toward-start" | "toward-end";
 
@@ -93,6 +102,7 @@ export interface ManualOverlayBundle {
   nonTransferStationIds: string[];
   stationOverrides: ManualStationOverride[];
   branchOverrides: ManualBranchOverride[];
+  branchStationExclusions: ManualBranchStationExclusion[];
   lineBranchOverrides: ManualLineBranchOverride[];
   geometryOverrides: ManualGeometryOverride[];
 }
@@ -108,6 +118,7 @@ export const EMPTY_MANUAL_OVERLAY_BUNDLE: ManualOverlayBundle = {
   nonTransferStationIds: [],
   stationOverrides: [],
   branchOverrides: [],
+  branchStationExclusions: [],
   lineBranchOverrides: [],
   geometryOverrides: [],
 };
@@ -162,4 +173,8 @@ export function deriveTransferEdgesFromGroups(groups: ManualTransferGroup[]): Ma
 
 export function makeLineBranchOverrideId(mode: ManualLineBranchMode, parentBranchId: string, anchorStationId: string, targetId: string) {
   return `manual-line-branch:${mode}:${parentBranchId}:${anchorStationId}:${targetId}`;
+}
+
+export function makeBranchStationExclusionId(branchId: string, stationId: string) {
+  return `manual-branch-station-exclusion:${branchId}:${stationId}`;
 }

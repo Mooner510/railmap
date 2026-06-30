@@ -3,6 +3,7 @@ import { getBundlePath, readManualOverlays } from "./manualOverlayStore";
 import {
   normalizeSearchText,
   type EditorStation,
+  type ManualBranchStationExclusion,
   type ManualGeometryOverride,
   type ManualOverlayBundle,
   type ManualStationOverride,
@@ -163,8 +164,27 @@ function applyStationOverrides(stations: EditorStation[], overrides: ManualStati
   });
 }
 
-function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geometryOverrides: ManualGeometryOverride[]): EditorMapBranch[] {
+function buildBranchStationExclusionIndex(exclusions: ManualBranchStationExclusion[]) {
+  const index = new Map<string, Set<string>>();
+
+  for (const exclusion of exclusions) {
+    if (exclusion.enabled === false) continue;
+    const set = index.get(exclusion.branchId) ?? new Set<string>();
+    set.add(exclusion.stationId);
+    index.set(exclusion.branchId, set);
+  }
+
+  return index;
+}
+
+function shouldKeepRouteStop(stop: CanonicalRouteStop, excludedStationIds: Set<string> | undefined) {
+  const stationId = getRouteStopStationId(stop);
+  return !stationId || !excludedStationIds?.has(stationId);
+}
+
+function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geometryOverrides: ManualGeometryOverride[], branchStationExclusions: ManualBranchStationExclusion[]): EditorMapBranch[] {
   const stationById = new Map(stations.map((station) => [station.id, station]));
+  const exclusionByBranchId = buildBranchStationExclusionIndex(branchStationExclusions);
   const overrideByBranchId = new Map(
     geometryOverrides
       .filter((override) => override.enabled !== false && override.points.length >= 2)
@@ -173,12 +193,15 @@ function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geome
 
   return (bundle.lines ?? []).flatMap((line) =>
     (line.branches ?? []).map((branch) => {
+      const excludedStationIds = exclusionByBranchId.get(branch.id);
+      const routeStops = branch.routeStops.filter((stop) => shouldKeepRouteStop(stop, excludedStationIds));
       const geometryOverrideCoordinates = overrideByBranchId.get(branch.id)?.points
+        .filter((point) => !point.stationId || !excludedStationIds?.has(point.stationId))
         .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
         .map((point) => [point.lng, point.lat] as [number, number]);
       const geometryCoordinates = geometryOverrideCoordinates && geometryOverrideCoordinates.length >= 2
         ? geometryOverrideCoordinates
-        : branch.routeStops
+        : routeStops
             .map((stop) => {
               const stationId = getRouteStopStationId(stop);
               const station = stationId ? stationById.get(stationId) : null;
@@ -200,8 +223,8 @@ function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geome
         terminal: branch.terminal ?? null,
         geometryOverrideCoordinates,
         geometryCoordinates,
-        routeStopCount: branch.routeStops.length,
-        routeStops: branch.routeStops.map((stop) => {
+        routeStopCount: routeStops.length,
+        routeStops: routeStops.map((stop) => {
           const stationId = getRouteStopStationId(stop);
           const station = stationId ? stationById.get(stationId) ?? null : null;
 
@@ -247,7 +270,7 @@ export async function readUnifiedEditorData(): Promise<UnifiedEditorData> {
 
   return {
     stations,
-    branches: toMapBranches(bundle, stations, overlays.geometryOverrides),
+    branches: toMapBranches(bundle, stations, overlays.geometryOverrides, overlays.branchStationExclusions),
     lines: toMapLines(bundle.lines),
     overlays,
   };
