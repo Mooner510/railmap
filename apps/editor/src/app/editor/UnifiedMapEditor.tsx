@@ -74,64 +74,6 @@ type ToolMode = "select" | "box" | "geometry";
 type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
 
-function addTransferIconImage(map: MapLibreMap) {
-  if (map.hasImage("transfer-icon")) return;
-
-  const commitCanvas = (draw: (context: CanvasRenderingContext2D, size: number) => void) => {
-    if (map.hasImage("transfer-icon")) return;
-    const size = 128;
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    context.clearRect(0, 0, size, size);
-    draw(context, size);
-    const imageData = context.getImageData(0, 0, size, size);
-    if (!map.hasImage("transfer-icon")) {
-      map.addImage("transfer-icon", imageData, { pixelRatio: 2 });
-    }
-  };
-
-  const drawFallback = (context: CanvasRenderingContext2D, size: number) => {
-    const center = size / 2;
-    const radius = size * 0.43;
-    context.beginPath();
-    context.arc(center, center, radius, 0, Math.PI * 2);
-    context.fillStyle = "#ffffff";
-    context.fill();
-    context.lineWidth = size * 0.08;
-    context.strokeStyle = "#334155";
-    context.stroke();
-    context.beginPath();
-    context.arc(center, center, radius * 0.76, -Math.PI / 2, Math.PI / 2);
-    context.fillStyle = "#cd2e3a";
-    context.fill();
-    context.beginPath();
-    context.arc(center, center, radius * 0.76, Math.PI / 2, Math.PI * 1.5);
-    context.fillStyle = "#0047a0";
-    context.fill();
-    context.beginPath();
-    context.arc(center, center - radius * 0.38, radius * 0.38, 0, Math.PI * 2);
-    context.fillStyle = "#0047a0";
-    context.fill();
-    context.beginPath();
-    context.arc(center, center + radius * 0.38, radius * 0.38, 0, Math.PI * 2);
-    context.fillStyle = "#cd2e3a";
-    context.fill();
-  };
-
-  const image = new Image();
-  image.onload = () => {
-    commitCanvas((context, size) => context.drawImage(image, 0, 0, size, size));
-  };
-  image.onerror = () => {
-    commitCanvas(drawFallback);
-  };
-  image.src = "/transfer.svg";
-}
-
-
 type ContextMenuState = {
   x: number;
   y: number;
@@ -359,11 +301,11 @@ function buildTransferGroupCircleCoordinates(members: Array<EditorStation & { la
   const centerLat = members.reduce((sum, station) => sum + station.lat, 0) / members.length;
   const lngScale = Math.max(0.35, Math.cos((centerLat * Math.PI) / 180));
   const radius = Math.max(
-    0.00075,
+    0.0022,
     ...members.map((station) => {
       const dx = (station.lng - centerLng) * lngScale;
       const dy = station.lat - centerLat;
-      return Math.sqrt(dx * dx + dy * dy) * 1.18;
+      return Math.sqrt(dx * dx + dy * dy) * 1.45;
     }),
   );
 
@@ -1504,7 +1446,54 @@ export default function UnifiedMapEditor({
     );
 
     map.on("load", () => {
-      addTransferIconImage(map);
+      const transferIconImage = new Image(128, 128);
+      transferIconImage.onload = () => {
+        if (!map.hasImage("transfer-icon")) {
+          map.addImage("transfer-icon", transferIconImage, { pixelRatio: 2 });
+        }
+        map.triggerRepaint();
+      };
+      transferIconImage.onerror = () => {
+        const size = 128;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext("2d");
+        if (!context) return;
+      
+        const center = size / 2;
+        const radius = size * 0.42;
+        context.beginPath();
+        context.arc(center, center, radius, 0, Math.PI * 2);
+        context.fillStyle = "#f8fafc";
+        context.fill();
+        context.lineWidth = size * 0.05;
+        context.strokeStyle = "#475569";
+        context.stroke();
+        context.save();
+        context.beginPath();
+        context.arc(center, center, radius * 0.82, 0, Math.PI * 2);
+        context.clip();
+        context.fillStyle = "#cd2e3a";
+        context.fillRect(center - radius, center - radius, radius * 2, radius);
+        context.fillStyle = "#0047a0";
+        context.fillRect(center - radius, center, radius * 2, radius);
+        context.fillStyle = "#0047a0";
+        context.beginPath();
+        context.arc(center, center - radius * 0.42, radius * 0.42, 0, Math.PI * 2);
+        context.fill();
+        context.fillStyle = "#cd2e3a";
+        context.beginPath();
+        context.arc(center, center + radius * 0.42, radius * 0.42, 0, Math.PI * 2);
+        context.fill();
+        context.restore();
+      
+        if (!map.hasImage("transfer-icon")) {
+          map.addImage("transfer-icon", context.getImageData(0, 0, size, size), { pixelRatio: 2 });
+        }
+        map.triggerRepaint();
+      };
+      transferIconImage.src = "/transfer.svg";
 
       map.addSource("railmap-branches", {
         type: "geojson",
@@ -1581,7 +1570,6 @@ export default function UnifiedMapEditor({
         type: "fill",
         source: "railmap-transfer-group-areas",
         minzoom: 12,
-        maxzoom: 15,
         paint: {
           "fill-color": [
             "case",
@@ -1603,7 +1591,6 @@ export default function UnifiedMapEditor({
         type: "line",
         source: "railmap-transfer-group-areas",
         minzoom: 12,
-        maxzoom: 15,
         paint: {
           "line-color": [
             "case",
@@ -1620,9 +1607,9 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-hit",
         type: "circle",
         source: "railmap-transfer-group-icons",
-        maxzoom: 15,
+        maxzoom: 14.5,
         paint: {
-          "circle-radius": 12,
+          "circle-radius": 22,
           "circle-color": "#000000",
           "circle-opacity": 0.01,
         },
@@ -1632,10 +1619,10 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-casing",
         type: "circle",
         source: "railmap-transfer-group-icons",
-        maxzoom: 15,
+        maxzoom: 14.5,
         paint: {
           "circle-color": "#ffffff",
-          "circle-radius": ["case", ["==", ["get", "selected"], true], 7.2, 5.8],
+          "circle-radius": ["case", ["==", ["get", "selected"], true], 15, 13],
           "circle-stroke-color": [
             "case",
             ["==", ["get", "selected"], true],
@@ -1645,8 +1632,8 @@ export default function UnifiedMapEditor({
           "circle-stroke-width": [
             "case",
             ["==", ["get", "selected"], true],
-            1.8,
-            1.1,
+            2.4,
+            1.4,
           ],
           "circle-opacity": 0.96,
         },
@@ -1656,10 +1643,10 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-icon",
         type: "symbol",
         source: "railmap-transfer-group-icons",
-        maxzoom: 15,
+        maxzoom: 14.5,
         layout: {
           "icon-image": "transfer-icon",
-          "icon-size": ["case", ["==", ["get", "selected"], true], 0.038, 0.032],
+          "icon-size": ["case", ["==", ["get", "selected"], true], 0.26, 0.22],
           "icon-allow-overlap": true,
           "icon-ignore-placement": true,
         },
@@ -1670,7 +1657,7 @@ export default function UnifiedMapEditor({
         type: "symbol",
         source: "railmap-transfer-group-icons",
         minzoom: 12,
-        maxzoom: 15,
+        maxzoom: 14.5,
         layout: {
           "text-field": ["get", "nameKo"],
           "text-size": 11,
@@ -1715,7 +1702,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-            15,
+            14.5,
             0.96,
           ],
         },
@@ -1730,7 +1717,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 12],
-            15,
+            14.5,
             12,
           ],
           "circle-color": "#000000",
@@ -1781,7 +1768,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 0.92],
-            15.6,
+            14.5,
             0.92,
           ],
         },
@@ -1828,10 +1815,10 @@ export default function UnifiedMapEditor({
 
       if (!selectionBoxStartRef.current) {
         const queryLayers = [
-          "railmap-stations-hit",
-          "railmap-stations-circle",
           "railmap-transfer-group-hit",
           "railmap-transfer-group-area-fill",
+          "railmap-stations-hit",
+          "railmap-stations-circle",
           "railmap-selected-branches-line",
           "railmap-branches-line",
         ].filter((layerId) => map.getLayer(layerId));
@@ -1884,10 +1871,10 @@ export default function UnifiedMapEditor({
       }
 
       const queryLayers = [
-        "railmap-stations-hit",
-        "railmap-stations-circle",
         "railmap-transfer-group-hit",
         "railmap-transfer-group-area-fill",
+        "railmap-stations-hit",
+        "railmap-stations-circle",
         "railmap-selected-branches-line",
         "railmap-branches-line",
       ].filter((layerId) => map.getLayer(layerId));
@@ -1895,21 +1882,24 @@ export default function UnifiedMapEditor({
         queryLayers.length > 0
           ? map.queryRenderedFeatures(event.point, { layers: queryLayers })
           : [];
-      const stationId = firstFeatureId(features, [
-        "railmap-stations-hit",
-        "railmap-stations-circle",
-      ]);
-      if (stationId) {
-        selectStationFromMapRef.current(stationId);
-        return;
-      }
-
       const transferGroupId = firstFeatureId(features, [
         "railmap-transfer-group-hit",
         "railmap-transfer-group-area-fill",
       ]);
       if (transferGroupId) {
         selectTransferGroupFromMapRef.current(transferGroupId);
+        return;
+      }
+
+      const stationId = firstFeatureId(features, [
+        "railmap-stations-hit",
+        "railmap-stations-circle",
+      ]);
+      if (stationId) {
+        const transferGroup = stationTransferGroupIndex.get(stationId);
+        if (transferGroup)
+          selectTransferGroupFromMapRef.current(transferGroup.id);
+        else selectStationFromMapRef.current(stationId);
         return;
       }
 
@@ -1923,10 +1913,10 @@ export default function UnifiedMapEditor({
     map.on("contextmenu", (event) => {
       event.preventDefault();
       const queryLayers = [
-        "railmap-stations-hit",
-        "railmap-stations-circle",
         "railmap-transfer-group-hit",
         "railmap-transfer-group-area-fill",
+        "railmap-stations-hit",
+        "railmap-stations-circle",
         "railmap-selected-branches-line",
         "railmap-branches-line",
       ].filter((layerId) => map.getLayer(layerId));
