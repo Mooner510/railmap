@@ -930,11 +930,16 @@ function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
   const override = (branch.geometryOverrideCoordinates ?? []).filter(
     ([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat),
   ) as LngLatTuple[];
-  if (override.length >= 2) return override;
+  if (override.length >= 2) return smoothCoordinates(override);
 
-  return (branch.geometryCoordinates ?? []).filter(
+  const coordinates = (branch.geometryCoordinates ?? []).filter(
     ([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat),
   ) as LngLatTuple[];
+
+  if (coordinates.length < 2) return [];
+
+  const smoothed = smoothCoordinates(coordinates);
+  return smoothed.length >= 2 ? smoothed : coordinates;
 }
 
 function formatStationSubLabel(station: EditorStation) {
