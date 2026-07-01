@@ -82,6 +82,23 @@ function isValidCoordinate(
   );
 }
 
+type RailFeatureCollection = {
+  type: "FeatureCollection";
+  features: Array<{
+    type: "Feature";
+    properties: Record<string, unknown>;
+    geometry: {
+      type: "Point" | "LineString" | "Polygon";
+      coordinates: LngLatTuple | LngLatTuple[] | LngLatTuple[][];
+    };
+  }>;
+};
+
+const EMPTY_FEATURE_COLLECTION: RailFeatureCollection = {
+  type: "FeatureCollection",
+  features: [],
+};
+
 function getBranchCoordinates(branch: RailMapBranch): LngLatTuple[] {
   if (
     branch.geometryOverrideCoordinates &&
@@ -572,15 +589,17 @@ function buildStationFeatures(
   highlightedRouteStationIdSet: Set<string>,
   stationColorIndex: Map<string, string>,
   stationTransferGroupIndex: Map<string, RailMapTransferGroup>,
+  transferDetailVisible: boolean,
 ) {
   return {
     type: "FeatureCollection" as const,
-    features: stations.map((station) => {
+    features: stations.flatMap((station) => {
       const transferGroup = stationTransferGroupIndex.get(station.id) ?? null;
+      if (transferGroup && !transferDetailVisible) return [];
       const lineNameKo = station.lineNameKo ?? "";
       const isSelected = selectedStationId === station.id;
       const isRouteStation = highlightedRouteStationIdSet.has(station.id);
-      return {
+      return [{
         type: "Feature" as const,
         properties: {
           id: station.id,
@@ -601,7 +620,7 @@ function buildStationFeatures(
           type: "Point" as const,
           coordinates: [station.lng, station.lat] as LngLatTuple,
         },
-      };
+      }];
     }),
   };
 }
@@ -622,7 +641,7 @@ function buildStationTransferGroupIndex(
 }
 
 function isTransferDetailVisible(zoom: number) {
-  return zoom >= TRANSFER_DETAIL_SHOW_ZOOM;
+  return zoom >= TRANSFER_DETAIL_ZOOM_THRESHOLD;
 }
 
 function clampTransferGroupRadius(radius: number) {
@@ -788,11 +807,6 @@ interface RailMapProps {
 }
 
 const TRANSFER_DETAIL_ZOOM_THRESHOLD = 13.8;
-const TRANSFER_VISIBILITY_OVERLAP_ZOOM = 0.08;
-const TRANSFER_DETAIL_SHOW_ZOOM =
-  TRANSFER_DETAIL_ZOOM_THRESHOLD - TRANSFER_VISIBILITY_OVERLAP_ZOOM;
-const TRANSFER_COLLAPSED_HIDE_ZOOM =
-  TRANSFER_DETAIL_ZOOM_THRESHOLD + TRANSFER_VISIBILITY_OVERLAP_ZOOM;
 const TRANSFER_GROUP_AREA_MIN_RADIUS = 0.0018;
 const TRANSFER_GROUP_AREA_MAX_RADIUS = 0.012;
 const TRANSFER_GROUP_AREA_PADDING_RATIO = 1.55;
@@ -904,6 +918,7 @@ export default function RailMap({
   const mapRef = useRef<MapLibreMap | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [transferDetailVisible, setTransferDetailVisible] = useState(false);
   const branchesRef = useRef(branches);
   const stationsRef = useRef(stations);
   const onSelectBranchRef = useRef(onSelectBranch);
@@ -1112,6 +1127,7 @@ export default function RailMap({
         highlightedRouteStationIdSet,
         stationColorIndex,
         stationTransferGroupIndex,
+        transferDetailVisible,
       ),
     [
       highlightedRouteStationIdSet,
@@ -1119,6 +1135,7 @@ export default function RailMap({
       selectedStationId,
       stationColorIndex,
       stationTransferGroupIndex,
+      transferDetailVisible,
     ],
   );
   const stationFeaturesRef = useRef(stationFeatures);
@@ -1206,6 +1223,11 @@ export default function RailMap({
         map.on("load", () => {
           setMapReady(true);
           setMapError(null);
+          const syncTransferVisibilityMode = () => {
+            setTransferDetailVisible(isTransferDetailVisible(map.getZoom()));
+          };
+          syncTransferVisibilityMode();
+          map.on("zoomend", syncTransferVisibilityMode);
 
           const transferIconImage = new Image();
           transferIconImage.onload = () => {
@@ -1333,12 +1355,16 @@ export default function RailMap({
 
           map.addSource("transfer-group-areas", {
             type: "geojson",
-            data: transferGroupAreaFeaturesRef.current,
+            data: isTransferDetailVisible(map.getZoom())
+              ? transferGroupAreaFeaturesRef.current
+              : EMPTY_FEATURE_COLLECTION,
           });
 
           map.addSource("transfer-group-icons", {
             type: "geojson",
-            data: transferGroupIconFeaturesRef.current,
+            data: isTransferDetailVisible(map.getZoom())
+              ? EMPTY_FEATURE_COLLECTION
+              : transferGroupIconFeaturesRef.current,
           });
 
           map.addLayer({
@@ -1353,16 +1379,10 @@ export default function RailMap({
                 "#0f172a",
               ],
               "fill-opacity": [
-                "step",
-                ["zoom"],
-                0,
-                TRANSFER_DETAIL_SHOW_ZOOM,
-                [
-                  "case",
-                  ["==", ["get", "isSelected"], true],
-                  0.34,
-                  0.22,
-                ],
+                "case",
+                ["==", ["get", "isSelected"], true],
+                0.34,
+                0.22,
               ],
             },
           });
@@ -1378,20 +1398,8 @@ export default function RailMap({
                 "#2563eb",
                 "#64748b",
               ],
-              "line-width": [
-                "step",
-                ["zoom"],
-                0,
-                TRANSFER_DETAIL_SHOW_ZOOM,
-                ["case", ["==", ["get", "isSelected"], true], 3.4, 2.2],
-              ],
-              "line-opacity": [
-                "step",
-                ["zoom"],
-                0,
-                TRANSFER_DETAIL_SHOW_ZOOM,
-                0.9,
-              ],
+              "line-width": ["case", ["==", ["get", "isSelected"], true], 3.4, 2.2],
+              "line-opacity": 0.9,
             },
           });
 
@@ -1400,13 +1408,7 @@ export default function RailMap({
             type: "circle",
             source: "transfer-group-icons",
             paint: {
-              "circle-radius": [
-                "step",
-                ["zoom"],
-                22,
-                TRANSFER_COLLAPSED_HIDE_ZOOM,
-                0,
-              ],
+              "circle-radius": 22,
               "circle-color": "rgba(0,0,0,0)",
               "circle-opacity": 0,
               "circle-stroke-opacity": 0,
@@ -1437,13 +1439,7 @@ export default function RailMap({
               "icon-ignore-placement": true,
             },
             paint: {
-              "icon-opacity": [
-                "step",
-                ["zoom"],
-                1,
-                TRANSFER_COLLAPSED_HIDE_ZOOM,
-                0,
-              ],
+              "icon-opacity": 1,
             },
           });
 
@@ -1464,20 +1460,8 @@ export default function RailMap({
             paint: {
               "text-color": "#0f172a",
               "text-halo-color": "#ffffff",
-              "text-halo-width": [
-                "step",
-                ["zoom"],
-                1.5,
-                TRANSFER_COLLAPSED_HIDE_ZOOM,
-                0,
-              ],
-              "text-opacity": [
-                "step",
-                ["zoom"],
-                1,
-                TRANSFER_COLLAPSED_HIDE_ZOOM,
-                0,
-              ],
+              "text-halo-width": 1.5,
+              "text-opacity": 1,
             },
           });
 
@@ -1492,25 +1476,8 @@ export default function RailMap({
             source: "branch-preview-stations",
             paint: {
               "circle-color": "#ffffff",
-              "circle-radius": [
-                "step",
-                ["zoom"],
-                [
-                  "case",
-                  ["==", ["get", "isTransferChild"], true],
-                  0,
-                  ["case", ["==", ["get", "isEmphasized"], true], 7.2, 5.6],
-                ],
-                TRANSFER_DETAIL_SHOW_ZOOM,
-                ["case", ["==", ["get", "isEmphasized"], true], 7.2, 5.6],
-              ],
-              "circle-opacity": [
-                "step",
-                ["zoom"],
-                ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-                TRANSFER_DETAIL_SHOW_ZOOM,
-                0.96,
-              ],
+              "circle-radius": ["case", ["==", ["get", "isEmphasized"], true], 7.2, 5.6],
+              "circle-opacity": 0.96,
             },
           });
 
@@ -1520,18 +1487,7 @@ export default function RailMap({
             source: "branch-preview-stations",
             paint: {
               "circle-color": ["coalesce", ["get", "colorHex"], "#64748b"],
-              "circle-radius": [
-                "step",
-                ["zoom"],
-                [
-                  "case",
-                  ["==", ["get", "isTransferChild"], true],
-                  0,
-                  ["case", ["==", ["get", "isEmphasized"], true], 5.2, 3.8],
-                ],
-                TRANSFER_DETAIL_SHOW_ZOOM,
-                ["case", ["==", ["get", "isEmphasized"], true], 5.2, 3.8],
-              ],
+              "circle-radius": ["case", ["==", ["get", "isEmphasized"], true], 5.2, 3.8],
               "circle-stroke-color": [
                 "case",
                 ["==", ["get", "isSelected"], true],
@@ -1544,20 +1500,8 @@ export default function RailMap({
                 2.2,
                 1.2,
               ],
-              "circle-stroke-opacity": [
-                "step",
-                ["zoom"],
-                ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
-                TRANSFER_DETAIL_SHOW_ZOOM,
-                1,
-              ],
-              "circle-opacity": [
-                "step",
-                ["zoom"],
-                ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-                TRANSFER_DETAIL_SHOW_ZOOM,
-                0.96,
-              ],
+              "circle-stroke-opacity": 1,
+              "circle-opacity": 0.96,
             },
           });
 
@@ -1579,13 +1523,7 @@ export default function RailMap({
               "text-color": "#0f172a",
               "text-halo-color": "#ffffff",
               "text-halo-width": 1.4,
-              "text-opacity": [
-                "step",
-                ["zoom"],
-                ["case", ["==", ["get", "isTransferChild"], true], 0, 0.92],
-                TRANSFER_DETAIL_SHOW_ZOOM,
-                0.92,
-              ],
+              "text-opacity": 0.92,
             },
           });
 
@@ -1608,13 +1546,7 @@ export default function RailMap({
               "text-color": "#0f172a",
               "text-halo-color": "#ffffff",
               "text-halo-width": 1.6,
-              "text-opacity": [
-                "step",
-                ["zoom"],
-                ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
-                TRANSFER_DETAIL_SHOW_ZOOM,
-                1,
-              ],
+              "text-opacity": 1,
             },
           });
 
@@ -1696,7 +1628,7 @@ export default function RailMap({
             const props = feature?.properties as
               Record<string, unknown> | undefined;
             if (
-              map.getZoom() < TRANSFER_DETAIL_SHOW_ZOOM &&
+              map.getZoom() < TRANSFER_DETAIL_ZOOM_THRESHOLD &&
               props?.isTransferChild === true
             ) {
               return;
@@ -1836,9 +1768,18 @@ export default function RailMap({
     const iconSource = map.getSource("transfer-group-icons") as
       GeoJSONSource | undefined;
 
-    areaSource?.setData(transferGroupAreaFeatures);
-    iconSource?.setData(transferGroupIconFeatures);
-  }, [transferGroupAreaFeatures, transferGroupIconFeatures, mapReady]);
+    areaSource?.setData(
+      transferDetailVisible ? transferGroupAreaFeatures : EMPTY_FEATURE_COLLECTION,
+    );
+    iconSource?.setData(
+      transferDetailVisible ? EMPTY_FEATURE_COLLECTION : transferGroupIconFeatures,
+    );
+  }, [
+    transferDetailVisible,
+    transferGroupAreaFeatures,
+    transferGroupIconFeatures,
+    mapReady,
+  ]);
 
   useEffect(() => {
     const map = mapRef.current;
