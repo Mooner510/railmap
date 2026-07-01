@@ -1420,11 +1420,27 @@ export default function RailMap({
             type: "circle",
             source: "transfer-group-icons",
             paint: {
-              "circle-color": "rgba(255,255,255,0)",
-              "circle-radius": 0,
-              "circle-stroke-width": 0,
-              "circle-opacity": 0,
-              "circle-stroke-opacity": 0,
+              "circle-color": "#ffffff",
+              "circle-radius": [
+                "case",
+                ["==", ["get", "isSelected"], true],
+                13.8,
+                12.6,
+              ],
+              "circle-opacity": 0.96,
+              "circle-stroke-color": [
+                "case",
+                ["==", ["get", "isSelected"], true],
+                "#111827",
+                "#ffffff",
+              ],
+              "circle-stroke-width": [
+                "case",
+                ["==", ["get", "isSelected"], true],
+                2.4,
+                1.4,
+              ],
+              "circle-stroke-opacity": 1,
             },
           });
 
@@ -1434,7 +1450,7 @@ export default function RailMap({
             source: "transfer-group-icons",
             layout: {
               "icon-image": "transfer-icon",
-              "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.038, 0.034],
+              "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.0437, 0.0391],
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
             },

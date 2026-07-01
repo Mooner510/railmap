@@ -76,11 +76,6 @@ type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
 
 const TRANSFER_DETAIL_ZOOM_THRESHOLD = 13.8;
-const TRANSFER_VISIBILITY_OVERLAP_ZOOM = 0.08;
-const TRANSFER_DETAIL_SHOW_ZOOM =
-  TRANSFER_DETAIL_ZOOM_THRESHOLD - TRANSFER_VISIBILITY_OVERLAP_ZOOM;
-const TRANSFER_COLLAPSED_HIDE_ZOOM =
-  TRANSFER_DETAIL_ZOOM_THRESHOLD + TRANSFER_VISIBILITY_OVERLAP_ZOOM;
 const TRANSFER_GROUP_AREA_MIN_RADIUS = 0.0018;
 const TRANSFER_GROUP_AREA_MAX_RADIUS = 0.012;
 const TRANSFER_GROUP_AREA_PADDING_RATIO = 1.55;
@@ -306,6 +301,7 @@ async function buildStationFeaturesChunked(
   selectedIds: Set<string>,
   nonTransferIds: Set<string>,
   stationTransferGroupIndex: Map<string, TransferGroupMapInfo>,
+  transferDetailVisible: boolean,
   visible: boolean,
   showNonTransferState: boolean,
   isCancelled: () => boolean,
@@ -323,6 +319,7 @@ async function buildStationFeaturesChunked(
       const selected = selectedIds.has(station.id);
       const nonTransfer = nonTransferIds.has(station.id);
       const transferGroup = stationTransferGroupIndex.get(station.id) ?? null;
+      if (transferGroup && !transferDetailVisible) continue;
 
       features.push({
         type: "Feature",
@@ -1651,7 +1648,7 @@ function firstFeatureId(
 }
 
 function isTransferDetailVisible(zoom: number) {
-  return zoom >= TRANSFER_DETAIL_SHOW_ZOOM;
+  return zoom >= TRANSFER_DETAIL_ZOOM_THRESHOLD;
 }
 
 function isCollapsedTransferZoom(zoom: number) {
@@ -2754,6 +2751,7 @@ export default function UnifiedMapEditor({
   } | null>(null);
   const [layers, setLayers] = useState(defaultLayers);
   const [zoom, setZoom] = useState(7);
+  const [transferDetailVisible, setTransferDetailVisible] = useState(false);
   const [cursorLngLat, setCursorLngLat] = useState<{
     lng: number;
     lat: number;
@@ -3642,16 +3640,10 @@ export default function UnifiedMapEditor({
             "#0f172a",
           ],
           "fill-opacity": [
-            "step",
-            ["zoom"],
-            0,
-            TRANSFER_DETAIL_SHOW_ZOOM,
-            [
-              "case",
-              ["==", ["get", "selected"], true],
-              0.34,
-              0.22,
-            ],
+            "case",
+            ["==", ["get", "selected"], true],
+            0.34,
+            0.22,
           ],
         },
       });
@@ -3667,20 +3659,8 @@ export default function UnifiedMapEditor({
             "#2563eb",
             "#64748b",
           ],
-          "line-width": [
-            "step",
-            ["zoom"],
-            0,
-            TRANSFER_DETAIL_SHOW_ZOOM,
-            ["case", ["==", ["get", "selected"], true], 3.4, 2.2],
-          ],
-          "line-opacity": [
-            "step",
-            ["zoom"],
-            0,
-            TRANSFER_DETAIL_SHOW_ZOOM,
-            0.9,
-          ],
+          "line-width": ["case", ["==", ["get", "selected"], true], 3.4, 2.2],
+          "line-opacity": 0.9,
         },
       });
 
@@ -3689,13 +3669,7 @@ export default function UnifiedMapEditor({
         type: "circle",
         source: "railmap-transfer-group-icons",
         paint: {
-          "circle-radius": [
-            "step",
-            ["zoom"],
-            22,
-            TRANSFER_COLLAPSED_HIDE_ZOOM,
-            0,
-          ],
+          "circle-radius": 22,
           "circle-color": "rgba(0,0,0,0)",
           "circle-opacity": 0,
           "circle-stroke-opacity": 0,
@@ -3707,11 +3681,27 @@ export default function UnifiedMapEditor({
         type: "circle",
         source: "railmap-transfer-group-icons",
         paint: {
-          "circle-color": "rgba(255,255,255,0)",
-          "circle-radius": 0,
-          "circle-stroke-width": 0,
-          "circle-opacity": 0,
-          "circle-stroke-opacity": 0,
+          "circle-color": "#ffffff",
+          "circle-radius": [
+            "case",
+            ["==", ["get", "selected"], true],
+            13.8,
+            12.6,
+          ],
+          "circle-opacity": 0.96,
+          "circle-stroke-color": [
+            "case",
+            ["==", ["get", "selected"], true],
+            "#111827",
+            "#ffffff",
+          ],
+          "circle-stroke-width": [
+            "case",
+            ["==", ["get", "selected"], true],
+            2.4,
+            1.4,
+          ],
+          "circle-stroke-opacity": 1,
         },
       });
 
@@ -3724,20 +3714,14 @@ export default function UnifiedMapEditor({
           "icon-size": [
             "case",
             ["==", ["get", "selected"], true],
-            0.038,
-            0.034,
+            0.0437,
+            0.0391,
           ],
           "icon-allow-overlap": true,
           "icon-ignore-placement": true,
         },
         paint: {
-          "icon-opacity": [
-            "step",
-            ["zoom"],
-            1,
-            TRANSFER_COLLAPSED_HIDE_ZOOM,
-            0,
-          ],
+          "icon-opacity": 1,
         },
       });
 
@@ -3758,20 +3742,8 @@ export default function UnifiedMapEditor({
         paint: {
           "text-color": "#0f172a",
           "text-halo-color": "#ffffff",
-          "text-halo-width": [
-            "step",
-            ["zoom"],
-            1.5,
-            TRANSFER_COLLAPSED_HIDE_ZOOM,
-            0,
-          ],
-          "text-opacity": [
-            "step",
-            ["zoom"],
-            1,
-            TRANSFER_COLLAPSED_HIDE_ZOOM,
-            0,
-          ],
+          "text-halo-width": 1.5,
+          "text-opacity": 1,
         },
       });
 
@@ -3781,18 +3753,7 @@ export default function UnifiedMapEditor({
         source: "railmap-stations",
         paint: {
           "circle-color": ["get", "colorHex"],
-          "circle-radius": [
-            "step",
-            ["zoom"],
-            [
-              "case",
-              ["==", ["get", "isTransferChild"], true],
-              0,
-              ["case", ["boolean", ["get", "selected"], false], 7, 4.5],
-            ],
-            TRANSFER_DETAIL_SHOW_ZOOM,
-            ["case", ["boolean", ["get", "selected"], false], 7, 4.5],
-          ],
+          "circle-radius": ["case", ["boolean", ["get", "selected"], false], 7, 4.5],
           "circle-stroke-color": [
             "case",
             ["boolean", ["get", "selected"], false],
@@ -3805,20 +3766,8 @@ export default function UnifiedMapEditor({
             3,
             1.5,
           ],
-          "circle-stroke-opacity": [
-            "step",
-            ["zoom"],
-            ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
-            TRANSFER_DETAIL_SHOW_ZOOM,
-            1,
-          ],
-          "circle-opacity": [
-            "step",
-            ["zoom"],
-            ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-            TRANSFER_DETAIL_SHOW_ZOOM,
-            0.96,
-          ],
+          "circle-stroke-opacity": 1,
+          "circle-opacity": 0.96,
         },
       });
 
@@ -3827,13 +3776,7 @@ export default function UnifiedMapEditor({
         type: "circle",
         source: "railmap-stations",
         paint: {
-          "circle-radius": [
-            "step",
-            ["zoom"],
-            ["case", ["==", ["get", "isTransferChild"], true], 0, 12],
-            TRANSFER_DETAIL_SHOW_ZOOM,
-            12,
-          ],
+          "circle-radius": 12,
           "circle-color": "rgba(0,0,0,0)",
           "circle-opacity": 0,
           "circle-stroke-width": 0,
@@ -3856,13 +3799,7 @@ export default function UnifiedMapEditor({
           "text-color": "#ffffff",
           "text-halo-color": "#0f172a",
           "text-halo-width": 0.7,
-          "text-opacity": [
-            "step",
-            ["zoom"],
-            ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
-            TRANSFER_DETAIL_SHOW_ZOOM,
-            1,
-          ],
+          "text-opacity": 1,
         },
       });
 
@@ -3885,13 +3822,7 @@ export default function UnifiedMapEditor({
           "text-color": "#0f172a",
           "text-halo-color": "#ffffff",
           "text-halo-width": 1.5,
-          "text-opacity": [
-            "step",
-            ["zoom"],
-            ["case", ["==", ["get", "isTransferChild"], true], 0, 0.92],
-            TRANSFER_DETAIL_SHOW_ZOOM,
-            0.92,
-          ],
+          "text-opacity": 0.92,
         },
       });
 
@@ -3914,13 +3845,7 @@ export default function UnifiedMapEditor({
           "text-color": "#111827",
           "text-halo-color": "#ffffff",
           "text-halo-width": 2,
-          "text-opacity": [
-            "step",
-            ["zoom"],
-            ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
-            TRANSFER_DETAIL_SHOW_ZOOM,
-            1,
-          ],
+          "text-opacity": 1,
         },
       });
 
@@ -4288,7 +4213,13 @@ export default function UnifiedMapEditor({
           setCursorLngLat(pendingCursorLngLatRef.current);
       });
     });
-    map.on("zoomend", () => setZoom(map.getZoom()));
+    const syncTransferVisibilityMode = () => {
+      const nextZoom = map.getZoom();
+      setZoom(nextZoom);
+      setTransferDetailVisible(isTransferDetailVisible(nextZoom));
+    };
+    syncTransferVisibilityMode();
+    map.on("zoomend", syncTransferVisibilityMode);
 
     map.on("click", (event) => {
       if (isClickAfterDrag(event.point)) return;
@@ -4509,6 +4440,7 @@ export default function UnifiedMapEditor({
           selectedStationIds,
           nonTransferIds,
           stationTransferGroupIndex,
+          transferDetailVisible,
           layers.stations,
           layers.nonTransfer,
           () => cancelled,
@@ -4533,6 +4465,7 @@ export default function UnifiedMapEditor({
     nonTransferIds,
     selectedStationIds,
     stationTransferGroupIndex,
+    transferDetailVisible,
   ]);
 
   useEffect(() => {
@@ -4627,8 +4560,12 @@ export default function UnifiedMapEditor({
         const iconSource = mapRef.current?.getSource(
           "railmap-transfer-group-icons",
         ) as GeoJSONSource | undefined;
-        areaSource?.setData(areaFeatures);
-        iconSource?.setData(iconFeatures);
+        areaSource?.setData(
+          transferDetailVisible ? areaFeatures : EMPTY_FEATURE_COLLECTION,
+        );
+        iconSource?.setData(
+          transferDetailVisible ? EMPTY_FEATURE_COLLECTION : iconFeatures,
+        );
       })();
     });
 
@@ -4642,6 +4579,7 @@ export default function UnifiedMapEditor({
     overlays.manualTransferGroups,
     selectedTransferGroupIds,
     displayStationById,
+    transferDetailVisible,
   ]);
 
   useEffect(() => {
