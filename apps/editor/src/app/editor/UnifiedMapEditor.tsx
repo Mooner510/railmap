@@ -3681,14 +3681,14 @@ export default function UnifiedMapEditor({
         type: "circle",
         source: "railmap-transfer-group-icons",
         paint: {
-          "circle-color": "#ffffff",
+          "circle-color": "rgba(255,255,255,0)",
           "circle-radius": [
             "case",
             ["==", ["get", "selected"], true],
-            13.8,
-            12.6,
+            9.2,
+            8.2,
           ],
-          "circle-opacity": 0.96,
+          "circle-opacity": 0,
           "circle-stroke-color": [
             "case",
             ["==", ["get", "selected"], true],
@@ -3698,8 +3698,8 @@ export default function UnifiedMapEditor({
           "circle-stroke-width": [
             "case",
             ["==", ["get", "selected"], true],
-            2.4,
-            1.4,
+            3,
+            1.5,
           ],
           "circle-stroke-opacity": 1,
         },
