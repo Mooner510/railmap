@@ -1420,14 +1420,14 @@ export default function RailMap({
             type: "circle",
             source: "transfer-group-icons",
             paint: {
-              "circle-color": "#ffffff",
+              "circle-color": "rgba(255,255,255,0)",
               "circle-radius": [
                 "case",
                 ["==", ["get", "isSelected"], true],
-                13.8,
-                12.6,
+                9.2,
+                8.2,
               ],
-              "circle-opacity": 0.96,
+              "circle-opacity": 0,
               "circle-stroke-color": [
                 "case",
                 ["==", ["get", "isSelected"], true],
@@ -1437,8 +1437,8 @@ export default function RailMap({
               "circle-stroke-width": [
                 "case",
                 ["==", ["get", "isSelected"], true],
-                2.4,
-                1.4,
+                3,
+                1.5,
               ],
               "circle-stroke-opacity": 1,
             },
