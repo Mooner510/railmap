@@ -75,7 +75,7 @@ type ToolMode = "select" | "box" | "geometry";
 type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
 
-const TRANSFER_GROUP_EXPANDED_ZOOM = 13.8;
+const TRANSFER_DETAIL_ZOOM_THRESHOLD = 13.8;
 const STATION_GEOMETRY_ANCHOR_TOLERANCE = 0.00015;
 const SAVED_STATION_ANCHOR_TOLERANCE = 0.0000001;
 
@@ -1640,6 +1640,64 @@ function firstFeatureId(
   return typeof id === "string" ? id : undefined;
 }
 
+function isCollapsedTransferZoom(zoom: number) {
+  return zoom < TRANSFER_DETAIL_ZOOM_THRESHOLD;
+}
+
+function featureStringProperty(
+  feature:
+    | { properties?: Record<string, unknown> | null }
+    | undefined,
+  key: string,
+) {
+  const value = feature?.properties?.[key];
+  return typeof value === "string" ? value : undefined;
+}
+
+function firstVisibleStationFeatureId(
+  features: Array<{
+    layer: { id: string };
+    properties?: Record<string, unknown> | null;
+  }>,
+  layerIds: string[],
+  zoom: number,
+) {
+  const collapsed = isCollapsedTransferZoom(zoom);
+  const feature = features.find((candidate) => {
+    if (!layerIds.includes(candidate.layer.id)) return false;
+    if (!collapsed) return true;
+    return candidate.properties?.isTransferChild !== true;
+  });
+  return featureStringProperty(feature, "id");
+}
+
+function visibleStationFeatureIds(
+  features: Array<{
+    layer: { id: string };
+    properties?: Record<string, unknown> | null;
+  }>,
+  layerIds: string[],
+  zoom: number,
+) {
+  const collapsed = isCollapsedTransferZoom(zoom);
+  return features
+    .filter((candidate) => {
+      if (!layerIds.includes(candidate.layer.id)) return false;
+      if (!collapsed) return true;
+      return candidate.properties?.isTransferChild !== true;
+    })
+    .map((feature) => featureStringProperty(feature, "id"))
+    .filter((id): id is string => Boolean(id));
+}
+
+function getTransferGroupStationIds(
+  groupId: string,
+  groupById: Map<string, ManualTransferGroup>,
+) {
+  const group = groupById.get(groupId);
+  return [...new Set(group?.stationIds ?? [])];
+}
+
 function selectionLabel(selection: Selection) {
   if (selection.type === "none") return "선택 없음";
   if (selection.type === "multiStation")
@@ -2581,6 +2639,9 @@ export default function UnifiedMapEditor({
   const selectTransferGroupFromMapRef = useRef<(groupId: string) => void>(
     () => undefined,
   );
+  const selectTransferGroupChildrenFromMapRef = useRef<(groupId: string) => void>(
+    () => undefined,
+  );
   const toolModeRef = useRef<ToolMode>("select");
   const geometryDraftRef = useRef<GeometryDraft | null>(null);
   const geometryDraftsByKeyRef = useRef<GeometryDraftMap>({});
@@ -2592,6 +2653,7 @@ export default function UnifiedMapEditor({
   const overlaysRef = useRef<ManualOverlayBundle>(
     (initialData ?? EMPTY_UNIFIED_EDITOR_DATA).overlays,
   );
+  const groupByIdRef = useRef<Map<string, ManualTransferGroup>>(new Map());
   const stationLocationPickModeRef = useRef(false);
   const showToastRef = useRef<(message: string, tone?: ToastTone) => void>(
     () => undefined,
@@ -2857,6 +2919,10 @@ export default function UnifiedMapEditor({
       new Map(overlays.manualTransferGroups.map((group) => [group.id, group])),
     [overlays.manualTransferGroups],
   );
+
+  useEffect(() => {
+    groupByIdRef.current = groupById;
+  }, [groupById]);
   const selectedTransferGroupId =
     selection.type === "transferGroup" ? selection.id : null;
   const stationTransferGroupIndex = useMemo(
@@ -3122,6 +3188,17 @@ export default function UnifiedMapEditor({
   useEffect(() => {
     selectTransferGroupFromMapRef.current = selectTransferGroup;
   }, [selectTransferGroup]);
+
+  useEffect(() => {
+    selectTransferGroupChildrenFromMapRef.current = (groupId) => {
+      const stationIds = getTransferGroupStationIds(groupId, groupById);
+      if (stationIds.length === 1) {
+        selectStation(stationIds[0] ?? "", false);
+        return;
+      }
+      if (stationIds.length > 1) selectMultipleStations(stationIds);
+    };
+  }, [groupById, selectMultipleStations, selectStation]);
 
   useEffect(() => {
     toolModeRef.current = toolMode;
@@ -3494,7 +3571,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-area-fill",
         type: "fill",
         source: "railmap-transfer-group-areas",
-        minzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
+        minzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
         paint: {
           "fill-color": [
             "case",
@@ -3515,7 +3592,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-area-outline",
         type: "line",
         source: "railmap-transfer-group-areas",
-        minzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
+        minzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
         paint: {
           "line-color": [
             "case",
@@ -3532,7 +3609,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-hit",
         type: "circle",
         source: "railmap-transfer-group-icons",
-        maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
+        maxzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
         paint: {
           "circle-radius": 22,
           "circle-color": "rgba(0,0,0,0)",
@@ -3544,7 +3621,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-casing",
         type: "circle",
         source: "railmap-transfer-group-icons",
-        maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
+        maxzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
         paint: {
           "circle-color": "rgba(255,255,255,0)",
           "circle-radius": 0,
@@ -3557,7 +3634,7 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-icon",
         type: "symbol",
         source: "railmap-transfer-group-icons",
-        maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
+        maxzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
         layout: {
           "icon-image": "transfer-icon",
           "icon-size": [
@@ -3576,7 +3653,7 @@ export default function UnifiedMapEditor({
         type: "symbol",
         source: "railmap-transfer-group-icons",
         minzoom: 11,
-        maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
+        maxzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
         layout: {
           "text-field": ["get", "nameKo"],
           "text-size": 11,
@@ -3600,10 +3677,16 @@ export default function UnifiedMapEditor({
         paint: {
           "circle-color": ["get", "colorHex"],
           "circle-radius": [
-            "case",
-            ["boolean", ["get", "selected"], false],
-            7,
-            4.5,
+            "step",
+            ["zoom"],
+            [
+              "case",
+              ["==", ["get", "isTransferChild"], true],
+              0,
+              ["case", ["boolean", ["get", "selected"], false], 7, 4.5],
+            ],
+            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            ["case", ["boolean", ["get", "selected"], false], 7, 4.5],
           ],
           "circle-stroke-color": [
             "case",
@@ -3621,7 +3704,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-            TRANSFER_GROUP_EXPANDED_ZOOM,
+            TRANSFER_DETAIL_ZOOM_THRESHOLD,
             0.96,
           ],
         },
@@ -3636,7 +3719,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 12],
-            TRANSFER_GROUP_EXPANDED_ZOOM,
+            TRANSFER_DETAIL_ZOOM_THRESHOLD,
             12,
           ],
           "circle-color": "rgba(0,0,0,0)",
@@ -3687,7 +3770,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 0.92],
-            TRANSFER_GROUP_EXPANDED_ZOOM,
+            TRANSFER_DETAIL_ZOOM_THRESHOLD,
             0.92,
           ],
         },
@@ -3716,7 +3799,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
-            TRANSFER_GROUP_EXPANDED_ZOOM,
+            TRANSFER_DETAIL_ZOOM_THRESHOLD,
             1,
           ],
         },
@@ -4018,9 +4101,12 @@ export default function UnifiedMapEditor({
               ].filter((layerId) => map.getLayer(layerId))
             : [
                 "railmap-transfer-group-hit",
-                "railmap-transfer-group-area-fill",
-                "railmap-stations-hit",
-                "railmap-stations-circle",
+                ...(isCollapsedTransferZoom(map.getZoom())
+                  ? []
+                  : ["railmap-transfer-group-area-fill"]),
+                ...(isCollapsedTransferZoom(map.getZoom())
+                  ? []
+                  : ["railmap-stations-hit", "railmap-stations-circle"]),
                 "railmap-selected-branches-line",
                 "railmap-branches-line",
               ].filter((layerId) => map.getLayer(layerId));
@@ -4099,11 +4185,15 @@ export default function UnifiedMapEditor({
         return;
       }
 
+      const collapsedTransferZoom = isCollapsedTransferZoom(map.getZoom());
       const queryLayers = [
-        "railmap-stations-hit",
-        "railmap-stations-circle",
-        "railmap-transfer-group-hit",
-        "railmap-transfer-group-area-fill",
+        ...(collapsedTransferZoom
+          ? ["railmap-transfer-group-hit"]
+          : [
+              "railmap-stations-hit",
+              "railmap-stations-circle",
+              "railmap-transfer-group-area-fill",
+            ]),
         "railmap-selected-branches-line",
         "railmap-branches-line",
       ].filter((layerId) => map.getLayer(layerId));
@@ -4111,22 +4201,33 @@ export default function UnifiedMapEditor({
         queryLayers.length > 0
           ? map.queryRenderedFeatures(event.point, { layers: queryLayers })
           : [];
-      const stationId = firstFeatureId(features, [
-        "railmap-stations-hit",
-        "railmap-stations-circle",
-      ]);
-      if (stationId) {
-        selectStationFromMapRef.current(stationId);
-        return;
-      }
 
-      const transferGroupId = firstFeatureId(features, [
-        "railmap-transfer-group-hit",
-        "railmap-transfer-group-area-fill",
-      ]);
-      if (transferGroupId) {
-        selectTransferGroupFromMapRef.current(transferGroupId);
-        return;
+      if (collapsedTransferZoom) {
+        const transferGroupId = firstFeatureId(features, [
+          "railmap-transfer-group-hit",
+        ]);
+        if (transferGroupId) {
+          selectTransferGroupChildrenFromMapRef.current(transferGroupId);
+          return;
+        }
+      } else {
+        const stationId = firstVisibleStationFeatureId(
+          features,
+          ["railmap-stations-hit", "railmap-stations-circle"],
+          map.getZoom(),
+        );
+        if (stationId) {
+          selectStationFromMapRef.current(stationId);
+          return;
+        }
+
+        const transferGroupId = firstFeatureId(features, [
+          "railmap-transfer-group-area-fill",
+        ]);
+        if (transferGroupId) {
+          selectTransferGroupFromMapRef.current(transferGroupId);
+          return;
+        }
       }
 
       const branchId = firstFeatureId(features, [
@@ -4144,11 +4245,15 @@ export default function UnifiedMapEditor({
     map.on("contextmenu", (event) => {
       event.preventDefault();
       if (toolModeRef.current === "geometry") return;
+      const collapsedTransferZoom = isCollapsedTransferZoom(map.getZoom());
       const queryLayers = [
-        "railmap-transfer-group-hit",
-        "railmap-transfer-group-area-fill",
-        "railmap-stations-hit",
-        "railmap-stations-circle",
+        ...(collapsedTransferZoom
+          ? ["railmap-transfer-group-hit"]
+          : [
+              "railmap-transfer-group-area-fill",
+              "railmap-stations-hit",
+              "railmap-stations-circle",
+            ]),
         "railmap-selected-branches-line",
         "railmap-branches-line",
       ].filter((layerId) => map.getLayer(layerId));
@@ -4159,10 +4264,13 @@ export default function UnifiedMapEditor({
       setContextMenu({
         x: event.point.x,
         y: event.point.y,
-        stationId: firstFeatureId(features, [
-          "railmap-stations-hit",
-          "railmap-stations-circle",
-        ]),
+        stationId: collapsedTransferZoom
+          ? undefined
+          : firstVisibleStationFeatureId(
+              features,
+              ["railmap-stations-hit", "railmap-stations-circle"],
+              map.getZoom(),
+            ),
         branchId: firstFeatureId(features, [
           "railmap-selected-branches-line",
           "railmap-branches-line",
@@ -4233,12 +4341,27 @@ export default function UnifiedMapEditor({
         [Math.min(start.x, event.point.x), Math.min(start.y, event.point.y)],
         [Math.max(start.x, event.point.x), Math.max(start.y, event.point.y)],
       ] as [[number, number], [number, number]];
-      const selected = map
-        .queryRenderedFeatures(box, {
-          layers: ["railmap-stations-hit", "railmap-stations-circle"],
-        })
-        .map((feature) => feature.properties?.id as string | undefined)
-        .filter((id): id is string => Boolean(id));
+      const collapsedTransferZoom = isCollapsedTransferZoom(map.getZoom());
+      const rangeLayers = (collapsedTransferZoom
+        ? ["railmap-transfer-group-hit"]
+        : ["railmap-stations-hit", "railmap-stations-circle"]
+      ).filter((layerId) => map.getLayer(layerId));
+      const rangeFeatures =
+        rangeLayers.length > 0
+          ? map.queryRenderedFeatures(box, { layers: rangeLayers })
+          : [];
+      const selected = collapsedTransferZoom
+        ? rangeFeatures.flatMap((feature) => {
+            const groupId = featureStringProperty(feature, "id");
+            return groupId
+              ? getTransferGroupStationIds(groupId, groupByIdRef.current)
+              : [];
+          })
+        : visibleStationFeatureIds(
+            rangeFeatures,
+            ["railmap-stations-hit", "railmap-stations-circle"],
+            map.getZoom(),
+          );
       const ids = [...new Set(selected)];
       if (ids.length === 1) selectStationFromMapRef.current(ids[0] ?? "");
       if (ids.length > 1) selectMultipleStationsFromMapRef.current(ids);
