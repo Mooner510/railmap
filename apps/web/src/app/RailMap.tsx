@@ -621,36 +621,50 @@ function buildStationTransferGroupIndex(
   return index;
 }
 
-function buildTransferGroupCircleCoordinates(members: ValidRailMapStation[]) {
+function isTransferDetailVisible(zoom: number) {
+  return zoom >= TRANSFER_DETAIL_ZOOM_THRESHOLD;
+}
+
+function clampTransferGroupRadius(radius: number) {
+  if (!Number.isFinite(radius)) return TRANSFER_GROUP_AREA_MIN_RADIUS;
+  return Math.min(
+    TRANSFER_GROUP_AREA_MAX_RADIUS,
+    Math.max(TRANSFER_GROUP_AREA_MIN_RADIUS, radius),
+  );
+}
+
+function buildTransferGroupCircleGeometry(members: ValidRailMapStation[]) {
   const centerLng = members.reduce((sum, station) => sum + station.lng, 0) / members.length;
   const centerLat = members.reduce((sum, station) => sum + station.lat, 0) / members.length;
   const lngScale = Math.max(0.35, Math.cos((centerLat * Math.PI) / 180));
-  const radius = Math.max(
-    0.0022,
+  const farthestMemberRadius = Math.max(
+    0,
     ...members.map((station) => {
       const dx = (station.lng - centerLng) * lngScale;
       const dy = station.lat - centerLat;
-      return Math.sqrt(dx * dx + dy * dy) * 1.45;
+      return Math.sqrt(dx * dx + dy * dy);
     }),
+  );
+  const radius = clampTransferGroupRadius(
+    farthestMemberRadius * TRANSFER_GROUP_AREA_PADDING_RATIO,
   );
 
   const coordinates: LngLatTuple[] = [];
-  const segments = 48;
-  for (let index = 0; index <= segments; index += 1) {
-    const angle = (Math.PI * 2 * index) / segments;
+  for (let index = 0; index <= TRANSFER_GROUP_AREA_SEGMENTS; index += 1) {
+    const angle = (Math.PI * 2 * index) / TRANSFER_GROUP_AREA_SEGMENTS;
     coordinates.push([
       centerLng + (Math.cos(angle) * radius) / lngScale,
       centerLat + Math.sin(angle) * radius,
     ]);
   }
 
-  return coordinates;
+  return { center: [centerLng, centerLat] as LngLatTuple, radius, coordinates };
 }
 
 function buildTransferGroupAreaFeatures(
   transferGroups: RailMapTransferGroup[],
   stationIndex: Map<string, ValidRailMapStation>,
-  selectedTransferGroupId: string | null,
+  selectedTransferGroupIds: ReadonlySet<string>,
 ) {
   return {
     type: "FeatureCollection" as const,
@@ -664,7 +678,7 @@ function buildTransferGroupAreaFeatures(
           );
         if (members.length < 2) return null;
 
-        const coordinates = buildTransferGroupCircleCoordinates(members);
+        const circle = buildTransferGroupCircleGeometry(members);
 
         return {
           type: "Feature" as const,
@@ -672,11 +686,12 @@ function buildTransferGroupAreaFeatures(
             id: group.id,
             nameKo: group.nameKo,
             stationCount: members.length,
-            isSelected: selectedTransferGroupId === group.id,
+            isSelected: selectedTransferGroupIds.has(group.id),
+            radius: circle.radius,
           },
           geometry: {
             type: "Polygon" as const,
-            coordinates: [coordinates],
+            coordinates: [circle.coordinates],
           },
         };
       })
@@ -689,7 +704,7 @@ function buildTransferGroupAreaFeatures(
 function buildTransferGroupIconFeatures(
   transferGroups: RailMapTransferGroup[],
   stationIndex: Map<string, ValidRailMapStation>,
-  selectedTransferGroupId: string | null,
+  selectedTransferGroupIds: ReadonlySet<string>,
 ) {
   return {
     type: "FeatureCollection" as const,
@@ -703,12 +718,7 @@ function buildTransferGroupIconFeatures(
           );
         if (members.length < 2) return null;
 
-        const lng =
-          members.reduce((sum, station) => sum + station.lng, 0) /
-          members.length;
-        const lat =
-          members.reduce((sum, station) => sum + station.lat, 0) /
-          members.length;
+        const circle = buildTransferGroupCircleGeometry(members);
 
         return {
           type: "Feature" as const,
@@ -716,11 +726,12 @@ function buildTransferGroupIconFeatures(
             id: group.id,
             nameKo: group.nameKo,
             stationCount: members.length,
-            isSelected: selectedTransferGroupId === group.id,
+            isSelected: selectedTransferGroupIds.has(group.id),
+            radius: circle.radius,
           },
           geometry: {
             type: "Point" as const,
-            coordinates: [lng, lat] as LngLatTuple,
+            coordinates: circle.center,
           },
         };
       })
@@ -777,6 +788,10 @@ interface RailMapProps {
 }
 
 const TRANSFER_DETAIL_ZOOM_THRESHOLD = 13.8;
+const TRANSFER_GROUP_AREA_MIN_RADIUS = 0.0018;
+const TRANSFER_GROUP_AREA_MAX_RADIUS = 0.012;
+const TRANSFER_GROUP_AREA_PADDING_RATIO = 1.55;
+const TRANSFER_GROUP_AREA_SEGMENTS = 56;
 
 const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
   [121.4, 30.9],
@@ -927,6 +942,17 @@ export default function RailMap({
     () => buildStationTransferGroupIndex(transferGroups),
     [transferGroups],
   );
+  const selectedTransferGroupIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (selectedTransferGroupId) ids.add(selectedTransferGroupId);
+
+    if (selectedStationId) {
+      const group = stationTransferGroupIndex.get(selectedStationId);
+      if (group) ids.add(group.id);
+    }
+
+    return ids;
+  }, [selectedStationId, selectedTransferGroupId, stationTransferGroupIndex]);
   const transferGroupIndex = useMemo(
     () => new Map(transferGroups.map((group) => [group.id, group])),
     [transferGroups],
@@ -936,7 +962,7 @@ export default function RailMap({
       buildTransferGroupAreaFeatures(
         transferGroups,
         validStationIndex,
-        selectedTransferGroupId,
+        selectedTransferGroupIds,
       ),
     [selectedTransferGroupId, transferGroups, validStationIndex],
   );
@@ -945,7 +971,7 @@ export default function RailMap({
       buildTransferGroupIconFeatures(
         transferGroups,
         validStationIndex,
-        selectedTransferGroupId,
+        selectedTransferGroupIds,
       ),
     [selectedTransferGroupId, transferGroups, validStationIndex],
   );
@@ -1630,7 +1656,7 @@ export default function RailMap({
 
           map.on("click", (event) => {
             const transferDetailVisible =
-              map.getZoom() >= TRANSFER_DETAIL_ZOOM_THRESHOLD;
+              isTransferDetailVisible(map.getZoom());
             const interactiveLayers = [
               "branch-preview-lines",
               "branch-preview-lines-selected",
