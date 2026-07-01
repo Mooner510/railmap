@@ -76,6 +76,11 @@ type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
 
 const TRANSFER_DETAIL_ZOOM_THRESHOLD = 13.8;
+const TRANSFER_VISIBILITY_OVERLAP_ZOOM = 0.08;
+const TRANSFER_DETAIL_SHOW_ZOOM =
+  TRANSFER_DETAIL_ZOOM_THRESHOLD - TRANSFER_VISIBILITY_OVERLAP_ZOOM;
+const TRANSFER_COLLAPSED_HIDE_ZOOM =
+  TRANSFER_DETAIL_ZOOM_THRESHOLD + TRANSFER_VISIBILITY_OVERLAP_ZOOM;
 const TRANSFER_GROUP_AREA_MIN_RADIUS = 0.0018;
 const TRANSFER_GROUP_AREA_MAX_RADIUS = 0.012;
 const TRANSFER_GROUP_AREA_PADDING_RATIO = 1.55;
@@ -1646,7 +1651,7 @@ function firstFeatureId(
 }
 
 function isTransferDetailVisible(zoom: number) {
-  return zoom >= TRANSFER_DETAIL_ZOOM_THRESHOLD;
+  return zoom >= TRANSFER_DETAIL_SHOW_ZOOM;
 }
 
 function isCollapsedTransferZoom(zoom: number) {
@@ -3640,7 +3645,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             0,
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_DETAIL_SHOW_ZOOM,
             [
               "case",
               ["==", ["get", "selected"], true],
@@ -3666,14 +3671,14 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             0,
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_DETAIL_SHOW_ZOOM,
             ["case", ["==", ["get", "selected"], true], 3.4, 2.2],
           ],
           "line-opacity": [
             "step",
             ["zoom"],
             0,
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_DETAIL_SHOW_ZOOM,
             0.9,
           ],
         },
@@ -3688,7 +3693,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             22,
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_COLLAPSED_HIDE_ZOOM,
             0,
           ],
           "circle-color": "rgba(0,0,0,0)",
@@ -3730,7 +3735,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             1,
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_COLLAPSED_HIDE_ZOOM,
             0,
           ],
         },
@@ -3757,14 +3762,14 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             1.5,
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_COLLAPSED_HIDE_ZOOM,
             0,
           ],
           "text-opacity": [
             "step",
             ["zoom"],
             1,
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_COLLAPSED_HIDE_ZOOM,
             0,
           ],
         },
@@ -3785,7 +3790,7 @@ export default function UnifiedMapEditor({
               0,
               ["case", ["boolean", ["get", "selected"], false], 7, 4.5],
             ],
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_DETAIL_SHOW_ZOOM,
             ["case", ["boolean", ["get", "selected"], false], 7, 4.5],
           ],
           "circle-stroke-color": [
@@ -3804,14 +3809,14 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_DETAIL_SHOW_ZOOM,
             1,
           ],
           "circle-opacity": [
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_DETAIL_SHOW_ZOOM,
             0.96,
           ],
         },
@@ -3826,7 +3831,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 12],
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_DETAIL_SHOW_ZOOM,
             12,
           ],
           "circle-color": "rgba(0,0,0,0)",
@@ -3855,7 +3860,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_DETAIL_SHOW_ZOOM,
             1,
           ],
         },
@@ -3884,7 +3889,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 0.92],
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_DETAIL_SHOW_ZOOM,
             0.92,
           ],
         },
@@ -3913,7 +3918,7 @@ export default function UnifiedMapEditor({
             "step",
             ["zoom"],
             ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
-            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            TRANSFER_DETAIL_SHOW_ZOOM,
             1,
           ],
         },
