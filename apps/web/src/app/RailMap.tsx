@@ -776,7 +776,7 @@ interface RailMapProps {
   className?: string;
 }
 
-const TRANSFER_GROUP_EXPANDED_ZOOM = 13.8;
+const TRANSFER_DETAIL_ZOOM_THRESHOLD = 13.8;
 
 const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
   [121.4, 30.9],
@@ -1314,7 +1314,7 @@ export default function RailMap({
             id: "transfer-group-areas-fill",
             type: "fill",
             source: "transfer-group-areas",
-            minzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
+            minzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
             paint: {
               "fill-color": [
                 "case",
@@ -1335,7 +1335,7 @@ export default function RailMap({
             id: "transfer-group-areas-outline",
             type: "line",
             source: "transfer-group-areas",
-            minzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
+            minzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
             paint: {
               "line-color": [
                 "case",
@@ -1352,7 +1352,7 @@ export default function RailMap({
             id: "transfer-group-collapsed-hit",
             type: "circle",
             source: "transfer-group-icons",
-            maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
+            maxzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
             paint: {
               "circle-radius": 22,
               "circle-color": "rgba(0,0,0,0)",
@@ -1364,7 +1364,7 @@ export default function RailMap({
             id: "transfer-group-collapsed-casing",
             type: "circle",
             source: "transfer-group-icons",
-            maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
+            maxzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
             paint: {
               "circle-color": "rgba(255,255,255,0)",
               "circle-radius": 0,
@@ -1377,7 +1377,7 @@ export default function RailMap({
             id: "transfer-group-collapsed-icon",
             type: "symbol",
             source: "transfer-group-icons",
-            maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
+            maxzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
             layout: {
               "icon-image": "transfer-icon",
               "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.038, 0.034],
@@ -1391,7 +1391,7 @@ export default function RailMap({
             type: "symbol",
             source: "transfer-group-icons",
             minzoom: 12,
-            maxzoom: TRANSFER_GROUP_EXPANDED_ZOOM,
+            maxzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
             layout: {
               "text-field": ["get", "nameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
@@ -1420,16 +1420,22 @@ export default function RailMap({
             paint: {
               "circle-color": "#ffffff",
               "circle-radius": [
-                "case",
-                ["==", ["get", "isEmphasized"], true],
-                7.2,
-                5.6,
+                "step",
+                ["zoom"],
+                [
+                  "case",
+                  ["==", ["get", "isTransferChild"], true],
+                  0,
+                  ["case", ["==", ["get", "isEmphasized"], true], 7.2, 5.6],
+                ],
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
+                ["case", ["==", ["get", "isEmphasized"], true], 7.2, 5.6],
               ],
               "circle-opacity": [
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-                TRANSFER_GROUP_EXPANDED_ZOOM,
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
                 0.96,
               ],
             },
@@ -1442,10 +1448,16 @@ export default function RailMap({
             paint: {
               "circle-color": ["coalesce", ["get", "colorHex"], "#64748b"],
               "circle-radius": [
-                "case",
-                ["==", ["get", "isEmphasized"], true],
-                5.2,
-                3.8,
+                "step",
+                ["zoom"],
+                [
+                  "case",
+                  ["==", ["get", "isTransferChild"], true],
+                  0,
+                  ["case", ["==", ["get", "isEmphasized"], true], 5.2, 3.8],
+                ],
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
+                ["case", ["==", ["get", "isEmphasized"], true], 5.2, 3.8],
               ],
               "circle-stroke-color": [
                 "case",
@@ -1463,7 +1475,7 @@ export default function RailMap({
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 0.96],
-                TRANSFER_GROUP_EXPANDED_ZOOM,
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
                 0.96,
               ],
             },
@@ -1491,7 +1503,7 @@ export default function RailMap({
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 0.92],
-                TRANSFER_GROUP_EXPANDED_ZOOM,
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
                 0.92,
               ],
             },
@@ -1520,7 +1532,7 @@ export default function RailMap({
                 "step",
                 ["zoom"],
                 ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
-                TRANSFER_GROUP_EXPANDED_ZOOM,
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
                 1,
               ],
             },
@@ -1603,6 +1615,12 @@ export default function RailMap({
             const feature = event.features?.[0];
             const props = feature?.properties as
               Record<string, unknown> | undefined;
+            if (
+              map.getZoom() < TRANSFER_DETAIL_ZOOM_THRESHOLD &&
+              props?.isTransferChild === true
+            ) {
+              return;
+            }
             const stationId = String(props?.id ?? "");
             const station = stationsRef.current.find(
               (item) => item.id === stationId,
@@ -1611,15 +1629,20 @@ export default function RailMap({
           });
 
           map.on("click", (event) => {
-            const interactiveFeatures = map.queryRenderedFeatures(event.point, {
-              layers: [
-                "branch-preview-lines",
-                "branch-preview-lines-selected",
-                "transfer-group-collapsed-hit",
-                "transfer-group-areas-fill",
-                "branch-preview-stations-dot",
-              ],
-            });
+            const transferDetailVisible =
+              map.getZoom() >= TRANSFER_DETAIL_ZOOM_THRESHOLD;
+            const interactiveLayers = [
+              "branch-preview-lines",
+              "branch-preview-lines-selected",
+              ...(transferDetailVisible
+                ? ["transfer-group-areas-fill", "branch-preview-stations-dot"]
+                : ["transfer-group-collapsed-hit"]),
+            ].filter((layerId) => map.getLayer(layerId));
+            const interactiveFeatures = interactiveLayers.length
+              ? map.queryRenderedFeatures(event.point, {
+                  layers: interactiveLayers,
+                })
+              : [];
 
             if (interactiveFeatures.length === 0) onClearStationRef.current?.();
           });
