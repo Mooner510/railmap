@@ -3629,7 +3629,6 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-area-fill",
         type: "fill",
         source: "railmap-transfer-group-areas",
-        minzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
         paint: {
           "fill-color": [
             "case",
@@ -3638,10 +3637,16 @@ export default function UnifiedMapEditor({
             "#0f172a",
           ],
           "fill-opacity": [
-            "case",
-            ["==", ["get", "selected"], true],
-            0.34,
-            0.22,
+            "step",
+            ["zoom"],
+            0,
+            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            [
+              "case",
+              ["==", ["get", "selected"], true],
+              0.34,
+              0.22,
+            ],
           ],
         },
       });
@@ -3650,7 +3655,6 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-area-outline",
         type: "line",
         source: "railmap-transfer-group-areas",
-        minzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
         paint: {
           "line-color": [
             "case",
@@ -3658,8 +3662,20 @@ export default function UnifiedMapEditor({
             "#2563eb",
             "#64748b",
           ],
-          "line-width": ["case", ["==", ["get", "selected"], true], 3.4, 2.2],
-          "line-opacity": 0.9,
+          "line-width": [
+            "step",
+            ["zoom"],
+            0,
+            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            ["case", ["==", ["get", "selected"], true], 3.4, 2.2],
+          ],
+          "line-opacity": [
+            "step",
+            ["zoom"],
+            0,
+            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            0.9,
+          ],
         },
       });
 
@@ -3672,6 +3688,7 @@ export default function UnifiedMapEditor({
           "circle-radius": 22,
           "circle-color": "rgba(0,0,0,0)",
           "circle-opacity": 0,
+          "circle-stroke-opacity": 0,
         },
       });
 
@@ -3685,6 +3702,7 @@ export default function UnifiedMapEditor({
           "circle-radius": 0,
           "circle-stroke-width": 0,
           "circle-opacity": 0,
+          "circle-stroke-opacity": 0,
         },
       });
 
@@ -3758,6 +3776,13 @@ export default function UnifiedMapEditor({
             3,
             1.5,
           ],
+          "circle-stroke-opacity": [
+            "step",
+            ["zoom"],
+            ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
+            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            1,
+          ],
           "circle-opacity": [
             "step",
             ["zoom"],
@@ -3802,6 +3827,13 @@ export default function UnifiedMapEditor({
           "text-color": "#ffffff",
           "text-halo-color": "#0f172a",
           "text-halo-width": 0.7,
+          "text-opacity": [
+            "step",
+            ["zoom"],
+            ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
+            TRANSFER_DETAIL_ZOOM_THRESHOLD,
+            1,
+          ],
         },
       });
 
