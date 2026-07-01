@@ -76,6 +76,10 @@ type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
 
 const TRANSFER_DETAIL_ZOOM_THRESHOLD = 13.8;
+const TRANSFER_GROUP_AREA_MIN_RADIUS = 0.0018;
+const TRANSFER_GROUP_AREA_MAX_RADIUS = 0.012;
+const TRANSFER_GROUP_AREA_PADDING_RATIO = 1.55;
+const TRANSFER_GROUP_AREA_SEGMENTS = 56;
 const STATION_GEOMETRY_ANCHOR_TOLERANCE = 0.00015;
 const SAVED_STATION_ANCHOR_TOLERANCE = 0.0000001;
 
@@ -345,7 +349,7 @@ async function buildStationFeaturesChunked(
   return { type: "FeatureCollection", features };
 }
 
-function buildTransferGroupCircleCoordinates(
+function buildTransferGroupCircleGeometry(
   members: Array<EditorStation & { lat: number; lng: number }>,
 ) {
   const centerLng =
@@ -353,32 +357,34 @@ function buildTransferGroupCircleCoordinates(
   const centerLat =
     members.reduce((sum, station) => sum + station.lat, 0) / members.length;
   const lngScale = Math.max(0.35, Math.cos((centerLat * Math.PI) / 180));
-  const radius = Math.max(
-    0.0022,
+  const farthestMemberRadius = Math.max(
+    0,
     ...members.map((station) => {
       const dx = (station.lng - centerLng) * lngScale;
       const dy = station.lat - centerLat;
-      return Math.sqrt(dx * dx + dy * dy) * 1.45;
+      return Math.sqrt(dx * dx + dy * dy);
     }),
+  );
+  const radius = clampTransferGroupRadius(
+    farthestMemberRadius * TRANSFER_GROUP_AREA_PADDING_RATIO,
   );
 
   const coordinates: LngLatTuple[] = [];
-  const segments = 48;
-  for (let index = 0; index <= segments; index += 1) {
-    const angle = (Math.PI * 2 * index) / segments;
+  for (let index = 0; index <= TRANSFER_GROUP_AREA_SEGMENTS; index += 1) {
+    const angle = (Math.PI * 2 * index) / TRANSFER_GROUP_AREA_SEGMENTS;
     coordinates.push([
       centerLng + (Math.cos(angle) * radius) / lngScale,
       centerLat + Math.sin(angle) * radius,
     ]);
   }
 
-  return coordinates;
+  return { center: [centerLng, centerLat] as LngLatTuple, radius, coordinates };
 }
 
 async function buildTransferGroupAreaFeaturesChunked(
   groups: ManualTransferGroup[],
   stationById: Map<string, EditorStation>,
-  selectedGroupId: string | null,
+  selectedGroupIds: ReadonlySet<string>,
   isCancelled: () => boolean,
 ): Promise<RailFeatureCollection | null> {
   const features: RailFeatureCollection["features"] = [];
@@ -397,7 +403,7 @@ async function buildTransferGroupAreaFeaturesChunked(
         );
       if (members.length < 2) continue;
 
-      const coordinates = buildTransferGroupCircleCoordinates(members);
+      const circle = buildTransferGroupCircleGeometry(members);
 
       features.push({
         type: "Feature",
@@ -405,9 +411,10 @@ async function buildTransferGroupAreaFeaturesChunked(
           id: group.id,
           nameKo: group.nameKo,
           stationCount: members.length,
-          selected: selectedGroupId === group.id,
+          selected: selectedGroupIds.has(group.id),
+          radius: circle.radius,
         },
-        geometry: { type: "Polygon", coordinates: [coordinates] },
+        geometry: { type: "Polygon", coordinates: [circle.coordinates] },
       });
     }
 
@@ -420,7 +427,7 @@ async function buildTransferGroupAreaFeaturesChunked(
 async function buildTransferGroupIconFeaturesChunked(
   groups: ManualTransferGroup[],
   stationById: Map<string, EditorStation>,
-  selectedGroupId: string | null,
+  selectedGroupIds: ReadonlySet<string>,
   isCancelled: () => boolean,
 ): Promise<RailFeatureCollection | null> {
   const features: RailFeatureCollection["features"] = [];
@@ -439,10 +446,7 @@ async function buildTransferGroupIconFeaturesChunked(
         );
       if (members.length < 2) continue;
 
-      const lng =
-        members.reduce((sum, station) => sum + station.lng, 0) / members.length;
-      const lat =
-        members.reduce((sum, station) => sum + station.lat, 0) / members.length;
+      const circle = buildTransferGroupCircleGeometry(members);
 
       features.push({
         type: "Feature",
@@ -450,9 +454,10 @@ async function buildTransferGroupIconFeaturesChunked(
           id: group.id,
           nameKo: group.nameKo,
           stationCount: members.length,
-          selected: selectedGroupId === group.id,
+          selected: selectedGroupIds.has(group.id),
+          radius: circle.radius,
         },
-        geometry: { type: "Point", coordinates: [lng, lat] as LngLatTuple },
+        geometry: { type: "Point", coordinates: circle.center },
       });
     }
 
@@ -1640,8 +1645,20 @@ function firstFeatureId(
   return typeof id === "string" ? id : undefined;
 }
 
+function isTransferDetailVisible(zoom: number) {
+  return zoom >= TRANSFER_DETAIL_ZOOM_THRESHOLD;
+}
+
 function isCollapsedTransferZoom(zoom: number) {
-  return zoom < TRANSFER_DETAIL_ZOOM_THRESHOLD;
+  return !isTransferDetailVisible(zoom);
+}
+
+function clampTransferGroupRadius(radius: number) {
+  if (!Number.isFinite(radius)) return TRANSFER_GROUP_AREA_MIN_RADIUS;
+  return Math.min(
+    TRANSFER_GROUP_AREA_MAX_RADIUS,
+    Math.max(TRANSFER_GROUP_AREA_MIN_RADIUS, radius),
+  );
 }
 
 function featureStringProperty(
@@ -1696,6 +1713,43 @@ function getTransferGroupStationIds(
 ) {
   const group = groupById.get(groupId);
   return [...new Set(group?.stationIds ?? [])];
+}
+
+function getSelectedTransferGroupIds(
+  selection: Selection,
+  groups: ManualTransferGroup[],
+) {
+  if (selection.type === "transferGroup") return new Set([selection.id]);
+
+  const selectedStationIds =
+    selection.type === "station"
+      ? new Set([selection.id])
+      : selection.type === "multiStation"
+        ? new Set(selection.ids)
+        : new Set<string>();
+
+  if (selectedStationIds.size === 0) return new Set<string>();
+
+  return new Set(
+    groups
+      .filter((group) => {
+        if (group.enabled === false || group.stationIds.length < 2) return false;
+        return group.stationIds.every((stationId) =>
+          selectedStationIds.has(stationId),
+        );
+      })
+      .map((group) => group.id),
+  );
+}
+
+function getPrimarySelectedTransferGroup(
+  selection: Selection,
+  groups: ManualTransferGroup[],
+) {
+  const selectedGroupIds = getSelectedTransferGroupIds(selection, groups);
+  const firstGroupId = selectedGroupIds.values().next().value;
+  if (typeof firstGroupId !== "string") return null;
+  return groups.find((group) => group.id === firstGroupId) ?? null;
 }
 
 function selectionLabel(selection: Selection) {
@@ -2923,6 +2977,10 @@ export default function UnifiedMapEditor({
   useEffect(() => {
     groupByIdRef.current = groupById;
   }, [groupById]);
+  const selectedTransferGroupIds = useMemo(
+    () => getSelectedTransferGroupIds(selection, overlays.manualTransferGroups),
+    [overlays.manualTransferGroups, selection],
+  );
   const selectedTransferGroupId =
     selection.type === "transferGroup" ? selection.id : null;
   const stationTransferGroupIndex = useMemo(
@@ -4491,13 +4549,13 @@ export default function UnifiedMapEditor({
           buildTransferGroupAreaFeaturesChunked(
             overlays.manualTransferGroups,
             displayStationById,
-            selectedTransferGroupId,
+            selectedTransferGroupIds,
             () => cancelled,
           ),
           buildTransferGroupIconFeaturesChunked(
             overlays.manualTransferGroups,
             displayStationById,
-            selectedTransferGroupId,
+            selectedTransferGroupIds,
             () => cancelled,
           ),
         ]);
@@ -4521,7 +4579,7 @@ export default function UnifiedMapEditor({
     dataLoading,
     mapLoaded,
     overlays.manualTransferGroups,
-    selectedTransferGroupId,
+    selectedTransferGroupIds,
     displayStationById,
   ]);
 
@@ -5199,7 +5257,7 @@ export default function UnifiedMapEditor({
   const selectedGroup =
     selection.type === "transferGroup"
       ? (groupById.get(selection.id) ?? null)
-      : null;
+      : getPrimarySelectedTransferGroup(selection, overlays.manualTransferGroups);
   const multiStationIds =
     selection.type === "multiStation" ? selection.ids : [];
   const geometryDraftDirty = geometryWorkspaceDirtyDrafts.length > 0;
@@ -5419,6 +5477,14 @@ export default function UnifiedMapEditor({
 
               {!isGeometryMode && sidebarTab === "transfers" ? (
                 <div className="grid gap-2">
+                  {selectedGroup && selection.type === "multiStation" ? (
+                    <div className="rounded-2xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+                      <p className="font-semibold">환승 그룹 아이콘으로 선택됨</p>
+                      <p className="mt-1 font-medium">
+                        {selectedGroup.nameKo} · {selectedGroup.stationIds.length}개 하위 역 선택
+                      </p>
+                    </div>
+                  ) : null}
                   {multiStationIds.length >= 2 ? (
                     <Button
                       variant="outline"
@@ -5472,7 +5538,7 @@ export default function UnifiedMapEditor({
           <div ref={mapContainerRef} className="absolute inset-0 size-full" />
           <div className="pointer-events-none absolute left-4 top-4 flex flex-wrap gap-2">
             <Badge className="bg-white/90 text-slate-700">
-              {selectionLabel(selection)}
+              {selectedGroup ? `환승 그룹 · ${selectedGroup.nameKo}` : selectionLabel(selection)}
             </Badge>
             <Badge className="bg-white/90 text-slate-700">
               Zoom {zoom.toFixed(1)}
@@ -5553,7 +5619,7 @@ export default function UnifiedMapEditor({
               {isGeometryMode ? "Geometry Tools" : "Inspector"}
             </p>
             <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
-              {isGeometryMode ? "전체 선형 편집" : selectionLabel(selection)}
+              {isGeometryMode ? "전체 선형 편집" : selectedGroup ? `환승 그룹 · ${selectedGroup.nameKo}` : selectionLabel(selection)}
             </h2>
           </PanelHeader>
           <PanelBody className="min-h-0 flex-1 overflow-y-auto">
