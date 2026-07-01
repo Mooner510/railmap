@@ -3677,35 +3677,6 @@ export default function UnifiedMapEditor({
       });
 
       map.addLayer({
-        id: "railmap-transfer-group-casing",
-        type: "circle",
-        source: "railmap-transfer-group-icons",
-        paint: {
-          "circle-color": "rgba(255,255,255,0)",
-          "circle-radius": [
-            "case",
-            ["==", ["get", "selected"], true],
-            9.2,
-            8.2,
-          ],
-          "circle-opacity": 0,
-          "circle-stroke-color": [
-            "case",
-            ["==", ["get", "selected"], true],
-            "#111827",
-            "#ffffff",
-          ],
-          "circle-stroke-width": [
-            "case",
-            ["==", ["get", "selected"], true],
-            3,
-            1.5,
-          ],
-          "circle-stroke-opacity": 1,
-        },
-      });
-
-      map.addLayer({
         id: "railmap-transfer-group-icon",
         type: "symbol",
         source: "railmap-transfer-group-icons",
@@ -3851,7 +3822,6 @@ export default function UnifiedMapEditor({
 
       for (const layerId of [
         "railmap-transfer-group-hit",
-        "railmap-transfer-group-casing",
         "railmap-transfer-group-icon",
         "railmap-transfer-group-label",
       ]) {

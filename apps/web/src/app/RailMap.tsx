@@ -1416,35 +1416,6 @@ export default function RailMap({
           });
 
           map.addLayer({
-            id: "transfer-group-collapsed-casing",
-            type: "circle",
-            source: "transfer-group-icons",
-            paint: {
-              "circle-color": "rgba(255,255,255,0)",
-              "circle-radius": [
-                "case",
-                ["==", ["get", "isSelected"], true],
-                9.2,
-                8.2,
-              ],
-              "circle-opacity": 0,
-              "circle-stroke-color": [
-                "case",
-                ["==", ["get", "isSelected"], true],
-                "#111827",
-                "#ffffff",
-              ],
-              "circle-stroke-width": [
-                "case",
-                ["==", ["get", "isSelected"], true],
-                3,
-                1.5,
-              ],
-              "circle-stroke-opacity": 1,
-            },
-          });
-
-          map.addLayer({
             id: "transfer-group-collapsed-icon",
             type: "symbol",
             source: "transfer-group-icons",
@@ -1568,7 +1539,6 @@ export default function RailMap({
 
           for (const layerId of [
             "transfer-group-collapsed-hit",
-            "transfer-group-collapsed-casing",
             "transfer-group-collapsed-icon",
             "transfer-group-collapsed-label",
           ]) {
