@@ -1394,9 +1394,14 @@ export default function RailMap({
             id: "transfer-group-collapsed-hit",
             type: "circle",
             source: "transfer-group-icons",
-            maxzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
             paint: {
-              "circle-radius": 22,
+              "circle-radius": [
+                "step",
+                ["zoom"],
+                22,
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
+                0,
+              ],
               "circle-color": "rgba(0,0,0,0)",
               "circle-opacity": 0,
               "circle-stroke-opacity": 0,
@@ -1407,7 +1412,6 @@ export default function RailMap({
             id: "transfer-group-collapsed-casing",
             type: "circle",
             source: "transfer-group-icons",
-            maxzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
             paint: {
               "circle-color": "rgba(255,255,255,0)",
               "circle-radius": 0,
@@ -1421,12 +1425,20 @@ export default function RailMap({
             id: "transfer-group-collapsed-icon",
             type: "symbol",
             source: "transfer-group-icons",
-            maxzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
             layout: {
               "icon-image": "transfer-icon",
               "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.038, 0.034],
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
+            },
+            paint: {
+              "icon-opacity": [
+                "step",
+                ["zoom"],
+                1,
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
+                0,
+              ],
             },
           });
 
@@ -1435,7 +1447,6 @@ export default function RailMap({
             type: "symbol",
             source: "transfer-group-icons",
             minzoom: 12,
-            maxzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
             layout: {
               "text-field": ["get", "nameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
@@ -1448,7 +1459,20 @@ export default function RailMap({
             paint: {
               "text-color": "#0f172a",
               "text-halo-color": "#ffffff",
-              "text-halo-width": 1.5,
+              "text-halo-width": [
+                "step",
+                ["zoom"],
+                1.5,
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
+                0,
+              ],
+              "text-opacity": [
+                "step",
+                ["zoom"],
+                1,
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
+                0,
+              ],
             },
           });
 
