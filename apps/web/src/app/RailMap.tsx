@@ -1340,7 +1340,6 @@ export default function RailMap({
             id: "transfer-group-areas-fill",
             type: "fill",
             source: "transfer-group-areas",
-            minzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
             paint: {
               "fill-color": [
                 "case",
@@ -1349,10 +1348,16 @@ export default function RailMap({
                 "#0f172a",
               ],
               "fill-opacity": [
-                "case",
-                ["==", ["get", "isSelected"], true],
-                0.34,
-                0.22,
+                "step",
+                ["zoom"],
+                0,
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
+                [
+                  "case",
+                  ["==", ["get", "isSelected"], true],
+                  0.34,
+                  0.22,
+                ],
               ],
             },
           });
@@ -1361,7 +1366,6 @@ export default function RailMap({
             id: "transfer-group-areas-outline",
             type: "line",
             source: "transfer-group-areas",
-            minzoom: TRANSFER_DETAIL_ZOOM_THRESHOLD,
             paint: {
               "line-color": [
                 "case",
@@ -1369,8 +1373,20 @@ export default function RailMap({
                 "#2563eb",
                 "#64748b",
               ],
-              "line-width": ["case", ["==", ["get", "isSelected"], true], 3.4, 2.2],
-              "line-opacity": 0.9,
+              "line-width": [
+                "step",
+                ["zoom"],
+                0,
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
+                ["case", ["==", ["get", "isSelected"], true], 3.4, 2.2],
+              ],
+              "line-opacity": [
+                "step",
+                ["zoom"],
+                0,
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
+                0.9,
+              ],
             },
           });
 
@@ -1383,6 +1399,7 @@ export default function RailMap({
               "circle-radius": 22,
               "circle-color": "rgba(0,0,0,0)",
               "circle-opacity": 0,
+              "circle-stroke-opacity": 0,
             },
           });
 
@@ -1396,6 +1413,7 @@ export default function RailMap({
               "circle-radius": 0,
               "circle-stroke-width": 0,
               "circle-opacity": 0,
+              "circle-stroke-opacity": 0,
             },
           });
 
@@ -1496,6 +1514,13 @@ export default function RailMap({
                 ["==", ["get", "isSelected"], true],
                 2.2,
                 1.2,
+              ],
+              "circle-stroke-opacity": [
+                "step",
+                ["zoom"],
+                ["case", ["==", ["get", "isTransferChild"], true], 0, 1],
+                TRANSFER_DETAIL_ZOOM_THRESHOLD,
+                1,
               ],
               "circle-opacity": [
                 "step",
