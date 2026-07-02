@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   listManualOverlaySnapshots,
   loadManualOverlaySnapshot,
+  readManualOverlaySnapshot,
   saveManualOverlaySnapshot,
 } from "../../../manualOverlayStore";
 
@@ -15,6 +16,26 @@ export async function POST(request: Request) {
     subtitle?: string | null;
     snapshotId?: string;
   };
+
+
+  if (body.action === "preview") {
+    if (!body.snapshotId) {
+      return NextResponse.json(
+        { error: "snapshotId is required" },
+        { status: 400 },
+      );
+    }
+
+    const overlays = await readManualOverlaySnapshot(body.snapshotId);
+    if (!overlays) {
+      return NextResponse.json(
+        { error: "snapshot not found" },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({ overlays });
+  }
 
   if (body.action === "load") {
     if (!body.snapshotId) {
