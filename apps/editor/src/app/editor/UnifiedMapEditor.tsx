@@ -190,9 +190,34 @@ type GeometryEditTarget = {
   savedPointCount: number;
 };
 
+type LineBranchValidationIssueCategory =
+  | "missing-reference"
+  | "invalid-connection"
+  | "station-line-identity"
+  | "stale-anchor"
+  | "detached-geometry"
+  | "missing-geometry";
+
+type LineBranchValidationIssueSeverity = "error" | "warning";
+
+type LineBranchValidationAutoFix =
+  | { kind: "delete-line-branch"; id: string }
+  | { kind: "delete-branch-station-exclusion"; id: string }
+  | { kind: "remove-branch-route-station"; overrideId: string; stationId: string }
+  | { kind: "convert-geometry-station-to-control"; branchId: string; pointIndex: number }
+  | { kind: "convert-line-branch-station-to-control"; overrideId: string; pointIndex: number }
+  | { kind: "create-geometry-from-branch-stops"; branchId: string };
+
 type LineBranchValidationIssue = {
   id: string;
+  title: string;
   message: string;
+  category: LineBranchValidationIssueCategory;
+  severity: LineBranchValidationIssueSeverity;
+  cause: string;
+  solution: string;
+  autoFix?: LineBranchValidationAutoFix;
+  includeInBulkFix?: boolean;
 };
 
 type StaleSavedStationAnchorSummary = {
@@ -543,6 +568,58 @@ function getBranchStationIds(branch: EditorMapBranch): string[] {
     .filter((stationId): stationId is string => Boolean(stationId));
 }
 
+function makeValidationIssue(input: {
+  id: string;
+  title: string;
+  message: string;
+  category: LineBranchValidationIssueCategory;
+  severity?: LineBranchValidationIssueSeverity;
+  cause: string;
+  solution: string;
+  autoFix?: LineBranchValidationAutoFix;
+  includeInBulkFix?: boolean;
+}): LineBranchValidationIssue {
+  return {
+    severity: input.severity ?? "error",
+    includeInBulkFix: input.includeInBulkFix ?? Boolean(input.autoFix),
+    ...input,
+  };
+}
+
+function getValidationCategoryLabel(category: LineBranchValidationIssueCategory) {
+  switch (category) {
+    case "missing-reference":
+      return "존재하지 않는 대상";
+    case "invalid-connection":
+      return "잘못된 연결";
+    case "station-line-identity":
+      return "역/노선 규칙 위반";
+    case "stale-anchor":
+      return "예전 위치 anchor";
+    case "detached-geometry":
+      return "역과 선형 불일치";
+    case "missing-geometry":
+      return "선형 없음";
+  }
+}
+
+function getValidationCategoryDescription(category: LineBranchValidationIssueCategory) {
+  switch (category) {
+    case "missing-reference":
+      return "저장된 보정이 더 이상 존재하지 않는 역이나 노선을 가리킵니다.";
+    case "invalid-connection":
+      return "같은 노선을 서로 연결했거나 연결 기준이 올바르지 않습니다.";
+    case "station-line-identity":
+      return "다른 노선의 역 아이콘을 현재 노선의 역처럼 직접 사용했습니다.";
+    case "stale-anchor":
+      return "역 위치를 옮겼지만 저장된 선형 좌표는 예전 위치를 보고 있습니다.";
+    case "detached-geometry":
+      return "역 점과 선형이 서로 떨어져 있어 지도에서 어긋나 보일 수 있습니다.";
+    case "missing-geometry":
+      return "정차역은 있지만 선형 좌표가 없어 지도에서 선이 빠질 수 있습니다.";
+  }
+}
+
 function validateLineBranchOverrides(
   overlays: ManualOverlayBundle,
   branches: EditorMapBranch[],
@@ -557,33 +634,53 @@ function validateLineBranchOverrides(
 
     const parentBranch = branchById.get(override.parentBranchId);
     if (!parentBranch) {
-      issues.push({
+      issues.push(makeValidationIssue({
         id: `${override.id}:parent`,
+        title: "상위 노선을 찾을 수 없음",
         message: `상위 노선을 찾을 수 없음: ${override.parentBranchId}`,
-      });
+        category: "missing-reference",
+        cause: "지선 보정이 삭제되었거나 이름이 바뀐 branch를 가리킵니다.",
+        solution: "이 보정은 더 이상 적용할 수 없으므로 지선 보정을 삭제해야 합니다.",
+        autoFix: { kind: "delete-line-branch", id: override.id },
+      }));
       continue;
     }
 
     const parentStationIds = new Set(getBranchStationIds(parentBranch));
     if (!parentStationIds.has(override.anchorStationId)) {
-      issues.push({
+      issues.push(makeValidationIssue({
         id: `${override.id}:anchor`,
+        title: "연결 기준 역이 상위 노선에 없음",
         message: `연결 기준 역이 상위 노선에 없음: ${formatStationDisplayName(stationById.get(override.anchorStationId))}`,
-      });
+        category: "invalid-connection",
+        cause: "지선의 시작점으로 지정한 역이 상위 branch의 정차역 목록에 없습니다.",
+        solution: "상위 branch에 있는 다른 역으로 다시 연결하거나, 이 지선 보정을 삭제해야 합니다.",
+        autoFix: { kind: "delete-line-branch", id: override.id },
+      }));
     }
 
     if (override.mode === "add-station") {
       const branchStationId = override.branchStationId;
       if (!branchStationId || !stationById.has(branchStationId)) {
-        issues.push({
+        issues.push(makeValidationIssue({
           id: `${override.id}:branch-station`,
+          title: "추가할 지선 역을 찾을 수 없음",
           message: `추가할 지선 역을 찾을 수 없음: ${branchStationId ?? "-"}`,
-        });
+          category: "missing-reference",
+          cause: "지선에 추가하려던 역 ID가 현재 데이터에 없습니다.",
+          solution: "존재하지 않는 역을 참조하는 보정이므로 삭제한 뒤 새 역 생성 기능으로 다시 만들어야 합니다.",
+          autoFix: { kind: "delete-line-branch", id: override.id },
+        }));
       } else if (assignedStationIds.has(branchStationId)) {
-        issues.push({
+        issues.push(makeValidationIssue({
           id: `${override.id}:branch-station-assigned`,
+          title: "이미 다른 노선에 소속된 역을 지선에 추가함",
           message: `추가할 지선 역이 이미 다른 노선에 소속됨: ${formatStationDisplayName(stationById.get(branchStationId))}`,
-        });
+          category: "station-line-identity",
+          cause: "기존 역 아이콘을 다른 노선의 역처럼 재사용했습니다.",
+          solution: "기존 역 연결이 아니라 새 역 생성 기능으로 노선 전용 역을 새로 만들어야 합니다.",
+          autoFix: { kind: "delete-line-branch", id: override.id },
+        }));
       }
     }
 
@@ -592,26 +689,41 @@ function validateLineBranchOverrides(
         ? branchById.get(override.connectedBranchId)
         : null;
       if (!connectedBranch) {
-        issues.push({
+        issues.push(makeValidationIssue({
           id: `${override.id}:connected`,
+          title: "연결할 노선을 찾을 수 없음",
           message: `연결할 노선을 찾을 수 없음: ${override.connectedBranchId ?? "-"}`,
-        });
+          category: "missing-reference",
+          cause: "결합 대상으로 지정한 branch가 현재 데이터에 없습니다.",
+          solution: "이 결합 보정은 더 이상 적용할 수 없으므로 삭제해야 합니다.",
+          autoFix: { kind: "delete-line-branch", id: override.id },
+        }));
         continue;
       }
 
       if (connectedBranch.id === parentBranch.id) {
-        issues.push({
+        issues.push(makeValidationIssue({
           id: `${override.id}:same-branch`,
+          title: "같은 branch끼리 결합됨",
           message: "같은 branch끼리는 지선 결합할 수 없음",
-        });
+          category: "invalid-connection",
+          cause: "상위 branch와 연결 대상 branch가 같습니다.",
+          solution: "같은 노선을 다시 연결하는 보정은 의미가 없으므로 삭제해야 합니다.",
+          autoFix: { kind: "delete-line-branch", id: override.id },
+        }));
       }
       const connectedStationId = override.connectedEndpointStationId;
       const connectedStationIds = new Set(getBranchStationIds(connectedBranch));
       if (!connectedStationId || !connectedStationIds.has(connectedStationId)) {
-        issues.push({
+        issues.push(makeValidationIssue({
           id: `${override.id}:connected-station`,
+          title: "연결 대상 역이 연결 노선에 없음",
           message: `연결 노선의 선택 역이 노선에 없음: ${formatStationDisplayName(connectedStationId ? stationById.get(connectedStationId) : null)}`,
-        });
+          category: "invalid-connection",
+          cause: "연결 대상으로 고른 역이 연결 branch의 정차역이 아닙니다.",
+          solution: "연결 대상을 다시 고르거나 이 결합 보정을 삭제해야 합니다.",
+          autoFix: { kind: "delete-line-branch", id: override.id },
+        }));
       }
     }
   }
@@ -631,22 +743,64 @@ function validateBranchStationExclusions(
     if (exclusion.enabled === false) continue;
     const branch = branchById.get(exclusion.branchId);
     if (!branch) {
-      issues.push({
+      issues.push(makeValidationIssue({
         id: `${exclusion.id}:branch`,
+        title: "역 제거 대상 노선을 찾을 수 없음",
         message: `역 제거 대상 노선을 찾을 수 없음: ${exclusion.branchId}`,
-      });
+        category: "missing-reference",
+        cause: "역 제거 보정이 더 이상 존재하지 않는 branch를 가리킵니다.",
+        solution: "이 역 제거 보정은 적용할 수 없으므로 삭제해야 합니다.",
+        autoFix: { kind: "delete-branch-station-exclusion", id: exclusion.id },
+      }));
       continue;
     }
 
     if (!stationById.has(exclusion.stationId)) {
-      issues.push({
+      issues.push(makeValidationIssue({
         id: `${exclusion.id}:station`,
+        title: "제거 대상 역을 찾을 수 없음",
         message: `제거 대상 역을 찾을 수 없음: ${exclusion.stationId}`,
-      });
+        category: "missing-reference",
+        cause: "삭제하려던 역 ID가 현재 데이터에 없습니다.",
+        solution: "존재하지 않는 역을 제거하는 보정이므로 삭제해야 합니다.",
+        autoFix: { kind: "delete-branch-station-exclusion", id: exclusion.id },
+      }));
     }
   }
 
   return issues;
+}
+
+function validateMissingBranchGeometry(
+  branches: EditorMapBranch[],
+  overlays: ManualOverlayBundle,
+): LineBranchValidationIssue[] {
+  const existingGeometryBranchIds = new Set(
+    overlays.geometryOverrides
+      .filter((override) => override.enabled !== false)
+      .map((override) => override.branchId),
+  );
+
+  return branches
+    .filter((branch) => {
+      if (existingGeometryBranchIds.has(branch.id)) return false;
+      if (branchCoordinates(branch).length >= 2) return false;
+      const validStopCount = getBranchStopStations(branch).filter(isValidStation).length;
+      return validStopCount >= 2;
+    })
+    .map((branch) =>
+      makeValidationIssue({
+        id: `${branch.id}:missing-geometry`,
+        title: "정차역은 있지만 선형이 없음",
+        message: `정차역은 있지만 선형 좌표가 없어 지도에서 선이 빠질 수 있음: ${formatBranchDisplayName(branch)}`,
+        category: "missing-geometry",
+        severity: "warning",
+        cause: "collector 또는 수기 보정에 이 branch의 geometry가 없습니다. 정차역 아이콘만 있고 노선 선이 빠질 수 있습니다.",
+        solution: "정확한 선형이 있으면 geometry 편집으로 보정하고, 임시로 보이게 하려면 역 좌표 순서로 선형을 생성합니다.",
+        autoFix: { kind: "create-geometry-from-branch-stops", branchId: branch.id },
+        includeInBulkFix: false,
+      }),
+    );
 }
 
 function getPublicWebManualChangeRows(overlays: ManualOverlayBundle) {
@@ -853,10 +1007,16 @@ function validateSavedGeometryStationAnchors(
         point.lat,
       ]);
       if (distance <= SAVED_STATION_ANCHOR_TOLERANCE) continue;
-      issues.push({
+      issues.push(makeValidationIssue({
         id: `${override.branchId}:${point.stationId}:stale-anchor`,
+        title: "저장된 선형 anchor가 예전 위치임",
         message: `저장된 선형 보정의 역 anchor가 현재 역 위치와 다름: ${formatStationDisplayName(stationById.get(point.stationId))}`,
-      });
+        category: "stale-anchor",
+        severity: "warning",
+        cause: "역 위치를 옮긴 뒤 저장된 선형 좌표가 아직 예전 역 위치를 가지고 있습니다.",
+        solution: "해당 역 anchor를 현재 역 위치로 다시 맞추면 됩니다.",
+        includeInBulkFix: false,
+      }));
     }
   }
 
@@ -871,10 +1031,16 @@ function validateSavedGeometryStationAnchors(
         point.lat,
       ]);
       if (distance <= SAVED_STATION_ANCHOR_TOLERANCE) continue;
-      issues.push({
+      issues.push(makeValidationIssue({
         id: `${override.id}:${point.stationId}:stale-line-branch-anchor`,
+        title: "저장된 지선 anchor가 예전 위치임",
         message: `저장된 지선 선형의 역 anchor가 현재 역 위치와 다름: ${formatStationDisplayName(stationById.get(point.stationId))}`,
-      });
+        category: "stale-anchor",
+        severity: "warning",
+        cause: "역 위치를 옮긴 뒤 저장된 지선 좌표가 아직 예전 역 위치를 가지고 있습니다.",
+        solution: "검증 탭 상단의 anchor 일괄 수정 버튼으로 현재 위치에 맞출 수 있습니다.",
+        includeInBulkFix: false,
+      }));
     }
   }
 
@@ -1098,10 +1264,16 @@ function validateStationGeometryAlignment(
       const distance = distanceToCoordinatePolyline(coordinate, coordinates);
       if (distance <= STATION_GEOMETRY_ANCHOR_TOLERANCE) continue;
       reportedStationIds.add(station.id);
-      issues.push({
+      issues.push(makeValidationIssue({
         id: `${branch.id}:${station.id}:detached-station`,
+        title: "역과 본선 선형이 떨어져 있음",
         message: `역 위치와 본선 선형이 떨어져 있음: ${formatStationDisplayName(station)} · ${formatBranchDisplayName(branch)}`,
-      });
+        category: "detached-geometry",
+        severity: "warning",
+        cause: "역 위치와 현재 선형 좌표가 서로 떨어져 있어 지도에서 역이 선 밖에 떠 보일 수 있습니다.",
+        solution: "역 위치를 다시 맞추거나 geometry 편집에서 선형을 역 위치에 맞게 보정해야 합니다.",
+        includeInBulkFix: false,
+      }));
     }
   }
 
@@ -1132,10 +1304,16 @@ function validateStationGeometryAlignment(
         coordinates,
       );
       if (distance <= STATION_GEOMETRY_ANCHOR_TOLERANCE) continue;
-      issues.push({
+      issues.push(makeValidationIssue({
         id: `${override.id}:${stationId}:detached-line-branch-station`,
+        title: "역과 지선 선형이 떨어져 있음",
         message: `역 위치와 지선 선형이 떨어져 있음: ${formatStationDisplayName(stationById.get(stationId))}`,
-      });
+        category: "detached-geometry",
+        severity: "warning",
+        cause: "지선 선형이 역 위치를 지나지 않아 연결선이 어색하게 보일 수 있습니다.",
+        solution: "지선 선형을 다시 편집하거나 저장된 anchor를 현재 역 위치로 맞춰야 합니다.",
+        includeInBulkFix: false,
+      }));
     }
   }
 
@@ -1219,11 +1397,17 @@ function makeStationLineIdentityIssue(
   branch: EditorMapBranch | null | undefined,
   stationById: Map<string, EditorStation>,
   context: string,
+  autoFix?: LineBranchValidationAutoFix,
 ): LineBranchValidationIssue {
-  return {
+  return makeValidationIssue({
     id,
+    title: `${context}에서 다른 노선 역을 직접 사용함`,
     message: `${context}: 다른 노선의 역 아이콘을 직접 참조함 - ${formatStationDisplayName(stationById.get(stationId))} → ${formatBranchDisplayName(branch)}`,
-  };
+    category: "station-line-identity",
+    cause: "같은 물리 위치라도 노선이 다르면 별도 역 아이콘/역사로 관리해야 하는데, 기존 다른 노선의 stationId를 직접 재사용했습니다.",
+    solution: "새 역 생성 기능으로 해당 노선 전용 역을 만들거나, 선형 모양만 필요하면 station anchor가 아니라 control point로 바꿔야 합니다.",
+    autoFix,
+  });
 }
 
 function validateStationLineIdentity(
@@ -1247,6 +1431,7 @@ function validateStationLineIdentity(
           branch,
           stationById,
           "노선 정차 순서 보정",
+          { kind: "remove-branch-route-station", overrideId: override.id, stationId },
         ),
       );
     }
@@ -1266,6 +1451,7 @@ function validateStationLineIdentity(
           branch,
           stationById,
           "선형 보정",
+          { kind: "convert-geometry-station-to-control", branchId: override.branchId, pointIndex: index },
         ),
       );
     }
@@ -1286,6 +1472,7 @@ function validateStationLineIdentity(
           parentBranch,
           stationById,
           "지선 시작 역",
+          { kind: "delete-line-branch", id: override.id },
         ),
       );
     }
@@ -1302,6 +1489,7 @@ function validateStationLineIdentity(
           parentBranch,
           stationById,
           "기존 역 연결",
+          { kind: "delete-line-branch", id: override.id },
         ),
       );
     }
@@ -1322,6 +1510,7 @@ function validateStationLineIdentity(
           connectedBranch,
           stationById,
           "결합 대상 역",
+          { kind: "delete-line-branch", id: override.id },
         ),
       );
     }
@@ -1339,6 +1528,7 @@ function validateStationLineIdentity(
           parentBranch,
           stationById,
           "지선 선형",
+          { kind: "convert-line-branch-station-to-control", overrideId: override.id, pointIndex: index },
         ),
       );
     }
@@ -1726,6 +1916,31 @@ function makeLineBranchGeometry(anchor: EditorStation, target: EditorStation) {
       stationId: target.id,
     },
   ];
+}
+
+function makeGeometryOverrideFromBranchStops(
+  branch: EditorMapBranch,
+): ManualGeometryOverride | null {
+  const points: ManualGeometryOverridePoint[] = [];
+
+  for (const station of getBranchStopStations(branch)) {
+    const coordinate = getStationCoordinate(station);
+    if (!coordinate) continue;
+    points.push({
+      lng: coordinate[0],
+      lat: coordinate[1],
+      kind: "station",
+      stationId: station.id,
+    });
+  }
+
+  if (points.length < 2) return null;
+  return {
+    branchId: branch.id,
+    points,
+    enabled: true,
+    note: "정차역 좌표 순서로 자동 생성한 임시 선형입니다. 정확한 선형은 geometry 편집에서 보정하세요.",
+  };
 }
 
 function getGeometryTargetKey(type: GeometryTargetType, id: string) {
@@ -3391,6 +3606,7 @@ export default function UnifiedMapEditor({
       ...validateLineBranchOverrides(overlays, data.branches, stationById),
       ...validateBranchStationExclusions(overlays, data.branches, stationById),
       ...validateStationLineIdentity(overlays, data.branches, stationById),
+      ...validateMissingBranchGeometry(data.branches, overlays),
       ...validateGeometryConsistency(
         displayBranches,
         displayLineBranchOverrides,
@@ -5916,6 +6132,127 @@ export default function UnifiedMapEditor({
     setSidebarTab("validation");
   }
 
+  function applyValidationFixToOverlays(
+    current: ManualOverlayBundle,
+    fix: LineBranchValidationAutoFix,
+  ): ManualOverlayBundle {
+    if (fix.kind === "delete-line-branch") {
+      return {
+        ...current,
+        lineBranchOverrides: current.lineBranchOverrides.filter(
+          (override) => override.id !== fix.id,
+        ),
+      };
+    }
+
+    if (fix.kind === "delete-branch-station-exclusion") {
+      return {
+        ...current,
+        branchStationExclusions: current.branchStationExclusions.filter(
+          (override) => override.id !== fix.id,
+        ),
+      };
+    }
+
+    if (fix.kind === "remove-branch-route-station") {
+      return {
+        ...current,
+        branchRouteOverrides: current.branchRouteOverrides.flatMap((override) => {
+          if (override.id !== fix.overrideId) return [override];
+          const stationIds = override.stationIds.filter(
+            (stationId) => stationId !== fix.stationId,
+          );
+          return stationIds.length >= 2 ? [{ ...override, stationIds }] : [];
+        }),
+      };
+    }
+
+    if (fix.kind === "convert-geometry-station-to-control") {
+      return {
+        ...current,
+        geometryOverrides: current.geometryOverrides.map((override) => {
+          if (override.branchId !== fix.branchId) return override;
+          const points = override.points.map((point, index) => {
+            if (index !== fix.pointIndex || point.kind !== "station") return point;
+            return { lng: point.lng, lat: point.lat, kind: "control" as const };
+          });
+          return { ...override, points };
+        }),
+      };
+    }
+
+    if (fix.kind === "convert-line-branch-station-to-control") {
+      return {
+        ...current,
+        lineBranchOverrides: current.lineBranchOverrides.map((override) => {
+          if (override.id !== fix.overrideId || !override.geometry) return override;
+          const geometry = override.geometry.map((point, index) => {
+            if (index !== fix.pointIndex || point.kind !== "station") return point;
+            return { lng: point.lng, lat: point.lat, kind: "control" as const };
+          });
+          return { ...override, geometry };
+        }),
+      };
+    }
+
+    if (fix.kind === "create-geometry-from-branch-stops") {
+      const branch = branchById.get(fix.branchId);
+      const override = branch ? makeGeometryOverrideFromBranchStops(branch) : null;
+      if (!override) return current;
+      return {
+        ...current,
+        geometryOverrides: [
+          ...current.geometryOverrides.filter(
+            (candidate) => candidate.branchId !== override.branchId,
+          ),
+          override,
+        ],
+      };
+    }
+
+    return current;
+  }
+
+  async function applyValidationAutoFix(
+    fix: LineBranchValidationAutoFix,
+    label = "검증 문제 자동 해결",
+  ) {
+    const next = applyValidationFixToOverlays(overlays, fix);
+    if (next === overlays) {
+      showToast("자동 해결할 수 있는 변경이 없습니다", "info");
+      return;
+    }
+    const saved = await executeOverlayCommand(label, next, "검증 문제 자동 해결 완료");
+    if (!saved) return;
+    await reloadEditorData();
+    setSidebarTab("validation");
+  }
+
+  async function applyAllSafeValidationFixes() {
+    const fixes = lineBranchIssues
+      .filter((issue) => issue.autoFix && issue.includeInBulkFix !== false)
+      .map((issue) => issue.autoFix)
+      .filter((fix): fix is LineBranchValidationAutoFix => Boolean(fix));
+
+    if (fixes.length === 0) {
+      showToast("일괄 자동 해결할 항목이 없습니다", "info");
+      return;
+    }
+
+    const next = fixes.reduce(
+      (current, fix) => applyValidationFixToOverlays(current, fix),
+      overlays,
+    );
+    const saved = await executeOverlayCommand(
+      "검증 문제 일괄 자동 해결",
+      next,
+      `${fixes.length.toLocaleString("ko-KR")}개 검증 문제 자동 해결 완료`,
+    );
+    if (!saved) return;
+    await reloadEditorData();
+    setSidebarTab("validation");
+  }
+
   async function saveBranchRouteOverride(
     branchId: string,
     stationIds: string[],
@@ -5989,7 +6326,7 @@ export default function UnifiedMapEditor({
     await reloadEditorData();
   }
 
-  function startAddStationInsertion(insertion: PendingAddStationInsertion) {
+  async function startAddStationInsertion(insertion: PendingAddStationInsertion) {
     const branch = branchById.get(insertion.parentBranchId);
     const beforeStation = stationById.get(insertion.beforeStationId);
     const afterStation = stationById.get(insertion.afterStationId);
@@ -6006,25 +6343,49 @@ export default function UnifiedMapEditor({
       const manualStationId = makeManualStationId(branch, manualStationName);
       setSelection({ type: "none" });
       setStationDraft(makeManualStationOverride(branch, manualStationId, manualStationName));
+      setAddStationModalOpen(false);
+      setPendingAddStationInsertion(insertion);
+      setStationLocationPickMode(true);
+      setSidebarTab("search");
+
+      const map = mapRef.current;
+      if (!map) return;
+
+      const bounds = new maplibregl.LngLatBounds(
+        beforeCoordinate,
+        beforeCoordinate,
+      ).extend(afterCoordinate);
+      map.fitBounds(bounds, {
+        padding: { top: 160, right: 420, bottom: 160, left: 80 },
+        maxZoom: 15,
+        duration: 500,
+      });
+      return;
     }
 
+    const currentDraft = stationDraftRef.current;
+    if (!currentDraft) {
+      showToast("노선에 연결할 기존 역을 먼저 선택하세요", "error");
+      return;
+    }
+
+    const stationCoordinate = getStationCoordinate(selectedStation);
+    const nextDraft: ManualStationOverride = {
+      ...currentDraft,
+      lng:
+        typeof currentDraft.lng === "number"
+          ? currentDraft.lng
+          : stationCoordinate?.[0] ?? null,
+      lat:
+        typeof currentDraft.lat === "number"
+          ? currentDraft.lat
+          : stationCoordinate?.[1] ?? null,
+    };
+
     setAddStationModalOpen(false);
-    setPendingAddStationInsertion(insertion);
-    setStationLocationPickMode(true);
-    setSidebarTab("search");
-
-    const map = mapRef.current;
-    if (!map) return;
-
-    const bounds = new maplibregl.LngLatBounds(
-      beforeCoordinate,
-      beforeCoordinate,
-    ).extend(afterCoordinate);
-    map.fitBounds(bounds, {
-      padding: { top: 160, right: 420, bottom: 160, left: 80 },
-      maxZoom: 15,
-      duration: 500,
-    });
+    setPendingAddStationInsertion(null);
+    setStationLocationPickMode(false);
+    await saveStationLocationAndAddToBranch(nextDraft, insertion);
   }
 
   const selectedStation =
@@ -6479,6 +6840,8 @@ export default function UnifiedMapEditor({
                 onSyncStaleSavedAnchors={() =>
                   void syncAllStaleSavedGeometryAnchors()
                 }
+                onApplyIssueFix={(fix) => void applyValidationAutoFix(fix)}
+                onApplyAllSafeFixes={() => void applyAllSafeValidationFixes()}
               />
             ) : null}
             {!isGeometryMode && sidebarTab === "history" ? (
@@ -7363,7 +7726,7 @@ function AddStationInsertionDialog({
         <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
           {creationMode
             ? "새 역 이름과 들어갈 위치를 고른 뒤, 지도에서 실제 위치를 클릭해 저장합니다."
-            : `${station.nameKo}을(를) 기존 노선의 어느 두 역 사이에 넣을지 선택하세요.`}
+            : `${station.nameKo}은(는) 이미 위치가 있으므로 두 역 사이만 고르면 바로 노선에 연결됩니다.`}
         </p>
       </div>
       <div className="grid min-h-0 gap-3 overflow-y-auto p-4">
@@ -7396,35 +7759,78 @@ function AddStationInsertionDialog({
           </select>
         </Field>
         <div className="grid gap-2">
-          <strong className="text-xs font-semibold text-slate-700">
-            추가 위치
-          </strong>
+          <div className="flex items-start justify-between gap-3">
+            <span>
+              <strong className="block text-xs font-semibold text-slate-700">
+                추가 위치
+              </strong>
+              <span className="mt-0.5 block text-[11px] font-medium leading-4 text-slate-400">
+                노선도에서 두 역 사이의 파란 선을 눌러 선택하세요.
+              </span>
+            </span>
+            <Badge className="bg-blue-50 text-blue-700">
+              {creationMode ? "새 역" : "기존 역 연결"}
+            </Badge>
+          </div>
           {selectedBranch && pairs.length > 0 ? (
-            <div className="grid gap-1.5">
-              {pairs.map(({ before, after }) => (
-                <button
-                  key={`${before.id}:${after.id}`}
-                  type="button"
-                  className="grid grid-cols-[minmax(0,1fr)_40px_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={!canSelectLocation}
-                  onClick={() =>
-                    onSelect({
-                      parentBranchId: selectedBranch.id,
-                      beforeStationId: before.id,
-                      afterStationId: after.id,
-                      newStationNameKo: creationMode
-                        ? newStationNameKo.trim()
-                        : undefined,
-                    })
-                  }
-                >
-                  <span className="truncate text-right">{before.nameKo}</span>
-                  <span className="mx-auto grid size-8 place-items-center rounded-full bg-blue-600 text-white">
-                    <Plus className="size-4" />
-                  </span>
-                  <span className="truncate text-left">{after.nameKo}</span>
-                </button>
-              ))}
+            <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mx-auto grid min-w-[520px] max-w-xl grid-cols-[minmax(0,1fr)_88px_minmax(0,1fr)] gap-x-2 gap-y-1">
+                {pairs.map(({ before, after }, index) => {
+                  const reversed = index % 2 === 1;
+                  const beforeCell = reversed ? 2 : 0;
+                  const afterCell = reversed ? 0 : 2;
+                  return (
+                    <div
+                      key={`${before.id}:${after.id}`}
+                      className="contents"
+                    >
+                      <div
+                        className={cn(
+                          "flex min-h-10 items-center",
+                          beforeCell === 0 ? "justify-end" : "justify-start",
+                        )}
+                        style={{ gridColumn: beforeCell + 1 }}
+                      >
+                        <span className="max-w-[180px] truncate rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-sm">
+                          {before.nameKo}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="group relative col-start-2 row-auto flex h-10 items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
+                        disabled={!canSelectLocation}
+                        title={`${before.nameKo} - ${after.nameKo} 사이에 ${creationMode ? "새 역 생성" : "기존 역 연결"}`}
+                        onClick={() =>
+                          onSelect({
+                            parentBranchId: selectedBranch.id,
+                            beforeStationId: before.id,
+                            afterStationId: after.id,
+                            newStationNameKo: creationMode
+                              ? newStationNameKo.trim()
+                              : undefined,
+                          })
+                        }
+                      >
+                        <span className="absolute left-1/2 top-0 h-full w-1 -translate-x-1/2 rounded-full bg-blue-200 transition group-hover:w-2 group-hover:bg-blue-500" />
+                        <span className="relative grid size-8 place-items-center rounded-full border-2 border-white bg-blue-600 text-white shadow-sm transition group-hover:scale-110 group-hover:bg-blue-700">
+                          <Plus className="size-4" />
+                        </span>
+                      </button>
+                      <div
+                        className={cn(
+                          "flex min-h-10 items-center",
+                          afterCell === 0 ? "justify-end" : "justify-start",
+                        )}
+                        style={{ gridColumn: afterCell + 1 }}
+                      >
+                        <span className="max-w-[180px] truncate rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-sm">
+                          {after.nameKo}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-xs font-medium text-slate-400">
@@ -8070,18 +8476,34 @@ function StationInspector({
   );
 }
 
+function getValidationIssueToneClassName(issue: LineBranchValidationIssue) {
+  if (issue.severity === "warning") {
+    return "border-amber-100 bg-amber-50 text-amber-900";
+  }
+  return "border-red-100 bg-red-50 text-red-900";
+}
+
+function getValidationIssueBadgeClassName(issue: LineBranchValidationIssue) {
+  if (issue.severity === "warning") return "bg-amber-100 text-amber-700";
+  return "bg-red-100 text-red-700";
+}
+
 function LineBranchValidationPanel({
   count,
   issues,
   overlays,
   staleSavedAnchorSummaries,
   onSyncStaleSavedAnchors,
+  onApplyIssueFix,
+  onApplyAllSafeFixes,
 }: {
   count: number;
   issues: LineBranchValidationIssue[];
   overlays: ManualOverlayBundle;
   staleSavedAnchorSummaries: StaleSavedStationAnchorSummary[];
   onSyncStaleSavedAnchors: () => void;
+  onApplyIssueFix: (fix: LineBranchValidationAutoFix) => void;
+  onApplyAllSafeFixes: () => void;
 }) {
   const webRows = getPublicWebManualChangeRows(overlays);
   const webChangeTotal = getPublicWebManualChangeTotal(overlays);
@@ -8090,25 +8512,59 @@ function LineBranchValidationPanel({
     (sum, item) => sum + item.changedCount,
     0,
   );
+  const errorCount = issues.filter((issue) => issue.severity === "error").length;
+  const warningCount = issues.filter(
+    (issue) => issue.severity === "warning",
+  ).length;
+  const safeFixCount = issues.filter(
+    (issue) => issue.autoFix && issue.includeInBulkFix !== false,
+  ).length;
+  const groupedIssues = issues.reduce(
+    (groups, issue) => {
+      const list = groups.get(issue.category) ?? [];
+      list.push(issue);
+      groups.set(issue.category, list);
+      return groups;
+    },
+    new Map<LineBranchValidationIssueCategory, LineBranchValidationIssue[]>(),
+  );
 
   return (
     <div className="grid gap-3">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-        <strong className="text-sm font-semibold text-slate-700">
-          오버레이/선형 검증
-        </strong>
-        <p className="mt-2 text-xs font-medium text-slate-500">
-          지선 등록 {count}개 · 검증 항목 {issues.length}개
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <strong className="text-sm font-semibold text-slate-700">
+              오버레이/선형 검증
+            </strong>
+            <p className="mt-2 text-xs font-medium text-slate-500">
+              지선 등록 {count}개 · 오류 {errorCount}개 · 주의 {warningCount}개
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={safeFixCount === 0}
+            onClick={onApplyAllSafeFixes}
+          >
+            가능한 것 모두 해결
+          </Button>
+        </div>
+        <p className="mt-3 text-[11px] font-medium leading-5 text-slate-500">
+          각 항목은 문제, 원인, 해결 방법을 분리해서 표시합니다. 자동 해결은 데이터 손실 가능성이 낮은 항목만 일괄 처리합니다. 선형 없음처럼 임시 선형을 새로 만드는 작업은 개별 버튼으로만 처리합니다.
         </p>
       </div>
+
       {staleSavedAnchorSummaries.length > 0 ? (
         <div className="rounded-2xl border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
           <div className="flex items-start justify-between gap-3">
             <div>
               <strong className="font-semibold">저장 선형 anchor 불일치</strong>
               <p className="mt-1 leading-5 text-orange-800">
-                역 위치는 바뀌었지만 저장된 선형 안의 역 좌표가 예전 위치인
-                항목입니다. 한 번에 현재 역 위치로 맞출 수 있습니다.
+                역 위치는 바뀌었지만 저장된 선형 안의 역 좌표가 예전 위치인 항목입니다.
+              </p>
+              <p className="mt-1 leading-5 text-orange-800">
+                해결 방법: 현재 역 위치로 anchor 좌표를 다시 맞추면 됩니다.
               </p>
             </div>
             <Badge>{staleSavedAnchorTotal}개</Badge>
@@ -8148,6 +8604,7 @@ function LineBranchValidationPanel({
           </Button>
         </div>
       ) : null}
+
       <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -8155,8 +8612,7 @@ function LineBranchValidationPanel({
               공개 Web 반영 대상
             </strong>
             <p className="mt-1 text-[11px] font-medium leading-4 text-blue-800">
-              Editor override 중 공개 Web 렌더링과 데이터 계산에 반영되어야 하는
-              항목입니다. 이 목록을 기준으로 Editor/Web 표시 차이를 줄입니다.
+              Editor override 중 공개 Web 렌더링과 데이터 계산에 반영되어야 하는 항목입니다.
             </p>
           </div>
           <Badge className="shrink-0 bg-white/80 text-blue-700">
@@ -8204,26 +8660,82 @@ function LineBranchValidationPanel({
             </div>
           ))}
         </div>
-        <div className="mt-3 rounded-xl border border-blue-100 bg-white/70 px-3 py-2 text-[11px] font-semibold text-blue-800">
-          {issues.length === 0
-            ? "Web 반영 전 기본 점검을 통과했습니다."
-            : "검증 오류가 남아 있으면 Web에서도 표시가 깨질 수 있습니다."}
-        </div>
       </div>
+
       {issues.length === 0 ? (
         <Placeholder
           title="선형 검증 통과"
           description="역 위치, 본선/지선 선형, 저장된 anchor에서 감지된 불일치가 없습니다."
         />
       ) : (
-        <div className="grid gap-2">
-          {issues.map((issue) => (
-            <div
-              key={issue.id}
-              className="rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
+        <div className="grid gap-3">
+          {[...groupedIssues.entries()].map(([category, categoryIssues]) => (
+            <section
+              key={category}
+              className="rounded-3xl border border-slate-200 bg-white p-3"
             >
-              {issue.message}
-            </div>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <strong className="text-sm font-semibold text-slate-800">
+                    {getValidationCategoryLabel(category)}
+                  </strong>
+                  <p className="mt-1 text-[11px] font-medium leading-4 text-slate-500">
+                    {getValidationCategoryDescription(category)}
+                  </p>
+                </div>
+                <Badge className="shrink-0">{categoryIssues.length}개</Badge>
+              </div>
+              <div className="mt-3 grid gap-2">
+                {categoryIssues.map((issue) => (
+                  <div
+                    key={issue.id}
+                    className={cn(
+                      "rounded-2xl border px-3 py-3 text-xs",
+                      getValidationIssueToneClassName(issue),
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className={cn(
+                              "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                              getValidationIssueBadgeClassName(issue),
+                            )}
+                          >
+                            {issue.severity === "error" ? "오류" : "주의"}
+                          </span>
+                          <strong className="font-bold">{issue.title}</strong>
+                        </div>
+                        <p className="mt-2 break-words leading-5 font-semibold">
+                          {issue.message}
+                        </p>
+                      </div>
+                      {issue.autoFix ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0"
+                          onClick={() => onApplyIssueFix(issue.autoFix!)}
+                        >
+                          해결
+                        </Button>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 grid gap-2 text-[11px] leading-5">
+                      <div className="rounded-xl bg-white/65 px-3 py-2">
+                        <span className="font-bold">원인: </span>
+                        {issue.cause}
+                      </div>
+                      <div className="rounded-xl bg-white/65 px-3 py-2">
+                        <span className="font-bold">해결 방법: </span>
+                        {issue.solution}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       )}
