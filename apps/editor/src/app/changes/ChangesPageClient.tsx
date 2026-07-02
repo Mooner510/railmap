@@ -60,6 +60,48 @@ type EditorState = {
   draft: string;
 };
 
+type SnapshotPreview = {
+  snapshot: SnapshotSummary;
+  counts: Record<CategoryKey, number>;
+  diffs: { key: CategoryKey; label: string; current: number; snapshot: number }[];
+  totalDiff: number;
+};
+
+type SnapshotPreviewResponse = {
+  overlays: ManualOverlayBundle;
+};
+
+function countOverlayItems(overlays: ManualOverlayBundle | null) {
+  return Object.fromEntries(
+    CATEGORIES.map((category) => [
+      category.key,
+      categoryItems(overlays, category.key).length,
+    ]),
+  ) as Record<CategoryKey, number>;
+}
+
+function buildSnapshotPreview(
+  snapshot: SnapshotSummary,
+  currentOverlays: ManualOverlayBundle | null,
+  snapshotOverlays: ManualOverlayBundle,
+): SnapshotPreview {
+  const currentCounts = countOverlayItems(currentOverlays);
+  const snapshotCounts = countOverlayItems(snapshotOverlays);
+  const diffs = CATEGORIES.map((category) => ({
+    key: category.key,
+    label: category.label,
+    current: currentCounts[category.key] ?? 0,
+    snapshot: snapshotCounts[category.key] ?? 0,
+  })).filter((diff) => diff.current !== diff.snapshot);
+
+  return {
+    snapshot,
+    counts: snapshotCounts,
+    diffs,
+    totalDiff: diffs.length,
+  };
+}
+
 function getItemId(value: unknown, index: number) {
   if (typeof value === "string") return value;
   if (value && typeof value === "object") {
@@ -134,6 +176,7 @@ export default function ChangesPageClient() {
     draft: "",
   });
   const [snapshotSubtitle, setSnapshotSubtitle] = useState("");
+  const [snapshotPreview, setSnapshotPreview] = useState<SnapshotPreview | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -144,6 +187,13 @@ export default function ChangesPageClient() {
     ]);
     setOverlays(nextOverlays);
     setSnapshots(nextSnapshots);
+    setSnapshotPreview((current) => {
+      if (!current) return null;
+      const nextSnapshot = nextSnapshots.find(
+        (snapshot) => snapshot.id === current.snapshot.id,
+      );
+      return nextSnapshot ? { ...current, snapshot: nextSnapshot } : null;
+    });
   }
 
   useEffect(() => {
@@ -157,13 +207,11 @@ export default function ChangesPageClient() {
     [overlays, selectedCategory],
   );
 
+  const currentCounts = useMemo(() => countOverlayItems(overlays), [overlays]);
+
   const totalCount = useMemo(
-    () =>
-      CATEGORIES.reduce(
-        (sum, category) => sum + categoryItems(overlays, category.key).length,
-        0,
-      ),
-    [overlays],
+    () => CATEGORIES.reduce((sum, category) => sum + currentCounts[category.key], 0),
+    [currentCounts],
   );
 
   async function saveOverlays(next: ManualOverlayBundle, doneMessage: string) {
@@ -220,10 +268,34 @@ export default function ChangesPageClient() {
         body: JSON.stringify({ subtitle: snapshotSubtitle }),
       });
       setSnapshotSubtitle("");
+      setSnapshotPreview(null);
       await reload();
       setMessage("스냅샷을 저장했습니다");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "스냅샷 저장 실패");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+
+  async function previewSnapshot(snapshot: SnapshotSummary) {
+    setBusy(true);
+    try {
+      const response = await fetchJson<SnapshotPreviewResponse>(
+        "/api/manual-overlays/snapshots",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "preview", snapshotId: snapshot.id }),
+        },
+      );
+      setSnapshotPreview(buildSnapshotPreview(snapshot, overlays, response.overlays));
+      setMessage("스냅샷 내용을 미리 확인했습니다");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "스냅샷 미리보기 실패",
+      );
     } finally {
       setBusy(false);
     }
@@ -246,6 +318,7 @@ export default function ChangesPageClient() {
           body: JSON.stringify({ action: "load", snapshotId }),
         },
       );
+      setSnapshotPreview(null);
       await reload();
       setMessage("스냅샷을 메인 데이터로 불러왔습니다");
     } catch (error) {
@@ -431,19 +504,75 @@ export default function ChangesPageClient() {
                   스냅샷
                 </h2>
                 <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
-                  스냅샷은 프로젝트 내부 data/manual/snapshots에 저장됩니다.
-                  별도 export/import는 제공하지 않습니다.
+                  현재 데이터를 저장해두고, 나중에 선택한 스냅샷으로 되돌릴 수 있습니다.
+                  불러오기 전에 현재 데이터는 자동으로 백업됩니다.
                 </p>
               </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold text-slate-600">현재 메인 데이터</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {CATEGORIES.slice(0, 6).map((category) => (
+                    <div
+                      key={category.key}
+                      className="rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-600"
+                    >
+                      <span className="block text-[10px] text-slate-400">
+                        {category.label}
+                      </span>
+                      {currentCounts[category.key]}개
+                    </div>
+                  ))}
+                </div>
+              </div>
               <Input
-                placeholder="부제목 선택 입력"
+                placeholder="예: 선형 수정 전 백업"
                 value={snapshotSubtitle}
                 onChange={(event) => setSnapshotSubtitle(event.target.value)}
               />
               <Button disabled={busy} onClick={() => void createSnapshot()}>
-                현재 메인 데이터 스냅샷 저장
+                현재 상태 저장하기
               </Button>
-              <div className="max-h-[560px] overflow-y-auto rounded-2xl border border-slate-200 p-2">
+              {snapshotPreview ? (
+                <div className="rounded-2xl border border-blue-200 bg-blue-50 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-xs font-semibold text-blue-800">
+                        선택한 스냅샷
+                      </p>
+                      <strong className="mt-1 block text-sm font-semibold text-blue-950">
+                        {snapshotPreview.snapshot.title}
+                      </strong>
+                    </div>
+                    <Badge>{snapshotPreview.totalDiff}개 차이</Badge>
+                  </div>
+                  <div className="mt-3 grid gap-1">
+                    {snapshotPreview.diffs.length === 0 ? (
+                      <p className="rounded-xl bg-white/70 p-2 text-xs font-semibold text-blue-700">
+                        현재 데이터와 항목 수 차이가 없습니다.
+                      </p>
+                    ) : null}
+                    {snapshotPreview.diffs.map((diff) => (
+                      <div
+                        key={diff.key}
+                        className="flex items-center justify-between rounded-xl bg-white/70 px-3 py-2 text-xs font-semibold text-blue-900"
+                      >
+                        <span>{diff.label}</span>
+                        <span>
+                          현재 {diff.current}개 → 스냅샷 {diff.snapshot}개
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <Button
+                    className="mt-3 w-full"
+                    disabled={busy}
+                    onClick={() => void loadSnapshot(snapshotPreview.snapshot.id)}
+                  >
+                    이 스냅샷으로 되돌리기
+                  </Button>
+                </div>
+              ) : null}
+              <div className="max-h-[420px] overflow-y-auto rounded-2xl border border-slate-200 p-2">
                 {snapshots.length === 0 ? (
                   <p className="p-3 text-xs font-medium text-slate-400">
                     저장된 스냅샷이 없습니다.
@@ -452,7 +581,11 @@ export default function ChangesPageClient() {
                 {snapshots.map((snapshot) => (
                   <div
                     key={snapshot.id}
-                    className="rounded-xl p-2 hover:bg-slate-50"
+                    className={`rounded-xl p-2 ${
+                      snapshotPreview?.snapshot.id === snapshot.id
+                        ? "bg-blue-50"
+                        : "hover:bg-slate-50"
+                    }`}
                   >
                     <strong className="block text-xs font-semibold text-slate-700">
                       {snapshot.title}
@@ -460,15 +593,22 @@ export default function ChangesPageClient() {
                     <p className="mt-1 text-[10px] font-medium text-slate-400">
                       {snapshot.fileName}
                     </p>
-                    <Button
-                      className="mt-2 w-full"
-
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => void loadSnapshot(snapshot.id)}
-                    >
-                      불러오기
-                    </Button>
+                    <div className="mt-2 grid grid-cols-2 gap-1">
+                      <Button
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => void previewSnapshot(snapshot)}
+                      >
+                        미리보기
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => void loadSnapshot(snapshot.id)}
+                      >
+                        바로 복구
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
