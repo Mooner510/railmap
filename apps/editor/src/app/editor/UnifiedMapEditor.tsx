@@ -76,6 +76,7 @@ import {
   normalizeSearchText,
 } from "../editorModel";
 import type { EditorMapBranch, UnifiedEditorData } from "../editorData";
+import { getLineBranchConnectionBlockReason, isBranchCircular } from "./branchRules";
 
 type Selection =
   | { type: "none" }
@@ -701,14 +702,21 @@ function validateLineBranchOverrides(
         continue;
       }
 
-      if (connectedBranch.id === parentBranch.id) {
+      const connectionBlockReason = getLineBranchConnectionBlockReason(parentBranch, connectedBranch);
+      if (connectionBlockReason) {
         issues.push(makeValidationIssue({
-          id: `${override.id}:same-branch`,
-          title: "같은 branch끼리 결합됨",
-          message: "같은 branch끼리는 지선 결합할 수 없음",
+          id: `${override.id}:connection-rule`,
+          title: isBranchCircular(parentBranch) || isBranchCircular(connectedBranch)
+            ? "순환 노선은 다른 노선과 결합할 수 없음"
+            : "같은 branch끼리 결합됨",
+          message: connectionBlockReason,
           category: "invalid-connection",
-          cause: "상위 branch와 연결 대상 branch가 같습니다.",
-          solution: "같은 노선을 다시 연결하는 보정은 의미가 없으므로 삭제해야 합니다.",
+          cause: isBranchCircular(parentBranch) || isBranchCircular(connectedBranch)
+            ? "순환 노선은 양방향으로 닫힌 노선이라 시작/끝 역 기준의 결합 방향을 안정적으로 정의할 수 없습니다."
+            : "상위 branch와 연결 대상 branch가 같습니다.",
+          solution: isBranchCircular(parentBranch) || isBranchCircular(connectedBranch)
+            ? "노선 결합 대신 순환 노선 내부에서 새 지선을 추가하거나, 순환 토글을 끈 뒤 결합을 다시 설정하세요."
+            : "같은 노선을 다시 연결하는 보정은 의미가 없으므로 삭제해야 합니다.",
           autoFix: { kind: "delete-line-branch", id: override.id },
         }));
       }
@@ -1895,6 +1903,7 @@ function formatLineBranchDirectionSummary(
 }
 
 function getBranchEndpointStations(branch: EditorMapBranch): EditorStation[] {
+  if (isBranchCircular(branch)) return [];
   const stations = getBranchStopStations(branch);
   return [stations[0], stations.at(-1)].filter(
     (station, index, values): station is EditorStation =>
@@ -6016,8 +6025,9 @@ export default function UnifiedMapEditor({
       return;
     }
 
-    if (parentBranch.id === connectedBranch.id) {
-      showToast("같은 branch끼리는 결합할 수 없습니다", "error");
+    const connectionBlockReason = getLineBranchConnectionBlockReason(parentBranch, connectedBranch);
+    if (connectionBlockReason) {
+      showToast(connectionBlockReason, "error");
       return;
     }
     const parentStationIds = new Set(getBranchStationIds(parentBranch));
@@ -7969,6 +7979,7 @@ function StationInspector({
   const endpointConnectOptions = useMemo(
     () =>
       branchRemovalOptions.filter((branch) =>
+        !isBranchCircular(branch) &&
         getBranchEndpointStations(branch).some(
           (candidate) => candidate.id === station.id,
         ),
@@ -7984,7 +7995,9 @@ function StationInspector({
     ) ?? null;
   const connectOtherBranches = useMemo(
     () =>
-      branchAddOptions.filter((branch) => branch.id !== connectParentBranchId),
+      branchAddOptions.filter(
+        (branch) => branch.id !== connectParentBranchId && !isBranchCircular(branch),
+      ),
     [branchAddOptions, connectParentBranchId],
   );
   const [connectBranchId, setConnectBranchId] = useState(
@@ -8509,7 +8522,7 @@ function StationInspector({
         ) : (
           <Placeholder
             title="연결 작업 없음"
-            description="이 역이 노선의 시작/끝 역일 때 노선 결합 작업이 표시됩니다."
+            description="이 역이 순환 노선이 아닌 노선의 시작/끝 역일 때만 노선 결합 작업이 표시됩니다. 순환 노선에서는 내부 지선 추가만 가능합니다."
           />
         )}
       </CollapsibleSection>
@@ -8892,7 +8905,7 @@ function BranchInspector({
                 순환 노선
               </strong>
               <p className="mt-1 text-[11px] font-medium leading-4 text-slate-500">
-                켜면 마지막 역과 첫 역이 연결되고, 역 추가 프리뷰에도 순환 구간이 표시됩니다.
+                켜면 마지막 역과 첫 역이 연결되고, 다른 노선과의 지선 결합은 막힙니다. 내부 지선 추가는 계속 가능합니다.
               </p>
             </div>
             <button
