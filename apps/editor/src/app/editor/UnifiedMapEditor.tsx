@@ -6283,7 +6283,7 @@ export default function UnifiedMapEditor({
               </div>
             </div>
             {!isGeometryMode ? (
-              <TabList className="mt-3 grid grid-cols-5 gap-0.5">
+              <TabList className="mt-3 grid grid-cols-6 gap-0.5">
                 {sidebarTabOptions.map(({ value, label, Icon, badge }) => (
                   <TabButton
                     key={value}
@@ -6301,6 +6301,19 @@ export default function UnifiedMapEditor({
                     ) : null}
                   </TabButton>
                 ))}
+                <TabButton
+                  className="relative flex min-w-0 items-center justify-center gap-1 px-1"
+                  active={false}
+                  onClick={() => {
+                    setSelection({ type: "none" });
+                    setStationDraft(null);
+                    setAddStationModalOpen(true);
+                  }}
+                  title="새 역 생성"
+                >
+                  <Plus className="size-3.5 shrink-0" />
+                  <span className="truncate">새 역</span>
+                </TabButton>
               </TabList>
             ) : null}
           </PanelHeader>
@@ -6333,17 +6346,6 @@ export default function UnifiedMapEditor({
                     onChange={(event) => setQuery(event.target.value)}
                   />
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelection({ type: "none" });
-                    setStationDraft(null);
-                    setAddStationModalOpen(true);
-                  }}
-                >
-                  <Plus className="mr-1 size-4" />
-                  새 역 생성
-                </Button>
                 <div className="flex items-center justify-between px-1 text-[11px] font-semibold text-slate-400">
                   <span>
                     {filteredStations.length.toLocaleString("ko-KR")}개 결과
