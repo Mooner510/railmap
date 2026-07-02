@@ -2077,6 +2077,37 @@ function normalizeTransferGroupDraftPairs(
   return result;
 }
 
+function getTransferPairKeys(stationIds: string[]) {
+  const keys: string[] = [];
+  for (let i = 0; i < stationIds.length - 1; i += 1) {
+    for (let j = i + 1; j < stationIds.length; j += 1) {
+      keys.push(makeTransferPairKey(stationIds[i] ?? "", stationIds[j] ?? ""));
+    }
+  }
+  return keys;
+}
+
+function getMissingTransferMinutePairLabels(
+  draft: TransferGroupDraft,
+  stationById: Map<string, EditorStation>,
+) {
+  const labels: string[] = [];
+  for (let i = 0; i < draft.stationIds.length - 1; i += 1) {
+    for (let j = i + 1; j < draft.stationIds.length; j += 1) {
+      const leftId = draft.stationIds[i] ?? "";
+      const rightId = draft.stationIds[j] ?? "";
+      const pairKey = makeTransferPairKey(leftId, rightId);
+      if (draft.transferMinutesByPair[pairKey] != null) continue;
+      labels.push(
+        `${stationById.get(leftId)?.nameKo ?? leftId} ↔ ${
+          stationById.get(rightId)?.nameKo ?? rightId
+        }`,
+      );
+    }
+  }
+  return labels;
+}
+
 function makeTransferDraftFromStations(
   stationIds: string[],
   stationById: Map<string, EditorStation>,
@@ -4632,7 +4663,7 @@ export default function UnifiedMapEditor({
           "railmap-transfer-group-hit",
         ]);
         if (transferGroupId) {
-          selectTransferGroupChildrenFromMapRef.current(transferGroupId);
+          selectTransferGroupFromMapRef.current(transferGroupId);
           return;
         }
       } else {
@@ -5244,6 +5275,17 @@ export default function UnifiedMapEditor({
       showToast("환승 그룹은 역이 2개 이상 필요합니다", "error");
       return;
     }
+    const missingPairs = getMissingTransferMinutePairLabels(
+      transferDraft,
+      stationById,
+    );
+    if (missingPairs.length > 0) {
+      showToast(
+        `환승 시간표 ${missingPairs.length.toLocaleString("ko-KR")}개를 모두 입력해야 저장할 수 있습니다`,
+        "error",
+      );
+      return;
+    }
 
     const next: ManualOverlayBundle = {
       ...overlays,
@@ -5274,6 +5316,43 @@ export default function UnifiedMapEditor({
     await executeOverlayCommand("환승 그룹 삭제", next, "환승 그룹 삭제 완료");
     setTransferDraft(null);
     setSelection({ type: "none" });
+  }
+
+  async function removeStationFromTransferGroup(
+    groupId: string,
+    stationId: string,
+  ) {
+    const group = groupById.get(groupId);
+    if (!group) return;
+    const stationIds = group.stationIds.filter((id) => id !== stationId);
+    const nextGroups =
+      stationIds.length < 2
+        ? overlays.manualTransferGroups.filter((candidate) => candidate.id !== groupId)
+        : overlays.manualTransferGroups.map((candidate) =>
+            candidate.id === groupId
+              ? {
+                  ...candidate,
+                  stationIds,
+                  transferMinutesByPair: normalizeTransferGroupDraftPairs(
+                    stationIds,
+                    candidate.transferMinutesByPair,
+                  ),
+                }
+              : candidate,
+          );
+    const saved = await executeOverlayCommand(
+      stationIds.length < 2
+        ? "환승 그룹 역 제거 및 그룹 삭제"
+        : "환승 그룹 역 제거",
+      { ...overlays, manualTransferGroups: nextGroups },
+      stationIds.length < 2
+        ? "역 제거 후 환승 그룹을 삭제했습니다"
+        : "환승 그룹에서 역을 제거했습니다",
+    );
+    if (!saved) return;
+    setTransferDraft(null);
+    setSelection({ type: "station", id: stationId });
+    await reloadEditorData();
   }
 
   async function saveGeometryWorkspaceDrafts() {
@@ -5628,6 +5707,9 @@ export default function UnifiedMapEditor({
   const selectedStationBranches = selectedStation
     ? getBranchesServingStation(data.branches, selectedStation.id)
     : [];
+  const selectedStationTransferGroup = selectedStation
+    ? (stationTransferGroupIndex.get(selectedStation.id) ?? null)
+    : null;
   const selectedBranch =
     selection.type === "branch" ? (branchById.get(selection.id) ?? null) : null;
   const geometryWorkspaceDirtyDrafts = geometryWorkspaceDrafts.filter(
@@ -5970,7 +6052,7 @@ export default function UnifiedMapEditor({
                     </p>
                   </div>
                 ) : null}
-                {multiStationIds.length >= 2 ? (
+                {multiStationIds.length >= 2 && !selectedGroup ? (
                   <Button
                     variant="outline"
                     onClick={() =>
@@ -6137,6 +6219,7 @@ export default function UnifiedMapEditor({
                 station={selectedStation}
                 draft={stationDraft}
                 nonTransfer={nonTransferIds.has(selectedStation.id)}
+                transferGroup={selectedStationTransferGroup}
                 onChange={setStationDraft}
                 onSave={() => void saveStationDraft()}
                 onRollbackPosition={() =>
@@ -6150,6 +6233,13 @@ export default function UnifiedMapEditor({
                 }
                 onSetNonTransfer={(enabled) =>
                   void setStationsNonTransfer([selectedStation.id], enabled)
+                }
+                onOpenTransferGroup={(groupId) => selectTransferGroup(groupId)}
+                onRemoveFromTransferGroup={(groupId) =>
+                  void removeStationFromTransferGroup(
+                    groupId,
+                    selectedStation.id,
+                  )
                 }
                 onStartMapPick={() => setStationLocationPickMode(true)}
                 onFocus={() => focusStation(selectedStation.id)}
@@ -6222,9 +6312,11 @@ export default function UnifiedMapEditor({
                 ids={multiStationIds}
                 stationById={stationById}
                 nonTransferIds={nonTransferIds}
+                transferGroup={selectedGroup}
                 onSetNonTransfer={(enabled) =>
                   void setStationsNonTransfer(multiStationIds, enabled)
                 }
+                onOpenTransferGroup={(groupId) => selectTransferGroup(groupId)}
                 onCreateTransferGroup={() =>
                   createTransferGroupFromSelection(multiStationIds)
                 }
@@ -6778,6 +6870,7 @@ function StationInspector({
   station,
   draft,
   nonTransfer,
+  transferGroup,
   pickMode,
   onChange,
   onSave,
@@ -6787,6 +6880,8 @@ function StationInspector({
   saving,
   onSyncSavedAnchors,
   onSetNonTransfer,
+  onOpenTransferGroup,
+  onRemoveFromTransferGroup,
   onStartMapPick,
   onFocus,
   branchRemovalOptions,
@@ -6798,6 +6893,7 @@ function StationInspector({
   station: EditorStation;
   draft: ManualStationOverride;
   nonTransfer: boolean;
+  transferGroup: TransferGroupMapInfo | null;
   pickMode: boolean;
   onChange: (next: ManualStationOverride) => void;
   onSave: () => void;
@@ -6807,6 +6903,8 @@ function StationInspector({
   saving: boolean;
   onSyncSavedAnchors: () => void;
   onSetNonTransfer: (enabled: boolean) => void;
+  onOpenTransferGroup: (groupId: string) => void;
+  onRemoveFromTransferGroup: (groupId: string) => void;
   onStartMapPick: () => void;
   onFocus: () => void;
   branchRemovalOptions: EditorMapBranch[];
@@ -6952,29 +7050,9 @@ function StationInspector({
           }
         />
       </Field>
-      <div className="grid grid-cols-2 gap-2">
-        <Field label="위도">
-          <Input
-            value={draft.lat ?? ""}
-            onChange={(event) =>
-              onChange({
-                ...draft,
-                lat: parseStationCoordinateInput(event.target.value),
-              })
-            }
-          />
-        </Field>
-        <Field label="경도">
-          <Input
-            value={draft.lng ?? ""}
-            onChange={(event) =>
-              onChange({
-                ...draft,
-                lng: parseStationCoordinateInput(event.target.value),
-              })
-            }
-          />
-        </Field>
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium leading-5 text-slate-600">
+        역 위치는 숫자를 직접 입력하지 않고 지도에서 지정합니다. 현재 위치로
+        지도를 이동한 뒤, 필요한 경우 지도 클릭으로 새 위치를 저장하세요.
       </div>
       <Field label="메모">
         <Textarea
@@ -7012,17 +7090,49 @@ function StationInspector({
           </Button>
         </div>
       ) : null}
+      {transferGroup ? (
+        <div className="grid gap-2 rounded-2xl border border-blue-100 bg-blue-50/80 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <strong className="text-xs font-semibold text-blue-900">
+                환승 그룹에 속한 역
+              </strong>
+              <p className="mt-1 text-xs font-medium leading-5 text-blue-800">
+                {transferGroup.nameKo} 그룹에 포함되어 있습니다. 이 역을
+                미환승역으로 바꾸려면 먼저 그룹에서 제거해야 합니다.
+              </p>
+            </div>
+            <Badge className="shrink-0 bg-white/80 text-blue-700">
+              {transferGroup.stationIds.length}개 역
+            </Badge>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              onClick={() => onOpenTransferGroup(transferGroup.id)}
+            >
+              환승 그룹 설정 열기
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => onRemoveFromTransferGroup(transferGroup.id)}
+            >
+              그룹에서 제거
+            </Button>
+          </div>
+        </div>
+      ) : null}
       <div className="grid grid-cols-2 gap-2">
         <Button variant="outline" onClick={onFocus}>
           <LocateFixed className="mr-1 size-4" />
-          이동
+          지도에서 이 역 보기
         </Button>
         <Button
           variant={pickMode ? "secondary" : "outline"}
           disabled={saving}
           onClick={onStartMapPick}
         >
-          {pickMode ? "지도에서 선택 중" : "지도에서 위치 지정"}
+          {pickMode ? "새 위치 클릭 대기 중" : "지도 클릭으로 위치 변경"}
         </Button>
         <Button
           variant="outline"
@@ -7030,14 +7140,16 @@ function StationInspector({
           onClick={onRollbackPosition}
         >
           <Undo2 className="mr-1 size-4" />
-          위치 롤백
+          위치 되돌리기
         </Button>
-        <Button
-          variant={nonTransfer ? "secondary" : "outline"}
-          onClick={() => onSetNonTransfer(!nonTransfer)}
-        >
-          {nonTransfer ? "환승 가능역" : "미환승역"}
-        </Button>
+        {!transferGroup ? (
+          <Button
+            variant={nonTransfer ? "secondary" : "outline"}
+            onClick={() => onSetNonTransfer(!nonTransfer)}
+          >
+            {nonTransfer ? "환승 가능역으로 변경" : "미환승역으로 설정"}
+          </Button>
+        ) : null}
         <Button disabled={saving} onClick={onSave}>
           <Save className="mr-1 size-4" />
           {saving ? "저장 중" : "저장"}
@@ -7554,6 +7666,7 @@ function TransferGroupInspector({
   group,
   draft,
   stationById,
+  mode = "edit",
   onChange,
   onSave,
   onDelete,
@@ -7561,10 +7674,20 @@ function TransferGroupInspector({
   group: ManualTransferGroup;
   draft: TransferGroupDraft;
   stationById: Map<string, EditorStation>;
+  mode?: "edit" | "create";
   onChange: (draft: TransferGroupDraft) => void;
   onSave: () => void;
   onDelete: () => void;
 }) {
+  const [timeModalOpen, setTimeModalOpen] = useState(false);
+  const pairKeys = getTransferPairKeys(draft.stationIds);
+  const missingPairs = getMissingTransferMinutePairLabels(draft, stationById);
+  const title = mode === "create" ? "새 환승 그룹 만들기" : group.nameKo;
+  const description =
+    mode === "create"
+      ? `${draft.stationIds.length}개 역을 하나의 환승 그룹으로 묶습니다.`
+      : `${group.stationIds.length}개 역 · ${group.note || "메모 없음"}`;
+
   function updateMinute(pairKey: string, value: string) {
     const numberValue = value === "" ? null : Number(value);
     const nextValue =
@@ -7594,11 +7717,30 @@ function TransferGroupInspector({
 
   return (
     <div className="grid gap-3">
-      <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-        <h3 className="text-base font-semibold">{group.nameKo}</h3>
-        <p className="mt-1 text-xs font-medium text-slate-500">
-          {group.stationIds.length}개 역 · {group.note || "메모 없음"}
-        </p>
+      <div
+        className={cn(
+          "rounded-3xl border p-4",
+          mode === "create"
+            ? "border-blue-200 bg-blue-50 text-blue-950"
+            : "border-slate-200 bg-slate-50",
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold">{title}</h3>
+            <p
+              className={cn(
+                "mt-1 text-xs font-medium leading-5",
+                mode === "create" ? "text-blue-700" : "text-slate-500",
+              )}
+            >
+              {description}
+            </p>
+          </div>
+          <Badge className={mode === "create" ? "bg-white/80 text-blue-700" : ""}>
+            {draft.stationIds.length}개 역
+          </Badge>
+        </div>
       </div>
       <Field label="그룹 이름">
         <Input
@@ -7615,9 +7757,14 @@ function TransferGroupInspector({
         />
       </Field>
       <div className="grid gap-2 rounded-3xl border border-slate-200 p-2">
-        <strong className="px-1 text-xs font-medium text-slate-600">
-          환승 그룹 역 목록
-        </strong>
+        <div className="flex items-center justify-between px-1">
+          <strong className="text-xs font-medium text-slate-600">
+            환승 그룹 역 목록
+          </strong>
+          <span className="text-[11px] font-semibold text-slate-400">
+            최소 2개 필요
+          </span>
+        </div>
         {draft.stationIds.map((stationId) => {
           const station = stationById.get(stationId);
           return (
@@ -7640,6 +7787,7 @@ function TransferGroupInspector({
                 variant="ghost"
                 onClick={() => removeStation(stationId)}
                 disabled={draft.stationIds.length <= 2}
+                title="환승 그룹에서 제거"
               >
                 <Trash2 className="size-3" />
               </Button>
@@ -7647,57 +7795,160 @@ function TransferGroupInspector({
           );
         })}
       </div>
-      <div className="grid gap-2 rounded-3xl border border-slate-200 p-2">
-        <strong className="px-1 text-xs font-medium text-slate-600">
-          역간 환승 시간표
-        </strong>
-        <div className="max-h-80 overflow-auto">
-          <table className="w-full border-separate border-spacing-1 text-[11px]">
-            <tbody>
-              {draft.stationIds.map((rowId, rowIndex) => (
-                <tr key={rowId}>
-                  <th className="sticky left-0 max-w-24 truncate rounded-xl bg-white px-2 py-1 text-left font-medium text-slate-500">
-                    {stationById.get(rowId)?.nameKo ?? rowId}
-                  </th>
-                  {draft.stationIds.map((colId, colIndex) => {
-                    if (colIndex <= rowIndex)
-                      return (
-                        <td
-                          key={colId}
-                          className="rounded-xl bg-slate-50 px-2 py-1 text-center text-slate-300"
-                        >
-                          -
-                        </td>
-                      );
-                    const pairKey = makeTransferPairKey(rowId, colId);
-                    return (
-                      <td key={colId} className="rounded-xl bg-slate-50 p-1">
-                        <Input
-                          className="h-7 px-2 text-[11px]"
-                          value={draft.transferMinutesByPair[pairKey] ?? ""}
-                          onChange={(event) =>
-                            updateMinute(pairKey, event.target.value)
-                          }
-                        />
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div
+        className={cn(
+          "grid gap-2 rounded-3xl border p-3",
+          missingPairs.length > 0
+            ? "border-amber-200 bg-amber-50/80"
+            : "border-emerald-200 bg-emerald-50/70",
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <strong
+              className={cn(
+                "text-xs font-semibold",
+                missingPairs.length > 0 ? "text-amber-900" : "text-emerald-900",
+              )}
+            >
+              역간 환승 시간표
+            </strong>
+            <p
+              className={cn(
+                "mt-1 text-xs font-medium leading-5",
+                missingPairs.length > 0 ? "text-amber-800" : "text-emerald-800",
+              )}
+            >
+              {missingPairs.length > 0
+                ? `${missingPairs.length.toLocaleString("ko-KR")}개 구간을 더 입력해야 저장할 수 있습니다.`
+                : `모든 ${pairKeys.length.toLocaleString("ko-KR")}개 구간 시간이 입력됐습니다.`}
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => setTimeModalOpen(true)}>
+            시간표 크게 편집
+          </Button>
         </div>
+        {missingPairs.length > 0 ? (
+          <p className="line-clamp-2 text-[11px] font-medium leading-5 text-amber-700">
+            누락: {missingPairs.slice(0, 4).join(", ")}
+            {missingPairs.length > 4 ? ` 외 ${missingPairs.length - 4}개` : ""}
+          </p>
+        ) : null}
       </div>
       <div className="grid grid-cols-2 gap-2">
         <Button variant="outline" onClick={onDelete}>
           <Trash2 className="mr-1 size-4" />
-          삭제
+          {mode === "create" ? "취소" : "삭제"}
         </Button>
-        <Button onClick={onSave}>
+        <Button onClick={onSave} disabled={missingPairs.length > 0}>
           <Save className="mr-1 size-4" />
-          저장
+          {mode === "create" ? "환승 그룹 저장" : "저장"}
         </Button>
       </div>
+      <Dialog
+        open={timeModalOpen}
+        className="flex h-[min(860px,calc(100dvh-24px))] max-w-[min(1180px,calc(100vw-24px))] flex-col"
+      >
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-4 py-3">
+          <div>
+            <strong className="block text-sm font-semibold text-slate-950">
+              역간 환승 시간표 편집
+            </strong>
+            <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+              행과 열의 모든 역 조합을 확인하세요. 같은 조합은 양방향 동일 값으로 저장됩니다.
+            </p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={() => setTimeModalOpen(false)}>
+            <X className="size-4" />
+          </Button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-3">
+          <table className="min-w-max border-separate border-spacing-1 text-[11px]">
+            <thead>
+              <tr>
+                <th className="sticky left-0 top-0 z-20 min-w-36 rounded-xl bg-white px-2 py-2 text-left font-semibold text-slate-500 shadow-sm">
+                  행 / 열
+                </th>
+                {draft.stationIds.map((colId) => {
+                  const station = stationById.get(colId);
+                  return (
+                    <th
+                      key={colId}
+                      className="sticky top-0 z-10 min-w-32 max-w-40 rounded-xl bg-white px-2 py-2 text-left font-semibold text-slate-600 shadow-sm"
+                    >
+                      <span className="block truncate">
+                        {station?.nameKo ?? colId}
+                      </span>
+                      <span className="block truncate text-[10px] font-medium text-slate-400">
+                        {station?.lineNameKo ?? "-"}
+                      </span>
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {draft.stationIds.map((rowId, rowIndex) => {
+                const rowStation = stationById.get(rowId);
+                return (
+                  <tr key={rowId}>
+                    <th className="sticky left-0 z-10 min-w-36 max-w-44 rounded-xl bg-white px-2 py-2 text-left font-semibold text-slate-600 shadow-sm">
+                      <span className="block truncate">
+                        {rowStation?.nameKo ?? rowId}
+                      </span>
+                      <span className="block truncate text-[10px] font-medium text-slate-400">
+                        {rowStation?.lineNameKo ?? "-"}
+                      </span>
+                    </th>
+                    {draft.stationIds.map((colId, colIndex) => {
+                      if (colIndex === rowIndex) {
+                        return (
+                          <td
+                            key={colId}
+                            className="rounded-xl bg-slate-100 px-3 py-2 text-center font-semibold text-slate-300"
+                          >
+                            같은 역
+                          </td>
+                        );
+                      }
+                      const pairKey = makeTransferPairKey(rowId, colId);
+                      const value = draft.transferMinutesByPair[pairKey];
+                      return (
+                        <td
+                          key={colId}
+                          className={cn(
+                            "rounded-xl p-1",
+                            value == null ? "bg-amber-50" : "bg-slate-50",
+                          )}
+                        >
+                          <Input
+                            type="number"
+                            min={0}
+                            className="h-8 min-w-24 px-2 text-[11px]"
+                            value={value ?? ""}
+                            placeholder="분"
+                            onChange={(event) =>
+                              updateMinute(pairKey, event.target.value)
+                            }
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 px-4 py-3">
+          <p className="text-xs font-medium text-slate-500">
+            {missingPairs.length > 0
+              ? `아직 ${missingPairs.length.toLocaleString("ko-KR")}개 구간이 비어 있습니다.`
+              : "모든 구간이 입력되었습니다."}
+          </p>
+          <Button onClick={() => setTimeModalOpen(false)}>닫기</Button>
+        </div>
+      </Dialog>
     </div>
   );
 }
@@ -7718,22 +7969,15 @@ function NewTransferGroupInspector({
   const previewGroup = toTransferGroup(draft);
 
   return (
-    <div className="grid gap-3">
-      <div className="rounded-3xl border border-blue-200 bg-blue-50 p-4">
-        <h3 className="text-base font-semibold text-blue-950">새 환승 그룹</h3>
-        <p className="mt-1 text-xs font-medium text-blue-700">
-          선택한 환승 가능역으로 그룹을 생성합니다.
-        </p>
-      </div>
-      <TransferGroupInspector
-        group={previewGroup}
-        draft={draft}
-        stationById={stationById}
-        onChange={onChange}
-        onSave={onSave}
-        onDelete={onCancel}
-      />
-    </div>
+    <TransferGroupInspector
+      group={previewGroup}
+      draft={draft}
+      stationById={stationById}
+      mode="create"
+      onChange={onChange}
+      onSave={onSave}
+      onDelete={onCancel}
+    />
   );
 }
 
@@ -7741,13 +7985,17 @@ function MultiStationInspector({
   ids,
   stationById,
   nonTransferIds,
+  transferGroup,
   onSetNonTransfer,
+  onOpenTransferGroup,
   onCreateTransferGroup,
 }: {
   ids: string[];
   stationById: Map<string, EditorStation>;
   nonTransferIds: Set<string>;
+  transferGroup: ManualTransferGroup | null;
   onSetNonTransfer: (enabled: boolean) => void;
+  onOpenTransferGroup: (groupId: string) => void;
   onCreateTransferGroup: () => void;
 }) {
   const allNonTransfer =
@@ -7764,21 +8012,32 @@ function MultiStationInspector({
         </p>
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {!allNonTransfer ? (
-          <Button variant="outline" onClick={() => onSetNonTransfer(true)}>
-            미환승역
+        {transferGroup ? (
+          <Button
+            className="col-span-2"
+            onClick={() => onOpenTransferGroup(transferGroup.id)}
+          >
+            환승 그룹 편집
           </Button>
-        ) : null}
-        {!allTransfer ? (
-          <Button variant="outline" onClick={() => onSetNonTransfer(false)}>
-            환승 가능역
-          </Button>
-        ) : null}
-        {ids.length >= 2 && !allNonTransfer ? (
-          <Button className="col-span-2" onClick={onCreateTransferGroup}>
-            환승 그룹 생성
-          </Button>
-        ) : null}
+        ) : (
+          <>
+            {!allNonTransfer ? (
+              <Button variant="outline" onClick={() => onSetNonTransfer(true)}>
+                미환승역으로 설정
+              </Button>
+            ) : null}
+            {!allTransfer ? (
+              <Button variant="outline" onClick={() => onSetNonTransfer(false)}>
+                환승 가능역으로 변경
+              </Button>
+            ) : null}
+            {ids.length >= 2 && !allNonTransfer ? (
+              <Button className="col-span-2" onClick={onCreateTransferGroup}>
+                선택한 역으로 환승 그룹 생성
+              </Button>
+            ) : null}
+          </>
+        )}
       </div>
       <div className="max-h-72 overflow-y-auto rounded-3xl border border-slate-200 p-2">
         {ids.map((id) => {
