@@ -180,6 +180,14 @@ type LineBranchValidationIssue = {
   message: string;
 };
 
+type StaleSavedStationAnchorSummary = {
+  stationId: string;
+  stationLabel: string;
+  changedCount: number;
+  geometryCount: number;
+  lineBranchCount: number;
+};
+
 type PublicWebParityStatus = "ok" | "warning" | "error";
 
 type PublicWebParityRow = {
@@ -1058,6 +1066,122 @@ function replaceStaleSavedStationAnchorPoints(
     };
   });
   return { points: nextPoints, changedCount };
+}
+
+function isStaleSavedStationAnchorPoint(
+  point: ManualGeometryOverridePoint,
+  coordinate: LngLatTuple,
+) {
+  return (
+    Math.abs(point.lng - coordinate[0]) > SAVED_STATION_ANCHOR_TOLERANCE ||
+    Math.abs(point.lat - coordinate[1]) > SAVED_STATION_ANCHOR_TOLERANCE
+  );
+}
+
+function getStaleSavedStationAnchorSummaries(
+  overlays: ManualOverlayBundle,
+  stationById: Map<string, EditorStation>,
+): StaleSavedStationAnchorSummary[] {
+  const summaries = new Map<string, StaleSavedStationAnchorSummary>();
+
+  const addStalePoint = (
+    stationId: string,
+    source: "geometry" | "lineBranch",
+  ) => {
+    const station = stationById.get(stationId);
+    const existing = summaries.get(stationId) ?? {
+      stationId,
+      stationLabel: formatStationDisplayName(station),
+      changedCount: 0,
+      geometryCount: 0,
+      lineBranchCount: 0,
+    };
+    existing.changedCount += 1;
+    if (source === "geometry") existing.geometryCount += 1;
+    if (source === "lineBranch") existing.lineBranchCount += 1;
+    summaries.set(stationId, existing);
+  };
+
+  for (const override of overlays.geometryOverrides) {
+    if (override.enabled === false) continue;
+    for (const point of override.points) {
+      if (point.kind !== "station" || !point.stationId) continue;
+      const coordinate = getStationCoordinate(stationById.get(point.stationId));
+      if (!coordinate || !isStaleSavedStationAnchorPoint(point, coordinate)) {
+        continue;
+      }
+      addStalePoint(point.stationId, "geometry");
+    }
+  }
+
+  for (const override of overlays.lineBranchOverrides ?? []) {
+    if (override.enabled === false || !override.geometry?.length) continue;
+    for (const point of override.geometry) {
+      if (point.kind !== "station" || !point.stationId) continue;
+      const coordinate = getStationCoordinate(stationById.get(point.stationId));
+      if (!coordinate || !isStaleSavedStationAnchorPoint(point, coordinate)) {
+        continue;
+      }
+      addStalePoint(point.stationId, "lineBranch");
+    }
+  }
+
+  return [...summaries.values()].sort((left, right) =>
+    left.stationLabel.localeCompare(right.stationLabel, "ko-KR"),
+  );
+}
+
+function syncAllSavedGeometryAnchors(
+  overlays: ManualOverlayBundle,
+  stationById: Map<string, EditorStation>,
+) {
+  const changedStationIds = new Set<string>();
+  let changedCount = 0;
+
+  const replacePoint = (point: ManualGeometryOverridePoint) => {
+    if (point.kind !== "station" || !point.stationId) return point;
+    const coordinate = getStationCoordinate(stationById.get(point.stationId));
+    if (!coordinate || !isStaleSavedStationAnchorPoint(point, coordinate)) {
+      return point;
+    }
+    changedCount += 1;
+    changedStationIds.add(point.stationId);
+    return {
+      ...point,
+      lng: coordinate[0],
+      lat: coordinate[1],
+    };
+  };
+
+  const geometryOverrides = overlays.geometryOverrides.map((override) => {
+    if (override.enabled === false) return override;
+    const points = override.points.map(replacePoint);
+    return points === override.points ? override : { ...override, points };
+  });
+
+  const lineBranchOverrides = (overlays.lineBranchOverrides ?? []).map(
+    (override) => {
+      if (override.enabled === false || !override.geometry?.length) {
+        return override;
+      }
+      const geometry = override.geometry.map(replacePoint);
+      return geometry === override.geometry ? override : { ...override, geometry };
+    },
+  );
+
+  if (changedCount === 0) {
+    return { overlays, changedCount, stationCount: 0 };
+  }
+
+  return {
+    overlays: {
+      ...overlays,
+      geometryOverrides,
+      lineBranchOverrides,
+    },
+    changedCount,
+    stationCount: changedStationIds.size,
+  };
 }
 
 function syncSavedGeometryAnchorsForStation(
@@ -3158,6 +3282,10 @@ export default function UnifiedMapEditor({
       stationById,
     ],
   );
+  const staleSavedAnchorSummaries = useMemo(
+    () => getStaleSavedStationAnchorSummaries(overlays, displayStationById),
+    [displayStationById, overlays],
+  );
   const geometryTargets = useMemo<GeometryEditTarget[]>(() => {
     const geometryOverrideByBranchId = new Map(
       overlays.geometryOverrides.map((override) => [
@@ -5089,6 +5217,26 @@ export default function UnifiedMapEditor({
     }
   }
 
+  async function syncAllStaleSavedGeometryAnchors() {
+    const result = syncAllSavedGeometryAnchors(overlays, displayStationById);
+    if (result.changedCount < 1) {
+      showToast("동기화할 저장 선형 anchor가 없습니다", "info");
+      return;
+    }
+
+    const saved = await executeOverlayCommand(
+      "저장 선형 anchor 일괄 동기화",
+      result.overlays,
+      `저장 선형 anchor ${result.changedCount}개를 ${result.stationCount}개 역의 현재 위치로 맞췄습니다`,
+    );
+    if (!saved) return;
+
+    const nextData = await reloadEditorData();
+    if (selectedStation) {
+      await reloadStationDraftFromData(nextData, selectedStation.id);
+    }
+  }
+
   async function saveTransferDraft() {
     if (!transferDraft) return;
     const group = toTransferGroup(transferDraft);
@@ -5859,6 +6007,10 @@ export default function UnifiedMapEditor({
                 }
                 issues={lineBranchIssues}
                 overlays={overlays}
+                staleSavedAnchorSummaries={staleSavedAnchorSummaries}
+                onSyncStaleSavedAnchors={() =>
+                  void syncAllStaleSavedGeometryAnchors()
+                }
               />
             ) : null}
             {!isGeometryMode && sidebarTab === "history" ? (
@@ -7089,14 +7241,22 @@ function LineBranchValidationPanel({
   count,
   issues,
   overlays,
+  staleSavedAnchorSummaries,
+  onSyncStaleSavedAnchors,
 }: {
   count: number;
   issues: LineBranchValidationIssue[];
   overlays: ManualOverlayBundle;
+  staleSavedAnchorSummaries: StaleSavedStationAnchorSummary[];
+  onSyncStaleSavedAnchors: () => void;
 }) {
   const webRows = getPublicWebManualChangeRows(overlays);
   const webChangeTotal = getPublicWebManualChangeTotal(overlays);
   const parityRows = getPublicWebParityRows(overlays, issues);
+  const staleSavedAnchorTotal = staleSavedAnchorSummaries.reduce(
+    (sum, item) => sum + item.changedCount,
+    0,
+  );
 
   return (
     <div className="grid gap-3">
@@ -7108,6 +7268,53 @@ function LineBranchValidationPanel({
           지선 등록 {count}개 · 검증 항목 {issues.length}개
         </p>
       </div>
+      {staleSavedAnchorSummaries.length > 0 ? (
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <strong className="font-semibold">저장 선형 anchor 불일치</strong>
+              <p className="mt-1 leading-5 text-orange-800">
+                역 위치는 바뀌었지만 저장된 선형 안의 역 좌표가 예전 위치인
+                항목입니다. 한 번에 현재 역 위치로 맞출 수 있습니다.
+              </p>
+            </div>
+            <Badge>{staleSavedAnchorTotal}개</Badge>
+          </div>
+          <div className="mt-3 grid gap-1.5">
+            {staleSavedAnchorSummaries.slice(0, 5).map((item) => (
+              <div
+                key={item.stationId}
+                className="rounded-xl bg-white/75 px-3 py-2 text-[11px] font-medium text-orange-900"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-semibold">
+                    {item.stationLabel}
+                  </span>
+                  <span className="shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-bold text-orange-700">
+                    {item.changedCount}개
+                  </span>
+                </div>
+                <p className="mt-1 text-orange-700">
+                  본선 {item.geometryCount}개 · 지선 {item.lineBranchCount}개
+                </p>
+              </div>
+            ))}
+            {staleSavedAnchorSummaries.length > 5 ? (
+              <div className="rounded-xl bg-white/75 px-3 py-2 text-[11px] font-semibold text-orange-700">
+                그 외 {staleSavedAnchorSummaries.length - 5}개 역도 함께 수정됩니다.
+              </div>
+            ) : null}
+          </div>
+          <Button
+            className="mt-3 w-full"
+            variant="outline"
+            onClick={onSyncStaleSavedAnchors}
+          >
+            <Waypoints className="mr-1 size-4" />
+            불일치 anchor 모두 현재 위치로 맞추기
+          </Button>
+        </div>
+      ) : null}
       <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
         <div className="flex items-center justify-between gap-3">
           <div>
