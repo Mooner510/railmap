@@ -25,7 +25,6 @@ import {
   type CanonicalLine,
   type ManualLineBranchOverride,
   type ManualTransferEdge,
-  type ManualTransferGroup,
 } from "./railExplorerModel";
 
 interface RailExplorerProps {
@@ -371,6 +370,10 @@ export default function RailExplorer({
       mapStations.find((station) => station.id === selectedStationId) ?? null,
     [mapStations, selectedStationId],
   );
+  const stationById = useMemo(
+    () => new Map(mapStations.map((station) => [station.id, station])),
+    [mapStations],
+  );
 
   const selectedTransferGroup = useMemo(
     () =>
@@ -383,12 +386,10 @@ export default function RailExplorer({
     () =>
       selectedTransferGroup
         ? selectedTransferGroup.stationIds
-            .map((stationId) =>
-              mapStations.find((station) => station.id === stationId),
-            )
+            .map((stationId) => stationById.get(stationId))
             .filter((station): station is RailMapStation => Boolean(station))
         : [],
-    [mapStations, selectedTransferGroup],
+    [selectedTransferGroup, stationById],
   );
 
   const routeOriginStation = useMemo(
@@ -409,11 +410,6 @@ export default function RailExplorer({
     () => buildRouteGraph(bundle.lines, bundle.manualTransferEdges ?? []),
     [bundle.lines, bundle.manualTransferEdges],
   );
-  const stationById = useMemo(
-    () => new Map(mapStations.map((station) => [station.id, station])),
-    [mapStations],
-  );
-
   const routeResultStationIds = useMemo(
     () => routeSearchResult?.stationIds ?? [],
     [routeSearchResult],
@@ -448,7 +444,12 @@ export default function RailExplorer({
             "-",
         };
 
-        index.set(stationId, [...(index.get(stationId) ?? []), item]);
+        const items = index.get(stationId);
+        if (items) {
+          items.push(item);
+        } else {
+          index.set(stationId, [item]);
+        }
       }
     }
 
@@ -1227,7 +1228,6 @@ function FilterControls({
 
       {showSearchResults ? (
         <SearchResults
-          compact={compact}
           query={searchQuery}
           selectedStationId={selectedStationId}
           selectedLineKey={selectedLineKey}
@@ -1382,7 +1382,6 @@ function HighlightText({
 }
 
 function SearchResults({
-  compact,
   query,
   selectedStationId,
   stations,
@@ -1391,7 +1390,6 @@ function SearchResults({
   onSelectStation,
   onSelectLine,
 }: {
-  compact: boolean;
   query: string;
   selectedStationId: string | null;
   selectedLineKey: string | null;

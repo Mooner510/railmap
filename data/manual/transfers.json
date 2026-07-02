@@ -147,6 +147,34 @@
       "enabled": true,
       "source": "editor",
       "note": null
+    },
+    {
+      "id": "manual-transfer-group:여의도역:candidate:kric:urban-rail-station:S1105:0526:row-752:candidate:kric:urban-rail-station:S1109:4115:row-753",
+      "nameKo": "여의도역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1109:4115:row-753",
+        "candidate:kric:urban-rail-station:S1105:0526:row-752"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1105:0526:row-752<->candidate:kric:urban-rail-station:S1109:4115:row-753": 4
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    },
+    {
+      "id": "manual-transfer-group:충정로(경기대입구)역:candidate:kric:urban-rail-station:S1102:0243:row-1011:candidate:kric:urban-rail-station:S1105:0531:row-1012",
+      "nameKo": "충정로(경기대입구)역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1105:0531:row-1012",
+        "candidate:kric:urban-rail-station:S1102:0243:row-1011"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1102:0243:row-1011<->candidate:kric:urban-rail-station:S1105:0531:row-1012": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
     }
   ],
   "manualTransferEdges": []

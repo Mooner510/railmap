@@ -4,11 +4,15 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 import { Badge } from "@repo/ui/badge";
 import {
+  buildSmoothConnectionCurve,
   buildTransferGroupCircleGeometry,
+  getCoordinateDistance,
   isCollapsedTransferZoom,
   isTransferDetailVisible,
-  TRANSFER_DETAIL_ZOOM_THRESHOLD,
-} from "../../../../../packages/ui/src/map/renderPolicy";
+  optimizeCoordinates,
+  smoothCoordinateRange,
+  smoothCoordinates,
+} from "@repo/ui/map/renderPolicy";
 import { Button } from "@repo/ui/button";
 import { Dialog } from "@repo/ui/dialog";
 import { Input, Textarea } from "@repo/ui/input";
@@ -322,7 +326,7 @@ async function buildBranchFeaturesChunked(
         },
         geometry: {
           type: "LineString",
-          coordinates: optimizeCoordinates(coordinates),
+          coordinates: optimizeCoordinates(coordinates, 360),
         },
       });
     }
@@ -516,202 +520,16 @@ function cancelIdle(id: number) {
   else window.clearTimeout(id);
 }
 
-function optimizeCoordinates(coordinates: LngLatTuple[]) {
-  if (coordinates.length <= 360) return coordinates;
-  const stride = Math.ceil(coordinates.length / 360);
-  const result = coordinates.filter((_, index) => index % stride === 0);
-  const last = coordinates.at(-1);
-  if (last && result.at(-1) !== last) result.push(last);
-  return result;
-}
-
 function isValidStation(
   station: EditorStation,
 ): station is EditorStation & { lat: number; lng: number } {
   return Number.isFinite(station.lat) && Number.isFinite(station.lng);
 }
 
-function catmullRomPoint(
-  p0: LngLatTuple,
-  p1: LngLatTuple,
-  p2: LngLatTuple,
-  p3: LngLatTuple,
-  t: number,
-): LngLatTuple {
-  const [p0Lng, p0Lat] = p0;
-  const [p1Lng, p1Lat] = p1;
-  const [p2Lng, p2Lat] = p2;
-  const [p3Lng, p3Lat] = p3;
-  const t2 = t * t;
-  const t3 = t2 * t;
-
-  return [
-    0.5 *
-      (2 * p1Lng +
-        (-p0Lng + p2Lng) * t +
-        (2 * p0Lng - 5 * p1Lng + 4 * p2Lng - p3Lng) * t2 +
-        (-p0Lng + 3 * p1Lng - 3 * p2Lng + p3Lng) * t3),
-    0.5 *
-      (2 * p1Lat +
-        (-p0Lat + p2Lat) * t +
-        (2 * p0Lat - 5 * p1Lat + 4 * p2Lat - p3Lat) * t2 +
-        (-p0Lat + 3 * p1Lat - 3 * p2Lat + p3Lat) * t3),
-  ];
-}
-
-function smoothCoordinates(coordinates: LngLatTuple[]): LngLatTuple[] {
-  if (coordinates.length < 3) return coordinates;
-  const result: LngLatTuple[] = [];
-  const samplesPerSegment = 5;
-
-  for (let index = 0; index < coordinates.length - 1; index += 1) {
-    const p0 = coordinates[Math.max(0, index - 1)] ?? coordinates[index];
-    const p1 = coordinates[index];
-    const p2 = coordinates[index + 1];
-    const p3 = coordinates[Math.min(coordinates.length - 1, index + 2)] ?? p2;
-    if (!p0 || !p1 || !p2 || !p3) continue;
-    if (index === 0) result.push(p1);
-    for (let step = 1; step <= samplesPerSegment; step += 1)
-      result.push(catmullRomPoint(p0, p1, p2, p3, step / samplesPerSegment));
-  }
-
-  return result;
-}
-
-function smoothCoordinateRange(
-  coordinates: LngLatTuple[],
-  startIndex: number,
-  endIndex: number,
-): LngLatTuple[] {
-  if (coordinates.length < 2 || startIndex === endIndex) return [];
-
-  const start = Math.max(0, Math.min(startIndex, endIndex));
-  const end = Math.min(coordinates.length - 1, Math.max(startIndex, endIndex));
-  if (coordinates.length < 3) return coordinates.slice(start, end + 1);
-
-  const result: LngLatTuple[] = [];
-  const samplesPerSegment = 5;
-
-  for (let index = start; index < end; index += 1) {
-    const p0 = coordinates[Math.max(0, index - 1)] ?? coordinates[index];
-    const p1 = coordinates[index];
-    const p2 = coordinates[index + 1];
-    const p3 = coordinates[Math.min(coordinates.length - 1, index + 2)] ?? p2;
-    if (!p0 || !p1 || !p2 || !p3) continue;
-    if (index === start) result.push(p1);
-    for (let step = 1; step <= samplesPerSegment; step += 1) {
-      result.push(catmullRomPoint(p0, p1, p2, p3, step / samplesPerSegment));
-    }
-  }
-
-  return startIndex <= endIndex ? result : [...result].reverse();
-}
-
-function cubicBezierPoint(
-  start: LngLatTuple,
-  control1: LngLatTuple,
-  control2: LngLatTuple,
-  end: LngLatTuple,
-  t: number,
-): LngLatTuple {
-  const inverse = 1 - t;
-  const inverse2 = inverse * inverse;
-  const inverse3 = inverse2 * inverse;
-  const t2 = t * t;
-  const t3 = t2 * t;
-
-  return [
-    inverse3 * start[0] +
-      3 * inverse2 * t * control1[0] +
-      3 * inverse * t2 * control2[0] +
-      t3 * end[0],
-    inverse3 * start[1] +
-      3 * inverse2 * t * control1[1] +
-      3 * inverse * t2 * control2[1] +
-      t3 * end[1],
-  ];
-}
-
-function getCoordinateDistance(a: LngLatTuple, b: LngLatTuple) {
-  const lngScale = Math.max(
-    0.35,
-    Math.cos((((a[1] + b[1]) / 2) * Math.PI) / 180),
-  );
-  const dx = (b[0] - a[0]) * lngScale;
-  const dy = b[1] - a[1];
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-function normalizeCoordinateVector(
-  from: LngLatTuple,
-  to: LngLatTuple,
-): LngLatTuple | null {
-  const dx = to[0] - from[0];
-  const dy = to[1] - from[1];
-  const length = Math.sqrt(dx * dx + dy * dy);
-  if (!Number.isFinite(length) || length <= 0) return null;
-  return [dx / length, dy / length];
-}
-
-function buildSmoothConnectionCurve(
-  start: LngLatTuple,
-  end: LngLatTuple,
-  startContext: LngLatTuple | null,
-  endContext: LngLatTuple | null,
-): LngLatTuple[] {
-  const distance = getCoordinateDistance(start, end);
-  if (!Number.isFinite(distance) || distance <= 0) return [start, end];
-
-  const controlDistance = Math.min(Math.max(distance * 0.42, 0.0012), 0.08);
-  const startDirection = startContext
-    ? normalizeCoordinateVector(startContext, start)
-    : normalizeCoordinateVector(start, end);
-  const endDirection = endContext
-    ? normalizeCoordinateVector(end, endContext)
-    : normalizeCoordinateVector(start, end);
-
-  const control1: LngLatTuple = startDirection
-    ? [
-        start[0] + startDirection[0] * controlDistance,
-        start[1] + startDirection[1] * controlDistance,
-      ]
-    : [
-        start[0] + (end[0] - start[0]) * 0.33,
-        start[1] + (end[1] - start[1]) * 0.33,
-      ];
-  const control2: LngLatTuple = endDirection
-    ? [
-        end[0] - endDirection[0] * controlDistance,
-        end[1] - endDirection[1] * controlDistance,
-      ]
-    : [
-        start[0] + (end[0] - start[0]) * 0.66,
-        start[1] + (end[1] - start[1]) * 0.66,
-      ];
-
-  const coordinates: LngLatTuple[] = [start];
-  const segments = 28;
-  for (let step = 1; step <= segments; step += 1) {
-    coordinates.push(
-      cubicBezierPoint(start, control1, control2, end, step / segments),
-    );
-  }
-  return coordinates;
-}
-
 function getBranchStationIds(branch: EditorMapBranch): string[] {
   return branch.routeStops
     .map((stop) => stop.station?.id ?? null)
     .filter((stationId): stationId is string => Boolean(stationId));
-}
-
-function getBranchEndpointStationIds(branch: EditorMapBranch): Set<string> {
-  const stationIds = getBranchStationIds(branch);
-  return new Set(
-    [stationIds[0], stationIds.at(-1)].filter(
-      (stationId): stationId is string => Boolean(stationId),
-    ),
-  );
 }
 
 function validateLineBranchOverrides(
@@ -1609,7 +1427,7 @@ async function buildLineBranchFeaturesChunked(
         },
         geometry: {
           type: "LineString",
-          coordinates: optimizeCoordinates(coordinates),
+          coordinates: optimizeCoordinates(coordinates, 360),
         },
       });
     }
@@ -2004,12 +1822,6 @@ function validateStationOverrideDraft(
     return "위도/경도 범위를 벗어났습니다.";
   }
   return null;
-}
-
-function parseStationCoordinateInput(value: string) {
-  if (value.trim() === "") return null;
-  const next = Number(value);
-  return Number.isFinite(next) ? next : Number.NaN;
 }
 
 function shouldKeepStationOverride(
@@ -3370,7 +3182,7 @@ export default function UnifiedMapEditor({
     data.branches,
     overlays.geometryOverrides,
     overlays.lineBranchOverrides,
-    displayStationById,
+    stationById,
   ]);
   const geometryTargetByKey = useMemo(
     () =>
@@ -3414,8 +3226,6 @@ export default function UnifiedMapEditor({
     () => getSelectedTransferGroupIds(selection, overlays.manualTransferGroups),
     [overlays.manualTransferGroups, selection],
   );
-  const selectedTransferGroupId =
-    selection.type === "transferGroup" ? selection.id : null;
   const stationTransferGroupIndex = useMemo(
     () => buildStationTransferGroupIndex(overlays.manualTransferGroups),
     [overlays.manualTransferGroups],
@@ -4834,7 +4644,7 @@ export default function UnifiedMapEditor({
       map.remove();
       mapRef.current = null;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!mapLoaded || dataLoading) return;
@@ -6933,17 +6743,22 @@ function StationInspector({
 
   const addParentBranch =
     branchAddOptions.find((branch) => branch.id === addParentBranchId) ?? null;
-  const addAnchorStations = addParentBranch
-    ? getBranchStopStations(addParentBranch)
-    : [];
+  const addAnchorStations = useMemo(
+    () => (addParentBranch ? getBranchStopStations(addParentBranch) : []),
+    [addParentBranch],
+  );
   const [addAnchorStationId, setAddAnchorStationId] = useState(
     addAnchorStations[0]?.id ?? "",
   );
   const canAddToBranch = branchRemovalOptions.length === 0;
-  const endpointConnectOptions = branchRemovalOptions.filter((branch) =>
-    getBranchEndpointStations(branch).some(
-      (candidate) => candidate.id === station.id,
-    ),
+  const endpointConnectOptions = useMemo(
+    () =>
+      branchRemovalOptions.filter((branch) =>
+        getBranchEndpointStations(branch).some(
+          (candidate) => candidate.id === station.id,
+        ),
+      ),
+    [branchRemovalOptions, station.id],
   );
   const [connectParentBranchId, setConnectParentBranchId] = useState(
     endpointConnectOptions[0]?.id ?? "",
@@ -6952,17 +6767,21 @@ function StationInspector({
     endpointConnectOptions.find(
       (branch) => branch.id === connectParentBranchId,
     ) ?? null;
-  const connectOtherBranches = branchAddOptions.filter(
-    (branch) => branch.id !== connectParentBranchId,
+  const connectOtherBranches = useMemo(
+    () =>
+      branchAddOptions.filter((branch) => branch.id !== connectParentBranchId),
+    [branchAddOptions, connectParentBranchId],
   );
   const [connectBranchId, setConnectBranchId] = useState(
     connectOtherBranches[0]?.id ?? "",
   );
   const selectedConnectBranch =
     branchAddOptions.find((branch) => branch.id === connectBranchId) ?? null;
-  const connectEndpointStations = selectedConnectBranch
-    ? getBranchStopStations(selectedConnectBranch)
-    : [];
+  const connectEndpointStations = useMemo(
+    () =>
+      selectedConnectBranch ? getBranchStopStations(selectedConnectBranch) : [],
+    [selectedConnectBranch],
+  );
   const [connectEndpointStationId, setConnectEndpointStationId] = useState(
     connectEndpointStations[0]?.id ?? "",
   );

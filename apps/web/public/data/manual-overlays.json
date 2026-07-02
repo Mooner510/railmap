@@ -147,6 +147,34 @@
       "enabled": true,
       "source": "editor",
       "note": null
+    },
+    {
+      "id": "manual-transfer-group:여의도역:candidate:kric:urban-rail-station:S1105:0526:row-752:candidate:kric:urban-rail-station:S1109:4115:row-753",
+      "nameKo": "여의도역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1109:4115:row-753",
+        "candidate:kric:urban-rail-station:S1105:0526:row-752"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1105:0526:row-752<->candidate:kric:urban-rail-station:S1109:4115:row-753": 4
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    },
+    {
+      "id": "manual-transfer-group:충정로(경기대입구)역:candidate:kric:urban-rail-station:S1102:0243:row-1011:candidate:kric:urban-rail-station:S1105:0531:row-1012",
+      "nameKo": "충정로(경기대입구)역",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1105:0531:row-1012",
+        "candidate:kric:urban-rail-station:S1102:0243:row-1011"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1102:0243:row-1011<->candidate:kric:urban-rail-station:S1105:0531:row-1012": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": null
     }
   ],
   "manualTransferEdges": [],
@@ -177,6 +205,22 @@
       "lng": 127.1079205391614,
       "enabled": true,
       "note": null
+    },
+    {
+      "stationId": "candidate:kric:urban-rail-station:S1105:0514:row-341",
+      "nameKo": "마곡",
+      "lat": 37.560246697596696,
+      "lng": 126.82475789403958,
+      "enabled": true,
+      "note": null
+    },
+    {
+      "stationId": "candidate:kric:urban-rail-station:I4101:1003:row-813",
+      "nameKo": "용산역",
+      "lat": 37.529947893472254,
+      "lng": 126.96482306457216,
+      "enabled": true,
+      "note": null
     }
   ],
   "branchOverrides": [],
@@ -202,16 +246,24 @@
       "branchId": "01:K4:main:I4108:경의·중앙선:0",
       "stationId": "candidate:kric:urban-rail-station:I4108:1252:row-693",
       "enabled": true,
-      "source": "editor",
-      "note": null
+      "source": "manual",
+      "note": "경의중앙선 서울역 방면 지선 분리를 위한 본선 제외"
     },
     {
       "id": "manual-branch-station-exclusion:01:K4:main:I4108:경의·중앙선:0:candidate:kric:urban-rail-station:I4108:1251:row-557",
       "branchId": "01:K4:main:I4108:경의·중앙선:0",
       "stationId": "candidate:kric:urban-rail-station:I4108:1251:row-557",
       "enabled": true,
-      "source": "editor",
-      "note": null
+      "source": "manual",
+      "note": "경의중앙선 서울역 방면 지선 분리를 위한 본선 제외"
+    },
+    {
+      "id": "manual-branch-station-exclusion:01:K4:main:I4108:경의·중앙선:0:candidate:kric:urban-rail-station:I4108:1265:row-15",
+      "branchId": "01:K4:main:I4108:경의·중앙선:0",
+      "stationId": "candidate:kric:urban-rail-station:I4108:1265:row-15",
+      "enabled": true,
+      "source": "manual",
+      "note": "경의중앙선 서울역 방면 지선 분리를 위한 본선 제외"
     }
   ],
   "lineBranchOverrides": [
@@ -357,9 +409,184 @@
       "enabled": true,
       "source": "editor",
       "note": null
+    },
+    {
+      "id": "manual-line-branch:connect-line:01:7:branch:S1107:도시철도 7호선:1:candidate:kric:urban-rail-station:S1107:3753:row-181:01:7:main:S1107:수도권 도시철도 7호선:0:candidate:kric:urban-rail-station:S1107:0750:row-794:toward-start",
+      "mode": "connect-line",
+      "parentBranchId": "01:7:branch:S1107:도시철도 7호선:1",
+      "anchorStationId": "candidate:kric:urban-rail-station:S1107:3753:row-181",
+      "connectedBranchId": "01:7:main:S1107:수도권 도시철도 7호선:0",
+      "connectedEndpointStationId": "candidate:kric:urban-rail-station:S1107:0750:row-794",
+      "connectedDirection": "toward-start",
+      "geometry": [
+        {
+          "lng": 126.81095,
+          "lat": 37.506236,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:3753:row-181"
+        },
+        {
+          "lng": 126.823294,
+          "lat": 37.492059,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0750:row-794"
+        }
+      ],
+      "enabled": true,
+      "source": "editor",
+      "note": null
+    },
+    {
+      "id": "manual-line-branch:add-station:01:K4:main:I4108:경의·중앙선:0:candidate:kric:urban-rail-station:I4108:1265:row-15:candidate:kric:urban-rail-station:I4108:1251:row-557",
+      "mode": "add-station",
+      "parentBranchId": "01:K4:main:I4108:경의·중앙선:0",
+      "anchorStationId": "candidate:kric:urban-rail-station:I4108:1265:row-15",
+      "branchStationId": "candidate:kric:urban-rail-station:I4108:1251:row-557",
+      "connectedDirection": "toward-end",
+      "geometry": [
+        {
+          "lng": 126.914841,
+          "lat": 37.568611,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1265:row-15"
+        },
+        {
+          "lng": 126.942308,
+          "lat": 37.559768,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1252:row-693"
+        },
+        {
+          "lng": 126.97138700000001,
+          "lat": 37.556713,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1251:row-557"
+        }
+      ],
+      "enabled": true,
+      "source": "manual",
+      "note": "경의중앙선 서울역 방면 지선 표시 보정"
     }
   ],
   "geometryOverrides": [
+    {
+      "branchId": "01:D1:main:I11D1:신분당선:0",
+      "points": [
+        {
+          "lng": 127.0195609,
+          "lat": 37.51612526,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D004:row-677"
+        },
+        {
+          "lng": 127.0213658,
+          "lat": 37.5108115,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D005:row-219"
+        },
+        {
+          "lng": 127.0247306,
+          "lat": 37.50405543,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D006:row-661"
+        },
+        {
+          "lng": 127.0278789,
+          "lat": 37.49738544,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D007:row-28"
+        },
+        {
+          "lng": 127.0340995,
+          "lat": 37.48445352,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D008:row-735"
+        },
+        {
+          "lng": 127.0384203,
+          "lat": 37.47096388,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D009:row-736"
+        },
+        {
+          "lng": 127.0543396,
+          "lat": 37.44871485,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D010:row-984"
+        },
+        {
+          "lng": 127.0782070841131,
+          "lat": 37.42332936623848,
+          "kind": "control"
+        },
+        {
+          "lng": 127.09476084021617,
+          "lat": 37.41318538461469,
+          "kind": "control"
+        },
+        {
+          "lng": 127.10904678019915,
+          "lat": 37.40628440618521,
+          "kind": "control"
+        },
+        {
+          "lng": 127.1112107,
+          "lat": 37.39501475,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D011:row-1031"
+        },
+        {
+          "lng": 127.1084859,
+          "lat": 37.36750101,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D012:row-921"
+        },
+        {
+          "lng": 127.1088028,
+          "lat": 37.35058332,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D013:row-396"
+        },
+        {
+          "lng": 127.1028937,
+          "lat": 37.338068413,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D014:row-326"
+        },
+        {
+          "lng": 127.09477813,
+          "lat": 37.32250096,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D015:row-636"
+        },
+        {
+          "lng": 127.08057578,
+          "lat": 37.31374251,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D016:row-585"
+        },
+        {
+          "lng": 127.0694799,
+          "lat": 37.29808526,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D017:row-530"
+        },
+        {
+          "lng": 127.051609,
+          "lat": 37.2884537,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D018:row-105"
+        },
+        {
+          "lng": 127.0448561,
+          "lat": 37.30173474,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I11D1:D019:row-104"
+        }
+      ],
+      "enabled": true,
+      "note": null
+    },
     {
       "branchId": "01:1:branch:I4101:경부선:3",
       "points": [
@@ -401,10 +628,20 @@
           "kind": "control"
         },
         {
-          "lng": 126.964775,
-          "lat": 37.52989,
+          "lng": 126.96482306457216,
+          "lat": 37.529947893472254,
           "kind": "station",
           "stationId": "candidate:kric:urban-rail-station:I4101:1003:row-813"
+        },
+        {
+          "lng": 126.95739184873378,
+          "lat": 37.5246137986513,
+          "kind": "control"
+        },
+        {
+          "lng": 126.94813677280086,
+          "lat": 37.51606706108029,
+          "kind": "control"
         },
         {
           "lng": 126.941671,
@@ -670,6 +907,625 @@
       ],
       "enabled": true,
       "note": null
+    },
+    {
+      "branchId": "01:7:main:S1107:수도권 도시철도 7호선:0",
+      "points": [
+        {
+          "lng": 127.053126,
+          "lat": 37.70015,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0709:row-906"
+        },
+        {
+          "lng": 127.046548,
+          "lat": 37.689131,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0710:row-284"
+        },
+        {
+          "lng": 127.055314,
+          "lat": 37.677804,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0711:row-617"
+        },
+        {
+          "lng": 127.057701,
+          "lat": 37.664985,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0712:row-345"
+        },
+        {
+          "lng": 127.060555,
+          "lat": 37.654478,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0713:row-210"
+        },
+        {
+          "lng": 127.064084,
+          "lat": 37.645052,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0714:row-944"
+        },
+        {
+          "lng": 127.067999,
+          "lat": 37.636363,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0715:row-1047"
+        },
+        {
+          "lng": 127.072969,
+          "lat": 37.625642,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0716:row-96"
+        },
+        {
+          "lng": 127.075361,
+          "lat": 37.618519,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0717:row-1022"
+        },
+        {
+          "lng": 127.077719,
+          "lat": 37.610638,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0718:row-369"
+        },
+        {
+          "lng": 127.079254,
+          "lat": 37.602604,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0719:row-957"
+        },
+        {
+          "lng": 127.085708,
+          "lat": 37.595673,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0720:row-522"
+        },
+        {
+          "lng": 127.087503,
+          "lat": 37.588671,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0721:row-370"
+        },
+        {
+          "lng": 127.088502,
+          "lat": 37.580912,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0722:row-488"
+        },
+        {
+          "lng": 127.086802,
+          "lat": 37.573752,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0723:row-810"
+        },
+        {
+          "lng": 127.084291,
+          "lat": 37.565877,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0724:row-945"
+        },
+        {
+          "lng": 127.079484,
+          "lat": 37.557151,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0725:row-147"
+        },
+        {
+          "lng": 127.07465,
+          "lat": 37.547962,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0726:row-746"
+        },
+        {
+          "lng": 127.071103,
+          "lat": 37.540882,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0727:row-52"
+        },
+        {
+          "lng": 127.066714,
+          "lat": 37.531558,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0728:row-893"
+        },
+        {
+          "lng": 127.051851,
+          "lat": 37.519097,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0729:row-987"
+        },
+        {
+          "lng": 127.04122,
+          "lat": 37.517185,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0730:row-29"
+        },
+        {
+          "lng": 127.031738,
+          "lat": 37.514262,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0731:row-1053"
+        },
+        {
+          "lng": 127.021385,
+          "lat": 37.511108,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0732:row-218"
+        },
+        {
+          "lng": 127.011717,
+          "lat": 37.508171,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0733:row-413"
+        },
+        {
+          "lng": 127.005055,
+          "lat": 37.503387,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0734:row-80"
+        },
+        {
+          "lng": 126.993541,
+          "lat": 37.48764,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0735:row-204"
+        },
+        {
+          "lng": 126.981766,
+          "lat": 37.485258,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0736:row-865"
+        },
+        {
+          "lng": 126.971108,
+          "lat": 37.484688,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0737:row-192"
+        },
+        {
+          "lng": 126.96533934609488,
+          "lat": 37.48874361541881,
+          "kind": "control"
+        },
+        {
+          "lng": 126.95773541047055,
+          "lat": 37.492225735509805,
+          "kind": "control"
+        },
+        {
+          "lng": 126.953649,
+          "lat": 37.496258,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0738:row-640"
+        },
+        {
+          "lng": 126.947949,
+          "lat": 37.50279,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0739:row-517"
+        },
+        {
+          "lng": 126.94583553038495,
+          "lat": 37.504981762774804,
+          "kind": "control"
+        },
+        {
+          "lng": 126.94105912072638,
+          "lat": 37.5051563294255,
+          "kind": "control"
+        },
+        {
+          "lng": 126.939025,
+          "lat": 37.504845,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0740:row-904"
+        },
+        {
+          "lng": 126.93635748861857,
+          "lat": 37.50325712326607,
+          "kind": "control"
+        },
+        {
+          "lng": 126.93112791952655,
+          "lat": 37.49998674083106,
+          "kind": "control"
+        },
+        {
+          "lng": 126.928218,
+          "lat": 37.499717,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0741:row-666"
+        },
+        {
+          "lng": 126.920112,
+          "lat": 37.499916,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0742:row-442"
+        },
+        {
+          "lng": 126.909806,
+          "lat": 37.500107,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0743:row-696"
+        },
+        {
+          "lng": 126.896997,
+          "lat": 37.492984,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0744:row-251"
+        },
+        {
+          "lng": 126.887372,
+          "lat": 37.486181,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0745:row-185"
+        },
+        {
+          "lng": 126.882704,
+          "lat": 37.480376,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0746:row-7"
+        },
+        {
+          "lng": 126.868217,
+          "lat": 37.47616,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0747:row-983"
+        },
+        {
+          "lng": 126.854854,
+          "lat": 37.47927,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0748:row-108"
+        },
+        {
+          "lng": 126.838684,
+          "lat": 37.486699,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0749:row-980"
+        },
+        {
+          "lng": 126.823294,
+          "lat": 37.492059,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1107:0750:row-794"
+        }
+      ],
+      "enabled": true,
+      "note": null
+    },
+    {
+      "branchId": "01:8:branch:S4108:수도권 전철 8호선:1",
+      "points": [
+        {
+          "lng": 127.137556,
+          "lat": 37.557167,
+          "kind": "control"
+        },
+        {
+          "lng": 127.143373,
+          "lat": 37.60326,
+          "kind": "control"
+        },
+        {
+          "lng": 127.1498,
+          "lat": 37.62437,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S4108:805:row-228"
+        },
+        {
+          "lng": 127.1273,
+          "lat": 37.642517,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S4108:804:row-438"
+        }
+      ],
+      "enabled": true,
+      "note": "8호선 별내 연장 표시 보정: 현재 bundle에 있는 암사역사공원-구리-다산-별내 좌표 기반"
+    },
+    {
+      "branchId": "01:K4:main:I4108:경의·중앙선:0",
+      "points": [
+        {
+          "lng": 126.746777,
+          "lat": 37.888364,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1285:row-890"
+        },
+        {
+          "lng": 126.769713,
+          "lat": 37.880008,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1286:row-826"
+        },
+        {
+          "lng": 126.787531,
+          "lat": 37.854565,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1284:row-389"
+        },
+        {
+          "lng": 126.792426,
+          "lat": 37.815391,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1283:row-1030"
+        },
+        {
+          "lng": 126.792574,
+          "lat": 37.796201,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1282:row-842"
+        },
+        {
+          "lng": 126.774515,
+          "lat": 37.766106,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1280:row-163"
+        },
+        {
+          "lng": 126.765401,
+          "lat": 37.751295,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1279:row-158"
+        },
+        {
+          "lng": 126.767076,
+          "lat": 37.725441000000004,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1278:row-824"
+        },
+        {
+          "lng": 126.761535,
+          "lat": 37.712749,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1277:row-725"
+        },
+        {
+          "lng": 126.761075,
+          "lat": 37.694114,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1276:row-1018"
+        },
+        {
+          "lng": 126.769521,
+          "lat": 37.682231,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1275:row-886"
+        },
+        {
+          "lng": 126.786355,
+          "lat": 37.672173,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1274:row-1046"
+        },
+        {
+          "lng": 126.794401,
+          "lat": 37.658346,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1273:row-423"
+        },
+        {
+          "lng": 126.801877,
+          "lat": 37.645729,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1272:row-87"
+        },
+        {
+          "lng": 126.82089,
+          "lat": 37.618741,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1271:row-221"
+        },
+        {
+          "lng": 126.834063,
+          "lat": 37.612125,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1270:row-1072"
+        },
+        {
+          "lng": 126.844537,
+          "lat": 37.612396,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1269:row-34"
+        },
+        {
+          "lng": 126.868291,
+          "lat": 37.603102,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1268:row-1058"
+        },
+        {
+          "lng": 126.895681,
+          "lat": 37.580855,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1267:row-620"
+        },
+        {
+          "lng": 126.900421,
+          "lat": 37.577964,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1266:row-339"
+        },
+        {
+          "lng": 126.926833,
+          "lat": 37.55758,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1264:row-1080"
+        },
+        {
+          "lng": 126.935389,
+          "lat": 37.552132,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1263:row-535"
+        },
+        {
+          "lng": 126.952134,
+          "lat": 37.542711,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1262:row-95"
+        },
+        {
+          "lng": 126.962339,
+          "lat": 37.538789,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1261:row-1098"
+        },
+        {
+          "lng": 126.964775,
+          "lat": 37.52989,
+          "kind": "control"
+        },
+        {
+          "lng": 126.97335383888748,
+          "lat": 37.522424633965684,
+          "kind": "control"
+        },
+        {
+          "lng": 127.017303,
+          "lat": 37.541653,
+          "kind": "control"
+        },
+        {
+          "lng": 127.0370615,
+          "lat": 37.561289,
+          "kind": "control"
+        },
+        {
+          "lng": 127.045063,
+          "lat": 37.580148,
+          "kind": "control"
+        },
+        {
+          "lng": 127.057936,
+          "lat": 37.589602,
+          "kind": "control"
+        },
+        {
+          "lng": 127.076152,
+          "lat": 37.594948,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1201:row-949"
+        },
+        {
+          "lng": 127.085553,
+          "lat": 37.596754,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1202:row-521"
+        },
+        {
+          "lng": 127.092318,
+          "lat": 37.599288,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1203:row-360"
+        },
+        {
+          "lng": 129.091321,
+          "lat": 36.963729,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1204:row-733"
+        },
+        {
+          "lng": 127.143373,
+          "lat": 37.60326,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1205:row-129"
+        },
+        {
+          "lng": 127.161105,
+          "lat": 37.608756,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1206:row-280"
+        },
+        {
+          "lng": 127.194602,
+          "lat": 37.604269,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1207:row-738"
+        },
+        {
+          "lng": 127.208835,
+          "lat": 37.586892,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1208:row-272"
+        },
+        {
+          "lng": 127.222798,
+          "lat": 37.579628,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1209:row-286"
+        },
+        {
+          "lng": 127.243896,
+          "lat": 37.547321,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1210:row-1037"
+        },
+        {
+          "lng": 127.310089,
+          "lat": 37.554659,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1211:row-820"
+        },
+        {
+          "lng": 127.328948,
+          "lat": 37.545998,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1212:row-732"
+        },
+        {
+          "lng": 127.372745,
+          "lat": 37.525921,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1213:row-683"
+        },
+        {
+          "lng": 127.399402,
+          "lat": 37.516171,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1214:row-142"
+        },
+        {
+          "lng": 127.443238,
+          "lat": 37.513954,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1215:row-707"
+        },
+        {
+          "lng": 127.474053,
+          "lat": 37.506061,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1216:row-785"
+        },
+        {
+          "lng": 127.491858,
+          "lat": 37.492674,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1217:row-744"
+        },
+        {
+          "lng": 127.547468,
+          "lat": 37.468585,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1218:row-830"
+        },
+        {
+          "lng": 127.594251,
+          "lat": 37.482085,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1219:row-812"
+        },
+        {
+          "lng": 127.629681,
+          "lat": 37.476496,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:I4108:1220:row-969"
+        }
+      ],
+      "enabled": true,
+      "note": "경의중앙선 본선 표시 보정: 서울역 지선 분리 후 용산-청량리 경유 구간 좌표 보강"
     }
   ]
 }
