@@ -1854,14 +1854,20 @@ function getBranchStopStations(branch: EditorMapBranch): EditorStation[] {
     .filter((station): station is EditorStation => Boolean(station));
 }
 
-function getBranchAdjacentStationPairs(branch: EditorMapBranch) {
+function getBranchAdjacentStationPairs(branch: EditorMapBranch, circular = false) {
   const stations = getBranchStopStations(branch).filter(isValidStation);
-  const pairs: Array<{ before: EditorStation; after: EditorStation }> = [];
+  const pairs: Array<{ before: EditorStation; after: EditorStation; circular?: boolean }> = [];
 
   for (let index = 0; index < stations.length - 1; index += 1) {
     const before = stations[index];
     const after = stations[index + 1];
     if (before && after) pairs.push({ before, after });
+  }
+
+  const first = stations[0];
+  const last = stations[stations.length - 1];
+  if (circular && first && last && first.id !== last.id) {
+    pairs.push({ before: last, after: first, circular: true });
   }
 
   return pairs;
@@ -3537,6 +3543,10 @@ export default function UnifiedMapEditor({
   const branchById = useMemo(
     () => new Map(data.branches.map((branch) => [branch.id, branch])),
     [data.branches],
+  );
+  const branchRouteOverrideById = useMemo(
+    () => new Map(overlays.branchRouteOverrides.map((override) => [override.branchId, override])),
+    [overlays.branchRouteOverrides],
   );
 
   useEffect(() => {
@@ -6258,6 +6268,7 @@ export default function UnifiedMapEditor({
     stationIds: string[],
     commandLabel: string,
     message: string,
+    circular = branchRouteOverrideById.get(branchId)?.circular === true,
   ) {
     const branch = branchById.get(branchId);
     if (!branch) {
@@ -6276,11 +6287,13 @@ export default function UnifiedMapEditor({
     const baseStationIds = getBranchStopStations(branch).map(
       (station) => station.id,
     );
+    const currentCircular = branchRouteOverrideById.get(branchId)?.circular === true;
     const isSameAsCurrent =
       baseStationIds.length === uniqueStationIds.length &&
       baseStationIds.every(
         (stationId, index) => stationId === uniqueStationIds[index],
-      );
+      ) &&
+      currentCircular === circular;
     if (isSameAsCurrent) {
       showToast("변경된 정차 순서가 없습니다", "info");
       return;
@@ -6290,6 +6303,7 @@ export default function UnifiedMapEditor({
       id: makeBranchRouteOverrideId(branchId),
       branchId,
       stationIds: uniqueStationIds,
+      circular,
       enabled: true,
       source: "editor",
       note: null,
@@ -6324,6 +6338,23 @@ export default function UnifiedMapEditor({
     );
     if (!saved) return;
     await reloadEditorData();
+  }
+
+  async function setBranchCircular(branchId: string, circular: boolean) {
+    const branch = branchById.get(branchId);
+    if (!branch) {
+      showToast("노선을 찾지 못했습니다", "error");
+      return;
+    }
+
+    const stationIds = getBranchStopStations(branch).map((station) => station.id);
+    await saveBranchRouteOverride(
+      branchId,
+      stationIds,
+      circular ? "순환 노선 설정" : "순환 노선 해제",
+      circular ? "순환 노선으로 표시합니다" : "일반 노선으로 표시합니다",
+      circular,
+    );
   }
 
   async function startAddStationInsertion(insertion: PendingAddStationInsertion) {
@@ -6644,37 +6675,24 @@ export default function UnifiedMapEditor({
               </div>
             </div>
             {!isGeometryMode ? (
-              <TabList className="mt-3 grid grid-cols-6 gap-0.5">
+              <TabList className="mt-3 flex snap-x snap-mandatory gap-1 overflow-x-auto scroll-smooth rounded-2xl bg-slate-100 p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {sidebarTabOptions.map(({ value, label, Icon, badge }) => (
                   <TabButton
                     key={value}
-                    className="relative flex min-w-0 items-center justify-center gap-1 px-1"
+                    className="relative grid h-10 min-w-10 snap-center place-items-center px-0"
                     active={sidebarTab === value}
                     onClick={() => setSidebarTab(value)}
                     title={label}
+                    aria-label={label}
                   >
-                    <Icon className="size-3.5 shrink-0" />
-                    <span className="truncate">{label}</span>
+                    <Icon className="size-4 shrink-0" />
                     {badge && badge > 0 ? (
-                      <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-slate-900 px-1 text-[9px] font-bold leading-4 text-white">
+                      <span className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-slate-900 px-1 text-[9px] font-bold leading-4 text-white">
                         {badge > 99 ? "99+" : badge}
                       </span>
                     ) : null}
                   </TabButton>
                 ))}
-                <TabButton
-                  className="relative flex min-w-0 items-center justify-center gap-1 px-1"
-                  active={false}
-                  onClick={() => {
-                    setSelection({ type: "none" });
-                    setStationDraft(null);
-                    setAddStationModalOpen(true);
-                  }}
-                  title="새 역 생성"
-                >
-                  <Plus className="size-3.5 shrink-0" />
-                  <span className="truncate">새 역</span>
-                </TabButton>
               </TabList>
             ) : null}
           </PanelHeader>
@@ -6889,6 +6907,21 @@ export default function UnifiedMapEditor({
                 {label}
               </button>
             ))}
+            {!isGeometryMode ? (
+              <button
+                type="button"
+                className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-500 hover:bg-slate-100"
+                onClick={() => {
+                  setSelection({ type: "none" });
+                  setStationDraft(null);
+                  setAddStationModalOpen(true);
+                }}
+                title="새 역 생성"
+              >
+                <Plus className="size-4" />
+                새 역
+              </button>
+            ) : null}
           </div>
           {selectionBox ? (
             <div
@@ -7049,16 +7082,20 @@ export default function UnifiedMapEditor({
                 onRestoreBranchStation={(id) =>
                   void deleteBranchStationExclusion(id)
                 }
-                onUpdateRoute={(stationIds, label) =>
+                onUpdateRoute={(stationIds, label, circular) =>
                   void saveBranchRouteOverride(
                     activeGeometryBranch.id,
                     stationIds,
                     label,
                     "노선 정차 순서를 저장했습니다",
+                    circular,
                   )
                 }
                 onResetRoute={() =>
                   void resetBranchRouteOverride(activeGeometryBranch.id)
+                }
+                onSetCircular={(circular) =>
+                  void setBranchCircular(activeGeometryBranch.id, circular)
                 }
               />
             ) : null}
@@ -7699,8 +7736,12 @@ function AddStationInsertionDialog({
   const [newStationNameKo, setNewStationNameKo] = useState("");
   const selectedBranch =
     branches.find((branch) => branch.id === branchId) ?? branches[0] ?? null;
+  const selectedBranchCircular = selectedBranch?.isCircular === true;
   const pairs = useMemo(
-    () => (selectedBranch ? getBranchAdjacentStationPairs(selectedBranch) : []),
+    () =>
+      selectedBranch
+        ? getBranchAdjacentStationPairs(selectedBranch, selectedBranch.isCircular === true)
+        : [],
     [selectedBranch],
   );
   const creationMode = !station;
@@ -7769,13 +7810,13 @@ function AddStationInsertionDialog({
               </span>
             </span>
             <Badge className="bg-blue-50 text-blue-700">
-              {creationMode ? "새 역" : "기존 역 연결"}
+              {creationMode ? "새 역" : "기존 역 연결"}{selectedBranchCircular ? " · 순환" : ""}
             </Badge>
           </div>
           {selectedBranch && pairs.length > 0 ? (
             <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50 p-4">
               <div className="mx-auto grid min-w-[520px] max-w-xl grid-cols-[minmax(0,1fr)_88px_minmax(0,1fr)] gap-x-2 gap-y-1">
-                {pairs.map(({ before, after }, index) => {
+                {pairs.map(({ before, after, circular }, index) => {
                   const reversed = index % 2 === 1;
                   const beforeCell = reversed ? 2 : 0;
                   const afterCell = reversed ? 0 : 2;
@@ -7799,7 +7840,7 @@ function AddStationInsertionDialog({
                         type="button"
                         className="group relative col-start-2 row-auto flex h-10 items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
                         disabled={!canSelectLocation}
-                        title={`${before.nameKo} - ${after.nameKo} 사이에 ${creationMode ? "새 역 생성" : "기존 역 연결"}`}
+                        title={`${before.nameKo} - ${after.nameKo} 사이에 ${creationMode ? "새 역 생성" : "기존 역 연결"}${circular ? " · 순환 연결" : ""}`}
                         onClick={() =>
                           onSelect({
                             parentBranchId: selectedBranch.id,
@@ -7811,7 +7852,7 @@ function AddStationInsertionDialog({
                           })
                         }
                       >
-                        <span className="absolute left-1/2 top-0 h-full w-1 -translate-x-1/2 rounded-full bg-blue-200 transition group-hover:w-2 group-hover:bg-blue-500" />
+                        <span className={cn("absolute left-1/2 top-0 h-full w-1 -translate-x-1/2 rounded-full transition group-hover:w-2 group-hover:bg-blue-500", circular ? "bg-violet-300" : "bg-blue-200")} />
                         <span className="relative grid size-8 place-items-center rounded-full border-2 border-white bg-blue-600 text-white shadow-sm transition group-hover:scale-110 group-hover:bg-blue-700">
                           <Plus className="size-4" />
                         </span>
@@ -8754,6 +8795,7 @@ function BranchInspector({
   onRestoreBranchStation,
   onUpdateRoute,
   onResetRoute,
+  onSetCircular,
 }: {
   branch: EditorMapBranch;
   branches: EditorMapBranch[];
@@ -8763,8 +8805,9 @@ function BranchInspector({
   unassignedStations: EditorStation[];
   onDeleteLineBranch: (id: string) => void;
   onRestoreBranchStation: (id: string) => void;
-  onUpdateRoute: (stationIds: string[], label: string) => void;
+  onUpdateRoute: (stationIds: string[], label: string, circular?: boolean) => void;
   onResetRoute: () => void;
+  onSetCircular: (circular: boolean) => void;
 }) {
   const branchStations = getBranchStopStations(branch);
   const relatedLineBranches = lineBranchOverrides.filter(
@@ -8787,6 +8830,7 @@ function BranchInspector({
     branches.map((candidate) => [candidate.id, candidate]),
   );
   const routeStationIds = branchStations.map((station) => station.id);
+  const isCircular = branchRouteOverride?.circular === true || branch.isCircular === true;
 
   function moveStation(index: number, direction: -1 | 1) {
     const targetIndex = index + direction;
@@ -8797,13 +8841,14 @@ function BranchInspector({
     if (!target || !sibling) return;
     next[index] = sibling;
     next[targetIndex] = target;
-    onUpdateRoute(next, "노선 정차 순서 변경");
+    onUpdateRoute(next, "노선 정차 순서 변경", isCircular);
   }
 
   function removeFromRoute(stationId: string) {
     onUpdateRoute(
       routeStationIds.filter((id) => id !== stationId),
       "노선 정차역 제거",
+      isCircular,
     );
   }
 
@@ -8838,6 +8883,31 @@ function BranchInspector({
             <p className="mt-1 truncate text-xs font-bold text-slate-700">
               {branch.terminal ?? "-"}
             </p>
+          </div>
+        </div>
+        <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <strong className="text-xs font-semibold text-slate-800">
+                순환 노선
+              </strong>
+              <p className="mt-1 text-[11px] font-medium leading-4 text-slate-500">
+                켜면 마지막 역과 첫 역이 연결되고, 역 추가 프리뷰에도 순환 구간이 표시됩니다.
+              </p>
+            </div>
+            <button
+              type="button"
+              className={cn(
+                "shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold transition",
+                isCircular
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-500 hover:bg-slate-200",
+              )}
+              onClick={() => onSetCircular(!isCircular)}
+              aria-pressed={isCircular}
+            >
+              {isCircular ? "순환 켜짐" : "순환 꺼짐"}
+            </button>
           </div>
         </div>
       </div>

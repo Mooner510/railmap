@@ -221,6 +221,7 @@ function normalizeBranchRouteOverride(
     id: asString(override.id) ?? makeBranchRouteOverrideId(branchId),
     branchId,
     stationIds,
+    circular: override.circular === true,
     enabled: override.enabled !== false,
     source: asString(override.source) ?? "editor",
     note: asNullableString(override.note),
