@@ -341,16 +341,15 @@ export default function ChangesPageClient() {
                 전체 변경 내용
               </h1>
               <p className="mt-1 text-sm font-medium text-slate-500">
-                editor에서 저장한 override 데이터만 종류별로 조회하고, 항목
-                단위로 수정/삭제합니다.
+                저장된 역 위치, 선형, 환승, 스냅샷을 확인하고 필요하면 복구합니다.
               </p>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" asChild>
-                <Link href="/">메인</Link>
+                <Link href="/">편집기 홈</Link>
               </Button>
               <Button asChild>
-                <Link href="/editor">통합 맵 에디터</Link>
+                <Link href="/editor">통합 에디터 열기</Link>
               </Button>
             </div>
           </div>
