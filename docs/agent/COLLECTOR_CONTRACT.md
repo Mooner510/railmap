@@ -1,27 +1,34 @@
 # COLLECTOR_CONTRACT
 
-Status: active collector contract draft  
-Generated: 2026-06-23
+Status: active collector contract  
+Updated: 2026-07-02
 
 ## 1. Purpose
 
-This contract defines how project collectors must behave across KRIC, KORAIL, OSM, TAGO, and future sources.
+This contract defines how project collectors and build/export steps behave across KRIC, KORAIL, OSM, TAGO, and future sources.
 
-Collectors produce raw snapshots, parsed source records, candidate normalized records, and diagnostics.
+Collectors produce raw snapshots, parsed source records, candidate normalized records, generated app bundles, and diagnostics.
 
-Collectors do not produce final editorial truth.
+Collectors do not silently make final editorial decisions. Human corrections are stored as manual overlays.
 
 ## 2. Required outputs
 
-Each collector should be capable of writing:
+Collectors should be capable of writing:
 
 ```text
 data/raw/<acquired-date>/<source>/...
 data/probes/<acquired-date>/<source>/...
 data/collected/<acquired-date>/<source>/...
+data/generated/<acquired-date>/app-bundle/...
 ```
 
-`data/generated/` is reserved for later build outputs derived from collected/manual data.
+Public app export target:
+
+```text
+apps/web/public/data/
+```
+
+The public export must include the generated app bundle and manual overlays needed by `apps/web`.
 
 ## 3. Required metadata
 
@@ -54,13 +61,37 @@ Do not write service keys to:
 
 If a source response includes the key, redact before sharing or committing.
 
-## 5. KRIC collector contract
+## 5. Manual overlay build/export contract
 
-### 5.1 XLSX files
+The canonical manual source is:
+
+```text
+data/manual/manual-overlays.json
+```
+
+Build/export must copy or emit the web-readable version to:
+
+```text
+apps/web/public/data/manual-overlays.json
+```
+
+The build/export step must validate:
+
+1. manual overlay JSON is parseable;
+2. manual overlay references valid known stations/lines/branches or explicitly manual stations;
+3. station-line identity rules are satisfied;
+4. circular-line branch connection rules are satisfied;
+5. generated/public export still contains required manual overlay content.
+
+If validation fails, fail the build/export step instead of publishing partial data.
+
+## 6. KRIC collector contract
+
+### 6.1 XLSX files
 
 KRIC XLSX files are raw snapshot inputs. Preserve them unchanged.
 
-Current accepted raw XLSX files:
+Known accepted raw XLSX files include:
 
 ```text
 전체_도시철도운행정보_20260228.xlsx
@@ -69,7 +100,7 @@ Current accepted raw XLSX files:
 운영기관_역사_코드정보_2026.05.11_일반.xlsx
 ```
 
-### 5.2 `subwayRouteInfo`
+### 6.2 `subwayRouteInfo`
 
 Use the manual route allowlist:
 
@@ -89,13 +120,13 @@ For each route call, preserve the raw response and emit diagnostics.
 
 Do not remove a configured route merely because one request fails.
 
-### 5.3 KRIC route key rule
+### 6.3 KRIC route key rule
 
 Use `(mreaWideCd, lnCd)` as the API route key.
 
 Do not use `lnCd` alone because numeric line codes repeat across regions.
 
-## 6. KORAIL collector contract
+## 7. KORAIL collector contract
 
 Use `travelerTrainRunInfo2` as the main station-stop-level timetable candidate source.
 
@@ -124,7 +155,7 @@ Preserve nullable arrival/departure fields exactly:
 
 If duplicate `run_ymd + trn_no + trn_run_sn` rows are observed, preserve all raw rows and emit diagnostics instead of overwriting.
 
-## 7. OSM collector contract
+## 8. OSM collector contract
 
 Use Geofabrik Korea extract as primary OSM geometry source.
 
@@ -134,7 +165,7 @@ Preserve raw PBF metadata and extraction diagnostics.
 
 Exclude inactive/future railway objects from active normalized outputs unless manually reviewed.
 
-## 8. TAGO collector contract
+## 9. TAGO collector contract
 
 TAGO Train is currently blocked by access.
 
@@ -142,7 +173,7 @@ Do not implement or depend on TAGO Train until a successful probe confirms acces
 
 TAGO may later be used only as a secondary/cross-check source, not as a primary source.
 
-## 9. Diagnostics requirements
+## 10. Diagnostics requirements
 
 Collectors must emit diagnostics for:
 
@@ -158,10 +189,13 @@ Collectors must emit diagnostics for:
 - station-order mismatch;
 - unsupported date/time format;
 - source conflict;
-- skipped inactive/future object.
+- skipped inactive/future object;
+- station-line identity violation;
+- circular-line branch connection violation;
+- manual overlay export mismatch.
 
-## 10. Final publication boundary
+## 11. Final publication boundary
 
 Collected data is not automatically publishable.
 
-Final app/publication data must come from a later build step that combines raw/collected/manual decisions and passes validation.
+Final public data must come from a build/export step that combines raw/collected/generated/manual data and passes validation.
