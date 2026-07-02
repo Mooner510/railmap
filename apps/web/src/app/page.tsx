@@ -450,23 +450,57 @@ function toMapStations(stations: CanonicalStation[]): RailMapStation[] {
   }));
 }
 
+function buildMapStationIndex(stations: RailMapStation[]) {
+  return new Map(stations.map((station) => [station.id, station]));
+}
+
+function resolveGeometryPointStationAnchors<
+  TPoint extends { lng: number; lat: number; kind: string; stationId?: string },
+>(points: TPoint[], stationById: Map<string, RailMapStation>): TPoint[] {
+  return points.map((point) => {
+    if (point.kind !== "station" || !point.stationId) return point;
+    const station = stationById.get(point.stationId);
+    if (
+      !station ||
+      typeof station.lng !== "number" ||
+      typeof station.lat !== "number" ||
+      !Number.isFinite(station.lng) ||
+      !Number.isFinite(station.lat)
+    ) {
+      return point;
+    }
+
+    return {
+      ...point,
+      lng: station.lng,
+      lat: station.lat,
+    };
+  });
+}
+
+function toMapLineBranchOverrides(
+  overrides: ManualLineBranchOverride[],
+  stationById: Map<string, RailMapStation>,
+): ManualLineBranchOverride[] {
+  return overrides.map((override) =>
+    override.geometry?.length
+      ? {
+          ...override,
+          geometry: resolveGeometryPointStationAnchors(
+            override.geometry,
+            stationById,
+          ),
+        }
+      : override,
+  );
+}
+
 function toMapBranches(
   bundle: CanonicalBundle,
   geometryOverrides: ManualGeometryOverride[],
   branchStationExclusions: ManualBranchStationExclusion[],
+  stationById: Map<string, RailMapStation>,
 ): RailMapBranch[] {
-  const stationById = new Map(
-    bundle.stations.map((station) => [
-      station.id,
-      {
-        id: station.id,
-        nameKo: station.nameKo,
-        lineNameKo: station.lineNameKo,
-        lat: station.lat,
-        lng: station.lng,
-      } satisfies RailMapStation,
-    ]),
-  );
   const exclusionByBranchId = buildBranchStationExclusionIndex(branchStationExclusions);
   const overrideByBranchId = new Map(
     geometryOverrides
@@ -488,12 +522,22 @@ function toMapBranches(
         role: branch.role,
         sourceLineNumber: branch.sourceLineNumber,
         sourceLineName: branch.sourceLineName,
-        geometryOverrideCoordinates: override?.points
-          .filter((point) => !exclusionByBranchId.get(branch.id)?.has(point.stationId ?? ""))
-          .filter(
-            (point) => Number.isFinite(point.lng) && Number.isFinite(point.lat),
-          )
-          .map((point) => [point.lng, point.lat] as [number, number]),
+        geometryOverrideCoordinates: override
+          ? resolveGeometryPointStationAnchors(
+              override.points.filter(
+                (point) =>
+                  !exclusionByBranchId.get(branch.id)?.has(
+                    point.stationId ?? "",
+                  ),
+              ),
+              stationById,
+            )
+              .filter(
+                (point) =>
+                  Number.isFinite(point.lng) && Number.isFinite(point.lat),
+              )
+              .map((point) => [point.lng, point.lat] as [number, number])
+          : undefined,
         routeStops: branch.routeStops.map((stop) => ({
           id: stop.id,
           sequence: stop.sequence,
@@ -523,14 +567,24 @@ function toMapTransferGroups(
 export default function Home() {
   const bundle = readBundle();
   const manualOverlays = readManualOverlays();
+  const mapStations = toMapStations(bundle.stations);
+  const mapStationById = buildMapStationIndex(mapStations);
 
   return (
     <main className="h-[100dvh] overflow-hidden bg-slate-950 text-slate-950">
       <RailExplorer
         bundle={bundle}
-        mapStations={toMapStations(bundle.stations)}
-        mapBranches={toMapBranches(bundle, manualOverlays.geometryOverrides, manualOverlays.branchStationExclusions)}
-        lineBranchOverrides={manualOverlays.lineBranchOverrides}
+        mapStations={mapStations}
+        mapBranches={toMapBranches(
+          bundle,
+          manualOverlays.geometryOverrides,
+          manualOverlays.branchStationExclusions,
+          mapStationById,
+        )}
+        lineBranchOverrides={toMapLineBranchOverrides(
+          manualOverlays.lineBranchOverrides,
+          mapStationById,
+        )}
         transferGroups={toMapTransferGroups(
           manualOverlays.manualTransferGroups,
         )}
