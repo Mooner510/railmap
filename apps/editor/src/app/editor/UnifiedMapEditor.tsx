@@ -174,6 +174,7 @@ type PendingAddStationInsertion = {
   parentBranchId: string;
   beforeStationId: string;
   afterStationId: string;
+  newStationNameKo?: string;
 };
 
 type GeometryEditTarget = {
@@ -1983,6 +1984,32 @@ function selectionLabel(selection: Selection) {
   return "환승 그룹";
 }
 
+
+function makeManualStationId(branch: EditorMapBranch, nameKo: string) {
+  const slug = normalizeSearchText(nameKo || "new-station") || "new-station";
+  const branchSlug = branch.id.replace(/[^\w가-힣:.-]+/g, "_");
+  return `manual:station:${branchSlug}:${slug}:${Date.now().toString(36)}`;
+}
+
+function makeManualStationOverride(
+  branch: EditorMapBranch,
+  stationId: string,
+  nameKo: string,
+): ManualStationOverride {
+  return {
+    stationId,
+    nameKo: nameKo.trim(),
+    stationNumber: "MANUAL",
+    lineNameKo: branch.canonicalLineNameKo || branch.sourceLineName,
+    lineNumber: branch.sourceLineNumber,
+    colorHex: branch.colorHex ?? null,
+    lat: null,
+    lng: null,
+    enabled: true,
+    note: `수동 추가 역 · ${formatBranchDisplayName(branch)}`,
+  };
+}
+
 function emptyStationOverride(
   station: EditorStation,
   previous?: ManualStationOverride,
@@ -1990,6 +2017,10 @@ function emptyStationOverride(
   return {
     stationId: station.id,
     nameKo: previous?.nameKo ?? station.nameKo,
+    stationNumber: previous?.stationNumber ?? station.stationNumber,
+    lineNameKo: previous?.lineNameKo ?? station.lineNameKo,
+    lineNumber: previous?.lineNumber ?? station.lineNumber,
+    colorHex: previous?.colorHex ?? station.colorHex ?? null,
     lat: previous?.lat ?? station.lat,
     lng: previous?.lng ?? station.lng,
     enabled: previous?.enabled ?? true,
@@ -2023,7 +2054,7 @@ function validateStationOverrideDraft(
   stationById: Map<string, EditorStation>,
 ) {
   const station = stationById.get(draft.stationId);
-  if (!station) return "저장할 역을 찾을 수 없습니다.";
+  if (!station && !draft.nameKo?.trim()) return "새 역 이름을 입력하세요.";
 
   const lng = draft.lng;
   const lat = draft.lat;
@@ -2689,16 +2720,40 @@ function applyStationCoordinateToStations(
   );
 }
 
+function makeDisplayStationFromManualOverride(
+  override: ManualStationOverride,
+): EditorStation | null {
+  const lng = override.lng;
+  const lat = override.lat;
+  if (override.enabled === false) return null;
+  if (!override.nameKo?.trim()) return null;
+  if (typeof lng !== "number" || typeof lat !== "number") return null;
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+
+  return {
+    id: override.stationId,
+    stationNumber: override.stationNumber?.trim() || "MANUAL",
+    nameKo: override.nameKo.trim(),
+    lineNameKo: override.lineNameKo?.trim() || "수동 추가 역",
+    lineNumber: override.lineNumber?.trim() || "manual",
+    colorHex: override.colorHex ?? null,
+    lat,
+    lng,
+  };
+}
+
 function applyStationOverridesToStations(
   stations: EditorStation[],
   overrides: ManualStationOverride[],
 ): EditorStation[] {
-  return overrides.reduce((current, override) => {
+  const baseStationIds = new Set(stations.map((station) => station.id));
+  const updatedStations = overrides.reduce((current, override) => {
     const lng = override.lng;
     const lat = override.lat;
     if (override.enabled === false) return current;
     if (typeof lng !== "number" || typeof lat !== "number") return current;
     if (!Number.isFinite(lng) || !Number.isFinite(lat)) return current;
+    if (!baseStationIds.has(override.stationId)) return current;
     return applyStationCoordinateToStations(
       current,
       override.stationId,
@@ -2706,6 +2761,13 @@ function applyStationOverridesToStations(
       lat,
     );
   }, stations);
+
+  const manualStations = overrides
+    .filter((override) => !baseStationIds.has(override.stationId))
+    .map(makeDisplayStationFromManualOverride)
+    .filter((station): station is EditorStation => station !== null);
+
+  return [...updatedStations, ...manualStations];
 }
 
 function applyStationOverridesToBranches(
@@ -5222,7 +5284,9 @@ export default function UnifiedMapEditor({
     const parentBranch = branchByIdRef.current.get(insertion.parentBranchId);
     const beforeStation = stationByIdRef.current.get(insertion.beforeStationId);
     const afterStation = stationByIdRef.current.get(insertion.afterStationId);
-    const branchStation = stationByIdRef.current.get(nextOverride.stationId);
+    const branchStation =
+      stationByIdRef.current.get(nextOverride.stationId) ??
+      makeDisplayStationFromManualOverride(nextOverride);
     const beforeCoordinate = getStationCoordinate(beforeStation);
     const afterCoordinate = getStationCoordinate(afterStation);
 
@@ -5241,8 +5305,11 @@ export default function UnifiedMapEditor({
     }
 
     const assignedStationIds = new Set(data.branches.flatMap(getBranchStationIds));
-    if (assignedStationIds.has(nextOverride.stationId)) {
-      showToast("이미 노선에 소속된 역은 새 역으로 추가할 수 없습니다", "error");
+    const isManualNewStation = !data.stations.some(
+      (station) => station.id === nextOverride.stationId,
+    );
+    if (!isManualNewStation && assignedStationIds.has(nextOverride.stationId)) {
+      showToast("이미 노선에 소속된 기존 역은 새 역으로 추가할 수 없습니다", "error");
       return null;
     }
 
@@ -5302,6 +5369,9 @@ export default function UnifiedMapEditor({
       setPendingAddStationInsertion(null);
       setStationLocationPickMode(false);
       const nextData = await reloadEditorData();
+      if (nextData?.stations.some((station) => station.id === nextOverride.stationId)) {
+        setSelection({ type: "station", id: nextOverride.stationId });
+      }
       await reloadStationDraftFromData(nextData, nextOverride.stationId);
       return nextData;
     } finally {
@@ -5931,6 +6001,13 @@ export default function UnifiedMapEditor({
       return;
     }
 
+    const manualStationName = insertion.newStationNameKo?.trim();
+    if (manualStationName) {
+      const manualStationId = makeManualStationId(branch, manualStationName);
+      setSelection({ type: "none" });
+      setStationDraft(makeManualStationOverride(branch, manualStationId, manualStationName));
+    }
+
     setAddStationModalOpen(false);
     setPendingAddStationInsertion(insertion);
     setStationLocationPickMode(true);
@@ -6256,6 +6333,17 @@ export default function UnifiedMapEditor({
                     onChange={(event) => setQuery(event.target.value)}
                   />
                 </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelection({ type: "none" });
+                    setStationDraft(null);
+                    setAddStationModalOpen(true);
+                  }}
+                >
+                  <Plus className="mr-1 size-4" />
+                  새 역 생성
+                </Button>
                 <div className="flex items-center justify-between px-1 text-[11px] font-semibold text-slate-400">
                   <span>
                     {filteredStations.length.toLocaleString("ko-KR")}개 결과
@@ -6676,7 +6764,7 @@ export default function UnifiedMapEditor({
       </Dialog>
 
       <AddStationInsertionDialog
-        open={addStationModalOpen && Boolean(selectedStation)}
+        open={addStationModalOpen}
         station={selectedStation}
         branches={data.branches}
         onClose={() => setAddStationModalOpen(false)}
@@ -7243,12 +7331,14 @@ function AddStationInsertionDialog({
   onSelect: (insertion: PendingAddStationInsertion) => void;
 }) {
   const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
+  const [newStationNameKo, setNewStationNameKo] = useState("");
   const selectedBranch =
     branches.find((branch) => branch.id === branchId) ?? branches[0] ?? null;
   const pairs = useMemo(
     () => (selectedBranch ? getBranchAdjacentStationPairs(selectedBranch) : []),
     [selectedBranch],
   );
+  const creationMode = !station;
 
   useEffect(() => {
     if (!branches.some((branch) => branch.id === branchId)) {
@@ -7256,17 +7346,35 @@ function AddStationInsertionDialog({
     }
   }, [branchId, branches]);
 
+  useEffect(() => {
+    if (!open) setNewStationNameKo("");
+  }, [open]);
+
+  const canSelectLocation = !creationMode || newStationNameKo.trim().length > 0;
+
   return (
     <Dialog open={open} className="flex max-h-[620px] max-w-2xl flex-col">
       <div className="border-b border-slate-200 px-4 py-3">
         <strong className="block text-sm font-semibold text-slate-950">
-          기존 노선에 역 편입
+          {creationMode ? "새 역 생성" : "기존 역을 노선에 연결"}
         </strong>
         <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
-          {station ? `${station.nameKo}을(를) 기존 노선의 어느 두 역 사이에 넣을지 선택하세요.` : "추가할 역을 먼저 선택하세요."}
+          {creationMode
+            ? "새 역 이름과 들어갈 위치를 고른 뒤, 지도에서 실제 위치를 클릭해 저장합니다."
+            : `${station.nameKo}을(를) 기존 노선의 어느 두 역 사이에 넣을지 선택하세요.`}
         </p>
       </div>
       <div className="grid min-h-0 gap-3 overflow-y-auto p-4">
+        {creationMode ? (
+          <Field label="새 역 이름">
+            <Input
+              autoFocus
+              placeholder="예: 서울역(경의중앙선)"
+              value={newStationNameKo}
+              onChange={(event) => setNewStationNameKo(event.target.value)}
+            />
+          </Field>
+        ) : null}
         <Field label="노선">
           <select
             className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
@@ -7295,12 +7403,16 @@ function AddStationInsertionDialog({
                 <button
                   key={`${before.id}:${after.id}`}
                   type="button"
-                  className="grid grid-cols-[minmax(0,1fr)_40px_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50"
+                  className="grid grid-cols-[minmax(0,1fr)_40px_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={!canSelectLocation}
                   onClick={() =>
                     onSelect({
                       parentBranchId: selectedBranch.id,
                       beforeStationId: before.id,
                       afterStationId: after.id,
+                      newStationNameKo: creationMode
+                        ? newStationNameKo.trim()
+                        : undefined,
                     })
                   }
                 >

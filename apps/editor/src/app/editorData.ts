@@ -145,24 +145,54 @@ function resolveStationColor(station: EditorStation, colorIndex: StationColorInd
   return colorIndex.colorByStationId.get(station.id) ?? null;
 }
 
+function createManualStationFromOverride(override: ManualStationOverride): EditorStation | null {
+  if (override.enabled === false) return null;
+  if (!override.nameKo?.trim()) return null;
+  if (typeof override.lng !== "number" || typeof override.lat !== "number") return null;
+  if (!Number.isFinite(override.lng) || !Number.isFinite(override.lat)) return null;
+
+  return {
+    id: override.stationId,
+    stationNumber: override.stationNumber?.trim() || "MANUAL",
+    nameKo: override.nameKo.trim(),
+    lineNameKo: override.lineNameKo?.trim() || "수동 추가 역",
+    lineNumber: override.lineNumber?.trim() || "manual",
+    colorHex: override.colorHex ?? null,
+    lat: override.lat,
+    lng: override.lng,
+  };
+}
+
 function applyStationOverrides(stations: EditorStation[], overrides: ManualStationOverride[]): EditorStation[] {
   const overrideByStationId = new Map(
     overrides
       .filter((override) => override.enabled !== false)
       .map((override) => [override.stationId, override]),
   );
+  const baseStationIds = new Set(stations.map((station) => station.id));
 
-  return stations.map((station) => {
+  const updatedStations = stations.map((station) => {
     const override = overrideByStationId.get(station.id);
     if (!override) return station;
 
     return {
       ...station,
       nameKo: override.nameKo?.trim() || station.nameKo,
+      stationNumber: override.stationNumber?.trim() || station.stationNumber,
+      lineNameKo: override.lineNameKo?.trim() || station.lineNameKo,
+      lineNumber: override.lineNumber?.trim() || station.lineNumber,
+      colorHex: override.colorHex ?? station.colorHex,
       lat: typeof override.lat === "number" && Number.isFinite(override.lat) ? override.lat : station.lat,
       lng: typeof override.lng === "number" && Number.isFinite(override.lng) ? override.lng : station.lng,
     };
   });
+
+  const manualStations = overrides
+    .filter((override) => !baseStationIds.has(override.stationId))
+    .map(createManualStationFromOverride)
+    .filter((station): station is EditorStation => station !== null);
+
+  return [...updatedStations, ...manualStations];
 }
 
 

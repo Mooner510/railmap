@@ -63,6 +63,10 @@ export interface ManualTransferEdge {
 export interface ManualStationOverride {
   stationId: string;
   nameKo?: string;
+  stationNumber?: string;
+  lineNameKo?: string;
+  lineNumber?: string;
+  colorHex?: string | null;
   lat?: number | null;
   lng?: number | null;
   enabled: boolean;
