@@ -17,8 +17,9 @@ const editorCards = [
     href: "/changes",
     title: "전체 변경 내용",
     description:
-      "editor가 저장한 모든 override를 종류별로 조회하고 수정/삭제/스냅샷 저장합니다.",
-    status: "신규",
+      "저장된 역 위치, 선형, 환승, 스냅샷을 한곳에서 확인하고 복구합니다.",
+    status: "검토/복구",
+    primary: true,
   },
   {
     href: "/transfers",
@@ -65,15 +66,15 @@ export default async function Home() {
           수동 데이터 편집기
         </h1>
         <p className="mt-2 max-w-3xl text-sm font-normal leading-7 text-slate-500">
-          v12부터 통합 맵 에디터를 중심으로 전환합니다. 기존 페이지는 안전한
-          fallback으로 유지합니다.
+          지도 편집은 통합 에디터에서 진행하고, 저장된 변경 확인·스냅샷 복구는
+          전체 변경 내용에서 처리합니다.
         </p>
         <div className="mt-5 flex flex-wrap gap-2">
           <Button asChild>
             <Link href="/editor">통합 에디터 열기</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link href="/changes">전체 변경 내용</Link>
+            <Link href="/changes">전체 변경 내용 보기</Link>
           </Button>
         </div>
       </section>
