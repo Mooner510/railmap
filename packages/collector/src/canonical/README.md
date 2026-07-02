@@ -48,3 +48,16 @@ Build/export는 다음 오류를 잡아야 합니다.
 - same-name station 자동 병합 금지
 - source conflict 자동 승자 결정 금지
 - manual overlay를 generated 값으로 덮어쓰기 금지
+
+## 13.21 validation hardening
+
+`validate-manual-overlay-pipeline.ts`는 collector build 직후 다음 항목을 한 번 더 확인합니다.
+
+- `data/manual/manual-overlays.json`과 `apps/web/public/data/manual-overlays.json` parity
+- generated canonical bundle과 web public bundle parity
+- manual transfer/branch/geometry override의 station/branch 참조 유효성
+- 순환 노선이 parent/source가 되어 외부 노선으로 결합되는 오류
+- route stop은 있으나 지도에 그릴 좌표가 2개 미만인 branch
+- 각 오류의 위치, 원인, 해결 방법
+
+검증 실패 시 collector는 실패해야 하며, public web data를 조용히 배포하면 안 됩니다.
