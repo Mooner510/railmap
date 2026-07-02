@@ -163,6 +163,10 @@ function normalizeStationOverride(
   return {
     stationId,
     nameKo: asNullableString(override.nameKo) ?? undefined,
+    stationNumber: asNullableString(override.stationNumber) ?? undefined,
+    lineNameKo: asNullableString(override.lineNameKo) ?? undefined,
+    lineNumber: asNullableString(override.lineNumber) ?? undefined,
+    colorHex: asNullableString(override.colorHex),
     lat: asNullableCoordinateNumber(override.lat),
     lng: asNullableCoordinateNumber(override.lng),
     enabled: override.enabled !== false,

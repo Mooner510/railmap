@@ -65,6 +65,10 @@ interface CanonicalStation {
 interface ManualStationOverride {
   stationId: string;
   nameKo?: string;
+  stationNumber?: string;
+  lineNameKo?: string;
+  lineNumber?: string;
+  colorHex?: string | null;
   lat?: number | null;
   lng?: number | null;
   enabled: boolean;
@@ -495,6 +499,28 @@ function applyBranchRouteOverrides(
   };
 }
 
+function createManualStationFromOverride(
+  override: ManualStationOverride,
+): CanonicalStation | null {
+  if (override.enabled === false) return null;
+  if (!override.nameKo?.trim()) return null;
+  if (typeof override.lng !== "number" || typeof override.lat !== "number") return null;
+  if (!Number.isFinite(override.lng) || !Number.isFinite(override.lat)) return null;
+
+  return {
+    id: override.stationId,
+    stationNumber: override.stationNumber?.trim() || "MANUAL",
+    nameKo: override.nameKo.trim(),
+    nameEn: null,
+    lineNumber: override.lineNumber?.trim() || "manual",
+    lineNameKo: override.lineNameKo?.trim() || "수동 추가 역",
+    lat: override.lat,
+    lng: override.lng,
+    operatorNameKo: null,
+    sourceCandidateId: override.stationId,
+  };
+}
+
 function applyStationOverrides(
   stations: CanonicalStation[],
   overrides: ManualStationOverride[],
@@ -504,14 +530,18 @@ function applyStationOverrides(
       .filter((override) => override.enabled !== false)
       .map((override) => [override.stationId, override]),
   );
+  const baseStationIds = new Set(stations.map((station) => station.id));
 
-  return stations.map((station) => {
+  const updatedStations = stations.map((station) => {
     const override = overrideByStationId.get(station.id);
     if (!override) return station;
 
     return {
       ...station,
       nameKo: override.nameKo?.trim() || station.nameKo,
+      stationNumber: override.stationNumber?.trim() || station.stationNumber,
+      lineNameKo: override.lineNameKo?.trim() || station.lineNameKo,
+      lineNumber: override.lineNumber?.trim() || station.lineNumber,
       lat:
         typeof override.lat === "number" && Number.isFinite(override.lat)
           ? override.lat
@@ -522,6 +552,13 @@ function applyStationOverrides(
           : station.lng,
     };
   });
+
+  const manualStations = overrides
+    .filter((override) => !baseStationIds.has(override.stationId))
+    .map(createManualStationFromOverride)
+    .filter((station): station is CanonicalStation => station !== null);
+
+  return [...updatedStations, ...manualStations];
 }
 
 function readBundle(): CanonicalBundle {
