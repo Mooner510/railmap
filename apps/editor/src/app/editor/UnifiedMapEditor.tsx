@@ -58,6 +58,7 @@ import {
 import type {
   EditorStation,
   ManualBranchStationExclusion,
+  ManualBranchRouteOverride,
   ManualGeometryOverride,
   ManualGeometryOverridePoint,
   ManualLineBranchOverride,
@@ -67,6 +68,7 @@ import type {
 } from "../editorModel";
 import {
   EMPTY_MANUAL_OVERLAY_BUNDLE,
+  makeBranchRouteOverrideId,
   makeBranchStationExclusionId,
   makeLineBranchOverrideId,
   makeTransferGroupId,
@@ -671,9 +673,14 @@ function getPublicWebManualChangeRows(overlays: ManualOverlayBundle) {
       description: "특정 branch에서 역을 제거한 override입니다.",
     },
     {
+      label: "노선 정차 순서",
+      count: overlays.branchRouteOverrides.length,
+      description: "기존 branch의 역 추가/삭제/순서 변경 override입니다.",
+    },
+    {
       label: "지선 overlay",
       count: (overlays.lineBranchOverrides ?? []).length,
-      description: "역 추가/노선 결합으로 만든 수동 지선 선형입니다.",
+      description: "지선 추가/노선 결합으로 만든 수동 지선 선형입니다.",
     },
     {
       label: "선형 보정",
@@ -725,6 +732,7 @@ function getPublicWebParityRows(
 ): PublicWebParityRow[] {
   const stationOverrideCount = overlays.stationOverrides.length;
   const geometryOverrideCount = overlays.geometryOverrides.length;
+  const branchRouteOverrideCount = overlays.branchRouteOverrides.length;
   const lineBranchOverrideCount = overlays.lineBranchOverrides?.length ?? 0;
   const stationAnchorReferenceCount =
     overlays.geometryOverrides.reduce(
@@ -751,11 +759,13 @@ function getPublicWebParityRows(
     {
       label: "선형 보정 반영",
       status:
-        geometryOverrideCount + lineBranchOverrideCount > 0 ? "ok" : "warning",
-      value: `${(geometryOverrideCount + lineBranchOverrideCount).toLocaleString("ko-KR")}개`,
+        geometryOverrideCount + branchRouteOverrideCount + lineBranchOverrideCount > 0
+          ? "ok"
+          : "warning",
+      value: `${(geometryOverrideCount + branchRouteOverrideCount + lineBranchOverrideCount).toLocaleString("ko-KR")}개`,
       description:
-        geometryOverrideCount + lineBranchOverrideCount > 0
-          ? "Web에서 일반 선형 보정과 수동 지선을 함께 읽습니다."
+        geometryOverrideCount + branchRouteOverrideCount + lineBranchOverrideCount > 0
+          ? "Web에서 일반 선형 보정, 노선 정차 순서, 수동 지선을 함께 읽습니다."
           : "현재 Web에 반영할 선형 보정이 없습니다.",
     },
     {
@@ -5061,37 +5071,18 @@ export default function UnifiedMapEditor({
       return null;
     }
 
-    const override: ManualLineBranchOverride = {
-      id: makeLineBranchOverrideId(
-        "add-station",
-        insertion.parentBranchId,
-        insertion.beforeStationId,
-        nextOverride.stationId,
-      ),
-      mode: "add-station",
-      parentBranchId: insertion.parentBranchId,
-      anchorStationId: insertion.beforeStationId,
-      branchStationId: nextOverride.stationId,
-      geometry: [
-        {
-          lng: beforeCoordinate[0],
-          lat: beforeCoordinate[1],
-          kind: "station",
-          stationId: insertion.beforeStationId,
-        },
-        {
-          lng: nextOverride.lng,
-          lat: nextOverride.lat,
-          kind: "station",
-          stationId: nextOverride.stationId,
-        },
-        {
-          lng: afterCoordinate[0],
-          lat: afterCoordinate[1],
-          kind: "station",
-          stationId: insertion.afterStationId,
-        },
-      ],
+    const currentRouteStationIds = getBranchStopStations(parentBranch).map(
+      (station) => station.id,
+    );
+    const nextRouteStationIds = [
+      ...currentRouteStationIds.slice(0, beforeIndex + 1),
+      nextOverride.stationId,
+      ...currentRouteStationIds.slice(afterIndex),
+    ];
+    const routeOverride: ManualBranchRouteOverride = {
+      id: makeBranchRouteOverrideId(insertion.parentBranchId),
+      branchId: insertion.parentBranchId,
+      stationIds: nextRouteStationIds,
       enabled: true,
       source: "editor",
       note: `${formatStationDisplayName(beforeStation)} - ${formatStationDisplayName(branchStation)} - ${formatStationDisplayName(afterStation)}`,
@@ -5108,11 +5099,11 @@ export default function UnifiedMapEditor({
           ),
           nextOverride,
         ],
-        lineBranchOverrides: [
-          ...baseOverlays.lineBranchOverrides.filter(
-            (candidate) => candidate.id !== override.id,
+        branchRouteOverrides: [
+          ...baseOverlays.branchRouteOverrides.filter(
+            (candidate) => candidate.branchId !== routeOverride.branchId,
           ),
-          override,
+          routeOverride,
         ],
       };
 
@@ -5668,6 +5659,79 @@ export default function UnifiedMapEditor({
     if (!saved) return;
     await reloadEditorData();
     setSidebarTab("validation");
+  }
+
+  async function saveBranchRouteOverride(
+    branchId: string,
+    stationIds: string[],
+    commandLabel: string,
+    message: string,
+  ) {
+    const branch = branchById.get(branchId);
+    if (!branch) {
+      showToast("노선을 찾지 못했습니다", "error");
+      return;
+    }
+
+    const uniqueStationIds = [...new Set(stationIds)].filter((stationId) =>
+      stationById.has(stationId),
+    );
+    if (uniqueStationIds.length < 2) {
+      showToast("노선에는 역이 2개 이상 필요합니다", "error");
+      return;
+    }
+
+    const baseStationIds = getBranchStopStations(branch).map(
+      (station) => station.id,
+    );
+    const isSameAsCurrent =
+      baseStationIds.length === uniqueStationIds.length &&
+      baseStationIds.every(
+        (stationId, index) => stationId === uniqueStationIds[index],
+      );
+    if (isSameAsCurrent) {
+      showToast("변경된 정차 순서가 없습니다", "info");
+      return;
+    }
+
+    const override: ManualBranchRouteOverride = {
+      id: makeBranchRouteOverrideId(branchId),
+      branchId,
+      stationIds: uniqueStationIds,
+      enabled: true,
+      source: "editor",
+      note: null,
+    };
+    const next: ManualOverlayBundle = {
+      ...overlays,
+      branchRouteOverrides: [
+        ...overlays.branchRouteOverrides.filter(
+          (candidate) => candidate.branchId !== branchId,
+        ),
+        override,
+      ],
+    };
+
+    const saved = await executeOverlayCommand(commandLabel, next, message);
+    if (!saved) return;
+    await reloadEditorData();
+  }
+
+  async function resetBranchRouteOverride(branchId: string) {
+    const next: ManualOverlayBundle = {
+      ...overlays,
+      branchRouteOverrides: overlays.branchRouteOverrides.filter(
+        (override) => override.branchId !== branchId,
+      ),
+    };
+
+    const saved = await executeOverlayCommand(
+      "노선 정차 순서 초기화",
+      next,
+      "노선 정차 순서를 원본으로 되돌렸습니다",
+    );
+    if (!saved) return;
+    await reloadEditorData();
   }
 
   function startAddStationInsertion(insertion: PendingAddStationInsertion) {
@@ -6337,10 +6401,26 @@ export default function UnifiedMapEditor({
                 branches={data.branches}
                 lineBranchOverrides={overlays.lineBranchOverrides}
                 branchStationExclusions={overlays.branchStationExclusions}
+                branchRouteOverride={
+                  overlays.branchRouteOverrides.find(
+                    (override) => override.branchId === activeGeometryBranch.id,
+                  ) ?? null
+                }
                 unassignedStations={unassignedStations}
                 onDeleteLineBranch={(id) => void deleteLineBranchOverride(id)}
                 onRestoreBranchStation={(id) =>
                   void deleteBranchStationExclusion(id)
+                }
+                onUpdateRoute={(stationIds, label) =>
+                  void saveBranchRouteOverride(
+                    activeGeometryBranch.id,
+                    stationIds,
+                    label,
+                    "노선 정차 순서를 저장했습니다",
+                  )
+                }
+                onResetRoute={() =>
+                  void resetBranchRouteOverride(activeGeometryBranch.id)
                 }
               />
             ) : null}
@@ -6995,10 +7075,10 @@ function AddStationInsertionDialog({
     <Dialog open={open} className="flex max-h-[620px] max-w-2xl flex-col">
       <div className="border-b border-slate-200 px-4 py-3">
         <strong className="block text-sm font-semibold text-slate-950">
-          새 역 추가
+          기존 노선에 역 편입
         </strong>
         <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
-          {station ? `${station.nameKo}을(를) 추가할 노선과 위치를 선택하세요.` : "추가할 역을 먼저 선택하세요."}
+          {station ? `${station.nameKo}을(를) 기존 노선의 어느 두 역 사이에 넣을지 선택하세요.` : "추가할 역을 먼저 선택하세요."}
         </p>
       </div>
       <div className="grid min-h-0 gap-3 overflow-y-auto p-4">
@@ -7463,21 +7543,26 @@ function StationInspector({
         ) : (
           <div className="grid gap-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
             <div className="flex items-center justify-between">
-              <strong className="text-xs font-semibold text-blue-800">
-                새 역으로 추가
-              </strong>
-              <span className="text-[10px] font-semibold text-blue-700">
-                미소속 역
-              </span>
-            </div>
+            <strong className="text-xs font-semibold text-blue-800">
+              기존 노선에 편입
+            </strong>
+            <span className="text-[10px] font-semibold text-blue-700">
+              미소속 역
+            </span>
+          </div>
             <Button
               disabled={!canAddToBranch || branchAddOptions.length === 0}
               onClick={onOpenAddStationModal}
-            >
-              <Plus className="mr-1 size-4" />
-              노선 사이 위치 선택
-            </Button>
-            <Field label="연결할 노선">
+          >
+            <Plus className="mr-1 size-4" />
+            노선 사이 위치 선택
+          </Button>
+          <div className="mt-2 border-t border-blue-100 pt-2">
+            <strong className="text-[11px] font-semibold text-blue-800">
+              지선으로 추가
+            </strong>
+          </div>
+          <Field label="연결할 노선">
               <select
                 className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
                 value={addParentBranchId}
@@ -7852,17 +7937,23 @@ function BranchInspector({
   branches,
   lineBranchOverrides,
   branchStationExclusions,
+  branchRouteOverride,
   unassignedStations,
   onDeleteLineBranch,
   onRestoreBranchStation,
+  onUpdateRoute,
+  onResetRoute,
 }: {
   branch: EditorMapBranch;
   branches: EditorMapBranch[];
   lineBranchOverrides: ManualLineBranchOverride[];
   branchStationExclusions: ManualBranchStationExclusion[];
+  branchRouteOverride: ManualBranchRouteOverride | null;
   unassignedStations: EditorStation[];
   onDeleteLineBranch: (id: string) => void;
   onRestoreBranchStation: (id: string) => void;
+  onUpdateRoute: (stationIds: string[], label: string) => void;
+  onResetRoute: () => void;
 }) {
   const branchStations = getBranchStopStations(branch);
   const relatedLineBranches = lineBranchOverrides.filter(
@@ -7884,6 +7975,26 @@ function BranchInspector({
   const branchIndex = new Map(
     branches.map((candidate) => [candidate.id, candidate]),
   );
+  const routeStationIds = branchStations.map((station) => station.id);
+
+  function moveStation(index: number, direction: -1 | 1) {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= routeStationIds.length) return;
+    const next = [...routeStationIds];
+    const target = next[index];
+    const sibling = next[targetIndex];
+    if (!target || !sibling) return;
+    next[index] = sibling;
+    next[targetIndex] = target;
+    onUpdateRoute(next, "노선 정차 순서 변경");
+  }
+
+  function removeFromRoute(stationId: string) {
+    onUpdateRoute(
+      routeStationIds.filter((id) => id !== stationId),
+      "노선 정차역 제거",
+    );
+  }
 
   return (
     <div className="grid gap-3">
@@ -7918,6 +8029,75 @@ function BranchInspector({
             </p>
           </div>
         </div>
+      </div>
+
+      <div className="grid gap-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <strong className="text-xs font-semibold text-blue-800">
+            기존 노선 정차역 편집
+          </strong>
+          <span className="text-[11px] font-semibold text-blue-700">
+            {branchRouteOverride ? "보정됨" : "원본"}
+          </span>
+        </div>
+        <p className="text-xs font-medium leading-5 text-blue-800">
+          역을 이 노선에 편입하거나, 정차 순서를 바꾸거나, 이 노선에서만
+          제거합니다. 지선 생성과는 별도입니다.
+        </p>
+        <div className="grid gap-1.5">
+          {branchStations.map((station, index) => (
+            <div
+              key={`${station.id}:${index}`}
+              className="grid grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 rounded-xl bg-white/85 px-2 py-2"
+            >
+              <span className="text-center text-[10px] font-bold text-blue-500">
+                {index + 1}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-xs font-semibold text-blue-900">
+                  {station.nameKo}
+                </span>
+                <span className="block truncate text-[10px] font-medium text-blue-500">
+                  {station.id}
+                </span>
+              </span>
+              <span className="flex items-center gap-1">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  disabled={index === 0}
+                  onClick={() => moveStation(index, -1)}
+                  title="위로 이동"
+                >
+                  <ChevronRight className="size-3 -rotate-90" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  disabled={index === branchStations.length - 1}
+                  onClick={() => moveStation(index, 1)}
+                  title="아래로 이동"
+                >
+                  <ChevronRight className="size-3 rotate-90" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  disabled={branchStations.length <= 2}
+                  onClick={() => removeFromRoute(station.id)}
+                  title="이 노선에서만 제거"
+                >
+                  <Trash2 className="size-3" />
+                </Button>
+              </span>
+            </div>
+          ))}
+        </div>
+        {branchRouteOverride ? (
+          <Button variant="outline" onClick={onResetRoute}>
+            노선 정차 순서 원본으로 되돌리기
+          </Button>
+        ) : null}
       </div>
 
       {branchStationExclusionsForBranch.length > 0 ? (

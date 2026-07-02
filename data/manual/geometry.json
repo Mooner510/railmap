@@ -212,37 +212,6 @@
       "enabled": true,
       "source": "editor",
       "note": null
-    },
-    {
-      "id": "manual-line-branch:add-station:01:K4:main:I4108:경의·중앙선:0:candidate:kric:urban-rail-station:I4108:1265:row-15:candidate:kric:urban-rail-station:I4108:1251:row-557",
-      "mode": "add-station",
-      "parentBranchId": "01:K4:main:I4108:경의·중앙선:0",
-      "anchorStationId": "candidate:kric:urban-rail-station:I4108:1265:row-15",
-      "branchStationId": "candidate:kric:urban-rail-station:I4108:1251:row-557",
-      "connectedDirection": "toward-end",
-      "geometry": [
-        {
-          "lng": 126.914841,
-          "lat": 37.568611,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:I4108:1265:row-15"
-        },
-        {
-          "lng": 126.942308,
-          "lat": 37.559768,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:I4108:1252:row-693"
-        },
-        {
-          "lng": 126.97138700000001,
-          "lat": 37.556713,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:I4108:1251:row-557"
-        }
-      ],
-      "enabled": true,
-      "source": "manual",
-      "note": "경의중앙선 서울역 방면 지선 표시 보정"
     }
   ],
   "geometryOverrides": [
@@ -1199,8 +1168,8 @@
           "stationId": "candidate:kric:urban-rail-station:I4108:1203:row-360"
         },
         {
-          "lng": 129.091321,
-          "lat": 36.963729,
+          "lng": 127.1079205391614,
+          "lat": 37.60659529367665,
           "kind": "station",
           "stationId": "candidate:kric:urban-rail-station:I4108:1204:row-733"
         },

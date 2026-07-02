@@ -1,7 +1,7 @@
 {
   "bundleId": "kric-canonical-app-bundle",
   "acquiredDate": "2026-06-19",
-  "generatedAt": "2026-07-01T03:48:12.206Z",
+  "generatedAt": "2026-07-02T06:22:27.242Z",
   "policy": {
     "canonicalLineSource": "data/manual/kric-subway-route-info-line-map.csv",
     "canonicalSourceLineMap": "data/manual/kric-canonical-source-line-map.csv",
