@@ -82,6 +82,9 @@ const TRANSFER_GROUP_AREA_PADDING_RATIO = 1.55;
 const TRANSFER_GROUP_AREA_SEGMENTS = 56;
 const STATION_GEOMETRY_ANCHOR_TOLERANCE = 0.00015;
 const SAVED_STATION_ANCHOR_TOLERANCE = 0.0000001;
+const GEOMETRY_NEAR_ZERO_SEGMENT_DISTANCE = 0.000001;
+const KOREA_GEOMETRY_LNG_RANGE = [124, 132] as const;
+const KOREA_GEOMETRY_LAT_RANGE = [33, 39.5] as const;
 
 type ContextMenuState = {
   x: number;
@@ -124,9 +127,13 @@ type GeometryDraftHistoryRecord = {
 
 type GeometryDraftMap = Record<string, GeometryDraft>;
 
+type GeometryDraftValidationSeverity = "error" | "warning";
+
 type GeometryDraftValidationIssue = {
   targetKey: string;
   targetTitle: string;
+  severity: GeometryDraftValidationSeverity;
+  code: string;
   message: string;
 };
 
@@ -134,7 +141,10 @@ type GeometryWorkspaceSummary = {
   changedTargetCount: number;
   changedTargetLabels: string[];
   validationIssueCount: number;
+  validationErrorCount: number;
+  validationWarningCount: number;
   validationIssueTargetLabels: string[];
+  validationWarningTargetLabels: string[];
   addedControlPointCount: number;
   removedControlPointCount: number;
   movedStationCount: number;
@@ -1936,46 +1946,153 @@ function getGeometryDraftValidationIssues(
   const targetKey = getGeometryDraftTargetKey(draft) ?? draft.targetId;
   const targetTitle = getGeometryDraftTargetTitle(draft, targetByKey);
   const issues: GeometryDraftValidationIssue[] = [];
+
+  function addIssue(
+    severity: GeometryDraftValidationSeverity,
+    code: string,
+    message: string,
+  ) {
+    issues.push({ targetKey, targetTitle, severity, code, message });
+  }
+
+  const target = targetByKey.get(targetKey);
+  if (!target) {
+    addIssue(
+      "error",
+      "missing-target",
+      `${targetTitle}: 편집 대상 노선/지선을 찾을 수 없습니다.`,
+    );
+  }
+
   const usablePoints = draft.points.filter(
     (point) => Number.isFinite(point.lng) && Number.isFinite(point.lat),
   );
 
   if (usablePoints.length < 2) {
-    issues.push({
-      targetKey,
-      targetTitle,
-      message: `${targetTitle}: 선형은 유효 좌표가 2개 이상 필요합니다.`,
-    });
+    addIssue(
+      "error",
+      "too-few-points",
+      `${targetTitle}: 선형은 유효 좌표가 2개 이상 필요합니다.`,
+    );
+  }
+
+  if (draft.points.length !== usablePoints.length) {
+    addIssue(
+      "error",
+      "invalid-coordinate-count",
+      `${targetTitle}: 유효하지 않은 좌표가 ${draft.points.length - usablePoints.length}개 있습니다.`,
+    );
   }
 
   draft.points.forEach((point, index) => {
+    const label = `${targetTitle}: ${index + 1}번째 점`;
+
     if (!Number.isFinite(point.lng) || !Number.isFinite(point.lat)) {
-      issues.push({
-        targetKey,
-        targetTitle,
-        message: `${targetTitle}: ${index + 1}번째 점의 좌표가 유효하지 않습니다.`,
-      });
+      addIssue(
+        "error",
+        "invalid-coordinate",
+        `${label}의 좌표가 유효하지 않습니다.`,
+      );
+      return;
+    }
+
+    if (point.lng < -180 || point.lng > 180 || point.lat < -90 || point.lat > 90) {
+      addIssue(
+        "error",
+        "coordinate-out-of-world",
+        `${label}의 좌표가 위경도 허용 범위를 벗어났습니다.`,
+      );
+    }
+
+    if (
+      point.lng < KOREA_GEOMETRY_LNG_RANGE[0] ||
+      point.lng > KOREA_GEOMETRY_LNG_RANGE[1] ||
+      point.lat < KOREA_GEOMETRY_LAT_RANGE[0] ||
+      point.lat > KOREA_GEOMETRY_LAT_RANGE[1]
+    ) {
+      addIssue(
+        "warning",
+        "coordinate-outside-korea-range",
+        `${label}의 좌표가 한국 철도 작업 범위 밖에 있습니다.`,
+      );
     }
 
     if (point.kind === "station") {
       if (!point.stationId) {
-        issues.push({
-          targetKey,
-          targetTitle,
-          message: `${targetTitle}: ${index + 1}번째 station anchor에 stationId가 없습니다.`,
-        });
+        addIssue(
+          "error",
+          "station-anchor-missing-id",
+          `${label} station anchor에 stationId가 없습니다.`,
+        );
       } else if (!stationById.has(point.stationId)) {
-        issues.push({
-          targetKey,
-          targetTitle,
-          message: `${targetTitle}: ${index + 1}번째 station anchor 역을 찾을 수 없습니다.`,
-        });
+        addIssue(
+          "error",
+          "station-anchor-not-found",
+          `${label} station anchor 역을 찾을 수 없습니다.`,
+        );
       }
     }
   });
 
+  for (let index = 0; index < usablePoints.length - 1; index += 1) {
+    const start = usablePoints[index];
+    const end = usablePoints[index + 1];
+    if (!start || !end) continue;
+
+    const distance = Math.hypot(end.lng - start.lng, end.lat - start.lat);
+    if (distance === 0) {
+      addIssue(
+        "error",
+        "zero-length-segment",
+        `${targetTitle}: ${index + 1}-${index + 2}번째 점이 완전히 같은 좌표입니다.`,
+      );
+    } else if (distance < GEOMETRY_NEAR_ZERO_SEGMENT_DISTANCE) {
+      addIssue(
+        "warning",
+        "near-zero-length-segment",
+        `${targetTitle}: ${index + 1}-${index + 2}번째 선형 구간이 너무 짧습니다.`,
+      );
+    }
+  }
+
+  const stationAnchorPoints = draft.points.filter(
+    (point) => point.kind === "station" && point.stationId,
+  );
+  if (draft.targetType === "branch" && stationAnchorPoints.length < 2) {
+    addIssue(
+      "warning",
+      "branch-has-few-station-anchors",
+      `${targetTitle}: 본선 선형에 station anchor가 2개 미만입니다. 저장은 가능하지만 Web 반영 전 확인이 필요합니다.`,
+    );
+  }
+  if (draft.targetType === "lineBranch" && stationAnchorPoints.length < 1) {
+    addIssue(
+      "error",
+      "line-branch-has-no-station-anchor",
+      `${targetTitle}: 지선 선형에는 최소 1개의 station anchor가 필요합니다.`,
+    );
+  }
+
+  const duplicateStationAnchors = new Set<string>();
+  const seenStationAnchors = new Set<string>();
+  stationAnchorPoints.forEach((point) => {
+    if (!point.stationId) return;
+    if (seenStationAnchors.has(point.stationId)) {
+      duplicateStationAnchors.add(point.stationId);
+    }
+    seenStationAnchors.add(point.stationId);
+  });
+  duplicateStationAnchors.forEach((stationId) => {
+    addIssue(
+      "warning",
+      "duplicate-station-anchor",
+      `${targetTitle}: 같은 station anchor가 반복됩니다: ${formatStationDisplayName(stationById.get(stationId))}`,
+    );
+  });
+
   return issues;
 }
+
 
 function getBranchAnchorGeometryPoints(
   branch: EditorMapBranch,
@@ -4923,9 +5040,12 @@ export default function UnifiedMapEditor({
     const validationIssues = dirtyDrafts.flatMap((draft) =>
       getGeometryDraftValidationIssues(draft, geometryTargetByKey, stationById),
     );
-    if (validationIssues.length > 0) {
+    const blockingIssues = validationIssues.filter(
+      (issue) => issue.severity === "error",
+    );
+    if (blockingIssues.length > 0) {
       showToast(
-        `선형 편집 검증 오류 ${validationIssues.length.toLocaleString("ko-KR")}개를 먼저 해결해야 합니다`,
+        `선형 편집 검증 오류 ${blockingIssues.length.toLocaleString("ko-KR")}개를 먼저 해결해야 합니다`,
         "error",
       );
       setSidebarTab("validation");
@@ -5266,6 +5386,12 @@ export default function UnifiedMapEditor({
   const geometryWorkspaceValidationIssues = geometryWorkspaceDirtyDrafts.flatMap(
     (draft) => getGeometryDraftValidationIssues(draft, geometryTargetByKey, stationById),
   );
+  const geometryWorkspaceValidationErrors = geometryWorkspaceValidationIssues.filter(
+    (issue) => issue.severity === "error",
+  );
+  const geometryWorkspaceValidationWarnings = geometryWorkspaceValidationIssues.filter(
+    (issue) => issue.severity === "warning",
+  );
   const geometryWorkspaceSummary: GeometryWorkspaceSummary =
     geometryWorkspaceDirtyDrafts.reduce<GeometryWorkspaceSummary>(
       (summary, draft) => {
@@ -5288,9 +5414,16 @@ export default function UnifiedMapEditor({
           changedTargetCount: summary.changedTargetCount + 1,
           changedTargetLabels: [...summary.changedTargetLabels, targetTitle],
           validationIssueCount: geometryWorkspaceValidationIssues.length,
+          validationErrorCount: geometryWorkspaceValidationErrors.length,
+          validationWarningCount: geometryWorkspaceValidationWarnings.length,
           validationIssueTargetLabels: [
             ...new Set(
-              geometryWorkspaceValidationIssues.map((issue) => issue.targetTitle),
+              geometryWorkspaceValidationErrors.map((issue) => issue.targetTitle),
+            ),
+          ],
+          validationWarningTargetLabels: [
+            ...new Set(
+              geometryWorkspaceValidationWarnings.map((issue) => issue.targetTitle),
             ),
           ],
           addedControlPointCount:
@@ -5309,9 +5442,16 @@ export default function UnifiedMapEditor({
         changedTargetCount: 0,
         changedTargetLabels: [],
         validationIssueCount: geometryWorkspaceValidationIssues.length,
+        validationErrorCount: geometryWorkspaceValidationErrors.length,
+        validationWarningCount: geometryWorkspaceValidationWarnings.length,
         validationIssueTargetLabels: [
           ...new Set(
-            geometryWorkspaceValidationIssues.map((issue) => issue.targetTitle),
+            geometryWorkspaceValidationErrors.map((issue) => issue.targetTitle),
+          ),
+        ],
+        validationWarningTargetLabels: [
+          ...new Set(
+            geometryWorkspaceValidationWarnings.map((issue) => issue.targetTitle),
           ),
         ],
         addedControlPointCount: 0,
@@ -6145,6 +6285,9 @@ function GeometryModeInspector({
   const validationTargetPreview = [
     ...new Set(summary.validationIssueTargetLabels),
   ].slice(0, 4);
+  const validationWarningTargetPreview = [
+    ...new Set(summary.validationWarningTargetLabels),
+  ].slice(0, 4);
 
   return (
     <div className="grid gap-3">
@@ -6242,10 +6385,10 @@ function GeometryModeInspector({
         ) : null}
       </div>
 
-      {summary.validationIssueCount > 0 ? (
+      {summary.validationErrorCount > 0 ? (
         <div className="rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-[11px] font-semibold leading-4 text-red-700">
           <p>
-            저장 전 검증 오류 {summary.validationIssueCount.toLocaleString("ko-KR")}개
+            저장 차단 오류 {summary.validationErrorCount.toLocaleString("ko-KR")}개
           </p>
           {validationTargetPreview.length > 0 ? (
             <p className="mt-1 truncate text-red-600">
@@ -6253,6 +6396,22 @@ function GeometryModeInspector({
               {summary.validationIssueTargetLabels.length >
               validationTargetPreview.length
                 ? ` 외 ${summary.validationIssueTargetLabels.length - validationTargetPreview.length}개`
+                : ""}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {summary.validationWarningCount > 0 ? (
+        <div className="rounded-2xl border border-yellow-100 bg-yellow-50 px-3 py-2 text-[11px] font-semibold leading-4 text-yellow-700">
+          <p>
+            저장 가능 경고 {summary.validationWarningCount.toLocaleString("ko-KR")}개
+          </p>
+          {validationWarningTargetPreview.length > 0 ? (
+            <p className="mt-1 truncate text-yellow-600">
+              대상: {validationWarningTargetPreview.join(", ")}
+              {summary.validationWarningTargetLabels.length >
+              validationWarningTargetPreview.length
+                ? ` 외 ${summary.validationWarningTargetLabels.length - validationWarningTargetPreview.length}개`
                 : ""}
             </p>
           ) : null}
