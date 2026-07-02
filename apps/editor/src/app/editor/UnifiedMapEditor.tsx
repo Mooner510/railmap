@@ -6246,6 +6246,7 @@ export default function UnifiedMapEditor({
                 pickMode={stationLocationPickMode}
                 branchRemovalOptions={selectedStationBranches}
                 branchAddOptions={data.branches}
+                lineBranchOverrides={overlays.lineBranchOverrides}
                 onExcludeFromBranch={(branchId) =>
                   void createBranchStationExclusion(
                     branchId,
@@ -6273,6 +6274,7 @@ export default function UnifiedMapEditor({
                     connectedDirection,
                   )
                 }
+                onDeleteLineBranch={(id) => void deleteLineBranchOverride(id)}
               />
             ) : null}
             {!isGeometryMode && activeGeometryBranch ? (
@@ -6886,9 +6888,11 @@ function StationInspector({
   onFocus,
   branchRemovalOptions,
   branchAddOptions,
+  lineBranchOverrides,
   onExcludeFromBranch,
   onCreateAddStationBranch,
   onCreateConnectLineBranch,
+  onDeleteLineBranch,
 }: {
   station: EditorStation;
   draft: ManualStationOverride;
@@ -6909,6 +6913,7 @@ function StationInspector({
   onFocus: () => void;
   branchRemovalOptions: EditorMapBranch[];
   branchAddOptions: EditorMapBranch[];
+  lineBranchOverrides: ManualLineBranchOverride[];
   onExcludeFromBranch: (branchId: string) => void;
   onCreateAddStationBranch: (branchId: string, anchorStationId: string) => void;
   onCreateConnectLineBranch: (
@@ -6917,6 +6922,7 @@ function StationInspector({
     connectedEndpointStationId: string,
     connectedDirection: LineBranchDirection,
   ) => void;
+  onDeleteLineBranch: (id: string) => void;
 }) {
   const [removeBranchId, setRemoveBranchId] = useState(
     branchRemovalOptions[0]?.id ?? "",
@@ -6965,6 +6971,25 @@ function StationInspector({
   const connectDirectionOptions = getBranchDirectionOptions(
     selectedConnectBranch,
     connectEndpointStationId,
+  );
+  const stationIndex = new Map(
+    [
+      station,
+      ...branchAddOptions.flatMap(getBranchStopStations),
+      ...branchRemovalOptions.flatMap(getBranchStopStations),
+    ].map((candidate) => [candidate.id, candidate]),
+  );
+  const branchIndex = new Map(
+    branchAddOptions.map((branch) => [branch.id, branch]),
+  );
+  const relatedLineBranches = lineBranchOverrides.filter(
+    (override) =>
+      override.anchorStationId === station.id ||
+      override.branchStationId === station.id ||
+      override.connectedEndpointStationId === station.id ||
+      (override.geometry ?? []).some(
+        (point) => point.kind === "station" && point.stationId === station.id,
+      ),
   );
 
   useEffect(() => {
@@ -7123,16 +7148,21 @@ function StationInspector({
         </div>
       ) : null}
       <div className="grid grid-cols-2 gap-2">
-        <Button variant="outline" onClick={onFocus}>
-          <LocateFixed className="mr-1 size-4" />
-          지도에서 이 역 보기
+        <Button
+          className="h-auto min-h-10 whitespace-normal px-2 py-2 text-center leading-4"
+          variant="outline"
+          onClick={onFocus}
+        >
+          <LocateFixed className="mr-1 size-4 shrink-0" />
+          현재 위치로 지도 이동
         </Button>
         <Button
+          className="h-auto min-h-10 whitespace-normal px-2 py-2 text-center leading-4"
           variant={pickMode ? "secondary" : "outline"}
           disabled={saving}
           onClick={onStartMapPick}
         >
-          {pickMode ? "새 위치 클릭 대기 중" : "지도 클릭으로 위치 변경"}
+          {pickMode ? "새 위치를 지도에서 클릭" : "지도 클릭으로 위치 저장"}
         </Button>
         <Button
           variant="outline"
@@ -7242,6 +7272,48 @@ function StationInspector({
           </Button>
         </div>
       )}
+      {relatedLineBranches.length > 0 ? (
+        <div className="grid gap-2 rounded-2xl border border-rose-100 bg-rose-50/70 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <strong className="text-xs font-semibold text-rose-800">
+              결합된 지선 제거
+            </strong>
+            <span className="text-[10px] font-semibold text-rose-700">
+              {relatedLineBranches.length}개
+            </span>
+          </div>
+          <p className="text-xs font-medium leading-5 text-rose-800">
+            이 역을 기준으로 만든 지선 추가/노선 결합을 제거할 수 있습니다.
+          </p>
+          {relatedLineBranches.map((override) => {
+            const display = getLineBranchDisplay(
+              override,
+              branchIndex,
+              stationIndex,
+            );
+            return (
+              <div
+                key={override.id}
+                className="grid gap-1.5 rounded-xl bg-white/80 p-2"
+              >
+                <p className="truncate text-xs font-bold text-rose-800">
+                  {display.title}
+                </p>
+                <p className="line-clamp-2 text-[11px] font-medium leading-5 text-rose-700">
+                  {display.summary}
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => onDeleteLineBranch(override.id)}
+                >
+                  <Trash2 className="mr-1 size-3" />
+                  이 결합 제거
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
       {endpointConnectOptions.length > 0 ? (
         <div className="grid gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
           <div className="flex items-center justify-between">
