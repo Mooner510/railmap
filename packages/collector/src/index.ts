@@ -4,6 +4,7 @@ import { collectKricStations } from "./kric/collect-stations.js";
 import { diagnoseKricRouteStopStationMatch } from "./kric/diagnose-route-stop-station-match.js";
 import { writeKricRouteStopStationReviewCsv } from "./kric/write-route-stop-station-review-csv.js";
 import { writeKricCanonicalDiagnostics } from "./canonical/write-canonical-diagnostics.js";
+import { validateStationLineIdentity } from "./canonical/validate-station-line-identity.js";
 
 console.log("[collector] railmap collector start");
 
@@ -12,6 +13,7 @@ collectKricStations();
 await diagnoseKricRouteStopStationMatch();
 writeKricRouteStopStationReviewCsv();
 buildKricCanonicalAppBundle();
+validateStationLineIdentity();
 writeKricCanonicalDiagnostics();
 
 console.log("[collector] OK");

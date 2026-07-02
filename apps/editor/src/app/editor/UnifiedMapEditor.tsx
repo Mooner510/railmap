@@ -1162,6 +1162,190 @@ function validateGeometryConsistency(
   ];
 }
 
+function normalizeIdentityKey(value: string | null | undefined) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
+}
+
+function getLineScopedStationKey(stationId: string) {
+  const marker = "::line:";
+  const index = stationId.indexOf(marker);
+  if (index < 0) return null;
+  return normalizeIdentityKey(stationId.slice(index + marker.length));
+}
+
+function getBranchIdentityKeys(branch: EditorMapBranch | null | undefined) {
+  if (!branch) return new Set<string>();
+  return new Set(
+    [
+      branch.canonicalLineId,
+      branch.canonicalLineNameKo,
+      branch.sourceLineNumber,
+      branch.sourceLineName,
+    ]
+      .map(normalizeIdentityKey)
+      .filter(Boolean),
+  );
+}
+
+function isStationCompatibleWithBranch(
+  stationId: string | null | undefined,
+  branch: EditorMapBranch | null | undefined,
+  stationById: Map<string, EditorStation>,
+) {
+  if (!stationId || !branch) return true;
+  const branchKeys = getBranchIdentityKeys(branch);
+  if (branchKeys.size === 0) return true;
+
+  const scopedLineKey = getLineScopedStationKey(stationId);
+  if (scopedLineKey) return branchKeys.has(scopedLineKey);
+
+  const station = stationById.get(stationId);
+  if (!station) return true;
+
+  const stationKeys = [station.lineNumber, station.lineNameKo]
+    .map(normalizeIdentityKey)
+    .filter(Boolean);
+
+  return stationKeys.some((key) => branchKeys.has(key));
+}
+
+function makeStationLineIdentityIssue(
+  id: string,
+  stationId: string,
+  branch: EditorMapBranch | null | undefined,
+  stationById: Map<string, EditorStation>,
+  context: string,
+): LineBranchValidationIssue {
+  return {
+    id,
+    message: `${context}: 다른 노선의 역 아이콘을 직접 참조함 - ${formatStationDisplayName(stationById.get(stationId))} → ${formatBranchDisplayName(branch)}`,
+  };
+}
+
+function validateStationLineIdentity(
+  overlays: ManualOverlayBundle,
+  branches: EditorMapBranch[],
+  stationById: Map<string, EditorStation>,
+): LineBranchValidationIssue[] {
+  const issues: LineBranchValidationIssue[] = [];
+  const branchById = new Map(branches.map((branch) => [branch.id, branch]));
+
+  for (const override of overlays.branchRouteOverrides ?? []) {
+    if (override.enabled === false) continue;
+    const branch = branchById.get(override.branchId);
+    if (!branch) continue;
+    for (const stationId of override.stationIds ?? []) {
+      if (isStationCompatibleWithBranch(stationId, branch, stationById)) continue;
+      issues.push(
+        makeStationLineIdentityIssue(
+          `${override.id}:${stationId}:station-line-identity`,
+          stationId,
+          branch,
+          stationById,
+          "노선 정차 순서 보정",
+        ),
+      );
+    }
+  }
+
+  for (const override of overlays.geometryOverrides ?? []) {
+    if (override.enabled === false) continue;
+    const branch = branchById.get(override.branchId);
+    if (!branch) continue;
+    for (const [index, point] of (override.points ?? []).entries()) {
+      if (point.kind !== "station" || !point.stationId) continue;
+      if (isStationCompatibleWithBranch(point.stationId, branch, stationById)) continue;
+      issues.push(
+        makeStationLineIdentityIssue(
+          `${override.branchId}:${index}:station-line-identity`,
+          point.stationId,
+          branch,
+          stationById,
+          "선형 보정",
+        ),
+      );
+    }
+  }
+
+  for (const override of overlays.lineBranchOverrides ?? []) {
+    if (override.enabled === false) continue;
+    const parentBranch = branchById.get(override.parentBranchId);
+    const connectedBranch = override.connectedBranchId
+      ? branchById.get(override.connectedBranchId)
+      : null;
+
+    if (override.anchorStationId && !isStationCompatibleWithBranch(override.anchorStationId, parentBranch, stationById)) {
+      issues.push(
+        makeStationLineIdentityIssue(
+          `${override.id}:anchor-station-line-identity`,
+          override.anchorStationId,
+          parentBranch,
+          stationById,
+          "지선 시작 역",
+        ),
+      );
+    }
+
+    if (
+      override.mode === "add-station" &&
+      override.branchStationId &&
+      !isStationCompatibleWithBranch(override.branchStationId, parentBranch, stationById)
+    ) {
+      issues.push(
+        makeStationLineIdentityIssue(
+          `${override.id}:branch-station-line-identity`,
+          override.branchStationId,
+          parentBranch,
+          stationById,
+          "기존 역 연결",
+        ),
+      );
+    }
+
+    if (
+      override.mode === "connect-line" &&
+      override.connectedEndpointStationId &&
+      !isStationCompatibleWithBranch(
+        override.connectedEndpointStationId,
+        connectedBranch,
+        stationById,
+      )
+    ) {
+      issues.push(
+        makeStationLineIdentityIssue(
+          `${override.id}:connected-station-line-identity`,
+          override.connectedEndpointStationId,
+          connectedBranch,
+          stationById,
+          "결합 대상 역",
+        ),
+      );
+    }
+
+    for (const [index, point] of (override.geometry ?? []).entries()) {
+      if (point.kind !== "station" || !point.stationId) continue;
+      const allowed =
+        isStationCompatibleWithBranch(point.stationId, parentBranch, stationById) ||
+        isStationCompatibleWithBranch(point.stationId, connectedBranch, stationById);
+      if (allowed) continue;
+      issues.push(
+        makeStationLineIdentityIssue(
+          `${override.id}:${index}:geometry-station-line-identity`,
+          point.stationId,
+          parentBranch,
+          stationById,
+          "지선 선형",
+        ),
+      );
+    }
+  }
+
+  return issues;
+}
+
 function formatBranchDisplayName(branch: EditorMapBranch | null | undefined) {
   if (!branch) return "알 수 없는 노선";
   const sourceName =
@@ -3144,6 +3328,7 @@ export default function UnifiedMapEditor({
     () => [
       ...validateLineBranchOverrides(overlays, data.branches, stationById),
       ...validateBranchStationExclusions(overlays, data.branches, stationById),
+      ...validateStationLineIdentity(overlays, data.branches, stationById),
       ...validateGeometryConsistency(
         displayBranches,
         displayLineBranchOverrides,
