@@ -26,7 +26,7 @@ export type PendingAddStationInsertion = {
   newStationNameKo?: string;
 };
 
-const DIAGRAM_ROW_SIZE = 6;
+const DIAGRAM_ROW_SIZE = 7;
 
 function formatBranchDisplayName(branch: EditorMapBranch | null | undefined) {
   if (!branch) return "알 수 없는 노선";
@@ -126,21 +126,21 @@ function StationNode({
   colorHex?: string | null;
 }) {
   const label = (
-    <span className="line-clamp-2 min-h-8 max-w-24 text-center text-[10px] font-bold leading-4 text-slate-700">
+    <span className="line-clamp-2 min-h-6 max-w-16 text-center text-[9px] font-bold leading-3 text-slate-700">
       {station.nameKo}
     </span>
   );
 
   return (
-    <div className="flex w-24 shrink-0 flex-col items-center gap-1" title={`${index + 1}. ${station.nameKo}`}>
-      {labelPosition === "top" ? label : <span className="min-h-8" aria-hidden="true" />}
-      <div className="grid size-8 place-items-center rounded-full border-[5px] border-white bg-white shadow-md ring-2 ring-slate-300 transition group-hover:ring-blue-300">
+    <div className="flex w-16 shrink-0 flex-col items-center gap-0.5" title={`${index + 1}. ${station.nameKo}`}>
+      {labelPosition === "top" ? label : <span className="min-h-6" aria-hidden="true" />}
+      <div className="grid size-6 place-items-center rounded-full border-[4px] border-white bg-white shadow-md ring-2 ring-slate-300 transition group-hover:ring-blue-300">
         <span
-          className="size-3.5 rounded-full shadow-inner"
+          className="size-2.5 rounded-full shadow-inner"
           style={{ backgroundColor: colorHex ?? station.colorHex ?? "#64748b" }}
         />
       </div>
-      {labelPosition === "bottom" ? label : <span className="min-h-8" aria-hidden="true" />}
+      {labelPosition === "bottom" ? label : <span className="min-h-6" aria-hidden="true" />}
     </div>
   );
 }
@@ -165,7 +165,7 @@ function SegmentButton({
       type="button"
       className={cn(
         "group relative grid place-items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-40",
-        vertical ? "h-16 w-12" : "h-12 w-20",
+        vertical ? "h-10 w-8" : "h-9 w-12",
       )}
       disabled={disabled}
       title={`${pair.before.nameKo} - ${pair.after.nameKo} 사이에 ${creationMode ? "새 역 생성" : "기존 역 연결"}${pair.circular ? " · 순환 연결" : ""}`}
@@ -174,13 +174,13 @@ function SegmentButton({
       <span
         className={cn(
           "absolute rounded-full transition group-hover:bg-blue-500 group-hover:shadow-lg group-hover:shadow-blue-500/20",
-          vertical ? "h-full w-1.5 group-hover:w-2.5" : "h-1.5 w-full group-hover:h-2.5",
+          vertical ? "h-full w-1 group-hover:w-2" : "h-1 w-full group-hover:h-2",
           pair.circular ? "bg-violet-300" : "bg-blue-200",
         )}
         style={pair.circular ? undefined : { backgroundColor: colorHex ?? "#bfdbfe" }}
       />
-      <span className="relative grid size-7 place-items-center rounded-full border-2 border-white bg-blue-600 text-white opacity-0 shadow-sm transition group-hover:scale-110 group-hover:opacity-100">
-        <Plus className="size-3.5" />
+      <span className="relative grid size-6 place-items-center rounded-full border-2 border-white bg-blue-600 text-white opacity-0 shadow-sm transition group-hover:scale-110 group-hover:opacity-100">
+        <Plus className="size-3" />
       </span>
     </button>
   );
@@ -213,15 +213,15 @@ function RouteInsertionDiagram({
   const branchColor = branch.colorHex ?? "#2563eb";
 
   return (
-    <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4">
-      <div className="mb-3 flex items-center justify-between gap-3 text-[11px] font-bold text-slate-500">
+    <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-2.5">
+      <div className="mb-2 flex items-center justify-between gap-2 text-[10px] font-bold text-slate-500">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-1 shadow-sm">
           <span className="size-2.5 rounded-full" style={{ backgroundColor: branchColor }} />
           {formatBranchDisplayName(branch)}
         </span>
         <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">선 구간을 눌러 삽입 위치 선택</span>
       </div>
-      <div className="grid min-w-[760px] gap-0">
+      <div className="grid min-w-[560px] gap-0">
         {rows.map((row, rowIndex) => {
           const labelPosition = rowIndex % 2 === 0 ? "top" : "bottom";
           const rowStartIndex = rowIndex * DIAGRAM_ROW_SIZE;
@@ -272,7 +272,7 @@ function RouteInsertionDiagram({
               {nextPair ? (
                 <div
                   className={cn(
-                    "flex h-16 px-6",
+                    "flex h-10 px-4",
                     verticalSide === "right" ? "justify-end" : "justify-start",
                   )}
                 >

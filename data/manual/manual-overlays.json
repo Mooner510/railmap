@@ -185,6 +185,7 @@
     {
       "stationId": "candidate:kric:urban-rail-station:I1104:0430:row-868",
       "nameKo": "이촌(국립중앙박물관)",
+      "colorHex": null,
       "lat": 37.522424633965684,
       "lng": 126.97335383888748,
       "enabled": true,
@@ -193,6 +194,7 @@
     {
       "stationId": "candidate:kric:urban-rail-station:I4101:1703:row-162",
       "nameKo": "금천구청역",
+      "colorHex": null,
       "lat": 37.455872665610016,
       "lng": 126.8938866998331,
       "enabled": true,
@@ -201,6 +203,7 @@
     {
       "stationId": "candidate:kric:urban-rail-station:I4108:1204:row-733",
       "nameKo": "양원역",
+      "colorHex": null,
       "lat": 37.60659529367665,
       "lng": 127.1079205391614,
       "enabled": true,
@@ -209,6 +212,7 @@
     {
       "stationId": "candidate:kric:urban-rail-station:S1105:0514:row-341",
       "nameKo": "마곡",
+      "colorHex": null,
       "lat": 37.560246697596696,
       "lng": 126.82475789403958,
       "enabled": true,
@@ -217,6 +221,7 @@
     {
       "stationId": "candidate:kric:urban-rail-station:I4101:1003:row-813",
       "nameKo": "용산역",
+      "colorHex": null,
       "lat": 37.529947893472254,
       "lng": 126.96482306457216,
       "enabled": true,
@@ -225,6 +230,7 @@
     {
       "stationId": "candidate:kric:urban-rail-station:I4108:1265:row-15",
       "nameKo": "가좌역",
+      "colorHex": null,
       "lat": 37.56865832606789,
       "lng": 126.9150549217253,
       "enabled": true,
@@ -272,6 +278,61 @@
       "enabled": true,
       "source": "manual",
       "note": "경의중앙선 서울역 방면 지선 분리를 위한 본선 제외"
+    }
+  ],
+  "branchRouteOverrides": [
+    {
+      "id": "manual-branch-route:01:2:main:S1102:수도권 도시철도 2호선:0",
+      "branchId": "01:2:main:S1102:수도권 도시철도 2호선:0",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0201:row-646",
+        "candidate:kric:urban-rail-station:S1102:0202:row-854",
+        "candidate:kric:urban-rail-station:S1102:0203:row-850",
+        "candidate:kric:urban-rail-station:S1102:0204:row-852",
+        "candidate:kric:urban-rail-station:S1102:0205:row-301",
+        "candidate:kric:urban-rail-station:S1102:0206:row-663",
+        "candidate:kric:urban-rail-station:S1102:0207:row-525",
+        "candidate:kric:urban-rail-station:S1102:0208:row-801",
+        "candidate:kric:urban-rail-station:S1102:0209:row-1064",
+        "candidate:kric:urban-rail-station:S1102:0210:row-340",
+        "candidate:kric:urban-rail-station:S1102:0211:row-587",
+        "candidate:kric:urban-rail-station:S1102:0212:row-51",
+        "candidate:kric:urban-rail-station:S1102:0213:row-138",
+        "candidate:kric:urban-rail-station:S1102:0214:row-35",
+        "candidate:kric:urban-rail-station:S1102:0215:row-897",
+        "candidate:kric:urban-rail-station:S1102:0216:row-895",
+        "candidate:kric:urban-rail-station:S1102:0217:row-898",
+        "candidate:kric:urban-rail-station:S1102:0218:row-931",
+        "candidate:kric:urban-rail-station:S1102:0219:row-509",
+        "candidate:kric:urban-rail-station:S1102:0220:row-574",
+        "candidate:kric:urban-rail-station:S1102:0221:row-756",
+        "candidate:kric:urban-rail-station:S1102:0222:row-27",
+        "candidate:kric:urban-rail-station:S1102:0223:row-121",
+        "candidate:kric:urban-rail-station:S1102:0224:row-561",
+        "candidate:kric:urban-rail-station:S1102:0225:row-416",
+        "candidate:kric:urban-rail-station:S1102:0226:row-490",
+        "candidate:kric:urban-rail-station:S1102:0227:row-183",
+        "candidate:kric:urban-rail-station:S1102:0228:row-552",
+        "candidate:kric:urban-rail-station:S1102:0229:row-455",
+        "candidate:kric:urban-rail-station:S1102:0230:row-670",
+        "candidate:kric:urban-rail-station:S1102:0231:row-665",
+        "candidate:kric:urban-rail-station:S1102:0232:row-126",
+        "candidate:kric:urban-rail-station:S1102:0233:row-250",
+        "candidate:kric:urban-rail-station:S1102:0234:row-668",
+        "candidate:kric:urban-rail-station:S1102:0235:row-388",
+        "candidate:kric:urban-rail-station:S1102:0236:row-770",
+        "candidate:kric:urban-rail-station:S1102:0237:row-237",
+        "candidate:kric:urban-rail-station:S1102:0238:row-1067",
+        "candidate:kric:urban-rail-station:S1102:0239:row-1078",
+        "candidate:kric:urban-rail-station:S1102:0240:row-692",
+        "candidate:kric:urban-rail-station:S1102:0241:row-862",
+        "candidate:kric:urban-rail-station:S1102:0242:row-710",
+        "candidate:kric:urban-rail-station:S1102:0243:row-1011"
+      ],
+      "circular": true,
+      "enabled": true,
+      "source": "editor",
+      "note": null
     }
   ],
   "lineBranchOverrides": [
@@ -386,32 +447,6 @@
           "lat": 37.415995,
           "kind": "station",
           "stationId": "candidate:kric:urban-rail-station:I4101:1750:row-107"
-        }
-      ],
-      "enabled": true,
-      "source": "editor",
-      "note": null
-    },
-    {
-      "id": "manual-line-branch:connect-line:01:2:branch:S1122:수도권 도시철도 2호선:2:candidate:kric:urban-rail-station:S1122:2341:row-281:01:2:main:S1102:수도권 도시철도 2호선:0:candidate:kric:urban-rail-station:S1102:0234:row-668:toward-start",
-      "mode": "connect-line",
-      "parentBranchId": "01:2:branch:S1122:수도권 도시철도 2호선:2",
-      "anchorStationId": "candidate:kric:urban-rail-station:S1122:2341:row-281",
-      "connectedBranchId": "01:2:main:S1102:수도권 도시철도 2호선:0",
-      "connectedEndpointStationId": "candidate:kric:urban-rail-station:S1102:0234:row-668",
-      "connectedDirection": "toward-start",
-      "geometry": [
-        {
-          "lng": 126.882586,
-          "lat": 37.5145589,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:S1122:2341:row-281"
-        },
-        {
-          "lng": 126.891222,
-          "lat": 37.508815,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:S1102:0234:row-668"
         }
       ],
       "enabled": true,

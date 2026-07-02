@@ -862,13 +862,29 @@ export default function RailExplorer({
           }}
         />
 
+        <MapStatusHud
+          visibleBranchCount={visibleMapBranches.length}
+          visibleStationCount={visibleMapStations.length}
+          transferGroupCount={transferGroups.length}
+          showMapLines={showMapLines}
+          showMapStations={showMapStations}
+          hasSelection={hasSelection}
+          copiedShareUrl={copiedShareUrl}
+          focusSelectionLabel={focusSelectionLabel}
+          onToggleMapLines={() => setShowMapLines((value) => !value)}
+          onToggleMapStations={() => setShowMapStations((value) => !value)}
+          onFocusSelection={focusSelection}
+          onClearSelection={clearSelection}
+          onCopyUrl={copyUrl}
+        />
+
         {selectedLine ||
         selectedStation ||
         selectedTransferGroup ||
         routeOriginStation ||
         routeDestinationStation ? (
           <div className="pointer-events-none absolute right-3 top-3 z-10 hidden w-[280px] max-w-[calc(100vw-24px)] lg:block">
-            <div className="pointer-events-auto grid min-w-0 w-full max-w-full max-h-[calc(100dvh-24px)] gap-1.5 overflow-x-hidden overflow-y-auto [overflow-wrap:anywhere] border border-slate-200 bg-white/95 p-1.5 shadow-sm shadow-slate-950/10 backdrop-blur">
+            <div className="pointer-events-auto grid min-w-0 w-full max-w-full max-h-[calc(100dvh-24px)] gap-2 overflow-x-hidden overflow-y-auto [overflow-wrap:anywhere] rounded-2xl border border-white/70 bg-white/95 p-2 shadow-xl shadow-slate-950/12 backdrop-blur">
               {routeOriginStation || routeDestinationStation ? (
                 <RouteDraftCard
                   originStation={routeOriginStation}
@@ -1044,6 +1060,107 @@ export default function RailExplorer({
         </div>
       </div>
     </section>
+  );
+}
+
+
+function MapStatusHud({
+  visibleBranchCount,
+  visibleStationCount,
+  transferGroupCount,
+  showMapLines,
+  showMapStations,
+  hasSelection,
+  copiedShareUrl,
+  focusSelectionLabel,
+  onToggleMapLines,
+  onToggleMapStations,
+  onFocusSelection,
+  onClearSelection,
+  onCopyUrl,
+}: {
+  visibleBranchCount: number;
+  visibleStationCount: number;
+  transferGroupCount: number;
+  showMapLines: boolean;
+  showMapStations: boolean;
+  hasSelection: boolean;
+  copiedShareUrl: boolean;
+  focusSelectionLabel: string;
+  onToggleMapLines: () => void;
+  onToggleMapStations: () => void;
+  onFocusSelection: () => void;
+  onClearSelection: () => void;
+  onCopyUrl: () => void;
+}) {
+  return (
+    <div className="pointer-events-none absolute left-3 top-3 z-10 hidden max-w-[calc(100vw-24px)] lg:block">
+      <div className="pointer-events-auto flex max-w-[560px] flex-wrap items-center gap-1.5 rounded-2xl border border-white/70 bg-white/92 px-2 py-2 shadow-xl shadow-slate-950/10 backdrop-blur">
+        <div className="mr-1 grid gap-0.5 px-1">
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-600">
+            Live map
+          </p>
+          <p className="text-[11px] font-bold text-slate-700">
+            {formatNumber(visibleBranchCount)}구간 · {formatNumber(visibleStationCount)}역 · 환승 {formatNumber(transferGroupCount)}
+          </p>
+        </div>
+        <HudToggle active={showMapLines} onClick={onToggleMapLines}>
+          노선
+        </HudToggle>
+        <HudToggle active={showMapStations} onClick={onToggleMapStations}>
+          역
+        </HudToggle>
+        {hasSelection ? (
+          <>
+            <button
+              type="button"
+              className="h-7 rounded-full border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99]"
+              onClick={onFocusSelection}
+            >
+              {focusSelectionLabel}
+            </button>
+            <button
+              type="button"
+              className="h-7 rounded-full border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-500 transition hover:bg-slate-50 active:scale-[0.99]"
+              onClick={onClearSelection}
+            >
+              해제
+            </button>
+          </>
+        ) : null}
+        <button
+          type="button"
+          className="h-7 rounded-full bg-slate-950 px-2.5 text-[11px] font-bold text-white transition hover:bg-slate-800 active:scale-[0.99]"
+          onClick={onCopyUrl}
+        >
+          {copiedShareUrl ? "복사됨" : "공유"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function HudToggle({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={
+        active
+          ? "h-7 rounded-full border border-sky-200 bg-sky-50 px-2.5 text-[11px] font-black text-sky-700"
+          : "h-7 rounded-full border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-500 transition hover:bg-slate-50"
+      }
+      onClick={onClick}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -2261,63 +2378,101 @@ function SelectedTransferGroupPanel({
       </div>
 
       <div className={compact ? "grid gap-1 p-2" : "grid gap-1.5 p-2"}>
-        {stations.map((station) => {
-          const servingBranches = servingBranchIndex.get(station.id) ?? [];
-          return (
-            <div
-              key={station.id}
-              className="rounded bg-white/85 p-2 shadow-sm shadow-slate-950/5"
-            >
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-2 text-left"
-                onClick={() => onSelectStation(station.id)}
-              >
-                <span className="min-w-0">
-                  <strong className="block truncate text-xs font-bold text-slate-800">
-                    {group.nameKo}({station.lineNameKo ?? "노선"})
-                  </strong>
-                  <span className="mt-0.5 block truncate text-[11px] font-medium text-slate-500">
-                    {servingBranches.length > 0
-                      ? servingBranches
-                          .map((branch) => branch.sourceLineName)
-                          .join(" · ")
-                      : station.nameKo}
-                  </span>
-                </span>
-                <span className="shrink-0 text-[11px] font-bold text-sky-600">
-                  보기
-                </span>
-              </button>
-              <div className="mt-1.5 grid grid-cols-2 gap-1">
-                <button
-                  type="button"
-                  className={
-                    routeOriginStationId === station.id
-                      ? "h-7 rounded bg-sky-600 px-2 text-[11px] font-bold text-white"
-                      : "h-7 rounded border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
-                  }
-                  onClick={() => onSetRoutePoint("origin", station.id)}
-                >
-                  출발
-                </button>
-                <button
-                  type="button"
-                  className={
-                    routeDestinationStationId === station.id
-                      ? "h-7 rounded bg-slate-950 px-2 text-[11px] font-bold text-white"
-                      : "h-7 rounded border border-slate-200 bg-white px-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
-                  }
-                  onClick={() => onSetRoutePoint("destination", station.id)}
-                >
-                  도착
-                </button>
-              </div>
-            </div>
-          );
-        })}
+        {stations.map((station) => (
+          <TransferStationRailCard
+            key={station.id}
+            station={station}
+            groupName={group.nameKo}
+            servingBranches={servingBranchIndex.get(station.id) ?? []}
+            isOrigin={routeOriginStationId === station.id}
+            isDestination={routeDestinationStationId === station.id}
+            onSelect={() => onSelectStation(station.id)}
+            onSetOrigin={() => onSetRoutePoint("origin", station.id)}
+            onSetDestination={() => onSetRoutePoint("destination", station.id)}
+          />
+        ))}
       </div>
     </section>
+  );
+}
+
+
+function TransferStationRailCard({
+  station,
+  groupName,
+  servingBranches,
+  isOrigin,
+  isDestination,
+  onSelect,
+  onSetOrigin,
+  onSetDestination,
+}: {
+  station: RailMapStation;
+  groupName: string;
+  servingBranches: StationServingBranch[];
+  isOrigin: boolean;
+  isDestination: boolean;
+  onSelect: () => void;
+  onSetOrigin: () => void;
+  onSetDestination: () => void;
+}) {
+  const primaryBranch = servingBranches[0];
+  const colorHex = primaryBranch?.colorHex ?? "#0ea5e9";
+  const branchLabel = servingBranches.length
+    ? servingBranches.map((branch) => branch.sourceLineName).join(" · ")
+    : (station.lineNameKo ?? "노선 정보 없음");
+
+  return (
+    <div className="rounded-xl border border-white/80 bg-white/90 p-2 shadow-sm shadow-slate-950/5">
+      <button
+        type="button"
+        className="grid w-full grid-cols-[18px_minmax(0,1fr)_auto] items-center gap-2 text-left"
+        onClick={onSelect}
+      >
+        <span className="relative flex h-10 items-center justify-center">
+          <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-slate-200" />
+          <span
+            className="relative size-3.5 rounded-full border-2 border-white shadow-sm"
+            style={{ backgroundColor: colorHex }}
+          />
+        </span>
+        <span className="min-w-0">
+          <strong className="block truncate text-xs font-black text-slate-900">
+            {station.nameKo}
+          </strong>
+          <span className="mt-0.5 block truncate text-[11px] font-semibold text-slate-500">
+            {groupName} · {branchLabel}
+          </span>
+        </span>
+        <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-black text-sky-700">
+          보기
+        </span>
+      </button>
+      <div className="mt-1.5 grid grid-cols-2 gap-1">
+        <button
+          type="button"
+          className={
+            isOrigin
+              ? "h-7 rounded-lg bg-sky-600 px-2 text-[11px] font-black text-white"
+              : "h-7 rounded-lg border border-sky-200 bg-sky-50 px-2 text-[11px] font-black text-sky-700 hover:bg-sky-100"
+          }
+          onClick={onSetOrigin}
+        >
+          출발
+        </button>
+        <button
+          type="button"
+          className={
+            isDestination
+              ? "h-7 rounded-lg bg-slate-950 px-2 text-[11px] font-black text-white"
+              : "h-7 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-600 hover:bg-slate-50"
+          }
+          onClick={onSetDestination}
+        >
+          도착
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -2532,6 +2687,11 @@ function SelectedLinePanel({
         <MetricMini label="정차역" value={countRouteStops(selectedLine)} />
       </div>
 
+      <LineRoutePreview
+        line={selectedLine}
+        branch={selectedBranch ?? selectedLine.branches[0] ?? null}
+      />
+
       {selectedBranch ? (
         <div className="mt-2 border border-slate-200 bg-slate-50 px-2 py-1.5">
           <div className="flex items-start justify-between gap-2">
@@ -2619,6 +2779,61 @@ function BranchChip({
     >
       {children}
     </button>
+  );
+}
+
+
+function LineRoutePreview({
+  line,
+  branch,
+}: {
+  line: CanonicalLine;
+  branch: CanonicalBranch | null;
+}) {
+  if (!branch || branch.routeStops.length === 0) return null;
+
+  const stops = branch.routeStops.slice(0, 6);
+  const firstName = getFirstStop(branch);
+  const lastName = getLastStop(branch);
+  const hiddenCount = Math.max(0, branch.routeStops.length - stops.length);
+
+  return (
+    <div className="mt-2 overflow-hidden rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-[11px] font-black text-slate-800">
+          {branch.sourceLineName}
+        </p>
+        <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 shadow-sm">
+          {branch.isCircular ? "순환" : `${firstName} → ${lastName}`}
+        </span>
+      </div>
+      <div className="mt-2 flex min-w-0 items-center overflow-hidden px-1">
+        {stops.map((stop, index) => (
+          <div key={stop.id} className="flex min-w-0 flex-1 items-center">
+            <div className="grid min-w-0 justify-items-center gap-1">
+              <span
+                className="size-3 rounded-full border-2 border-white shadow-sm"
+                style={{ backgroundColor: line.colorHex }}
+              />
+              <span className="max-w-12 truncate text-[9px] font-bold text-slate-600">
+                {stop.displayNameKo}
+              </span>
+            </div>
+            {index < stops.length - 1 ? (
+              <span
+                className="mx-1 h-1 min-w-5 flex-1 rounded-full"
+                style={{ backgroundColor: line.colorHex }}
+              />
+            ) : null}
+          </div>
+        ))}
+        {hiddenCount > 0 ? (
+          <span className="ml-1 shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">
+            +{formatNumber(hiddenCount)}
+          </span>
+        ) : null}
+      </div>
+    </div>
   );
 }
 
