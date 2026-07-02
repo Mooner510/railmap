@@ -6619,16 +6619,16 @@ export default function UnifiedMapEditor({
               </Badge>
             ) : null}
           </div>
-          <div className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
+          <div className="absolute left-1/2 top-4 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-1 overflow-x-auto rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {toolOptions.map(({ mode, label, description, Icon }) => (
               <button
                 key={mode}
                 type="button"
                 className={cn(
-                  "flex items-center gap-1 rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-500",
+                  "flex shrink-0 items-center gap-1 rounded-xl px-3 py-1.5 text-[11px] font-bold transition",
                   toolMode === mode
-                    ? "bg-blue-600 text-white"
-                    : "hover:bg-slate-100",
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-800",
                 )}
                 onClick={() => setToolMode(mode)}
                 title={description}
@@ -6638,19 +6638,22 @@ export default function UnifiedMapEditor({
               </button>
             ))}
             {!isGeometryMode ? (
-              <button
-                type="button"
-                className="flex items-center gap-1 rounded-xl px-3 py-1.5 text-[11px] font-medium text-slate-500 hover:bg-slate-100"
-                onClick={() => {
-                  setSelection({ type: "none" });
-                  setStationDraft(null);
-                  setAddStationModalOpen(true);
-                }}
-                title="새 역 생성"
-              >
-                <Plus className="size-4" />
-                새 역
-              </button>
+              <>
+                <span className="mx-0.5 h-5 w-px shrink-0 bg-slate-200" aria-hidden="true" />
+                <button
+                  type="button"
+                  className="flex shrink-0 items-center gap-1 rounded-xl border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] font-bold text-blue-700 transition hover:bg-blue-100"
+                  onClick={() => {
+                    setSelection({ type: "none" });
+                    setStationDraft(null);
+                    setAddStationModalOpen(true);
+                  }}
+                  title="새 역 생성"
+                >
+                  <Plus className="size-4" />
+                  새 역
+                </button>
+              </>
             ) : null}
           </div>
           {selectionBox ? (
@@ -6671,10 +6674,20 @@ export default function UnifiedMapEditor({
               />
             </div>
           ) : null}
-          <div className="pointer-events-none absolute bottom-3 left-3 max-w-[min(420px,calc(100%-1.5rem))] rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium leading-5 text-slate-600 shadow-lg backdrop-blur">
-            {isGeometryMode
-              ? "선형을 선택하고 지도 위 점/구간을 드래그해 보정합니다."
-              : "지도 객체 선택, 드래그 박스 다중 선택, Cmd/Ctrl+K 검색을 사용할 수 있습니다."}
+          <div className="pointer-events-none absolute bottom-3 left-3 max-w-[min(440px,calc(100%-1.5rem))] rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium leading-5 text-slate-600 shadow-lg backdrop-blur">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span>
+                {isGeometryMode
+                  ? "선형을 선택하고 지도 위 점/구간을 드래그해 보정합니다."
+                  : "지도 객체 선택, 드래그 박스 다중 선택, Cmd/Ctrl+K 검색을 사용할 수 있습니다."}
+              </span>
+              {!isGeometryMode && validationBadgeCount > 0 ? (
+                <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-black text-red-700">검증 {validationBadgeCount}개</span>
+              ) : null}
+              {!isGeometryMode && overlays.manualTransferGroups.length > 0 ? (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600">환승 {overlays.manualTransferGroups.length}개</span>
+              ) : null}
+            </div>
           </div>
           <div className="absolute bottom-3 right-3 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium text-slate-600 shadow-lg backdrop-blur">
             {cursorLngLat

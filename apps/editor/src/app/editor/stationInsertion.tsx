@@ -118,30 +118,29 @@ function StationNode({
   station,
   index,
   labelPosition,
+  colorHex,
 }: {
   station: EditorStation;
   index: number;
   labelPosition: "top" | "bottom";
+  colorHex?: string | null;
 }) {
+  const label = (
+    <span className="line-clamp-2 min-h-8 max-w-24 text-center text-[10px] font-bold leading-4 text-slate-700">
+      {station.nameKo}
+    </span>
+  );
+
   return (
-    <div className="flex w-24 shrink-0 flex-col items-center gap-1">
-      {labelPosition === "top" ? (
-        <span className="line-clamp-2 min-h-8 text-center text-[10px] font-semibold leading-4 text-slate-600">
-          {station.nameKo}
-        </span>
-      ) : (
-        <span className="min-h-8" aria-hidden="true" />
-      )}
-      <div className="grid size-8 place-items-center rounded-full border-4 border-white bg-slate-900 text-[10px] font-bold text-white shadow-md ring-2 ring-slate-200">
-        {index + 1}
+    <div className="flex w-24 shrink-0 flex-col items-center gap-1" title={`${index + 1}. ${station.nameKo}`}>
+      {labelPosition === "top" ? label : <span className="min-h-8" aria-hidden="true" />}
+      <div className="grid size-8 place-items-center rounded-full border-[5px] border-white bg-white shadow-md ring-2 ring-slate-300 transition group-hover:ring-blue-300">
+        <span
+          className="size-3.5 rounded-full shadow-inner"
+          style={{ backgroundColor: colorHex ?? station.colorHex ?? "#64748b" }}
+        />
       </div>
-      {labelPosition === "bottom" ? (
-        <span className="line-clamp-2 min-h-8 text-center text-[10px] font-semibold leading-4 text-slate-600">
-          {station.nameKo}
-        </span>
-      ) : (
-        <span className="min-h-8" aria-hidden="true" />
-      )}
+      {labelPosition === "bottom" ? label : <span className="min-h-8" aria-hidden="true" />}
     </div>
   );
 }
@@ -151,12 +150,14 @@ function SegmentButton({
   disabled,
   creationMode,
   vertical = false,
+  colorHex,
   onSelect,
 }: {
   pair: AdjacentStationPair;
   disabled: boolean;
   creationMode: boolean;
   vertical?: boolean;
+  colorHex?: string | null;
   onSelect: (pair: AdjacentStationPair) => void;
 }) {
   return (
@@ -176,6 +177,7 @@ function SegmentButton({
           vertical ? "h-full w-1.5 group-hover:w-2.5" : "h-1.5 w-full group-hover:h-2.5",
           pair.circular ? "bg-violet-300" : "bg-blue-200",
         )}
+        style={pair.circular ? undefined : { backgroundColor: colorHex ?? "#bfdbfe" }}
       />
       <span className="relative grid size-7 place-items-center rounded-full border-2 border-white bg-blue-600 text-white opacity-0 shadow-sm transition group-hover:scale-110 group-hover:opacity-100">
         <Plus className="size-3.5" />
@@ -208,8 +210,17 @@ function RouteInsertionDiagram({
     );
   }
 
+  const branchColor = branch.colorHex ?? "#2563eb";
+
   return (
-    <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50 p-4">
+    <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4">
+      <div className="mb-3 flex items-center justify-between gap-3 text-[11px] font-bold text-slate-500">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-2 py-1 shadow-sm">
+          <span className="size-2.5 rounded-full" style={{ backgroundColor: branchColor }} />
+          {formatBranchDisplayName(branch)}
+        </span>
+        <span className="rounded-full bg-blue-50 px-2 py-1 text-blue-700">선 구간을 눌러 삽입 위치 선택</span>
+      </div>
       <div className="grid min-w-[760px] gap-0">
         {rows.map((row, rowIndex) => {
           const labelPosition = rowIndex % 2 === 0 ? "top" : "bottom";
@@ -243,12 +254,14 @@ function RouteInsertionDiagram({
                         station={item.station}
                         index={item.sequenceIndex}
                         labelPosition={labelPosition}
+                        colorHex={branchColor}
                       />
                       {pair ? (
                         <SegmentButton
                           pair={pair}
                           disabled={disabled}
                           creationMode={creationMode}
+                          colorHex={branchColor}
                           onSelect={onSelect}
                         />
                       ) : null}
@@ -268,6 +281,7 @@ function RouteInsertionDiagram({
                     disabled={disabled}
                     creationMode={creationMode}
                     vertical
+                    colorHex={branchColor}
                     onSelect={onSelect}
                   />
                 </div>
@@ -370,7 +384,7 @@ export function AddStationInsertionDialog({
                 추가 위치
               </strong>
               <span className="mt-0.5 block text-[11px] font-medium leading-4 text-slate-400">
-                역 사이의 파란 선을 누르세요. 호버하면 선택 가능한 구간이 강조됩니다.
+                역 사이 선 구간을 누르세요. 선에 마우스를 올리면 굵어지고 + 버튼이 나타납니다.
               </span>
             </span>
             <Badge className="bg-blue-50 text-blue-700">
