@@ -124,8 +124,17 @@ type GeometryDraftHistoryRecord = {
 
 type GeometryDraftMap = Record<string, GeometryDraft>;
 
+type GeometryDraftValidationIssue = {
+  targetKey: string;
+  targetTitle: string;
+  message: string;
+};
+
 type GeometryWorkspaceSummary = {
   changedTargetCount: number;
+  changedTargetLabels: string[];
+  validationIssueCount: number;
+  validationIssueTargetLabels: string[];
   addedControlPointCount: number;
   removedControlPointCount: number;
   movedStationCount: number;
@@ -1910,6 +1919,64 @@ function toTransferGroup(draft: TransferGroupDraft): ManualTransferGroup {
   };
 }
 
+
+function getGeometryDraftTargetTitle(
+  draft: GeometryDraft,
+  targetByKey: Map<string, GeometryEditTarget>,
+) {
+  const key = getGeometryDraftTargetKey(draft);
+  return key ? (targetByKey.get(key)?.title ?? draft.targetId) : draft.targetId;
+}
+
+function getGeometryDraftValidationIssues(
+  draft: GeometryDraft,
+  targetByKey: Map<string, GeometryEditTarget>,
+  stationById: Map<string, EditorStation>,
+): GeometryDraftValidationIssue[] {
+  const targetKey = getGeometryDraftTargetKey(draft) ?? draft.targetId;
+  const targetTitle = getGeometryDraftTargetTitle(draft, targetByKey);
+  const issues: GeometryDraftValidationIssue[] = [];
+  const usablePoints = draft.points.filter(
+    (point) => Number.isFinite(point.lng) && Number.isFinite(point.lat),
+  );
+
+  if (usablePoints.length < 2) {
+    issues.push({
+      targetKey,
+      targetTitle,
+      message: `${targetTitle}: 선형은 유효 좌표가 2개 이상 필요합니다.`,
+    });
+  }
+
+  draft.points.forEach((point, index) => {
+    if (!Number.isFinite(point.lng) || !Number.isFinite(point.lat)) {
+      issues.push({
+        targetKey,
+        targetTitle,
+        message: `${targetTitle}: ${index + 1}번째 점의 좌표가 유효하지 않습니다.`,
+      });
+    }
+
+    if (point.kind === "station") {
+      if (!point.stationId) {
+        issues.push({
+          targetKey,
+          targetTitle,
+          message: `${targetTitle}: ${index + 1}번째 station anchor에 stationId가 없습니다.`,
+        });
+      } else if (!stationById.has(point.stationId)) {
+        issues.push({
+          targetKey,
+          targetTitle,
+          message: `${targetTitle}: ${index + 1}번째 station anchor 역을 찾을 수 없습니다.`,
+        });
+      }
+    }
+  });
+
+  return issues;
+}
+
 function getBranchAnchorGeometryPoints(
   branch: EditorMapBranch,
 ): ManualGeometryOverridePoint[] {
@@ -2953,6 +3020,17 @@ export default function UnifiedMapEditor({
     overlays.lineBranchOverrides,
     displayStationById,
   ]);
+  const geometryTargetByKey = useMemo(
+    () =>
+      new Map(
+        geometryTargets.map((target) => [
+          getGeometryTargetKey(target.type, target.id),
+          target,
+        ]),
+      ),
+    [geometryTargets],
+  );
+
   const filteredGeometryTargets = useMemo(() => {
     const normalizedQuery = normalizeSearchText(geometryTargetQuery);
 
@@ -4842,6 +4920,18 @@ export default function UnifiedMapEditor({
       return;
     }
 
+    const validationIssues = dirtyDrafts.flatMap((draft) =>
+      getGeometryDraftValidationIssues(draft, geometryTargetByKey, stationById),
+    );
+    if (validationIssues.length > 0) {
+      showToast(
+        `선형 편집 검증 오류 ${validationIssues.length.toLocaleString("ko-KR")}개를 먼저 해결해야 합니다`,
+        "error",
+      );
+      setSidebarTab("validation");
+      return;
+    }
+
     let nextStationOverrides = overlays.stationOverrides;
     let nextGeometryOverrides = overlays.geometryOverrides;
     let nextLineBranchOverrides = overlays.lineBranchOverrides ?? [];
@@ -5173,6 +5263,9 @@ export default function UnifiedMapEditor({
     (draft) =>
       !areGeometryDraftsEqual(draft, getSavedGeometryDraftForDraft(draft)),
   );
+  const geometryWorkspaceValidationIssues = geometryWorkspaceDirtyDrafts.flatMap(
+    (draft) => getGeometryDraftValidationIssues(draft, geometryTargetByKey, stationById),
+  );
   const geometryWorkspaceSummary: GeometryWorkspaceSummary =
     geometryWorkspaceDirtyDrafts.reduce<GeometryWorkspaceSummary>(
       (summary, draft) => {
@@ -5189,9 +5282,17 @@ export default function UnifiedMapEditor({
           0,
           getControlPointCount(savedDraft) - getControlPointCount(draft),
         );
+        const targetTitle = getGeometryDraftTargetTitle(draft, geometryTargetByKey);
 
         return {
           changedTargetCount: summary.changedTargetCount + 1,
+          changedTargetLabels: [...summary.changedTargetLabels, targetTitle],
+          validationIssueCount: geometryWorkspaceValidationIssues.length,
+          validationIssueTargetLabels: [
+            ...new Set(
+              geometryWorkspaceValidationIssues.map((issue) => issue.targetTitle),
+            ),
+          ],
           addedControlPointCount:
             summary.addedControlPointCount + addedControlPointCount,
           removedControlPointCount:
@@ -5206,6 +5307,13 @@ export default function UnifiedMapEditor({
       },
       {
         changedTargetCount: 0,
+        changedTargetLabels: [],
+        validationIssueCount: geometryWorkspaceValidationIssues.length,
+        validationIssueTargetLabels: [
+          ...new Set(
+            geometryWorkspaceValidationIssues.map((issue) => issue.targetTitle),
+          ),
+        ],
         addedControlPointCount: 0,
         removedControlPointCount: 0,
         movedStationCount: 0,
@@ -5230,6 +5338,11 @@ export default function UnifiedMapEditor({
   const multiStationIds =
     selection.type === "multiStation" ? selection.ids : [];
   const geometryDraftDirty = geometryWorkspaceDirtyDrafts.length > 0;
+  const geometryDirtyTargetKeys = new Set(
+    geometryWorkspaceDirtyDrafts
+      .map(getGeometryDraftTargetKey)
+      .filter((key): key is string => Boolean(key)),
+  );
   const isGeometryMode = toolMode === "geometry";
   const canUndo = isGeometryMode
     ? geometryHistoryVersion >= 0 && geometryUndoStackRef.current.length > 0
@@ -5361,11 +5474,7 @@ export default function UnifiedMapEditor({
                   targets={filteredGeometryTargets}
                   totalTargetCount={geometryTargets.length}
                   activeTargetKey={getGeometryDraftTargetKey(geometryDraft)}
-                  dirtyTargetKey={
-                    geometryDraftDirty
-                      ? getGeometryDraftTargetKey(geometryDraft)
-                      : null
-                  }
+                  dirtyTargetKeys={geometryDirtyTargetKeys}
                   query={geometryTargetQuery}
                   filter={geometryTargetFilter}
                   shortcutsOpen={shortcutHelpOpen}
@@ -5826,7 +5935,7 @@ function GeometryModeSidebar({
   targets,
   totalTargetCount,
   activeTargetKey,
-  dirtyTargetKey,
+  dirtyTargetKeys,
   query,
   filter,
   shortcutsOpen,
@@ -5838,7 +5947,7 @@ function GeometryModeSidebar({
   targets: GeometryEditTarget[];
   totalTargetCount: number;
   activeTargetKey: string | null;
-  dirtyTargetKey: string | null;
+  dirtyTargetKeys: Set<string>;
   query: string;
   filter: GeometryTargetFilter;
   shortcutsOpen: boolean;
@@ -5913,7 +6022,7 @@ function GeometryModeSidebar({
             {targets.map((target) => {
               const targetKey = getGeometryTargetKey(target.type, target.id);
               const active = activeTargetKey === targetKey;
-              const dirty = dirtyTargetKey === targetKey;
+              const dirty = dirtyTargetKeys.has(targetKey);
               return (
                 <button
                   key={targetKey}
@@ -6029,6 +6138,13 @@ function GeometryModeInspector({
     0,
     4,
   );
+  const changedTargetPreview = [...new Set(summary.changedTargetLabels)].slice(
+    0,
+    5,
+  );
+  const validationTargetPreview = [
+    ...new Set(summary.validationIssueTargetLabels),
+  ].slice(0, 4);
 
   return (
     <div className="grid gap-3">
@@ -6047,6 +6163,17 @@ function GeometryModeInspector({
           <p className="mt-2 truncate rounded-xl bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600">
             최근 편집: {activeTargetTitle}
           </p>
+        ) : null}
+        {changedTargetPreview.length > 0 ? (
+          <div className="mt-2 rounded-xl border border-amber-100 bg-amber-50/70 px-2 py-2 text-[11px] font-semibold text-amber-800">
+            <p>미저장 대상</p>
+            <p className="mt-1 truncate text-amber-700">
+              {changedTargetPreview.join(", ")}
+              {summary.changedTargetLabels.length > changedTargetPreview.length
+                ? ` 외 ${summary.changedTargetLabels.length - changedTargetPreview.length}개`
+                : ""}
+            </p>
+          </div>
         ) : null}
       </div>
 
@@ -6114,6 +6241,23 @@ function GeometryModeInspector({
           </p>
         ) : null}
       </div>
+
+      {summary.validationIssueCount > 0 ? (
+        <div className="rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-[11px] font-semibold leading-4 text-red-700">
+          <p>
+            저장 전 검증 오류 {summary.validationIssueCount.toLocaleString("ko-KR")}개
+          </p>
+          {validationTargetPreview.length > 0 ? (
+            <p className="mt-1 truncate text-red-600">
+              대상: {validationTargetPreview.join(", ")}
+              {summary.validationIssueTargetLabels.length >
+              validationTargetPreview.length
+                ? ` 외 ${summary.validationIssueTargetLabels.length - validationTargetPreview.length}개`
+                : ""}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-2">
         <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-semibold">
