@@ -698,18 +698,19 @@ function validateLineBranchOverrides(
 
       const connectionBlockReason = getLineBranchConnectionBlockReason(parentBranch, connectedBranch);
       if (connectionBlockReason) {
+        const parentIsCircular = isBranchCircular(parentBranch);
         issues.push(makeValidationIssue({
           id: `${override.id}:connection-rule`,
-          title: isBranchCircular(parentBranch) || isBranchCircular(connectedBranch)
-            ? "순환 노선은 다른 노선과 결합할 수 없음"
+          title: parentIsCircular
+            ? "순환 노선에서 외부 노선으로 결합할 수 없음"
             : "같은 branch끼리 결합됨",
           message: connectionBlockReason,
           category: "invalid-connection",
-          cause: isBranchCircular(parentBranch) || isBranchCircular(connectedBranch)
-            ? "순환 노선은 양방향으로 닫힌 노선이라 시작/끝 역 기준의 결합 방향을 안정적으로 정의할 수 없습니다."
+          cause: parentIsCircular
+            ? "순환 노선은 닫힌 구조라 자체 시작/끝 역이 없습니다. 따라서 순환 노선을 기준으로 외부 노선 방향 결합을 만들 수 없습니다."
             : "상위 branch와 연결 대상 branch가 같습니다.",
-          solution: isBranchCircular(parentBranch) || isBranchCircular(connectedBranch)
-            ? "노선 결합 대신 순환 노선 내부에서 새 지선을 추가하거나, 순환 토글을 끈 뒤 결합을 다시 설정하세요."
+          solution: parentIsCircular
+            ? "순환 노선 안에 새 지선을 추가하거나, 일반 노선의 시작/끝 역을 순환 노선의 특정 역에 연결하는 방식으로 설정하세요."
             : "같은 노선을 다시 연결하는 보정은 의미가 없으므로 삭제해야 합니다.",
           autoFix: { kind: "delete-line-branch", id: override.id },
         }));
@@ -8018,7 +8019,7 @@ function StationInspector({
   const connectOtherBranches = useMemo(
     () =>
       branchAddOptions.filter(
-        (branch) => branch.id !== connectParentBranchId && !isBranchCircular(branch),
+        (branch) => branch.id !== connectParentBranchId,
       ),
     [branchAddOptions, connectParentBranchId],
   );
