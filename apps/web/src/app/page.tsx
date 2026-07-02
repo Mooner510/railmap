@@ -278,28 +278,64 @@ function getLineKey(line: CanonicalLine, branch: CanonicalBranch) {
   return line.canonicalKey ?? line.id ?? branch.sourceLineNumber ?? line.nameKo;
 }
 
-function shouldScopeStationToLine(station: CanonicalStation | undefined, usageLineKeys: Set<string> | undefined, branch: CanonicalBranch) {
-  if (!station) return false;
-  if (station.lineNumber && branch.sourceLineNumber) return station.lineNumber !== branch.sourceLineNumber;
-  return (usageLineKeys?.size ?? 0) > 1;
+type StationLineUsage = {
+  lineKey: string;
+  lineNameKo: string;
+  sourceLineNumber: string;
+  sourceLineName: string;
+};
+
+function getPrimaryStationLineKey(
+  station: CanonicalStation | undefined,
+  usages: StationLineUsage[] | undefined,
+) {
+  if (!station || !usages || usages.length < 1) return null;
+
+  return (
+    usages.find(
+      (usage) =>
+        station.lineNumber &&
+        usage.sourceLineNumber &&
+        station.lineNumber === usage.sourceLineNumber,
+    ) ??
+    usages.find(
+      (usage) =>
+        station.lineNameKo &&
+        (station.lineNameKo === usage.lineNameKo ||
+          station.lineNameKo === usage.sourceLineName),
+    ) ??
+    usages[0] ??
+    null
+  )?.lineKey ?? null;
 }
 
 function normalizeSingleLineStationMappings(bundle: CanonicalBundle): CanonicalBundle {
   const stationById = new Map(bundle.stations.map((station) => [station.id, station]));
-  const usageByStationId = new Map<string, Set<string>>();
+  const usageByStationId = new Map<string, Map<string, StationLineUsage>>();
 
   for (const line of bundle.lines) {
     for (const branch of line.branches) {
       const lineKey = getLineKey(line, branch);
       for (const stop of branch.routeStops) {
-        const set = usageByStationId.get(stop.stationId) ?? new Set<string>();
-        set.add(lineKey);
-        usageByStationId.set(stop.stationId, set);
+        const usages = usageByStationId.get(stop.stationId) ?? new Map<string, StationLineUsage>();
+        usages.set(lineKey, {
+          lineKey,
+          lineNameKo: line.nameKo,
+          sourceLineNumber: branch.sourceLineNumber,
+          sourceLineName: branch.sourceLineName,
+        });
+        usageByStationId.set(stop.stationId, usages);
       }
     }
   }
 
   const nextStationById = new Map(bundle.stations.map((station) => [station.id, station]));
+  const primaryLineKeyByStationId = new Map(
+    [...usageByStationId.entries()].map(([stationId, usages]) => [
+      stationId,
+      getPrimaryStationLineKey(stationById.get(stationId), [...usages.values()]),
+    ]),
+  );
 
   const lines = bundle.lines.map((line) => ({
     ...line,
@@ -309,7 +345,10 @@ function normalizeSingleLineStationMappings(bundle: CanonicalBundle): CanonicalB
         ...branch,
         routeStops: branch.routeStops.map((stop) => {
           const station = stationById.get(stop.stationId);
-          if (!station || !shouldScopeStationToLine(station, usageByStationId.get(stop.stationId), branch)) {
+          const stationUsageCount = usageByStationId.get(stop.stationId)?.size ?? 0;
+          const primaryLineKey = primaryLineKeyByStationId.get(stop.stationId);
+
+          if (!station || stationUsageCount <= 1 || lineKey === primaryLineKey) {
             return stop;
           }
 

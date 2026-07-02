@@ -166,6 +166,12 @@ type PendingTransferSelection =
   | { type: "station"; stationId: string; shouldFocus: boolean }
   | { type: "multiStation"; ids: string[] };
 
+type PendingAddStationInsertion = {
+  parentBranchId: string;
+  beforeStationId: string;
+  afterStationId: string;
+};
+
 type GeometryEditTarget = {
   type: GeometryTargetType;
   id: string;
@@ -1459,6 +1465,19 @@ function getBranchStopStations(branch: EditorMapBranch): EditorStation[] {
   return branch.routeStops
     .map((stop) => stop.station)
     .filter((station): station is EditorStation => Boolean(station));
+}
+
+function getBranchAdjacentStationPairs(branch: EditorMapBranch) {
+  const stations = getBranchStopStations(branch).filter(isValidStation);
+  const pairs: Array<{ before: EditorStation; after: EditorStation }> = [];
+
+  for (let index = 0; index < stations.length - 1; index += 1) {
+    const before = stations[index];
+    const after = stations[index + 1];
+    if (before && after) pairs.push({ before, after });
+  }
+
+  return pairs;
 }
 
 function getBranchesServingStation(
@@ -2936,6 +2955,8 @@ export default function UnifiedMapEditor({
   );
   const groupByIdRef = useRef<Map<string, ManualTransferGroup>>(new Map());
   const stationLocationPickModeRef = useRef(false);
+  const pendingAddStationInsertionRef =
+    useRef<PendingAddStationInsertion | null>(null);
   const stationSaveBusyRef = useRef(false);
   const showToastRef = useRef<(message: string, tone?: ToastTone) => void>(
     () => undefined,
@@ -2990,6 +3011,9 @@ export default function UnifiedMapEditor({
   const [historyVersion, setHistoryVersion] = useState(0);
   const [geometryHistoryVersion, setGeometryHistoryVersion] = useState(0);
   const [stationLocationPickMode, setStationLocationPickMode] = useState(false);
+  const [addStationModalOpen, setAddStationModalOpen] = useState(false);
+  const [pendingAddStationInsertion, setPendingAddStationInsertion] =
+    useState<PendingAddStationInsertion | null>(null);
   const [stationSaveBusy, setStationSaveBusy] = useState(false);
   const [transferDraft, setTransferDraft] = useState<TransferGroupDraft | null>(
     null,
@@ -3315,6 +3339,10 @@ export default function UnifiedMapEditor({
   }, [stationLocationPickMode]);
 
   useEffect(() => {
+    pendingAddStationInsertionRef.current = pendingAddStationInsertion;
+  }, [pendingAddStationInsertion]);
+
+  useEffect(() => {
     stationDraftRef.current = stationDraft;
   }, [stationDraft]);
 
@@ -3347,6 +3375,8 @@ export default function UnifiedMapEditor({
       if (station) setStationDraft(emptyStationOverride(station, previous));
       setGeometryDraft(null);
       setStationLocationPickMode(false);
+      setPendingAddStationInsertion(null);
+      setAddStationModalOpen(false);
       if (shouldFocus) focusStation(stationId);
     },
     [focusStation, overlays.stationOverrides, stationById],
@@ -3357,6 +3387,8 @@ export default function UnifiedMapEditor({
     setStationDraft(null);
     setGeometryDraft(null);
     setStationLocationPickMode(false);
+    setPendingAddStationInsertion(null);
+    setAddStationModalOpen(false);
   }, []);
 
   const selectStation = useCallback(
@@ -3410,6 +3442,8 @@ export default function UnifiedMapEditor({
       setSelection({ type: "branch", id: branchId });
       setStationDraft(null);
       setTransferDraft(null);
+      setPendingAddStationInsertion(null);
+      setAddStationModalOpen(false);
       const branch = branchById.get(branchId);
       const previous = overlays.geometryOverrides.find(
         (override) => override.branchId === branchId,
@@ -3427,6 +3461,8 @@ export default function UnifiedMapEditor({
       setStationDraft(null);
       setTransferDraft(null);
       setStationLocationPickMode(false);
+      setPendingAddStationInsertion(null);
+      setAddStationModalOpen(false);
       geometryUndoStackRef.current = [];
       geometryRedoStackRef.current = [];
       geometryDragStartDraftRef.current = null;
@@ -3466,6 +3502,8 @@ export default function UnifiedMapEditor({
       setSelection({ type: "transferGroup", id: groupId });
       setStationDraft(null);
       setGeometryDraft(null);
+      setPendingAddStationInsertion(null);
+      setAddStationModalOpen(false);
       setTransferDraft(group ? makeTransferDraftFromGroup(group) : null);
       const firstStationId = group?.stationIds[0];
       if (firstStationId) focusStation(firstStationId);
@@ -4965,6 +5003,135 @@ export default function UnifiedMapEditor({
     }
   }
 
+  async function saveStationLocationAndAddToBranch(
+    nextOverride: ManualStationOverride,
+    insertion: PendingAddStationInsertion,
+  ) {
+    if (stationSaveBusyRef.current) {
+      showToast("역 위치 저장이 진행 중입니다", "info");
+      return null;
+    }
+
+    const validationMessage = validateStationOverrideDraft(
+      nextOverride,
+      stationByIdRef.current,
+    );
+    if (validationMessage) {
+      showToast(validationMessage, "error");
+      return null;
+    }
+
+    const baseOverlays = overlaysRef.current;
+    const parentBranch = branchByIdRef.current.get(insertion.parentBranchId);
+    const beforeStation = stationByIdRef.current.get(insertion.beforeStationId);
+    const afterStation = stationByIdRef.current.get(insertion.afterStationId);
+    const branchStation = stationByIdRef.current.get(nextOverride.stationId);
+    const beforeCoordinate = getStationCoordinate(beforeStation);
+    const afterCoordinate = getStationCoordinate(afterStation);
+
+    if (
+      !parentBranch ||
+      !beforeStation ||
+      !afterStation ||
+      !branchStation ||
+      !beforeCoordinate ||
+      !afterCoordinate ||
+      typeof nextOverride.lng !== "number" ||
+      typeof nextOverride.lat !== "number"
+    ) {
+      showToast("새 역 추가에 필요한 노선/역 좌표를 찾지 못했습니다", "error");
+      return null;
+    }
+
+    const assignedStationIds = new Set(data.branches.flatMap(getBranchStationIds));
+    if (assignedStationIds.has(nextOverride.stationId)) {
+      showToast("이미 노선에 소속된 역은 새 역으로 추가할 수 없습니다", "error");
+      return null;
+    }
+
+    const parentStationIds = getBranchStopStations(parentBranch).map(
+      (station) => station.id,
+    );
+    const beforeIndex = parentStationIds.indexOf(insertion.beforeStationId);
+    const afterIndex = parentStationIds.indexOf(insertion.afterStationId);
+    if (beforeIndex < 0 || afterIndex !== beforeIndex + 1) {
+      showToast("선택한 두 역이 같은 노선에서 인접해 있지 않습니다", "error");
+      return null;
+    }
+
+    const override: ManualLineBranchOverride = {
+      id: makeLineBranchOverrideId(
+        "add-station",
+        insertion.parentBranchId,
+        insertion.beforeStationId,
+        nextOverride.stationId,
+      ),
+      mode: "add-station",
+      parentBranchId: insertion.parentBranchId,
+      anchorStationId: insertion.beforeStationId,
+      branchStationId: nextOverride.stationId,
+      geometry: [
+        {
+          lng: beforeCoordinate[0],
+          lat: beforeCoordinate[1],
+          kind: "station",
+          stationId: insertion.beforeStationId,
+        },
+        {
+          lng: nextOverride.lng,
+          lat: nextOverride.lat,
+          kind: "station",
+          stationId: nextOverride.stationId,
+        },
+        {
+          lng: afterCoordinate[0],
+          lat: afterCoordinate[1],
+          kind: "station",
+          stationId: insertion.afterStationId,
+        },
+      ],
+      enabled: true,
+      source: "editor",
+      note: `${formatStationDisplayName(beforeStation)} - ${formatStationDisplayName(branchStation)} - ${formatStationDisplayName(afterStation)}`,
+    };
+
+    stationSaveBusyRef.current = true;
+    setStationSaveBusy(true);
+    try {
+      const next: ManualOverlayBundle = {
+        ...baseOverlays,
+        stationOverrides: [
+          ...baseOverlays.stationOverrides.filter(
+            (candidate) => candidate.stationId !== nextOverride.stationId,
+          ),
+          nextOverride,
+        ],
+        lineBranchOverrides: [
+          ...baseOverlays.lineBranchOverrides.filter(
+            (candidate) => candidate.id !== override.id,
+          ),
+          override,
+        ],
+      };
+
+      const saved = await executeOverlayCommand(
+        "새 역 추가",
+        next,
+        "새 역 위치와 노선 추가를 저장했습니다",
+      );
+      if (!saved) return null;
+
+      setPendingAddStationInsertion(null);
+      setStationLocationPickMode(false);
+      const nextData = await reloadEditorData();
+      await reloadStationDraftFromData(nextData, nextOverride.stationId);
+      return nextData;
+    } finally {
+      stationSaveBusyRef.current = false;
+      setStationSaveBusy(false);
+    }
+  }
+
   async function saveSelectedStationLocationFromMap(lng: number, lat: number) {
     const draft = stationDraftRef.current;
     if (!draft) {
@@ -4974,6 +5141,12 @@ export default function UnifiedMapEditor({
 
     const nextDraft = { ...draft, lng, lat };
     setStationDraft(nextDraft);
+    const insertion = pendingAddStationInsertionRef.current;
+    if (insertion) {
+      await saveStationLocationAndAddToBranch(nextDraft, insertion);
+      return;
+    }
+
     await saveStationOverrideAndSyncAnchors(
       nextDraft,
       "역 위치 지정",
@@ -5493,6 +5666,37 @@ export default function UnifiedMapEditor({
     if (!saved) return;
     await reloadEditorData();
     setSidebarTab("validation");
+  }
+
+  function startAddStationInsertion(insertion: PendingAddStationInsertion) {
+    const branch = branchById.get(insertion.parentBranchId);
+    const beforeStation = stationById.get(insertion.beforeStationId);
+    const afterStation = stationById.get(insertion.afterStationId);
+    const beforeCoordinate = getStationCoordinate(beforeStation);
+    const afterCoordinate = getStationCoordinate(afterStation);
+
+    if (!branch || !beforeCoordinate || !afterCoordinate) {
+      showToast("선택한 추가 위치의 좌표를 찾지 못했습니다", "error");
+      return;
+    }
+
+    setAddStationModalOpen(false);
+    setPendingAddStationInsertion(insertion);
+    setStationLocationPickMode(true);
+    setSidebarTab("search");
+
+    const map = mapRef.current;
+    if (!map) return;
+
+    const bounds = new maplibregl.LngLatBounds(
+      beforeCoordinate,
+      beforeCoordinate,
+    ).extend(afterCoordinate);
+    map.fitBounds(bounds, {
+      padding: { top: 160, right: 420, bottom: 160, left: 80 },
+      maxZoom: 15,
+      duration: 500,
+    });
   }
 
   const selectedStation =
@@ -6052,8 +6256,10 @@ export default function UnifiedMapEditor({
                   )
                 }
                 onStartMapPick={() => setStationLocationPickMode(true)}
+                onOpenAddStationModal={() => setAddStationModalOpen(true)}
                 onFocus={() => focusStation(selectedStation.id)}
                 pickMode={stationLocationPickMode}
+                pendingAddStationInsertion={pendingAddStationInsertion}
                 branchRemovalOptions={selectedStationBranches}
                 branchAddOptions={data.branches}
                 lineBranchOverrides={overlays.lineBranchOverrides}
@@ -6165,6 +6371,14 @@ export default function UnifiedMapEditor({
           </Button>
         </div>
       </Dialog>
+
+      <AddStationInsertionDialog
+        open={addStationModalOpen && Boolean(selectedStation)}
+        station={selectedStation}
+        branches={data.branches}
+        onClose={() => setAddStationModalOpen(false)}
+        onSelect={startAddStationInsertion}
+      />
 
       <Dialog open={commandOpen} className="flex h-[520px] max-w-xl flex-col">
         <div className="shrink-0 border-b border-slate-200 p-3">
@@ -6678,6 +6892,105 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+function AddStationInsertionDialog({
+  open,
+  station,
+  branches,
+  onClose,
+  onSelect,
+}: {
+  open: boolean;
+  station: EditorStation | null;
+  branches: EditorMapBranch[];
+  onClose: () => void;
+  onSelect: (insertion: PendingAddStationInsertion) => void;
+}) {
+  const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
+  const selectedBranch =
+    branches.find((branch) => branch.id === branchId) ?? branches[0] ?? null;
+  const pairs = useMemo(
+    () => (selectedBranch ? getBranchAdjacentStationPairs(selectedBranch) : []),
+    [selectedBranch],
+  );
+
+  useEffect(() => {
+    if (!branches.some((branch) => branch.id === branchId)) {
+      setBranchId(branches[0]?.id ?? "");
+    }
+  }, [branchId, branches]);
+
+  return (
+    <Dialog open={open} className="flex max-h-[620px] max-w-2xl flex-col">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <strong className="block text-sm font-semibold text-slate-950">
+          새 역 추가
+        </strong>
+        <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+          {station ? `${station.nameKo}을(를) 추가할 노선과 위치를 선택하세요.` : "추가할 역을 먼저 선택하세요."}
+        </p>
+      </div>
+      <div className="grid min-h-0 gap-3 overflow-y-auto p-4">
+        <Field label="노선">
+          <select
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+            value={selectedBranch?.id ?? ""}
+            onChange={(event) => setBranchId(event.target.value)}
+            disabled={branches.length === 0}
+          >
+            {branches.length === 0 ? (
+              <option value="">선택 가능한 노선 없음</option>
+            ) : (
+              branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {formatBranchDisplayName(branch)}
+                </option>
+              ))
+            )}
+          </select>
+        </Field>
+        <div className="grid gap-2">
+          <strong className="text-xs font-semibold text-slate-700">
+            추가 위치
+          </strong>
+          {selectedBranch && pairs.length > 0 ? (
+            <div className="grid gap-1.5">
+              {pairs.map(({ before, after }) => (
+                <button
+                  key={`${before.id}:${after.id}`}
+                  type="button"
+                  className="grid grid-cols-[minmax(0,1fr)_40px_minmax(0,1fr)] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-blue-300 hover:bg-blue-50"
+                  onClick={() =>
+                    onSelect({
+                      parentBranchId: selectedBranch.id,
+                      beforeStationId: before.id,
+                      afterStationId: after.id,
+                    })
+                  }
+                >
+                  <span className="truncate text-right">{before.nameKo}</span>
+                  <span className="mx-auto grid size-8 place-items-center rounded-full bg-blue-600 text-white">
+                    <Plus className="size-4" />
+                  </span>
+                  <span className="truncate text-left">{after.nameKo}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-xs font-medium text-slate-400">
+              인접한 두 역을 찾을 수 없습니다.
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="border-t border-slate-200 p-3">
+        <Button className="w-full" variant="outline" onClick={onClose}>
+          닫기
+        </Button>
+      </div>
+    </Dialog>
+  );
+}
+
 function StationInspector({
   station,
   draft,
@@ -6695,8 +7008,10 @@ function StationInspector({
   onOpenTransferGroup,
   onRemoveFromTransferGroup,
   onStartMapPick,
+  onOpenAddStationModal,
   onFocus,
   branchRemovalOptions,
+  pendingAddStationInsertion,
   branchAddOptions,
   lineBranchOverrides,
   onExcludeFromBranch,
@@ -6720,7 +7035,9 @@ function StationInspector({
   onOpenTransferGroup: (groupId: string) => void;
   onRemoveFromTransferGroup: (groupId: string) => void;
   onStartMapPick: () => void;
+  onOpenAddStationModal: () => void;
   onFocus: () => void;
+  pendingAddStationInsertion: PendingAddStationInsertion | null;
   branchRemovalOptions: EditorMapBranch[];
   branchAddOptions: EditorMapBranch[];
   lineBranchOverrides: ManualLineBranchOverride[];
@@ -6898,6 +7215,24 @@ function StationInspector({
         역 위치는 숫자를 직접 입력하지 않고 지도에서 지정합니다. 현재 위치로
         지도를 이동한 뒤, 필요한 경우 지도 클릭으로 새 위치를 저장하세요.
       </div>
+      {pendingAddStationInsertion ? (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-3 text-xs font-medium leading-5 text-blue-900">
+          <strong className="block font-semibold">새 역 추가 위치 선택 중</strong>
+          <span>
+            {formatBranchDisplayName(
+              branchIndex.get(pendingAddStationInsertion.parentBranchId),
+            )}{" "}
+            ·{" "}
+            {formatStationDisplayName(
+              stationIndex.get(pendingAddStationInsertion.beforeStationId),
+            )}{" "}
+            - {station.nameKo} -{" "}
+            {formatStationDisplayName(
+              stationIndex.get(pendingAddStationInsertion.afterStationId),
+            )}
+          </span>
+        </div>
+      ) : null}
       <Field label="메모">
         <Textarea
           value={draft.note ?? ""}
@@ -7039,12 +7374,19 @@ function StationInspector({
         <div className="grid gap-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
           <div className="flex items-center justify-between">
             <strong className="text-xs font-semibold text-blue-800">
-              지선 역으로 추가
+              새 역으로 추가
             </strong>
             <span className="text-[10px] font-semibold text-blue-700">
               미소속 역
             </span>
           </div>
+          <Button
+            disabled={!canAddToBranch || branchAddOptions.length === 0}
+            onClick={onOpenAddStationModal}
+          >
+            <Plus className="mr-1 size-4" />
+            노선 사이 위치 선택
+          </Button>
           <Field label="연결할 노선">
             <select
               className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"

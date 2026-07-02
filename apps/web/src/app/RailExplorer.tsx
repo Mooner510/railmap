@@ -407,8 +407,13 @@ export default function RailExplorer({
   );
 
   const routeGraph = useMemo(
-    () => buildRouteGraph(bundle.lines, bundle.manualTransferEdges ?? []),
-    [bundle.lines, bundle.manualTransferEdges],
+    () =>
+      buildRouteGraph(
+        bundle.lines,
+        bundle.manualTransferEdges ?? [],
+        lineBranchOverrides,
+      ),
+    [bundle.lines, bundle.manualTransferEdges, lineBranchOverrides],
   );
   const routeResultStationIds = useMemo(
     () => routeSearchResult?.stationIds ?? [],
@@ -1617,8 +1622,13 @@ function LineCard({
 function buildRouteGraph(
   lines: CanonicalLine[],
   manualTransferEdges: ManualTransferEdge[] = [],
+  lineBranchOverrides: ManualLineBranchOverride[] = [],
 ): Map<string, RouteGraphEdge[]> {
   const graph = new Map<string, RouteGraphEdge[]>();
+  const branchContextById = new Map<
+    string,
+    { branch: CanonicalBranch; line: CanonicalLine }
+  >();
 
   const addEdge = (fromStationId: string, edge: RouteGraphEdge) => {
     const edges = graph.get(fromStationId) ?? [];
@@ -1628,6 +1638,8 @@ function buildRouteGraph(
 
   for (const line of lines) {
     for (const branch of line.branches) {
+      branchContextById.set(branch.id, { branch, line });
+
       for (let index = 0; index < branch.routeStops.length - 1; index += 1) {
         const current = branch.routeStops[index];
         const next = branch.routeStops[index + 1];
@@ -1650,6 +1662,56 @@ function buildRouteGraph(
         addEdge(current.stationId, { ...edge, toStationId: next.stationId });
         addEdge(next.stationId, { ...edge, toStationId: current.stationId });
       }
+    }
+  }
+
+  for (const override of lineBranchOverrides) {
+    if (override.enabled === false) continue;
+
+    const parentContext = branchContextById.get(override.parentBranchId);
+    if (!parentContext || !override.anchorStationId) continue;
+
+    const targetStationId =
+      override.mode === "add-station"
+        ? override.branchStationId
+        : override.connectedEndpointStationId;
+    if (!targetStationId || targetStationId === override.anchorStationId)
+      continue;
+
+    const edge: Omit<RouteGraphEdge, "toStationId"> = {
+      branchId: override.id,
+      lineNameKo: parentContext.line.nameKo,
+      sourceLineName:
+        override.mode === "connect-line"
+          ? "지선 노선 결합"
+          : parentContext.branch.sourceLineName,
+      colorHex: parentContext.line.colorHex,
+      kind: "ride",
+    };
+    const geometryStationIds = (override.geometry ?? [])
+      .map((point) =>
+        point.kind === "station" && point.stationId ? point.stationId : null,
+      )
+      .filter((stationId): stationId is string => Boolean(stationId));
+    const stationIds =
+      geometryStationIds.length >= 2
+        ? geometryStationIds
+        : [override.anchorStationId, targetStationId];
+
+    for (let index = 0; index < stationIds.length - 1; index += 1) {
+      const fromStationId = stationIds[index];
+      const toStationId = stationIds[index + 1];
+      if (!fromStationId || !toStationId || fromStationId === toStationId)
+        continue;
+
+      addEdge(fromStationId, {
+        ...edge,
+        toStationId,
+      });
+      addEdge(toStationId, {
+        ...edge,
+        toStationId: fromStationId,
+      });
     }
   }
 
