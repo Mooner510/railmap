@@ -93,8 +93,11 @@ export default async function Home() {
         />
         <SummaryCard label="역 보정" value={overlays.stationOverrides.length} />
         <SummaryCard
-          label="선형 보정"
-          value={overlays.geometryOverrides.length}
+          label="노선 편집"
+          value={
+            overlays.geometryOverrides.length +
+            overlays.branchRouteOverrides.length
+          }
         />
       </section>
 

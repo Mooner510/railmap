@@ -3,8 +3,10 @@ import path from "node:path";
 import {
   EMPTY_MANUAL_OVERLAY_BUNDLE,
   deriveTransferEdgesFromGroups,
+  makeBranchRouteOverrideId,
   makeTransferPairKey,
   type ManualOverlayBundle,
+  type ManualBranchRouteOverride,
   type ManualBranchStationExclusion,
   type ManualGeometryOverride,
   type ManualGeometryOverridePoint,
@@ -187,6 +189,37 @@ function normalizeBranchStationExclusion(
     enabled: exclusion.enabled !== false,
     source: asString(exclusion.source) ?? "editor",
     note: asNullableString(exclusion.note),
+  };
+}
+
+function normalizeBranchRouteOverride(
+  value: unknown,
+): ManualBranchRouteOverride | null {
+  if (!value || typeof value !== "object") return null;
+
+  const override = value as Record<string, unknown>;
+  const branchId = asString(override.branchId);
+  if (!branchId) return null;
+
+  const stationIds = Array.isArray(override.stationIds)
+    ? [
+        ...new Set(
+          override.stationIds
+            .map(asString)
+            .filter((id): id is string => id !== null),
+        ),
+      ]
+    : [];
+
+  if (stationIds.length < 2) return null;
+
+  return {
+    id: asString(override.id) ?? makeBranchRouteOverrideId(branchId),
+    branchId,
+    stationIds,
+    enabled: override.enabled !== false,
+    source: asString(override.source) ?? "editor",
+    note: asNullableString(override.note),
   };
 }
 
@@ -395,6 +428,16 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
               exclusion !== null,
           )
       : [],
+    branchRouteOverrides: Array.isArray(
+      (data as { branchRouteOverrides?: unknown }).branchRouteOverrides,
+    )
+      ? (data as { branchRouteOverrides: unknown[] }).branchRouteOverrides
+          .map(normalizeBranchRouteOverride)
+          .filter(
+            (override): override is ManualBranchRouteOverride =>
+              override !== null,
+          )
+      : [],
     lineBranchOverrides: Array.isArray(
       (data as { lineBranchOverrides?: unknown }).lineBranchOverrides,
     )
@@ -456,6 +499,7 @@ async function writeManualOverlaySplitFiles(overlays: ManualOverlayBundle) {
       schemaVersion: overlays.schemaVersion,
       branchOverrides: overlays.branchOverrides,
       branchStationExclusions: overlays.branchStationExclusions,
+      branchRouteOverrides: overlays.branchRouteOverrides,
       lineBranchOverrides: overlays.lineBranchOverrides,
       geometryOverrides: overlays.geometryOverrides,
     }),

@@ -34,6 +34,12 @@ const CATEGORIES = [
     impact: "해당 노선의 역 목록과 지도 표시에서 제외됩니다.",
   },
   {
+    key: "branchRouteOverrides",
+    label: "노선 정차 순서",
+    description: "기존 노선의 역 추가, 삭제, 순서 변경",
+    impact: "Web 지도와 경로 탐색의 정차 순서에 직접 반영됩니다.",
+  },
+  {
     key: "lineBranchOverrides",
     label: "지선/연결선",
     description: "수동으로 추가하거나 수정한 지선/연결선",
@@ -119,6 +125,8 @@ function itemKindLabel(key: CategoryKey) {
       return "역 ID";
     case "branchStationExclusions":
       return "제외 역";
+    case "branchRouteOverrides":
+      return "정차 순서";
     case "lineBranchOverrides":
       return "지선";
     case "geometryOverrides":

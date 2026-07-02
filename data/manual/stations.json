@@ -40,6 +40,14 @@
       "lng": 126.96482306457216,
       "enabled": true,
       "note": null
+    },
+    {
+      "stationId": "candidate:kric:urban-rail-station:I4108:1265:row-15",
+      "nameKo": "가좌역",
+      "lat": 37.56865832606789,
+      "lng": 126.9150549217253,
+      "enabled": true,
+      "note": null
     }
   ],
   "nonTransferStationIds": [

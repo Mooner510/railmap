@@ -94,6 +94,15 @@ interface ManualBranchStationExclusion {
   note?: string | null;
 }
 
+interface ManualBranchRouteOverride {
+  id: string;
+  branchId: string;
+  stationIds: string[];
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 interface ManualLineBranchGeometryPoint {
   lng: number;
   lat: number;
@@ -165,6 +174,7 @@ interface ManualOverlays {
   nonTransferStationIds?: string[];
   stationOverrides: ManualStationOverride[];
   branchStationExclusions: ManualBranchStationExclusion[];
+  branchRouteOverrides: ManualBranchRouteOverride[];
   lineBranchOverrides: ManualLineBranchOverride[];
   geometryOverrides: ManualGeometryOverride[];
 }
@@ -247,6 +257,9 @@ function readManualOverlays(): ManualOverlays {
       branchStationExclusions: Array.isArray((parsed as { branchStationExclusions?: unknown }).branchStationExclusions)
         ? ((parsed as { branchStationExclusions: ManualBranchStationExclusion[] }).branchStationExclusions)
         : [],
+      branchRouteOverrides: Array.isArray((parsed as { branchRouteOverrides?: unknown }).branchRouteOverrides)
+        ? ((parsed as { branchRouteOverrides: ManualBranchRouteOverride[] }).branchRouteOverrides)
+        : [],
       lineBranchOverrides: Array.isArray((parsed as { lineBranchOverrides?: unknown }).lineBranchOverrides)
         ? ((parsed as { lineBranchOverrides: ManualLineBranchOverride[] }).lineBranchOverrides)
         : [],
@@ -263,6 +276,7 @@ function readManualOverlays(): ManualOverlays {
     nonTransferStationIds: [],
     stationOverrides: [],
     branchStationExclusions: [],
+    branchRouteOverrides: [],
     lineBranchOverrides: [],
     geometryOverrides: [],
   };
@@ -423,6 +437,64 @@ function applyBranchStationExclusions(bundle: CanonicalBundle, exclusions: Manua
   };
 }
 
+function applyBranchRouteOverrides(
+  bundle: CanonicalBundle,
+  overrides: ManualBranchRouteOverride[],
+): CanonicalBundle {
+  const stationById = new Map(bundle.stations.map((station) => [station.id, station]));
+  const overrideByBranchId = new Map(
+    overrides
+      .filter((override) => override.enabled !== false && override.stationIds.length >= 2)
+      .map((override) => [override.branchId, override]),
+  );
+  if (overrideByBranchId.size === 0) return bundle;
+
+  const lines = bundle.lines.map((line) => ({
+    ...line,
+    branches: line.branches.map((branch) => {
+      const override = overrideByBranchId.get(branch.id);
+      if (!override) return branch;
+
+      const stopByStationId = new Map(
+        branch.routeStops.map((stop) => [stop.stationId, stop] as const),
+      );
+      return {
+        ...branch,
+        routeStops: override.stationIds.map((stationId, index) => {
+          const existing = stopByStationId.get(stationId);
+          const station = stationById.get(stationId);
+          if (existing) return { ...existing, sequence: index + 1 };
+
+          return {
+            id: `${branch.id}:manual-route:${index + 1}:${stationId}`,
+            canonicalLineId: line.canonicalKey,
+            branchId: branch.id,
+            sourceLineNumber: branch.sourceLineNumber,
+            sourceLineName: branch.sourceLineName,
+            role: branch.role,
+            sequence: index + 1,
+            stationId,
+            sourceStationCode: station?.stationNumber ?? "",
+            displayNameKo: station?.nameKo ?? stationId,
+            matchStatus: "manual",
+            confidence: "manual",
+            sourceCandidateId: stationId,
+            diagnostics: ["manual-branch-route-override"],
+          } satisfies CanonicalRouteStop;
+        }),
+      };
+    }),
+  }));
+
+  return {
+    ...bundle,
+    lines,
+    routeStops: lines.flatMap((line) =>
+      line.branches.flatMap((branch) => branch.routeStops),
+    ),
+  };
+}
+
 function applyStationOverrides(
   stations: CanonicalStation[],
   overrides: ManualStationOverride[],
@@ -468,15 +540,23 @@ function readBundle(): CanonicalBundle {
     manualOverlays.stationOverrides,
   );
 
-  return normalizeSingleLineStationMappings(applyBranchStationExclusions({
-    ...bundle,
-    stations,
-    manualTransferGroups: manualOverlays.manualTransferGroups,
-    manualTransferEdges: [
-      ...(bundle.manualTransferEdges ?? []),
-      ...manualOverlays.manualTransferEdges,
-    ].filter((edge) => edge.enabled),
-  }, manualOverlays.branchStationExclusions));
+  return normalizeSingleLineStationMappings(
+    applyBranchStationExclusions(
+      applyBranchRouteOverrides(
+        {
+          ...bundle,
+          stations,
+          manualTransferGroups: manualOverlays.manualTransferGroups,
+          manualTransferEdges: [
+            ...(bundle.manualTransferEdges ?? []),
+            ...manualOverlays.manualTransferEdges,
+          ].filter((edge) => edge.enabled),
+        },
+        manualOverlays.branchRouteOverrides,
+      ),
+      manualOverlays.branchStationExclusions,
+    ),
+  );
 }
 
 function toMapStations(stations: CanonicalStation[]): RailMapStation[] {
