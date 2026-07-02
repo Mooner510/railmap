@@ -142,6 +142,36 @@ function getValidationIssueBadgeClassName(issue: LineBranchValidationIssue) {
   return "bg-red-100 text-red-700";
 }
 
+function ValidationStatCard({
+  label,
+  value,
+  description,
+  tone = "slate",
+}: {
+  label: string;
+  value: string | number;
+  description: string;
+  tone?: "slate" | "red" | "amber" | "blue" | "emerald";
+}) {
+  const toneClassName = {
+    slate: "border-slate-200 bg-white text-slate-700",
+    red: "border-red-100 bg-red-50 text-red-700",
+    amber: "border-amber-100 bg-amber-50 text-amber-700",
+    blue: "border-blue-100 bg-blue-50 text-blue-700",
+    emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
+  }[tone];
+
+  return (
+    <div className={cn("rounded-2xl border px-3 py-2", toneClassName)}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[10px] font-black uppercase tracking-tight opacity-70">{label}</span>
+        <strong className="text-sm font-black">{value}</strong>
+      </div>
+      <p className="mt-1 text-[10px] font-semibold leading-4 opacity-80">{description}</p>
+    </div>
+  );
+}
+
 export function LineBranchValidationPanel({
   count,
   issues,
@@ -179,11 +209,17 @@ export function LineBranchValidationPanel({
         <div className="flex items-start justify-between gap-3">
           <div>
             <strong className="text-sm font-semibold text-slate-700">오버레이/선형 검증</strong>
-            <p className="mt-2 text-xs font-medium text-slate-500">지선 등록 {count}개 · 오류 {errorCount}개 · 주의 {warningCount}개</p>
+            <p className="mt-2 text-xs font-medium text-slate-500">문제 유형을 먼저 보고, 필요한 항목만 바로 해결합니다.</p>
           </div>
           <Button size="sm" variant="outline" disabled={safeFixCount === 0} onClick={onApplyAllSafeFixes}>가능한 것 모두 해결</Button>
         </div>
-        <p className="mt-3 text-[11px] font-medium leading-5 text-slate-500">각 항목은 문제, 원인, 해결 방법을 분리해서 표시합니다. 자동 해결은 데이터 손실 가능성이 낮은 항목만 일괄 처리합니다. 선형 없음처럼 임시 선형을 새로 만드는 작업은 개별 버튼으로만 처리합니다.</p>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <ValidationStatCard label="지선 등록" value={count.toLocaleString("ko-KR")} description="수동 지선/결합 override" tone="blue" />
+          <ValidationStatCard label="오류" value={errorCount.toLocaleString("ko-KR")} description="저장 전 수정 권장" tone={errorCount > 0 ? "red" : "emerald"} />
+          <ValidationStatCard label="주의" value={warningCount.toLocaleString("ko-KR")} description="표시 품질 점검" tone={warningCount > 0 ? "amber" : "emerald"} />
+          <ValidationStatCard label="자동 해결" value={safeFixCount.toLocaleString("ko-KR")} description="일괄 처리 가능 항목" tone={safeFixCount > 0 ? "blue" : "slate"} />
+        </div>
+        <p className="mt-3 text-[11px] font-medium leading-5 text-slate-500">자동 해결은 데이터 손실 가능성이 낮은 항목만 일괄 처리합니다. 선형 없음처럼 임시 선형을 새로 만드는 작업은 개별 버튼으로만 처리합니다.</p>
       </div>
 
       {staleSavedAnchorSummaries.length > 0 ? (
