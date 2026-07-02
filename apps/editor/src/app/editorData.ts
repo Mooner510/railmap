@@ -52,6 +52,7 @@ export type EditorMapBranch = {
   geometryOverrideCoordinates?: Array<[number, number]>;
   geometryCoordinates: Array<[number, number]>;
   routeStopCount: number;
+  isCircular?: boolean;
   routeStops: Array<{
     id: string;
     sequence: number;
@@ -425,7 +426,10 @@ function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geome
         origin: branch.origin ?? null,
         terminal: branch.terminal ?? null,
         geometryOverrideCoordinates,
-        geometryCoordinates,
+        geometryCoordinates: routeOverrideByBranchId.get(branch.id)?.circular && geometryCoordinates.length >= 2
+          ? [...geometryCoordinates, geometryCoordinates[0]!]
+          : geometryCoordinates,
+        isCircular: routeOverrideByBranchId.get(branch.id)?.circular === true,
         routeStopCount: routeStops.length,
         routeStops: routeStops.map((stop) => {
           const stationId = getRouteStopStationId(stop);

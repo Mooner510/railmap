@@ -64,6 +64,7 @@ export interface ManualBranchRouteOverride {
   id: string;
   branchId: string;
   stationIds: string[];
+  circular?: boolean;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;

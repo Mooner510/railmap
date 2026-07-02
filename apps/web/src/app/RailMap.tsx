@@ -43,6 +43,7 @@ export interface RailMapBranch {
   sourceLineNumber: string;
   sourceLineName: string;
   geometryOverrideCoordinates?: Array<[number, number]>;
+  isCircular?: boolean;
   routeStops: Array<{
     id: string;
     sequence: number;
@@ -109,6 +110,15 @@ const EMPTY_FEATURE_COLLECTION: RailFeatureCollection = {
   features: [],
 };
 
+function closeCircularCoordinates(coordinates: LngLatTuple[], circular?: boolean): LngLatTuple[] {
+  if (!circular || coordinates.length < 2) return coordinates;
+  const first = coordinates[0];
+  const last = coordinates[coordinates.length - 1];
+  if (!first || !last) return coordinates;
+  if (first[0] === last[0] && first[1] === last[1]) return coordinates;
+  return [...coordinates, first];
+}
+
 function getBranchCoordinates(branch: RailMapBranch): LngLatTuple[] {
   if (
     branch.geometryOverrideCoordinates &&
@@ -123,7 +133,7 @@ function getBranchCoordinates(branch: RailMapBranch): LngLatTuple[] {
       .filter((coordinate): coordinate is LngLatTuple => coordinate !== null);
 
     if (overrideCoordinates.length >= 2)
-      return smoothCoordinates(overrideCoordinates);
+      return closeCircularCoordinates(smoothCoordinates(overrideCoordinates), branch.isCircular);
   }
 
   const coordinates = branch.routeStops
@@ -135,7 +145,7 @@ function getBranchCoordinates(branch: RailMapBranch): LngLatTuple[] {
 
   const smoothed = smoothCoordinates(coordinates);
 
-  return smoothed.length >= 2 ? smoothed : coordinates;
+  return closeCircularCoordinates(smoothed.length >= 2 ? smoothed : coordinates, branch.isCircular);
 }
 
 function getStationDisplayName(station: RailMapStation | null | undefined) {

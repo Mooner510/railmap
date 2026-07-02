@@ -35,6 +35,7 @@ interface CanonicalBranch {
   origin: string | null;
   terminal: string | null;
   routeStops: CanonicalRouteStop[];
+  isCircular?: boolean;
 }
 
 interface CanonicalLine {
@@ -102,6 +103,7 @@ interface ManualBranchRouteOverride {
   id: string;
   branchId: string;
   stationIds: string[];
+  circular?: boolean;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;
@@ -464,6 +466,7 @@ function applyBranchRouteOverrides(
       );
       return {
         ...branch,
+        isCircular: override.circular === true,
         routeStops: override.stationIds.map((stationId, index) => {
           const existing = stopByStationId.get(stationId);
           const station = stationById.get(stationId);
@@ -678,6 +681,7 @@ function toMapBranches(
         role: branch.role,
         sourceLineNumber: branch.sourceLineNumber,
         sourceLineName: branch.sourceLineName,
+        isCircular: branch.isCircular === true,
         geometryOverrideCoordinates: override
           ? resolveGeometryPointStationAnchors(
               override.points.filter(
