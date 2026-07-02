@@ -77,6 +77,7 @@ import {
 } from "../editorModel";
 import type { EditorMapBranch, UnifiedEditorData } from "../editorData";
 import { getLineBranchConnectionBlockReason, isBranchCircular } from "./branchRules";
+import { AddStationInsertionDialog, type PendingAddStationInsertion } from "./stationInsertion";
 
 type Selection =
   | { type: "none" }
@@ -170,13 +171,6 @@ type GeometryPointDragState = {
 type PendingTransferSelection =
   | { type: "station"; stationId: string; shouldFocus: boolean }
   | { type: "multiStation"; ids: string[] };
-
-type PendingAddStationInsertion = {
-  parentBranchId: string;
-  beforeStationId: string;
-  afterStationId: string;
-  newStationNameKo?: string;
-};
 
 type GeometryEditTarget = {
   type: GeometryTargetType;
@@ -1599,6 +1593,223 @@ function getLineBranchDisplay(
   };
 }
 
+
+function BranchChip({
+  branch,
+  tone = "slate",
+}: {
+  branch: EditorMapBranch | null | undefined;
+  tone?: "slate" | "emerald" | "rose" | "blue";
+}) {
+  const toneClassName = {
+    slate: "border-slate-200 bg-white text-slate-700",
+    emerald: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    rose: "border-rose-200 bg-rose-50 text-rose-800",
+    blue: "border-blue-200 bg-blue-50 text-blue-800",
+  }[tone];
+
+  return (
+    <span
+      className={cn(
+        "inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-bold",
+        toneClassName,
+      )}
+    >
+      <span
+        className="size-2.5 shrink-0 rounded-full"
+        style={{ backgroundColor: branch?.colorHex ?? "#94a3b8" }}
+      />
+      <span className="truncate">
+        {branch ? branch.canonicalLineNameKo : "알 수 없는 노선"}
+      </span>
+    </span>
+  );
+}
+
+function VisualStationNode({
+  station,
+  colorHex,
+  active = false,
+}: {
+  station: EditorStation | null | undefined;
+  colorHex?: string | null;
+  active?: boolean;
+}) {
+  return (
+    <span className="grid min-w-0 justify-items-center gap-1">
+      <span
+        className={cn(
+          "grid size-7 place-items-center rounded-full border-4 border-white shadow-sm ring-2",
+          active ? "bg-slate-950 text-white ring-blue-300" : "bg-white text-slate-700 ring-slate-200",
+        )}
+      >
+        <span
+          className="size-2.5 rounded-full"
+          style={{ backgroundColor: colorHex ?? station?.colorHex ?? "#64748b" }}
+        />
+      </span>
+      <span className="max-w-20 truncate text-center text-[10px] font-bold text-slate-700">
+        {station?.nameKo ?? "?"}
+      </span>
+    </span>
+  );
+}
+
+function VisualLineSegment({
+  colorHex,
+  dashed = false,
+}: {
+  colorHex?: string | null;
+  dashed?: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "h-1.5 min-w-10 flex-1 rounded-full",
+        dashed ? "border-t-2 border-dashed bg-transparent" : "",
+      )}
+      style={
+        dashed
+          ? { borderColor: colorHex ?? "#94a3b8" }
+          : { backgroundColor: colorHex ?? "#94a3b8" }
+      }
+    />
+  );
+}
+
+function AddStationBranchPreview({
+  parentBranch,
+  anchorStation,
+  branchStation,
+  compact = false,
+}: {
+  parentBranch: EditorMapBranch | null | undefined;
+  anchorStation: EditorStation | null | undefined;
+  branchStation: EditorStation | null | undefined;
+  compact?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-blue-100 bg-white/90 p-2">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <BranchChip branch={parentBranch} tone="blue" />
+        <Badge className="bg-blue-50 text-blue-700">지선 추가</Badge>
+      </div>
+      <div className="grid justify-items-center gap-1">
+        <div className="flex w-full items-center gap-2">
+          <VisualStationNode
+            station={anchorStation}
+            colorHex={parentBranch?.colorHex}
+            active
+          />
+          <VisualLineSegment colorHex={parentBranch?.colorHex} />
+          <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-500">
+            본선
+          </span>
+        </div>
+        <div className="h-7 w-1.5 rounded-full bg-blue-300" />
+        <div className="flex w-full items-center justify-center gap-2">
+          <span className="h-1.5 w-10 rounded-full bg-blue-300" />
+          <VisualStationNode station={branchStation} colorHex={parentBranch?.colorHex} />
+          {!compact ? <span className="h-1.5 w-10 rounded-full bg-blue-300" /> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConnectLineBranchPreview({
+  parentBranch,
+  anchorStation,
+  connectedBranch,
+  connectedStation,
+  directionLabel,
+}: {
+  parentBranch: EditorMapBranch | null | undefined;
+  anchorStation: EditorStation | null | undefined;
+  connectedBranch: EditorMapBranch | null | undefined;
+  connectedStation: EditorStation | null | undefined;
+  directionLabel?: string | null;
+}) {
+  return (
+    <div className="rounded-2xl border border-emerald-100 bg-white/90 p-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <BranchChip branch={parentBranch} tone="emerald" />
+        <span className="text-[11px] font-black text-emerald-500">↘</span>
+        <BranchChip branch={connectedBranch} tone="emerald" />
+      </div>
+      <div className="grid gap-2">
+        <div className="flex items-center gap-2">
+          <VisualStationNode
+            station={anchorStation}
+            colorHex={parentBranch?.colorHex}
+            active
+          />
+          <VisualLineSegment colorHex={parentBranch?.colorHex} />
+        </div>
+        <div className="ml-6 flex items-center gap-2">
+          <span className="h-8 w-8 rounded-bl-2xl border-b-4 border-l-4 border-emerald-300" />
+          <VisualStationNode station={connectedStation} colorHex={connectedBranch?.colorHex} />
+          <VisualLineSegment colorHex={connectedBranch?.colorHex} />
+        </div>
+      </div>
+      {directionLabel ? (
+        <p className="mt-2 rounded-xl bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
+          {directionLabel}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function LineBranchVisualCard({
+  override,
+  branchById,
+  stationById,
+}: {
+  override: ManualLineBranchOverride;
+  branchById: Map<string, EditorMapBranch>;
+  stationById: Map<string, EditorStation>;
+}) {
+  const parentBranch = branchById.get(override.parentBranchId) ?? null;
+  const anchorStation = stationById.get(override.anchorStationId) ?? null;
+
+  if (override.mode === "add-station") {
+    const branchStation = override.branchStationId
+      ? (stationById.get(override.branchStationId) ?? null)
+      : null;
+    return (
+      <AddStationBranchPreview
+        parentBranch={parentBranch}
+        anchorStation={anchorStation}
+        branchStation={branchStation}
+        compact
+      />
+    );
+  }
+
+  const connectedBranch = override.connectedBranchId
+    ? (branchById.get(override.connectedBranchId) ?? null)
+    : null;
+  const connectedStation = override.connectedEndpointStationId
+    ? (stationById.get(override.connectedEndpointStationId) ?? null)
+    : null;
+  const directionLabel = formatLineBranchDirectionSummary(
+    connectedBranch,
+    override.connectedEndpointStationId,
+    override.connectedDirection ?? "toward-end",
+  );
+
+  return (
+    <ConnectLineBranchPreview
+      parentBranch={parentBranch}
+      anchorStation={anchorStation}
+      connectedBranch={connectedBranch}
+      connectedStation={connectedStation}
+      directionLabel={directionLabel}
+    />
+  );
+}
+
 function getBranchStopCoordinatePoints(branch: EditorMapBranch) {
   return branch.routeStops
     .map((stop) => {
@@ -1860,25 +2071,6 @@ function getBranchStopStations(branch: EditorMapBranch): EditorStation[] {
   return branch.routeStops
     .map((stop) => stop.station)
     .filter((station): station is EditorStation => Boolean(station));
-}
-
-function getBranchAdjacentStationPairs(branch: EditorMapBranch, circular = false) {
-  const stations = getBranchStopStations(branch).filter(isValidStation);
-  const pairs: Array<{ before: EditorStation; after: EditorStation; circular?: boolean }> = [];
-
-  for (let index = 0; index < stations.length - 1; index += 1) {
-    const before = stations[index];
-    const after = stations[index + 1];
-    if (before && after) pairs.push({ before, after });
-  }
-
-  const first = stations[0];
-  const last = stations[stations.length - 1];
-  if (circular && first && last && first.id !== last.id) {
-    pairs.push({ before: last, after: first, circular: true });
-  }
-
-  return pairs;
 }
 
 function getBranchesServingStation(
@@ -7729,176 +7921,6 @@ function CollapsibleSection({
   );
 }
 
-function AddStationInsertionDialog({
-  open,
-  station,
-  branches,
-  onClose,
-  onSelect,
-}: {
-  open: boolean;
-  station: EditorStation | null;
-  branches: EditorMapBranch[];
-  onClose: () => void;
-  onSelect: (insertion: PendingAddStationInsertion) => void;
-}) {
-  const [branchId, setBranchId] = useState(branches[0]?.id ?? "");
-  const [newStationNameKo, setNewStationNameKo] = useState("");
-  const selectedBranch =
-    branches.find((branch) => branch.id === branchId) ?? branches[0] ?? null;
-  const selectedBranchCircular = selectedBranch?.isCircular === true;
-  const pairs = useMemo(
-    () =>
-      selectedBranch
-        ? getBranchAdjacentStationPairs(selectedBranch, selectedBranch.isCircular === true)
-        : [],
-    [selectedBranch],
-  );
-  const creationMode = !station;
-
-  useEffect(() => {
-    if (!branches.some((branch) => branch.id === branchId)) {
-      setBranchId(branches[0]?.id ?? "");
-    }
-  }, [branchId, branches]);
-
-  useEffect(() => {
-    if (!open) setNewStationNameKo("");
-  }, [open]);
-
-  const canSelectLocation = !creationMode || newStationNameKo.trim().length > 0;
-
-  return (
-    <Dialog open={open} className="flex max-h-[620px] max-w-2xl flex-col">
-      <div className="border-b border-slate-200 px-4 py-3">
-        <strong className="block text-sm font-semibold text-slate-950">
-          {creationMode ? "새 역 생성" : "기존 역을 노선에 연결"}
-        </strong>
-        <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
-          {creationMode
-            ? "새 역 이름과 들어갈 위치를 고른 뒤, 지도에서 실제 위치를 클릭해 저장합니다."
-            : `${station.nameKo}은(는) 이미 위치가 있으므로 두 역 사이만 고르면 바로 노선에 연결됩니다.`}
-        </p>
-      </div>
-      <div className="grid min-h-0 gap-3 overflow-y-auto p-4">
-        {creationMode ? (
-          <Field label="새 역 이름">
-            <Input
-              autoFocus
-              placeholder="예: 서울역(경의중앙선)"
-              value={newStationNameKo}
-              onChange={(event) => setNewStationNameKo(event.target.value)}
-            />
-          </Field>
-        ) : null}
-        <Field label="노선">
-          <select
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
-            value={selectedBranch?.id ?? ""}
-            onChange={(event) => setBranchId(event.target.value)}
-            disabled={branches.length === 0}
-          >
-            {branches.length === 0 ? (
-              <option value="">선택 가능한 노선 없음</option>
-            ) : (
-              branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {formatBranchDisplayName(branch)}
-                </option>
-              ))
-            )}
-          </select>
-        </Field>
-        <div className="grid gap-2">
-          <div className="flex items-start justify-between gap-3">
-            <span>
-              <strong className="block text-xs font-semibold text-slate-700">
-                추가 위치
-              </strong>
-              <span className="mt-0.5 block text-[11px] font-medium leading-4 text-slate-400">
-                노선도에서 두 역 사이의 파란 선을 눌러 선택하세요.
-              </span>
-            </span>
-            <Badge className="bg-blue-50 text-blue-700">
-              {creationMode ? "새 역" : "기존 역 연결"}{selectedBranchCircular ? " · 순환" : ""}
-            </Badge>
-          </div>
-          {selectedBranch && pairs.length > 0 ? (
-            <div className="overflow-x-auto rounded-3xl border border-slate-200 bg-slate-50 p-4">
-              <div className="mx-auto grid min-w-[520px] max-w-xl grid-cols-[minmax(0,1fr)_88px_minmax(0,1fr)] gap-x-2 gap-y-1">
-                {pairs.map(({ before, after, circular }, index) => {
-                  const reversed = index % 2 === 1;
-                  const beforeCell = reversed ? 2 : 0;
-                  const afterCell = reversed ? 0 : 2;
-                  return (
-                    <div
-                      key={`${before.id}:${after.id}`}
-                      className="contents"
-                    >
-                      <div
-                        className={cn(
-                          "flex min-h-10 items-center",
-                          beforeCell === 0 ? "justify-end" : "justify-start",
-                        )}
-                        style={{ gridColumn: beforeCell + 1 }}
-                      >
-                        <span className="max-w-[180px] truncate rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-sm">
-                          {before.nameKo}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        className="group relative col-start-2 row-auto flex h-10 items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
-                        disabled={!canSelectLocation}
-                        title={`${before.nameKo} - ${after.nameKo} 사이에 ${creationMode ? "새 역 생성" : "기존 역 연결"}${circular ? " · 순환 연결" : ""}`}
-                        onClick={() =>
-                          onSelect({
-                            parentBranchId: selectedBranch.id,
-                            beforeStationId: before.id,
-                            afterStationId: after.id,
-                            newStationNameKo: creationMode
-                              ? newStationNameKo.trim()
-                              : undefined,
-                          })
-                        }
-                      >
-                        <span className={cn("absolute left-1/2 top-0 h-full w-1 -translate-x-1/2 rounded-full transition group-hover:w-2 group-hover:bg-blue-500", circular ? "bg-violet-300" : "bg-blue-200")} />
-                        <span className="relative grid size-8 place-items-center rounded-full border-2 border-white bg-blue-600 text-white shadow-sm transition group-hover:scale-110 group-hover:bg-blue-700">
-                          <Plus className="size-4" />
-                        </span>
-                      </button>
-                      <div
-                        className={cn(
-                          "flex min-h-10 items-center",
-                          afterCell === 0 ? "justify-end" : "justify-start",
-                        )}
-                        style={{ gridColumn: afterCell + 1 }}
-                      >
-                        <span className="max-w-[180px] truncate rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 shadow-sm">
-                          {after.nameKo}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-xs font-medium text-slate-400">
-              인접한 두 역을 찾을 수 없습니다.
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="border-t border-slate-200 p-3">
-        <Button className="w-full" variant="outline" onClick={onClose}>
-          닫기
-        </Button>
-      </div>
-    </Dialog>
-  );
-}
-
 function StationInspector({
   station,
   draft,
@@ -8357,6 +8379,11 @@ function StationInspector({
                 )}
               </select>
             </Field>
+            <AddStationBranchPreview
+              parentBranch={addParentBranch}
+              anchorStation={stationIndex.get(addAnchorStationId)}
+              branchStation={station}
+            />
             <Button
               disabled={!addParentBranchId || !addAnchorStationId}
               onClick={() =>
@@ -8395,14 +8422,21 @@ function StationInspector({
               return (
                 <div
                   key={override.id}
-                  className="grid gap-1.5 rounded-xl bg-white/80 p-2"
+                  className="grid gap-2 rounded-xl bg-white/80 p-2"
                 >
-                  <p className="truncate text-xs font-bold text-rose-800">
-                    {display.title}
-                  </p>
-                  <p className="line-clamp-2 text-[11px] font-medium leading-5 text-rose-700">
-                    {display.summary}
-                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="truncate text-xs font-bold text-rose-800">
+                      {display.title}
+                    </p>
+                    <Badge className="bg-rose-100 text-rose-700">
+                      {override.mode === "add-station" ? "지선" : "결합"}
+                    </Badge>
+                  </div>
+                  <LineBranchVisualCard
+                    override={override}
+                    branchById={branchIndex}
+                    stationById={stationIndex}
+                  />
                   <Button
                     variant="outline"
                     onClick={() => onDeleteLineBranch(override.id)}
@@ -8500,6 +8534,17 @@ function StationInspector({
                 )}
               </select>
             </Field>
+            <ConnectLineBranchPreview
+              parentBranch={connectParentBranch}
+              anchorStation={station}
+              connectedBranch={selectedConnectBranch}
+              connectedStation={stationIndex.get(connectEndpointStationId)}
+              directionLabel={formatLineBranchDirectionSummary(
+                selectedConnectBranch,
+                connectEndpointStationId,
+                connectDirection,
+              )}
+            />
             <Button
               disabled={
                 !connectParentBranchId ||
