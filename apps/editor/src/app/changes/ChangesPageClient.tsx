@@ -11,38 +11,45 @@ import type { ManualOverlayBundle } from "../editorModel";
 const CATEGORIES = [
   {
     key: "stationOverrides",
-    label: "역 보정",
-    description: "역 표시명, 위치, 메모 override",
+    label: "역 위치/이름",
+    description: "역 이름, 위치, 메모를 직접 고친 항목",
+    impact: "Web 지도에서 역 점과 역 이름에 바로 반영됩니다.",
   },
   {
     key: "manualTransferGroups",
     label: "환승 그룹",
-    description: "editor에서 만든 수동 환승 그룹",
+    description: "여러 실제 역을 하나의 환승역처럼 묶은 항목",
+    impact: "Web 지도에서 환승 아이콘과 하위 역 표시 기준에 반영됩니다.",
   },
   {
     key: "nonTransferStationIds",
-    label: "미환승역",
-    description: "환승 그룹 대상에서 제외한 역 ID",
+    label: "미환승 처리",
+    description: "환승 그룹에서 제외한 역 ID",
+    impact: "해당 역은 환승 그룹으로 묶이지 않고 일반 역처럼 표시됩니다.",
   },
   {
     key: "branchStationExclusions",
     label: "노선별 역 제외",
-    description: "특정 노선에서 제거한 역 override",
+    description: "특정 노선에서 보이지 않게 뺀 역",
+    impact: "해당 노선의 역 목록과 지도 표시에서 제외됩니다.",
   },
   {
     key: "lineBranchOverrides",
-    label: "지선 overlay",
-    description: "역 추가/노선 결합 지선 override",
+    label: "지선/연결선",
+    description: "수동으로 추가하거나 수정한 지선/연결선",
+    impact: "Web 지도에서 지선과 역 연결 모양에 반영됩니다.",
   },
   {
     key: "geometryOverrides",
-    label: "선형 보정",
-    description: "일반 노선 수동 선형 보정",
+    label: "노선 선형",
+    description: "직접 그리거나 고친 노선 모양",
+    impact: "Web 지도에서 노선이 지나가는 모양에 반영됩니다.",
   },
   {
     key: "branchOverrides",
-    label: "노선 보정",
-    description: "노선 표시명/메모 override",
+    label: "노선 정보",
+    description: "노선 이름, 표시명, 메모를 고친 항목",
+    impact: "노선 목록과 지도 표시 이름에 반영됩니다.",
   },
 ] as const;
 
@@ -63,7 +70,12 @@ type EditorState = {
 type SnapshotPreview = {
   snapshot: SnapshotSummary;
   counts: Record<CategoryKey, number>;
-  diffs: { key: CategoryKey; label: string; current: number; snapshot: number }[];
+  diffs: {
+    key: CategoryKey;
+    label: string;
+    current: number;
+    snapshot: number;
+  }[];
   totalDiff: number;
 };
 
@@ -78,6 +90,42 @@ function countOverlayItems(overlays: ManualOverlayBundle | null) {
       categoryItems(overlays, category.key).length,
     ]),
   ) as Record<CategoryKey, number>;
+}
+
+function countTotalOverlayItems(counts: Record<CategoryKey, number>) {
+  return CATEGORIES.reduce((sum, category) => sum + counts[category.key], 0);
+}
+
+function categoryMeta(key: CategoryKey) {
+  return CATEGORIES.find((category) => category.key === key) ?? CATEGORIES[0];
+}
+
+function changedCategorySummaries(counts: Record<CategoryKey, number>) {
+  return CATEGORIES.filter((category) => counts[category.key] > 0).map(
+    (category) => ({
+      ...category,
+      count: counts[category.key],
+    }),
+  );
+}
+
+function itemKindLabel(key: CategoryKey) {
+  switch (key) {
+    case "stationOverrides":
+      return "역";
+    case "manualTransferGroups":
+      return "환승 그룹";
+    case "nonTransferStationIds":
+      return "역 ID";
+    case "branchStationExclusions":
+      return "제외 역";
+    case "lineBranchOverrides":
+      return "지선";
+    case "geometryOverrides":
+      return "선형";
+    case "branchOverrides":
+      return "노선";
+  }
 }
 
 function buildSnapshotPreview(
@@ -120,11 +168,14 @@ function describeItem(value: unknown) {
   const record = value as Record<string, unknown>;
   const parts = [
     record.nameKo,
+    record.name,
+    record.label,
     record.stationId,
     record.branchId,
     record.parentBranchId,
     record.anchorStationId,
     record.mode,
+    record.type,
   ].filter(
     (part): part is string =>
       typeof part === "string" && part.trim().length > 0,
@@ -176,7 +227,8 @@ export default function ChangesPageClient() {
     draft: "",
   });
   const [snapshotSubtitle, setSnapshotSubtitle] = useState("");
-  const [snapshotPreview, setSnapshotPreview] = useState<SnapshotPreview | null>(null);
+  const [snapshotPreview, setSnapshotPreview] =
+    useState<SnapshotPreview | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [wrapJson, setWrapJson] = useState(false);
@@ -208,10 +260,17 @@ export default function ChangesPageClient() {
     [overlays, selectedCategory],
   );
 
+  const selectedCategoryMeta = categoryMeta(selectedCategory);
+
   const currentCounts = useMemo(() => countOverlayItems(overlays), [overlays]);
 
+  const changedCategories = useMemo(
+    () => changedCategorySummaries(currentCounts),
+    [currentCounts],
+  );
+
   const totalCount = useMemo(
-    () => CATEGORIES.reduce((sum, category) => sum + currentCounts[category.key], 0),
+    () => countTotalOverlayItems(currentCounts),
     [currentCounts],
   );
 
@@ -279,7 +338,6 @@ export default function ChangesPageClient() {
     }
   }
 
-
   async function previewSnapshot(snapshot: SnapshotSummary) {
     setBusy(true);
     try {
@@ -291,7 +349,9 @@ export default function ChangesPageClient() {
           body: JSON.stringify({ action: "preview", snapshotId: snapshot.id }),
         },
       );
-      setSnapshotPreview(buildSnapshotPreview(snapshot, overlays, response.overlays));
+      setSnapshotPreview(
+        buildSnapshotPreview(snapshot, overlays, response.overlays),
+      );
       setMessage("스냅샷 내용을 미리 확인했습니다");
     } catch (error) {
       setMessage(
@@ -342,7 +402,8 @@ export default function ChangesPageClient() {
                 전체 변경 내용
               </h1>
               <p className="mt-1 text-sm font-medium text-slate-500">
-                저장된 역 위치, 선형, 환승, 스냅샷을 확인하고 필요하면 복구합니다.
+                저장된 역 위치, 선형, 환승, 스냅샷을 확인하고 필요하면
+                복구합니다.
               </p>
             </div>
             <div className="flex gap-2">
@@ -352,6 +413,54 @@ export default function ChangesPageClient() {
               <Button asChild>
                 <Link href="/editor">통합 에디터 열기</Link>
               </Button>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel>
+          <div className="grid gap-4 p-5 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="rounded-2xl bg-slate-950 p-4 text-white">
+              <p className="text-xs font-semibold text-slate-300">
+                전체 변경 요약
+              </p>
+              <strong className="mt-2 block text-3xl font-semibold tracking-[-0.05em]">
+                {totalCount}개
+              </strong>
+              <p className="mt-2 text-xs font-medium leading-5 text-slate-300">
+                현재 manual overlay에 저장된 전체 수정 항목입니다.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {changedCategories.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm font-semibold text-slate-500">
+                  아직 저장된 변경 내용이 없습니다.
+                </div>
+              ) : null}
+              {changedCategories.map((category) => (
+                <button
+                  key={category.key}
+                  type="button"
+                  className={`rounded-2xl border p-4 text-left transition ${
+                    selectedCategory === category.key
+                      ? "border-blue-300 bg-blue-50"
+                      : "border-slate-200 bg-white hover:border-blue-200 hover:bg-blue-50/50"
+                  }`}
+                  onClick={() => {
+                    setSelectedCategory(category.key);
+                    setEditor({ editingKey: null, draft: "" });
+                  }}
+                >
+                  <span className="flex items-center justify-between gap-2">
+                    <strong className="text-sm font-semibold text-slate-800">
+                      {category.label}
+                    </strong>
+                    <Badge>{category.count}개</Badge>
+                  </span>
+                  <span className="mt-2 block text-xs font-medium leading-5 text-slate-500">
+                    {category.impact}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         </Panel>
@@ -399,15 +508,13 @@ export default function ChangesPageClient() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold tracking-[-0.03em]">
-                    {
-                      CATEGORIES.find(
-                        (category) => category.key === selectedCategory,
-                      )?.label
-                    }
+                    {selectedCategoryMeta.label}
                   </h2>
                   <p className="mt-1 text-xs font-medium text-slate-500">
-                    항목을 수정한 뒤 저장하면 즉시 manual overlay 파일에
-                    반영됩니다.
+                    {selectedCategoryMeta.description}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-blue-600">
+                    {selectedCategoryMeta.impact}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
@@ -441,6 +548,7 @@ export default function ChangesPageClient() {
                             {describeItem(item)}
                           </strong>
                           <p className="mt-1 text-[11px] font-medium text-slate-400">
+                            {itemKindLabel(selectedCategory)} ·{" "}
                             {getItemId(item, index)}
                           </p>
                         </div>
@@ -518,12 +626,14 @@ export default function ChangesPageClient() {
                   스냅샷
                 </h2>
                 <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
-                  현재 데이터를 저장해두고, 나중에 선택한 스냅샷으로 되돌릴 수 있습니다.
-                  불러오기 전에 현재 데이터는 자동으로 백업됩니다.
+                  현재 데이터를 저장해두고, 나중에 선택한 스냅샷으로 되돌릴 수
+                  있습니다. 불러오기 전에 현재 데이터는 자동으로 백업됩니다.
                 </p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-semibold text-slate-600">현재 메인 데이터</p>
+                <p className="text-xs font-semibold text-slate-600">
+                  현재 메인 데이터
+                </p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   {CATEGORIES.slice(0, 6).map((category) => (
                     <div
@@ -580,7 +690,9 @@ export default function ChangesPageClient() {
                   <Button
                     className="mt-3 w-full"
                     disabled={busy}
-                    onClick={() => void loadSnapshot(snapshotPreview.snapshot.id)}
+                    onClick={() =>
+                      void loadSnapshot(snapshotPreview.snapshot.id)
+                    }
                   >
                     이 스냅샷으로 되돌리기
                   </Button>
