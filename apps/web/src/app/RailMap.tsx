@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  buildTransferGroupCircleGeometry,
+  isTransferDetailVisible,
+  TRANSFER_DETAIL_ZOOM_THRESHOLD,
+} from "../../../../packages/ui/src/map/renderPolicy";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import maplibregl, {
@@ -640,45 +645,8 @@ function buildStationTransferGroupIndex(
   return index;
 }
 
-function isTransferDetailVisible(zoom: number) {
-  return zoom >= TRANSFER_DETAIL_ZOOM_THRESHOLD;
-}
 
-function clampTransferGroupRadius(radius: number) {
-  if (!Number.isFinite(radius)) return TRANSFER_GROUP_AREA_MIN_RADIUS;
-  return Math.min(
-    TRANSFER_GROUP_AREA_MAX_RADIUS,
-    Math.max(TRANSFER_GROUP_AREA_MIN_RADIUS, radius),
-  );
-}
 
-function buildTransferGroupCircleGeometry(members: ValidRailMapStation[]) {
-  const centerLng = members.reduce((sum, station) => sum + station.lng, 0) / members.length;
-  const centerLat = members.reduce((sum, station) => sum + station.lat, 0) / members.length;
-  const lngScale = Math.max(0.35, Math.cos((centerLat * Math.PI) / 180));
-  const farthestMemberRadius = Math.max(
-    0,
-    ...members.map((station) => {
-      const dx = (station.lng - centerLng) * lngScale;
-      const dy = station.lat - centerLat;
-      return Math.sqrt(dx * dx + dy * dy);
-    }),
-  );
-  const radius = clampTransferGroupRadius(
-    farthestMemberRadius * TRANSFER_GROUP_AREA_PADDING_RATIO,
-  );
-
-  const coordinates: LngLatTuple[] = [];
-  for (let index = 0; index <= TRANSFER_GROUP_AREA_SEGMENTS; index += 1) {
-    const angle = (Math.PI * 2 * index) / TRANSFER_GROUP_AREA_SEGMENTS;
-    coordinates.push([
-      centerLng + (Math.cos(angle) * radius) / lngScale,
-      centerLat + Math.sin(angle) * radius,
-    ]);
-  }
-
-  return { center: [centerLng, centerLat] as LngLatTuple, radius, coordinates };
-}
 
 function buildTransferGroupAreaFeatures(
   transferGroups: RailMapTransferGroup[],
@@ -806,11 +774,23 @@ interface RailMapProps {
   className?: string;
 }
 
-const TRANSFER_DETAIL_ZOOM_THRESHOLD = 13.8;
-const TRANSFER_GROUP_AREA_MIN_RADIUS = 0.0018;
-const TRANSFER_GROUP_AREA_MAX_RADIUS = 0.012;
-const TRANSFER_GROUP_AREA_PADDING_RATIO = 1.55;
-const TRANSFER_GROUP_AREA_SEGMENTS = 56;
+
+const MAP_RENDER_POLICY = {
+  branchLineWidth: 3,
+  branchLineCasingWidth: 5.2,
+  selectedBranchLineWidth: 7,
+  lineBranchLineWidth: 3,
+  lineBranchCasingWidth: 4.8,
+  transferGroupHitRadius: 22,
+  transferGroupIconSize: 0.0391,
+  transferGroupSelectedIconSize: 0.0437,
+  stationRadius: 4.5,
+  selectedStationRadius: 7,
+  stationCasingRadius: 6,
+  selectedStationCasingRadius: 10,
+  stationStrokeWidth: 1.5,
+  selectedStationStrokeWidth: 3,
+} as const;
 
 const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
   [121.4, 30.9],
@@ -1227,6 +1207,7 @@ export default function RailMap({
             setTransferDetailVisible(isTransferDetailVisible(map.getZoom()));
           };
           syncTransferVisibilityMode();
+          map.on("zoom", syncTransferVisibilityMode);
           map.on("zoomend", syncTransferVisibilityMode);
 
           const transferIconImage = new Image();
@@ -1259,7 +1240,7 @@ export default function RailMap({
             source: "branch-preview-lines",
             paint: {
               "line-color": "#ffffff",
-              "line-width": 3.8,
+              "line-width": MAP_RENDER_POLICY.branchLineCasingWidth,
               "line-opacity": 0.88,
             },
             layout: {
@@ -1274,7 +1255,7 @@ export default function RailMap({
             source: "branch-preview-lines",
             paint: {
               "line-color": ["coalesce", ["get", "colorHex"], "#0284c7"],
-              "line-width": 2.2,
+              "line-width": MAP_RENDER_POLICY.branchLineWidth,
               "line-opacity": 0.76,
             },
             layout: {
@@ -1290,7 +1271,7 @@ export default function RailMap({
             filter: ["==", ["get", "id"], ""],
             paint: {
               "line-color": ["coalesce", ["get", "colorHex"], "#0369a1"],
-              "line-width": 4.2,
+              "line-width": MAP_RENDER_POLICY.selectedBranchLineWidth,
               "line-opacity": 0.96,
             },
             layout: {
@@ -1305,7 +1286,7 @@ export default function RailMap({
             source: "line-branch-lines",
             paint: {
               "line-color": "#ffffff",
-              "line-width": 4.2,
+              "line-width": MAP_RENDER_POLICY.lineBranchCasingWidth,
               "line-opacity": 0.88,
             },
             layout: { "line-cap": "round", "line-join": "round" },
@@ -1317,7 +1298,7 @@ export default function RailMap({
             source: "line-branch-lines",
             paint: {
               "line-color": ["get", "colorHex"],
-              "line-width": 2.4,
+              "line-width": MAP_RENDER_POLICY.lineBranchLineWidth,
               "line-opacity": 0.78,
             },
             layout: { "line-cap": "round", "line-join": "round" },
@@ -1408,7 +1389,7 @@ export default function RailMap({
             type: "circle",
             source: "transfer-group-icons",
             paint: {
-              "circle-radius": 22,
+              "circle-radius": MAP_RENDER_POLICY.transferGroupHitRadius,
               "circle-color": "rgba(0,0,0,0)",
               "circle-opacity": 0,
               "circle-stroke-opacity": 0,
@@ -1421,7 +1402,12 @@ export default function RailMap({
             source: "transfer-group-icons",
             layout: {
               "icon-image": "transfer-icon",
-              "icon-size": ["case", ["==", ["get", "isSelected"], true], 0.0437, 0.0391],
+              "icon-size": [
+                "case",
+                ["==", ["get", "isSelected"], true],
+                MAP_RENDER_POLICY.transferGroupSelectedIconSize,
+                MAP_RENDER_POLICY.transferGroupIconSize,
+              ],
               "icon-allow-overlap": true,
               "icon-ignore-placement": true,
             },
@@ -1463,7 +1449,12 @@ export default function RailMap({
             source: "branch-preview-stations",
             paint: {
               "circle-color": "#ffffff",
-              "circle-radius": ["case", ["==", ["get", "isEmphasized"], true], 7.2, 5.6],
+              "circle-radius": [
+                "case",
+                ["==", ["get", "isEmphasized"], true],
+                MAP_RENDER_POLICY.selectedStationCasingRadius,
+                MAP_RENDER_POLICY.stationCasingRadius,
+              ],
               "circle-opacity": 0.96,
             },
           });
@@ -1474,7 +1465,12 @@ export default function RailMap({
             source: "branch-preview-stations",
             paint: {
               "circle-color": ["coalesce", ["get", "colorHex"], "#64748b"],
-              "circle-radius": ["case", ["==", ["get", "isEmphasized"], true], 5.2, 3.8],
+              "circle-radius": [
+                "case",
+                ["==", ["get", "isEmphasized"], true],
+                MAP_RENDER_POLICY.selectedStationRadius,
+                MAP_RENDER_POLICY.stationRadius,
+              ],
               "circle-stroke-color": [
                 "case",
                 ["==", ["get", "isSelected"], true],
@@ -1484,8 +1480,8 @@ export default function RailMap({
               "circle-stroke-width": [
                 "case",
                 ["==", ["get", "isSelected"], true],
-                2.2,
-                1.2,
+                MAP_RENDER_POLICY.selectedStationStrokeWidth,
+                MAP_RENDER_POLICY.stationStrokeWidth,
               ],
               "circle-stroke-opacity": 1,
               "circle-opacity": 0.96,
