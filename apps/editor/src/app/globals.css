@@ -1479,3 +1479,49 @@ button:disabled { cursor: not-allowed; opacity: 0.5; }
   width: 26px;
   height: 26px;
 }
+
+/* 12.1 unified editor UX refinement */
+.editor-app-shell {
+  background:
+    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+}
+
+.editor-inspector-grid {
+  grid-template-columns: 300px minmax(0, 1fr) 360px;
+  gap: 10px;
+  padding: 10px;
+}
+
+.editor-panel-header {
+  background: rgb(255 255 255 / 0.9);
+}
+
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+details[open] > summary {
+  border-radius: 16px 16px 0 0;
+  background: #f8fafc;
+}
+
+@media (max-width: 1180px) {
+  .editor-inspector-grid {
+    grid-template-columns: 280px minmax(0, 1fr);
+  }
+
+  .editor-inspector-grid > section:last-child {
+    grid-column: 1 / -1;
+    min-height: 320px;
+  }
+}
+
+@media (max-width: 860px) {
+  .editor-inspector-grid {
+    height: auto;
+    min-height: 100dvh;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(520px, 62dvh) auto;
+    overflow: auto;
+  }
+}

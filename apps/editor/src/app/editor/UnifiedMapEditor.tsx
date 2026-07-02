@@ -24,7 +24,9 @@ import { cn } from "@repo/ui/utils";
 import {
   ChevronRight,
   Command,
+  History,
   Layers3,
+  ListChecks,
   LocateFixed,
   MapPin,
   MousePointer2,
@@ -5852,6 +5854,30 @@ export default function UnifiedMapEditor({
   const canRedo = isGeometryMode
     ? geometryHistoryVersion >= 0 && geometryRedoStackRef.current.length > 0
     : historyVersion >= 0 && redoStackRef.current.length > 0;
+  const validationBadgeCount =
+    lineBranchIssues.length + staleSavedAnchorSummaries.length;
+  const sidebarTabOptions: Array<{
+    value: SidebarTab;
+    label: string;
+    Icon: IconComponent;
+    badge?: number;
+  }> = [
+    { value: "search", label: "검색", Icon: Search },
+    { value: "layers", label: "레이어", Icon: Layers3 },
+    {
+      value: "transfers",
+      label: "환승",
+      Icon: Waypoints,
+      badge: overlays.manualTransferGroups.length,
+    },
+    {
+      value: "validation",
+      label: "검증",
+      Icon: ListChecks,
+      badge: validationBadgeCount,
+    },
+    { value: "history", label: "기록", Icon: History },
+  ];
 
   useEffect(() => {
     const map = mapRef.current;
@@ -5882,16 +5908,16 @@ export default function UnifiedMapEditor({
   }, []);
 
   return (
-    <AppShell>
-      <InspectorGrid>
+    <AppShell className="editor-app-shell">
+      <InspectorGrid className="editor-inspector-grid">
         <Panel className="flex min-h-0 flex-col overflow-hidden">
-          <PanelHeader>
+          <PanelHeader className="editor-panel-header">
             <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase text-slate-400">
                   {isGeometryMode ? "Geometry" : "Railmap"}
                 </p>
-                <h1 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+                <h1 className="mt-1 truncate text-lg font-semibold">
                   {isGeometryMode ? "선형 편집" : "통합 맵 에디터"}
                 </h1>
               </div>
@@ -5931,42 +5957,25 @@ export default function UnifiedMapEditor({
               </div>
             </div>
             {!isGeometryMode ? (
-              <>
-                <TabList className="mt-4 grid grid-cols-3">
+              <TabList className="mt-3 grid grid-cols-5 gap-0.5">
+                {sidebarTabOptions.map(({ value, label, Icon, badge }) => (
                   <TabButton
-                    active={sidebarTab === "search"}
-                    onClick={() => setSidebarTab("search")}
+                    key={value}
+                    className="relative flex min-w-0 items-center justify-center gap-1 px-1"
+                    active={sidebarTab === value}
+                    onClick={() => setSidebarTab(value)}
+                    title={label}
                   >
-                    검색
+                    <Icon className="size-3.5 shrink-0" />
+                    <span className="truncate">{label}</span>
+                    {badge && badge > 0 ? (
+                      <span className="absolute -right-1 -top-1 min-w-4 rounded-full bg-slate-900 px-1 text-[9px] font-bold leading-4 text-white">
+                        {badge > 99 ? "99+" : badge}
+                      </span>
+                    ) : null}
                   </TabButton>
-                  <TabButton
-                    active={sidebarTab === "layers"}
-                    onClick={() => setSidebarTab("layers")}
-                  >
-                    레이어
-                  </TabButton>
-                  <TabButton
-                    active={sidebarTab === "transfers"}
-                    onClick={() => setSidebarTab("transfers")}
-                  >
-                    환승
-                  </TabButton>
-                </TabList>
-                <TabList className="mt-2 grid grid-cols-2">
-                  <TabButton
-                    active={sidebarTab === "validation"}
-                    onClick={() => setSidebarTab("validation")}
-                  >
-                    검증
-                  </TabButton>
-                  <TabButton
-                    active={sidebarTab === "history"}
-                    onClick={() => setSidebarTab("history")}
-                  >
-                    기록
-                  </TabButton>
-                </TabList>
-              </>
+                ))}
+              </TabList>
             ) : null}
           </PanelHeader>
 
@@ -5998,6 +6007,12 @@ export default function UnifiedMapEditor({
                     onChange={(event) => setQuery(event.target.value)}
                   />
                 </div>
+                <div className="flex items-center justify-between px-1 text-[11px] font-semibold text-slate-400">
+                  <span>
+                    {filteredStations.length.toLocaleString("ko-KR")}개 결과
+                  </span>
+                  <span>전체 {data.stations.length.toLocaleString("ko-KR")}개</span>
+                </div>
                 <div className="grid gap-2">
                   {filteredStations.map((station) => (
                     <button
@@ -6027,6 +6042,12 @@ export default function UnifiedMapEditor({
                       </p>
                     </button>
                   ))}
+                  {filteredStations.length === 0 ? (
+                    <Placeholder
+                      title="검색 결과 없음"
+                      description="역명, 노선명, 역번호를 다른 방식으로 입력하세요."
+                    />
+                  ) : null}
                 </div>
               </div>
             ) : null}
@@ -6036,10 +6057,11 @@ export default function UnifiedMapEditor({
                 {layerOptions.map(({ key, label, Icon }) => (
                   <label
                     key={String(key)}
-                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm font-semibold"
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm font-semibold transition hover:border-blue-200 hover:bg-blue-50"
                   >
                     <input
                       type="checkbox"
+                      className="size-4 accent-blue-600"
                       checked={layers[key]}
                       onChange={(event) =>
                         setLayers((previous) => ({
@@ -6049,7 +6071,7 @@ export default function UnifiedMapEditor({
                       }
                     />
                     <Icon className="size-4 text-slate-400" />
-                    {label}
+                    <span className="min-w-0 flex-1 truncate">{label}</span>
                   </label>
                 ))}
               </div>
@@ -6080,7 +6102,12 @@ export default function UnifiedMapEditor({
                   <button
                     key={group.id}
                     type="button"
-                    className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50"
+                    className={cn(
+                      "rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50",
+                      selectedGroup?.id === group.id
+                        ? "border-blue-300 bg-blue-50"
+                        : null,
+                    )}
                     onClick={() => selectTransferGroup(group.id)}
                   >
                     <strong className="text-sm font-semibold">
@@ -6092,6 +6119,12 @@ export default function UnifiedMapEditor({
                     </p>
                   </button>
                 ))}
+                {overlays.manualTransferGroups.length === 0 ? (
+                  <Placeholder
+                    title="환승 그룹 없음"
+                    description="지도에서 여러 역을 선택한 뒤 환승 그룹을 만들 수 있습니다."
+                  />
+                ) : null}
               </div>
             ) : null}
 
@@ -6119,9 +6152,9 @@ export default function UnifiedMapEditor({
           </PanelBody>
         </Panel>
 
-        <main className="relative min-h-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-xl">
+        <main className="relative min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
           <div ref={mapContainerRef} className="absolute inset-0 size-full" />
-          <div className="pointer-events-none absolute left-4 top-4 flex flex-wrap gap-2">
+          <div className="pointer-events-none absolute left-4 top-4 flex max-w-[calc(100%-2rem)] flex-wrap gap-2">
             <Badge className="bg-white/90 text-slate-700">
               {selectedGroup
                 ? `환승 그룹 · ${selectedGroup.nameKo}`
@@ -6136,7 +6169,7 @@ export default function UnifiedMapEditor({
               </Badge>
             ) : null}
           </div>
-          <div className="absolute left-1/2 top-4 flex -translate-x-1/2 gap-2 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
+          <div className="absolute left-1/2 top-4 flex -translate-x-1/2 items-center gap-1 rounded-2xl border border-slate-200 bg-white/95 p-1 shadow-lg backdrop-blur">
             {toolOptions.map(({ mode, label, description, Icon }) => (
               <button
                 key={mode}
@@ -6173,6 +6206,11 @@ export default function UnifiedMapEditor({
               />
             </div>
           ) : null}
+          <div className="pointer-events-none absolute bottom-3 left-3 max-w-[min(420px,calc(100%-1.5rem))] rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium leading-5 text-slate-600 shadow-lg backdrop-blur">
+            {isGeometryMode
+              ? "선형을 선택하고 지도 위 점/구간을 드래그해 보정합니다."
+              : "지도 객체 선택, 드래그 박스 다중 선택, Cmd/Ctrl+K 검색을 사용할 수 있습니다."}
+          </div>
           <div className="absolute bottom-3 right-3 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium text-slate-600 shadow-lg backdrop-blur">
             {cursorLngLat
               ? `${cursorLngLat.lng.toFixed(6)}, ${cursorLngLat.lat.toFixed(6)}`
@@ -6201,11 +6239,11 @@ export default function UnifiedMapEditor({
         </main>
 
         <Panel className="flex min-h-0 flex-col overflow-hidden">
-          <PanelHeader>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+          <PanelHeader className="editor-panel-header">
+            <p className="text-[11px] font-semibold uppercase text-slate-400">
               {isGeometryMode ? "Geometry Tools" : "Inspector"}
             </p>
-            <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+            <h2 className="mt-1 truncate text-lg font-semibold">
               {isGeometryMode
                 ? "전체 선형 편집"
                 : selectedGroup
@@ -6892,6 +6930,40 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+function CollapsibleSection({
+  title,
+  meta,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  meta?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details
+      className="group rounded-2xl border border-slate-200 bg-white"
+      open={defaultOpen}
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-left">
+        <span className="min-w-0">
+          <strong className="block truncate text-xs font-semibold text-slate-700">
+            {title}
+          </strong>
+          {meta ? (
+            <span className="mt-0.5 block truncate text-[11px] font-medium text-slate-400">
+              {meta}
+            </span>
+          ) : null}
+        </span>
+        <ChevronRight className="size-4 shrink-0 text-slate-400 transition group-open:rotate-90" />
+      </summary>
+      <div className="grid gap-2 border-t border-slate-100 p-2">{children}</div>
+    </details>
+  );
+}
+
 function AddStationInsertionDialog({
   open,
   station,
@@ -7194,7 +7266,12 @@ function StationInspector({
             className="size-3 rounded-full"
             style={{ backgroundColor: station.colorHex ?? "#64748b" }}
           />
-          <strong className="text-base font-semibold">{station.nameKo}</strong>
+          <strong className="min-w-0 flex-1 truncate text-base font-semibold">
+            {station.nameKo}
+          </strong>
+          {nonTransfer ? (
+            <Badge className="bg-amber-50 text-amber-700">미환승</Badge>
+          ) : null}
         </div>
         <p className="mt-1 text-xs font-medium text-slate-500">
           {formatStationSubLabel(station)}
@@ -7301,7 +7378,7 @@ function StationInspector({
           </div>
         </div>
       ) : null}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2">
         <Button
           className="h-auto min-h-10 whitespace-normal px-2 py-2 text-center leading-4"
           variant="outline"
@@ -7334,250 +7411,277 @@ function StationInspector({
             {nonTransfer ? "환승 가능역으로 변경" : "미환승역으로 설정"}
           </Button>
         ) : null}
-        <Button disabled={saving} onClick={onSave}>
+        <Button
+          className={transferGroup ? "" : "col-span-2"}
+          disabled={saving}
+          onClick={onSave}
+        >
           <Save className="mr-1 size-4" />
           {saving ? "저장 중" : "저장"}
         </Button>
       </div>
-      {branchRemovalOptions.length > 0 ? (
-        <div className="grid gap-2 rounded-2xl border border-amber-100 bg-amber-50/70 p-3">
-          <div className="flex items-center justify-between">
-            <strong className="text-xs font-semibold text-amber-800">
-              특정 노선에서 제거
-            </strong>
-            <span className="text-[10px] font-semibold text-amber-700">
-              제외
-            </span>
-          </div>
-          <Field label="제거할 노선">
-            <select
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
-              value={removeBranchId}
-              onChange={(event) => setRemoveBranchId(event.target.value)}
-            >
-              {branchRemovalOptions.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {formatBranchDisplayName(branch)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Button
-            disabled={!removeBranchId}
-            variant="outline"
-            onClick={() => onExcludeFromBranch(removeBranchId)}
-          >
-            <Trash2 className="mr-1 size-4" />이 노선에서 역 제거
-          </Button>
-        </div>
-      ) : (
-        <div className="grid gap-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
-          <div className="flex items-center justify-between">
-            <strong className="text-xs font-semibold text-blue-800">
-              새 역으로 추가
-            </strong>
-            <span className="text-[10px] font-semibold text-blue-700">
-              미소속 역
-            </span>
-          </div>
-          <Button
-            disabled={!canAddToBranch || branchAddOptions.length === 0}
-            onClick={onOpenAddStationModal}
-          >
-            <Plus className="mr-1 size-4" />
-            노선 사이 위치 선택
-          </Button>
-          <Field label="연결할 노선">
-            <select
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
-              value={addParentBranchId}
-              onChange={(event) => setAddParentBranchId(event.target.value)}
-              disabled={!canAddToBranch || branchAddOptions.length === 0}
-            >
-              {branchAddOptions.length === 0 ? (
-                <option value="">연결 가능한 노선 없음</option>
-              ) : (
-                branchAddOptions.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {formatBranchDisplayName(branch)}
-                  </option>
-                ))
-              )}
-            </select>
-          </Field>
-          <Field label="기준 역">
-            <select
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
-              value={addAnchorStationId}
-              onChange={(event) => setAddAnchorStationId(event.target.value)}
-              disabled={!canAddToBranch || addAnchorStations.length === 0}
-            >
-              {addAnchorStations.length === 0 ? (
-                <option value="">기준 역 없음</option>
-              ) : (
-                addAnchorStations.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.nameKo} · {candidate.lineNameKo}
-                  </option>
-                ))
-              )}
-            </select>
-          </Field>
-          <Button
-            disabled={!addParentBranchId || !addAnchorStationId}
-            onClick={() =>
-              onCreateAddStationBranch(addParentBranchId, addAnchorStationId)
-            }
-          >
-            <Plus className="mr-1 size-4" />이 역을 지선으로 추가
-          </Button>
-        </div>
-      )}
-      {relatedLineBranches.length > 0 ? (
-        <div className="grid gap-2 rounded-2xl border border-rose-100 bg-rose-50/70 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <strong className="text-xs font-semibold text-rose-800">
-              결합된 지선 제거
-            </strong>
-            <span className="text-[10px] font-semibold text-rose-700">
-              {relatedLineBranches.length}개
-            </span>
-          </div>
-          <p className="text-xs font-medium leading-5 text-rose-800">
-            이 역을 기준으로 만든 지선 추가/노선 결합을 제거할 수 있습니다.
-          </p>
-          {relatedLineBranches.map((override) => {
-            const display = getLineBranchDisplay(
-              override,
-              branchIndex,
-              stationIndex,
-            );
-            return (
-              <div
-                key={override.id}
-                className="grid gap-1.5 rounded-xl bg-white/80 p-2"
+      <CollapsibleSection
+        title="노선 소속 관리"
+        meta={
+          branchRemovalOptions.length > 0
+            ? `${branchRemovalOptions.length}개 소속 노선`
+            : "미소속 역"
+        }
+        defaultOpen={branchRemovalOptions.length === 0}
+      >
+        {branchRemovalOptions.length > 0 ? (
+          <div className="grid gap-2 rounded-2xl border border-amber-100 bg-amber-50/70 p-3">
+            <div className="flex items-center justify-between">
+              <strong className="text-xs font-semibold text-amber-800">
+                특정 노선에서 제거
+              </strong>
+              <span className="text-[10px] font-semibold text-amber-700">
+                제외
+              </span>
+            </div>
+            <Field label="제거할 노선">
+              <select
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+                value={removeBranchId}
+                onChange={(event) => setRemoveBranchId(event.target.value)}
               >
-                <p className="truncate text-xs font-bold text-rose-800">
-                  {display.title}
-                </p>
-                <p className="line-clamp-2 text-[11px] font-medium leading-5 text-rose-700">
-                  {display.summary}
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={() => onDeleteLineBranch(override.id)}
-                >
-                  <Trash2 className="mr-1 size-3" />
-                  이 결합 제거
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      ) : null}
-      {endpointConnectOptions.length > 0 ? (
-        <div className="grid gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
-          <div className="flex items-center justify-between">
-            <strong className="text-xs font-semibold text-emerald-800">
-              이 역에서 노선 결합
-            </strong>
-            <span className="text-[10px] font-semibold text-emerald-700">
-              시작/끝 역
-            </span>
-          </div>
-          <Field label="기준 노선">
-            <select
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
-              value={connectParentBranchId}
-              onChange={(event) => setConnectParentBranchId(event.target.value)}
-            >
-              {endpointConnectOptions.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {formatBranchDisplayName(branch)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="연결할 노선">
-            <select
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
-              value={connectBranchId}
-              onChange={(event) => setConnectBranchId(event.target.value)}
-              disabled={
-                !connectParentBranch || connectOtherBranches.length === 0
-              }
-            >
-              {connectOtherBranches.length === 0 ? (
-                <option value="">연결 가능한 노선 없음</option>
-              ) : (
-                connectOtherBranches.map((branch) => (
+                {branchRemovalOptions.map((branch) => (
                   <option key={branch.id} value={branch.id}>
                     {formatBranchDisplayName(branch)}
                   </option>
-                ))
-              )}
-            </select>
-          </Field>
-          <Field label="연결 노선 연결 역">
-            <select
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
-              value={connectEndpointStationId}
-              onChange={(event) =>
-                setConnectEndpointStationId(event.target.value)
-              }
-              disabled={connectEndpointStations.length === 0}
+                ))}
+              </select>
+            </Field>
+            <Button
+              disabled={!removeBranchId}
+              variant="outline"
+              onClick={() => onExcludeFromBranch(removeBranchId)}
             >
-              {connectEndpointStations.length === 0 ? (
-                <option value="">연결 역 없음</option>
-              ) : (
-                connectEndpointStations.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.nameKo} · {candidate.lineNameKo}
-                  </option>
-                ))
-              )}
-            </select>
-          </Field>
-          <Field label="연결 방향">
-            <select
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
-              value={connectDirection}
-              onChange={(event) =>
-                setConnectDirection(event.target.value as LineBranchDirection)
-              }
-              disabled={connectDirectionOptions.length === 0}
+              <Trash2 className="mr-1 size-4" />이 노선에서 역 제거
+            </Button>
+          </div>
+        ) : (
+          <div className="grid gap-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-3">
+            <div className="flex items-center justify-between">
+              <strong className="text-xs font-semibold text-blue-800">
+                새 역으로 추가
+              </strong>
+              <span className="text-[10px] font-semibold text-blue-700">
+                미소속 역
+              </span>
+            </div>
+            <Button
+              disabled={!canAddToBranch || branchAddOptions.length === 0}
+              onClick={onOpenAddStationModal}
             >
-              {connectDirectionOptions.length === 0 ? (
-                <option value="toward-end">선택 가능한 방향 없음</option>
-              ) : (
-                connectDirectionOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
+              <Plus className="mr-1 size-4" />
+              노선 사이 위치 선택
+            </Button>
+            <Field label="연결할 노선">
+              <select
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+                value={addParentBranchId}
+                onChange={(event) => setAddParentBranchId(event.target.value)}
+                disabled={!canAddToBranch || branchAddOptions.length === 0}
+              >
+                {branchAddOptions.length === 0 ? (
+                  <option value="">연결 가능한 노선 없음</option>
+                ) : (
+                  branchAddOptions.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {formatBranchDisplayName(branch)}
+                    </option>
+                  ))
+                )}
+              </select>
+            </Field>
+            <Field label="기준 역">
+              <select
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+                value={addAnchorStationId}
+                onChange={(event) => setAddAnchorStationId(event.target.value)}
+                disabled={!canAddToBranch || addAnchorStations.length === 0}
+              >
+                {addAnchorStations.length === 0 ? (
+                  <option value="">기준 역 없음</option>
+                ) : (
+                  addAnchorStations.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.nameKo} · {candidate.lineNameKo}
+                    </option>
+                  ))
+                )}
+              </select>
+            </Field>
+            <Button
+              disabled={!addParentBranchId || !addAnchorStationId}
+              onClick={() =>
+                onCreateAddStationBranch(addParentBranchId, addAnchorStationId)
+              }
+            >
+              <Plus className="mr-1 size-4" />이 역을 지선으로 추가
+            </Button>
+          </div>
+        )}
+      </CollapsibleSection>
+      <CollapsibleSection
+        title="지선 연결 관리"
+        meta={`${relatedLineBranches.length + endpointConnectOptions.length}개 관련 작업`}
+        defaultOpen={relatedLineBranches.length > 0}
+      >
+        {relatedLineBranches.length > 0 ? (
+          <div className="grid gap-2 rounded-2xl border border-rose-100 bg-rose-50/70 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <strong className="text-xs font-semibold text-rose-800">
+                결합된 지선 제거
+              </strong>
+              <span className="text-[10px] font-semibold text-rose-700">
+                {relatedLineBranches.length}개
+              </span>
+            </div>
+            <p className="text-xs font-medium leading-5 text-rose-800">
+              이 역을 기준으로 만든 지선 추가/노선 결합을 제거할 수 있습니다.
+            </p>
+            {relatedLineBranches.map((override) => {
+              const display = getLineBranchDisplay(
+                override,
+                branchIndex,
+                stationIndex,
+              );
+              return (
+                <div
+                  key={override.id}
+                  className="grid gap-1.5 rounded-xl bg-white/80 p-2"
+                >
+                  <p className="truncate text-xs font-bold text-rose-800">
+                    {display.title}
+                  </p>
+                  <p className="line-clamp-2 text-[11px] font-medium leading-5 text-rose-700">
+                    {display.summary}
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => onDeleteLineBranch(override.id)}
+                  >
+                    <Trash2 className="mr-1 size-3" />
+                    이 결합 제거
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
+        {endpointConnectOptions.length > 0 ? (
+          <div className="grid gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
+            <div className="flex items-center justify-between">
+              <strong className="text-xs font-semibold text-emerald-800">
+                이 역에서 노선 결합
+              </strong>
+              <span className="text-[10px] font-semibold text-emerald-700">
+                시작/끝 역
+              </span>
+            </div>
+            <Field label="기준 노선">
+              <select
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+                value={connectParentBranchId}
+                onChange={(event) =>
+                  setConnectParentBranchId(event.target.value)
+                }
+              >
+                {endpointConnectOptions.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {formatBranchDisplayName(branch)}
                   </option>
-                ))
-              )}
-            </select>
-          </Field>
-          <Button
-            disabled={
-              !connectParentBranchId ||
-              !connectBranchId ||
-              !connectEndpointStationId ||
-              connectDirectionOptions.length === 0
-            }
-            onClick={() =>
-              onCreateConnectLineBranch(
-                connectParentBranchId,
-                connectBranchId,
-                connectEndpointStationId,
-                connectDirection,
-              )
-            }
-          >
-            <Route className="mr-1 size-4" />이 역에서 노선 결합
-          </Button>
-        </div>
-      ) : null}
+                ))}
+              </select>
+            </Field>
+            <Field label="연결할 노선">
+              <select
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+                value={connectBranchId}
+                onChange={(event) => setConnectBranchId(event.target.value)}
+                disabled={
+                  !connectParentBranch || connectOtherBranches.length === 0
+                }
+              >
+                {connectOtherBranches.length === 0 ? (
+                  <option value="">연결 가능한 노선 없음</option>
+                ) : (
+                  connectOtherBranches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {formatBranchDisplayName(branch)}
+                    </option>
+                  ))
+                )}
+              </select>
+            </Field>
+            <Field label="연결 노선 연결 역">
+              <select
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+                value={connectEndpointStationId}
+                onChange={(event) =>
+                  setConnectEndpointStationId(event.target.value)
+                }
+                disabled={connectEndpointStations.length === 0}
+              >
+                {connectEndpointStations.length === 0 ? (
+                  <option value="">연결 역 없음</option>
+                ) : (
+                  connectEndpointStations.map((candidate) => (
+                    <option key={candidate.id} value={candidate.id}>
+                      {candidate.nameKo} · {candidate.lineNameKo}
+                    </option>
+                  ))
+                )}
+              </select>
+            </Field>
+            <Field label="연결 방향">
+              <select
+                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium"
+                value={connectDirection}
+                onChange={(event) =>
+                  setConnectDirection(event.target.value as LineBranchDirection)
+                }
+                disabled={connectDirectionOptions.length === 0}
+              >
+                {connectDirectionOptions.length === 0 ? (
+                  <option value="toward-end">선택 가능한 방향 없음</option>
+                ) : (
+                  connectDirectionOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))
+                )}
+              </select>
+            </Field>
+            <Button
+              disabled={
+                !connectParentBranchId ||
+                !connectBranchId ||
+                !connectEndpointStationId ||
+                connectDirectionOptions.length === 0
+              }
+              onClick={() =>
+                onCreateConnectLineBranch(
+                  connectParentBranchId,
+                  connectBranchId,
+                  connectEndpointStationId,
+                  connectDirection,
+                )
+              }
+            >
+              <Route className="mr-1 size-4" />이 역에서 노선 결합
+            </Button>
+          </div>
+        ) : (
+          <Placeholder
+            title="연결 작업 없음"
+            description="이 역이 노선의 시작/끝 역일 때 노선 결합 작업이 표시됩니다."
+          />
+        )}
+      </CollapsibleSection>
     </div>
   );
 }
