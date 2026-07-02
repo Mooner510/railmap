@@ -1,84 +1,101 @@
 # CURRENT_TASK
 
-Status: current handoff note  
-Generated: 2026-06-23
+Status: active implementation handoff  
+Updated: 2026-07-02  
+Current version target: `13.20.1-docs-and-operation-cleanup`
 
 ## 1. Current phase
 
-The project is in source-design and collector-contract phase.
+The project is now in implementation and hardening phase.
 
-Do not start UI/app implementation.
+The old source-design-only phase is complete. UI/editor/web implementation already exists and must be maintained.
 
-Do not create fake data.
+Current focus:
 
-Do not perform broad new API probing unless necessary for collector implementation.
+1. keep data identity rules enforced;
+2. keep manual overlays durable through collector/export runs;
+3. reduce editor maintenance risk after module splitting;
+4. productize the public web map;
+5. keep documents synchronized with the current code.
 
-## 2. Completed source-design work
+## 2. Recently completed work
 
-### KRIC urban rail
+### Editor
 
-- KRIC XLSX files inspected.
-- KRIC `trainUseInfo/subwayRouteInfo` sample call verified.
-- KRIC `mreaWideCd` value set confirmed: `01` 수도권, `02` 부산, `03` 대구, `04` 광주, `05` 대전.
-- Manual `(mreaWideCd, lnCd, lineName)` allowlist provided.
-- KRIC operator/station code workbook accepted as code reference.
-- Full route API execution deferred to collector implementation.
+- Unified map editor is implemented.
+- Station position override flow exists.
+- Transfer group editor exists.
+- Geometry/line branch editing exists.
+- New station creation flow exists.
+- Existing station insertion into a line exists.
+- Circular line toggle exists.
+- Validation panel is readable and grouped by problem type.
+- Some repair actions are available per issue and in bulk.
+- Station insertion uses a compact ㄹ-shaped visual line diagram.
+- Editor module splitting has started:
+  - `branchRules.ts`
+  - `stationInsertion.tsx`
+  - `branchInspector.tsx`
+  - `validationPanel.tsx`
+  - `stationInspector.tsx`
 
-### KORAIL run API
+### Web
 
-- `travelerTrainRunInfo2` returned usable station-stop-level records.
-- `travelerTrainRunPlan2` returned usable train-level records.
-- `codes2` returned empty items in observed probes.
-- Pagination works.
-- Date filtering behavior is not verified; local filtering rule retained.
+- Public map is implemented.
+- Rail explorer UI exists.
+- User-facing HUD exists.
+- Selected station/line/transfer group panels exist.
+- Transfer group and line preview visuals exist.
+- Web metadata is updated for the Korean public rail map.
 
-### OSM
+### Collector/data
 
-- Geofabrik Korea and OSM Korea extracts inspected.
-- Railway extraction and tag counts observed.
-- OSM accepted as geometry/context source, not timetable source.
+- KRIC canonical app bundle generation exists.
+- Manual overlay export into web public data exists.
+- Station-line identity validation exists.
+- Manual overlay source-of-truth is `data/manual`.
+- Public export path is `apps/web/public/data`.
 
-### TAGO Train
+## 3. Non-negotiable current data rules
 
-- Service metadata identified.
-- Access currently blocked with `Forbidden`.
-- TAGO deferred as secondary/cross-check only.
+1. Do not create fake transit data.
+2. Do not infer timetable travel times.
+3. Do not merge same-name stations automatically.
+4. Do not use one `stationId` as a real station for multiple lines.
+5. A physical transfer location may contain multiple line-specific station icons.
+6. Cross-line geometry references must use `control` points, not foreign `stationId` station points.
+7. Circular lines cannot themselves branch-connect outward into another line.
+8. Non-circular lines may connect into a station on a circular line.
+9. Circular lines may still have internal branch additions.
+10. `data/manual` is the manual source of truth.
 
-## 3. Current files to place in repo
+## 4. Recommended next work
 
-```text
-docs/data-sources/DATA_SOURCE_REGISTRY.md
-docs/data-sources/DATA_SOURCE_KRIC.md
-docs/data-sources/DATA_SOURCE_KORAIL_RUN.md
-docs/data-sources/DATA_SOURCE_OSM.md
-docs/data-sources/DATA_SOURCE_TAGO_TRAIN.md
-docs/collector/RAW_SNAPSHOT_POLICY.md
-docs/agent/AGENT_RULES.md
-docs/agent/COLLECTOR_CONTRACT.md
-docs/agent/CURRENT_TASK.md
-data/manual/kric-subway-route-info-line-map.csv
-```
+### 13.21.0 collector/data validation hardening
 
-## 4. Next recommended task
+Recommended scope:
 
-Prepare the first collector implementation handoff without doing additional documentation-phase API probing. Start with KRIC raw XLSX parsing, KRIC route allowlist handling, and KORAIL grouping rules.
+- Add stricter collector-side validation for manual overlays.
+- Validate every geometry override point.
+- Validate every line branch override against circular-line branch rules.
+- Validate generated/public data parity.
+- Fail build/export when manual overlay cannot be safely applied.
+- Emit clear diagnostics that match editor validation categories.
 
-Minimum next collector behavior:
+### 13.22.0 deployment/cache/version policy
 
-1. Read KRIC raw XLSX files without modifying them.
-2. Parse sheets into raw row records while preserving original headers and values.
-3. Read `data/manual/kric-subway-route-info-line-map.csv`.
-4. Validate that duplicate `lnCd` values are allowed across different `mreaWideCd` values.
-5. Prepare, but do not necessarily execute, route API call plans from `(mreaWideCd, lnCd)`.
-6. Emit diagnostics instead of final canonical data.
-7. Group KORAIL `travelerTrainRunInfo2` rows by `run_ymd + trn_no` and sort by numeric `trn_run_sn`.
-8. Preserve null arrival/departure times without inference.
+Recommended scope:
+
+- Define public data version metadata.
+- Define cache-busting behavior for app bundle and manual overlays.
+- Add release checklist.
+- Add deployment verification checklist.
 
 ## 5. Do not do next
 
-- Do not brute-force all possible KRIC `lnCd` values.
-- Do not test every KRIC route during documentation work.
-- Do not use TAGO as a blocker.
-- Do not infer transfers from same station name alone.
-- Do not infer route geometry from timetable rows.
-- Do not infer travel time from OSM geometry or KRIC speed fields.
+- Do not redesign the project architecture from scratch.
+- Do not remove existing editor/web functionality while refactoring.
+- Do not reintroduce sample or dummy data.
+- Do not treat `apps/web/public/data` as the canonical manual source.
+- Do not use old documentation that says UI implementation is not allowed.
+- Do not silently auto-fix risky geometry problems without user-visible diagnostics.
