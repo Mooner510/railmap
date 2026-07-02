@@ -681,9 +681,22 @@ export function buildKricCanonicalAppBundle() {
 
   const outputPath = path.join(outputDir, "kric-canonical-app-bundle.json");
   const publicPath = path.join(publicDataDir, "kric-canonical-app-bundle.json");
+  const manualOverlayPath = path.join(repoRoot, "data/manual/manual-overlays.json");
+  const publicManualOverlayPath = path.join(publicDataDir, "manual-overlays.json");
 
   writeJson(outputPath, bundle);
   writeJson(publicPath, bundle);
+
+  if (fs.existsSync(manualOverlayPath)) {
+    fs.copyFileSync(manualOverlayPath, publicManualOverlayPath);
+    console.log(
+      `[collector] copied manual overlays: ${path.relative(repoRoot, publicManualOverlayPath)}`,
+    );
+  } else {
+    console.warn(
+      `[collector] manual overlays not found: ${path.relative(repoRoot, manualOverlayPath)}`,
+    );
+  }
 
   console.log(`[collector] wrote canonical app bundle: ${path.relative(repoRoot, outputPath)}`);
   console.log(`[collector] copied canonical app bundle: ${path.relative(repoRoot, publicPath)}`);
