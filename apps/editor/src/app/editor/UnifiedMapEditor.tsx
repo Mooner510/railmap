@@ -3,6 +3,12 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import { Badge } from "@repo/ui/badge";
+import {
+  buildTransferGroupCircleGeometry,
+  isCollapsedTransferZoom,
+  isTransferDetailVisible,
+  TRANSFER_DETAIL_ZOOM_THRESHOLD,
+} from "../../../../../packages/ui/src/map/renderPolicy";
 import { Button } from "@repo/ui/button";
 import { Dialog } from "@repo/ui/dialog";
 import { Input, Textarea } from "@repo/ui/input";
@@ -75,11 +81,6 @@ type ToolMode = "select" | "box" | "geometry";
 type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
 
-const TRANSFER_DETAIL_ZOOM_THRESHOLD = 13.8;
-const TRANSFER_GROUP_AREA_MIN_RADIUS = 0.0018;
-const TRANSFER_GROUP_AREA_MAX_RADIUS = 0.012;
-const TRANSFER_GROUP_AREA_PADDING_RATIO = 1.55;
-const TRANSFER_GROUP_AREA_SEGMENTS = 56;
 const STATION_GEOMETRY_ANCHOR_TOLERANCE = 0.00015;
 const SAVED_STATION_ANCHOR_TOLERANCE = 0.0000001;
 const GEOMETRY_NEAR_ZERO_SEGMENT_DISTANCE = 0.000001;
@@ -377,38 +378,6 @@ async function buildStationFeaturesChunked(
   }
 
   return { type: "FeatureCollection", features };
-}
-
-function buildTransferGroupCircleGeometry(
-  members: Array<EditorStation & { lat: number; lng: number }>,
-) {
-  const centerLng =
-    members.reduce((sum, station) => sum + station.lng, 0) / members.length;
-  const centerLat =
-    members.reduce((sum, station) => sum + station.lat, 0) / members.length;
-  const lngScale = Math.max(0.35, Math.cos((centerLat * Math.PI) / 180));
-  const farthestMemberRadius = Math.max(
-    0,
-    ...members.map((station) => {
-      const dx = (station.lng - centerLng) * lngScale;
-      const dy = station.lat - centerLat;
-      return Math.sqrt(dx * dx + dy * dy);
-    }),
-  );
-  const radius = clampTransferGroupRadius(
-    farthestMemberRadius * TRANSFER_GROUP_AREA_PADDING_RATIO,
-  );
-
-  const coordinates: LngLatTuple[] = [];
-  for (let index = 0; index <= TRANSFER_GROUP_AREA_SEGMENTS; index += 1) {
-    const angle = (Math.PI * 2 * index) / TRANSFER_GROUP_AREA_SEGMENTS;
-    coordinates.push([
-      centerLng + (Math.cos(angle) * radius) / lngScale,
-      centerLat + Math.sin(angle) * radius,
-    ]);
-  }
-
-  return { center: [centerLng, centerLat] as LngLatTuple, radius, coordinates };
 }
 
 async function buildTransferGroupAreaFeaturesChunked(
@@ -909,7 +878,9 @@ function getParityStatusClassName(status: PublicWebParityStatus) {
   return "border-emerald-100 bg-emerald-50 text-emerald-700";
 }
 
-function countStationAnchorReferences(points: ManualGeometryOverridePoint[] = []) {
+function countStationAnchorReferences(
+  points: ManualGeometryOverridePoint[] = [],
+) {
   return points.filter((point) => point.kind === "station" && point.stationId)
     .length;
 }
@@ -923,7 +894,8 @@ function getPublicWebParityRows(
   const lineBranchOverrideCount = overlays.lineBranchOverrides?.length ?? 0;
   const stationAnchorReferenceCount =
     overlays.geometryOverrides.reduce(
-      (total, override) => total + countStationAnchorReferences(override.points),
+      (total, override) =>
+        total + countStationAnchorReferences(override.points),
       0,
     ) +
     (overlays.lineBranchOverrides ?? []).reduce(
@@ -944,7 +916,8 @@ function getPublicWebParityRows(
     },
     {
       label: "선형 보정 반영",
-      status: geometryOverrideCount + lineBranchOverrideCount > 0 ? "ok" : "warning",
+      status:
+        geometryOverrideCount + lineBranchOverrideCount > 0 ? "ok" : "warning",
       value: `${(geometryOverrideCount + lineBranchOverrideCount).toLocaleString("ko-KR")}개`,
       description:
         geometryOverrideCount + lineBranchOverrideCount > 0
@@ -1754,26 +1727,8 @@ function firstFeatureId(
   return typeof id === "string" ? id : undefined;
 }
 
-function isTransferDetailVisible(zoom: number) {
-  return zoom >= TRANSFER_DETAIL_ZOOM_THRESHOLD;
-}
-
-function isCollapsedTransferZoom(zoom: number) {
-  return !isTransferDetailVisible(zoom);
-}
-
-function clampTransferGroupRadius(radius: number) {
-  if (!Number.isFinite(radius)) return TRANSFER_GROUP_AREA_MIN_RADIUS;
-  return Math.min(
-    TRANSFER_GROUP_AREA_MAX_RADIUS,
-    Math.max(TRANSFER_GROUP_AREA_MIN_RADIUS, radius),
-  );
-}
-
 function featureStringProperty(
-  feature:
-    | { properties?: Record<string, unknown> | null }
-    | undefined,
+  feature: { properties?: Record<string, unknown> | null } | undefined,
   key: string,
 ) {
   const value = feature?.properties?.[key];
@@ -1842,7 +1797,8 @@ function getSelectedTransferGroupIds(
   return new Set(
     groups
       .filter((group) => {
-        if (group.enabled === false || group.stationIds.length < 2) return false;
+        if (group.enabled === false || group.stationIds.length < 2)
+          return false;
         return group.stationIds.every((stationId) =>
           selectedStationIds.has(stationId),
         );
@@ -1903,6 +1859,33 @@ function hasStationPositionOverride(
     Math.abs(overrideLng - stationLng) > SAVED_STATION_ANCHOR_TOLERANCE ||
     Math.abs(overrideLat - stationLat) > SAVED_STATION_ANCHOR_TOLERANCE
   );
+}
+
+function validateStationOverrideDraft(
+  draft: ManualStationOverride,
+  stationById: Map<string, EditorStation>,
+) {
+  const station = stationById.get(draft.stationId);
+  if (!station) return "저장할 역을 찾을 수 없습니다.";
+
+  const lng = draft.lng;
+  const lat = draft.lat;
+  if (typeof lng !== "number" || typeof lat !== "number") {
+    return "위도와 경도를 숫자로 입력하세요.";
+  }
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) {
+    return "위도와 경도에 올바른 숫자를 입력하세요.";
+  }
+  if (lng < -180 || lng > 180 || lat < -90 || lat > 90) {
+    return "위도/경도 범위를 벗어났습니다.";
+  }
+  return null;
+}
+
+function parseStationCoordinateInput(value: string) {
+  if (value.trim() === "") return null;
+  const next = Number(value);
+  return Number.isFinite(next) ? next : Number.NaN;
 }
 
 function shouldKeepStationOverride(
@@ -2017,7 +2000,6 @@ function toTransferGroup(draft: TransferGroupDraft): ManualTransferGroup {
   };
 }
 
-
 function getGeometryDraftTargetTitle(
   draft: GeometryDraft,
   targetByKey: Map<string, GeometryEditTarget>,
@@ -2084,7 +2066,12 @@ function getGeometryDraftValidationIssues(
       return;
     }
 
-    if (point.lng < -180 || point.lng > 180 || point.lat < -90 || point.lat > 90) {
+    if (
+      point.lng < -180 ||
+      point.lng > 180 ||
+      point.lat < -90 ||
+      point.lat > 90
+    ) {
       addIssue(
         "error",
         "coordinate-out-of-world",
@@ -2180,7 +2167,6 @@ function getGeometryDraftValidationIssues(
 
   return issues;
 }
-
 
 function getBranchAnchorGeometryPoints(
   branch: EditorMapBranch,
@@ -2967,9 +2953,9 @@ export default function UnifiedMapEditor({
   const selectTransferGroupFromMapRef = useRef<(groupId: string) => void>(
     () => undefined,
   );
-  const selectTransferGroupChildrenFromMapRef = useRef<(groupId: string) => void>(
-    () => undefined,
-  );
+  const selectTransferGroupChildrenFromMapRef = useRef<
+    (groupId: string) => void
+  >(() => undefined);
   const toolModeRef = useRef<ToolMode>("select");
   const geometryDraftRef = useRef<GeometryDraft | null>(null);
   const geometryDraftsByKeyRef = useRef<GeometryDraftMap>({});
@@ -2983,6 +2969,7 @@ export default function UnifiedMapEditor({
   );
   const groupByIdRef = useRef<Map<string, ManualTransferGroup>>(new Map());
   const stationLocationPickModeRef = useRef(false);
+  const stationSaveBusyRef = useRef(false);
   const showToastRef = useRef<(message: string, tone?: ToastTone) => void>(
     () => undefined,
   );
@@ -3036,6 +3023,7 @@ export default function UnifiedMapEditor({
   const [historyVersion, setHistoryVersion] = useState(0);
   const [geometryHistoryVersion, setGeometryHistoryVersion] = useState(0);
   const [stationLocationPickMode, setStationLocationPickMode] = useState(false);
+  const [stationSaveBusy, setStationSaveBusy] = useState(false);
   const [transferDraft, setTransferDraft] = useState<TransferGroupDraft | null>(
     null,
   );
@@ -4007,7 +3995,12 @@ export default function UnifiedMapEditor({
         source: "railmap-stations",
         paint: {
           "circle-color": ["get", "colorHex"],
-          "circle-radius": ["case", ["boolean", ["get", "selected"], false], 7, 4.5],
+          "circle-radius": [
+            "case",
+            ["boolean", ["get", "selected"], false],
+            7,
+            4.5,
+          ],
           "circle-stroke-color": [
             "case",
             ["boolean", ["get", "selected"], false],
@@ -4472,6 +4465,7 @@ export default function UnifiedMapEditor({
       setTransferDetailVisible(isTransferDetailVisible(nextZoom));
     };
     syncTransferVisibilityMode();
+    map.on("zoom", syncTransferVisibilityMode);
     map.on("zoomend", syncTransferVisibilityMode);
 
     map.on("click", (event) => {
@@ -4645,9 +4639,10 @@ export default function UnifiedMapEditor({
         [Math.max(start.x, event.point.x), Math.max(start.y, event.point.y)],
       ] as [[number, number], [number, number]];
       const collapsedTransferZoom = isCollapsedTransferZoom(map.getZoom());
-      const rangeLayers = (collapsedTransferZoom
-        ? ["railmap-transfer-group-hit"]
-        : ["railmap-stations-hit", "railmap-stations-circle"]
+      const rangeLayers = (
+        collapsedTransferZoom
+          ? ["railmap-transfer-group-hit"]
+          : ["railmap-stations-hit", "railmap-stations-circle"]
       ).filter((layerId) => map.getLayer(layerId));
       const rangeFeatures =
         rangeLayers.length > 0
@@ -4918,25 +4913,22 @@ export default function UnifiedMapEditor({
     }
   }
 
-  async function saveStationOverrideAndSyncAnchors(
-    nextOverride: ManualStationOverride,
-    label: string,
-    message: string,
+  async function reloadStationDraftFromData(
+    nextData: UnifiedEditorData | null,
+    stationId: string,
   ) {
-    const baseOverlays = overlaysRef.current;
-    const next: ManualOverlayBundle = {
-      ...baseOverlays,
-      stationOverrides: [
-        ...baseOverlays.stationOverrides.filter(
-          (override) => override.stationId !== nextOverride.stationId,
-        ),
-        nextOverride,
-      ],
-    };
+    const nextStation = nextData?.stations.find(
+      (station) => station.id === stationId,
+    );
+    if (!nextStation) return;
 
-    const saved = await executeOverlayCommand(label, next, message);
-    if (!saved) return null;
+    const nextOverride = nextData?.overlays.stationOverrides.find(
+      (override) => override.stationId === nextStation.id,
+    );
+    setStationDraft(emptyStationOverride(nextStation, nextOverride));
+  }
 
+  async function syncSavedGeometryAnchorsAndReload(stationId: string) {
     let nextData = await reloadEditorData();
     if (!nextData) return null;
 
@@ -4945,7 +4937,7 @@ export default function UnifiedMapEditor({
     );
     const syncResult = syncSavedGeometryAnchorsForStation(
       nextData.overlays,
-      nextOverride.stationId,
+      stationId,
       nextStationById,
     );
 
@@ -4954,22 +4946,54 @@ export default function UnifiedMapEditor({
         syncResult.overlays,
         `저장 선형 anchor ${syncResult.changedCount}개를 현재 역 위치로 맞췄습니다`,
       );
-      if (synced) {
-        nextData = await reloadEditorData();
-      }
+      if (synced) nextData = await reloadEditorData();
     }
 
-    const nextStation = nextData?.stations.find(
-      (station) => station.id === nextOverride.stationId,
-    );
-    if (nextStation) {
-      const nextStationOverride = nextData?.overlays.stationOverrides.find(
-        (override) => override.stationId === nextStation.id,
-      );
-      setStationDraft(emptyStationOverride(nextStation, nextStationOverride));
-    }
-
+    await reloadStationDraftFromData(nextData, stationId);
     return nextData;
+  }
+
+  async function saveStationOverrideAndSyncAnchors(
+    nextOverride: ManualStationOverride,
+    label: string,
+    message: string,
+  ) {
+    if (stationSaveBusyRef.current) {
+      showToast("역 위치 저장이 진행 중입니다", "info");
+      return null;
+    }
+
+    const validationMessage = validateStationOverrideDraft(
+      nextOverride,
+      stationByIdRef.current,
+    );
+    if (validationMessage) {
+      showToast(validationMessage, "error");
+      return null;
+    }
+
+    stationSaveBusyRef.current = true;
+    setStationSaveBusy(true);
+    try {
+      const baseOverlays = overlaysRef.current;
+      const next: ManualOverlayBundle = {
+        ...baseOverlays,
+        stationOverrides: [
+          ...baseOverlays.stationOverrides.filter(
+            (override) => override.stationId !== nextOverride.stationId,
+          ),
+          nextOverride,
+        ],
+      };
+
+      const saved = await executeOverlayCommand(label, next, message);
+      if (!saved) return null;
+
+      return await syncSavedGeometryAnchorsAndReload(nextOverride.stationId);
+    } finally {
+      stationSaveBusyRef.current = false;
+      setStationSaveBusy(false);
+    }
   }
 
   async function saveSelectedStationLocationFromMap(lng: number, lat: number) {
@@ -5029,16 +5053,7 @@ export default function UnifiedMapEditor({
     );
     if (!saved) return;
 
-    const nextData = await reloadEditorData();
-    const nextStation = nextData?.stations.find(
-      (station) => station.id === selectedStation.id,
-    );
-    if (nextStation) {
-      const nextOverride = nextData?.overlays.stationOverrides.find(
-        (override) => override.stationId === nextStation.id,
-      );
-      setStationDraft(emptyStationOverride(nextStation, nextOverride));
-    }
+    await syncSavedGeometryAnchorsAndReload(selectedStation.id);
     setStationLocationPickMode(false);
   }
 
@@ -5471,15 +5486,18 @@ export default function UnifiedMapEditor({
     (draft) =>
       !areGeometryDraftsEqual(draft, getSavedGeometryDraftForDraft(draft)),
   );
-  const geometryWorkspaceValidationIssues = geometryWorkspaceDirtyDrafts.flatMap(
-    (draft) => getGeometryDraftValidationIssues(draft, geometryTargetByKey, stationById),
-  );
-  const geometryWorkspaceValidationErrors = geometryWorkspaceValidationIssues.filter(
-    (issue) => issue.severity === "error",
-  );
-  const geometryWorkspaceValidationWarnings = geometryWorkspaceValidationIssues.filter(
-    (issue) => issue.severity === "warning",
-  );
+  const geometryWorkspaceValidationIssues =
+    geometryWorkspaceDirtyDrafts.flatMap((draft) =>
+      getGeometryDraftValidationIssues(draft, geometryTargetByKey, stationById),
+    );
+  const geometryWorkspaceValidationErrors =
+    geometryWorkspaceValidationIssues.filter(
+      (issue) => issue.severity === "error",
+    );
+  const geometryWorkspaceValidationWarnings =
+    geometryWorkspaceValidationIssues.filter(
+      (issue) => issue.severity === "warning",
+    );
   const geometryWorkspaceSummary: GeometryWorkspaceSummary =
     geometryWorkspaceDirtyDrafts.reduce<GeometryWorkspaceSummary>(
       (summary, draft) => {
@@ -5496,7 +5514,10 @@ export default function UnifiedMapEditor({
           0,
           getControlPointCount(savedDraft) - getControlPointCount(draft),
         );
-        const targetTitle = getGeometryDraftTargetTitle(draft, geometryTargetByKey);
+        const targetTitle = getGeometryDraftTargetTitle(
+          draft,
+          geometryTargetByKey,
+        );
 
         return {
           changedTargetCount: summary.changedTargetCount + 1,
@@ -5506,12 +5527,16 @@ export default function UnifiedMapEditor({
           validationWarningCount: geometryWorkspaceValidationWarnings.length,
           validationIssueTargetLabels: [
             ...new Set(
-              geometryWorkspaceValidationErrors.map((issue) => issue.targetTitle),
+              geometryWorkspaceValidationErrors.map(
+                (issue) => issue.targetTitle,
+              ),
             ),
           ],
           validationWarningTargetLabels: [
             ...new Set(
-              geometryWorkspaceValidationWarnings.map((issue) => issue.targetTitle),
+              geometryWorkspaceValidationWarnings.map(
+                (issue) => issue.targetTitle,
+              ),
             ),
           ],
           addedControlPointCount:
@@ -5539,7 +5564,9 @@ export default function UnifiedMapEditor({
         ],
         validationWarningTargetLabels: [
           ...new Set(
-            geometryWorkspaceValidationWarnings.map((issue) => issue.targetTitle),
+            geometryWorkspaceValidationWarnings.map(
+              (issue) => issue.targetTitle,
+            ),
           ),
         ],
         addedControlPointCount: 0,
@@ -5562,7 +5589,10 @@ export default function UnifiedMapEditor({
   const selectedGroup =
     selection.type === "transferGroup"
       ? (groupById.get(selection.id) ?? null)
-      : getPrimarySelectedTransferGroup(selection, overlays.manualTransferGroups);
+      : getPrimarySelectedTransferGroup(
+          selection,
+          overlays.manualTransferGroups,
+        );
   const multiStationIds =
     selection.type === "multiStation" ? selection.ids : [];
   const geometryDraftDirty = geometryWorkspaceDirtyDrafts.length > 0;
@@ -5611,240 +5641,243 @@ export default function UnifiedMapEditor({
     <AppShell>
       <InspectorGrid>
         <Panel className="flex min-h-0 flex-col overflow-hidden">
-            <PanelHeader>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-                    {isGeometryMode ? "Geometry" : "Railmap"}
-                  </p>
-                  <h1 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
-                    {isGeometryMode ? "선형 편집" : "통합 맵 에디터"}
-                  </h1>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => {
-                      if (isGeometryMode) undoGeometryDraftEdit();
-                      else void undoOverlayCommand();
-                    }}
-                    disabled={!canUndo}
-                    aria-label="되돌리기"
-                  >
-                    <Undo2 className="size-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => {
-                      if (isGeometryMode) redoGeometryDraftEdit();
-                      else void redoOverlayCommand();
-                    }}
-                    disabled={!canRedo}
-                    aria-label="다시 실행"
-                  >
-                    <Redo2 className="size-4" />
-                  </Button>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={() => setCommandOpen(true)}
-                    aria-label="명령 팔레트 열기"
-                  >
-                    <Command className="size-4" />
-                  </Button>
-                </div>
+          <PanelHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  {isGeometryMode ? "Geometry" : "Railmap"}
+                </p>
+                <h1 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
+                  {isGeometryMode ? "선형 편집" : "통합 맵 에디터"}
+                </h1>
               </div>
-              {!isGeometryMode ? (
-                <>
-                  <TabList className="mt-4 grid grid-cols-3">
-                    <TabButton
-                      active={sidebarTab === "search"}
-                      onClick={() => setSidebarTab("search")}
-                    >
-                      검색
-                    </TabButton>
-                    <TabButton
-                      active={sidebarTab === "layers"}
-                      onClick={() => setSidebarTab("layers")}
-                    >
-                      레이어
-                    </TabButton>
-                    <TabButton
-                      active={sidebarTab === "transfers"}
-                      onClick={() => setSidebarTab("transfers")}
-                    >
-                      환승
-                    </TabButton>
-                  </TabList>
-                  <TabList className="mt-2 grid grid-cols-2">
-                    <TabButton
-                      active={sidebarTab === "validation"}
-                      onClick={() => setSidebarTab("validation")}
-                    >
-                      검증
-                    </TabButton>
-                    <TabButton
-                      active={sidebarTab === "history"}
-                      onClick={() => setSidebarTab("history")}
-                    >
-                      기록
-                    </TabButton>
-                  </TabList>
-                </>
-              ) : null}
-            </PanelHeader>
+              <div className="flex items-center gap-1">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => {
+                    if (isGeometryMode) undoGeometryDraftEdit();
+                    else void undoOverlayCommand();
+                  }}
+                  disabled={!canUndo}
+                  aria-label="되돌리기"
+                >
+                  <Undo2 className="size-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => {
+                    if (isGeometryMode) redoGeometryDraftEdit();
+                    else void redoOverlayCommand();
+                  }}
+                  disabled={!canRedo}
+                  aria-label="다시 실행"
+                >
+                  <Redo2 className="size-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setCommandOpen(true)}
+                  aria-label="명령 팔레트 열기"
+                >
+                  <Command className="size-4" />
+                </Button>
+              </div>
+            </div>
+            {!isGeometryMode ? (
+              <>
+                <TabList className="mt-4 grid grid-cols-3">
+                  <TabButton
+                    active={sidebarTab === "search"}
+                    onClick={() => setSidebarTab("search")}
+                  >
+                    검색
+                  </TabButton>
+                  <TabButton
+                    active={sidebarTab === "layers"}
+                    onClick={() => setSidebarTab("layers")}
+                  >
+                    레이어
+                  </TabButton>
+                  <TabButton
+                    active={sidebarTab === "transfers"}
+                    onClick={() => setSidebarTab("transfers")}
+                  >
+                    환승
+                  </TabButton>
+                </TabList>
+                <TabList className="mt-2 grid grid-cols-2">
+                  <TabButton
+                    active={sidebarTab === "validation"}
+                    onClick={() => setSidebarTab("validation")}
+                  >
+                    검증
+                  </TabButton>
+                  <TabButton
+                    active={sidebarTab === "history"}
+                    onClick={() => setSidebarTab("history")}
+                  >
+                    기록
+                  </TabButton>
+                </TabList>
+              </>
+            ) : null}
+          </PanelHeader>
 
-            <PanelBody className="min-h-0 flex-1 overflow-y-auto">
-              {isGeometryMode ? (
-                <GeometryModeSidebar
-                  targets={filteredGeometryTargets}
-                  totalTargetCount={geometryTargets.length}
-                  activeTargetKey={getGeometryDraftTargetKey(geometryDraft)}
-                  dirtyTargetKeys={geometryDirtyTargetKeys}
-                  query={geometryTargetQuery}
-                  filter={geometryTargetFilter}
-                  shortcutsOpen={shortcutHelpOpen}
-                  onQueryChange={setGeometryTargetQuery}
-                  onFilterChange={setGeometryTargetFilter}
-                  onToggleShortcuts={() => setShortcutHelpOpen((open) => !open)}
-                  onSelectTarget={selectGeometryTarget}
-                />
-              ) : null}
+          <PanelBody className="min-h-0 flex-1 overflow-y-auto">
+            {isGeometryMode ? (
+              <GeometryModeSidebar
+                targets={filteredGeometryTargets}
+                totalTargetCount={geometryTargets.length}
+                activeTargetKey={getGeometryDraftTargetKey(geometryDraft)}
+                dirtyTargetKeys={geometryDirtyTargetKeys}
+                query={geometryTargetQuery}
+                filter={geometryTargetFilter}
+                shortcutsOpen={shortcutHelpOpen}
+                onQueryChange={setGeometryTargetQuery}
+                onFilterChange={setGeometryTargetFilter}
+                onToggleShortcuts={() => setShortcutHelpOpen((open) => !open)}
+                onSelectTarget={selectGeometryTarget}
+              />
+            ) : null}
 
-              {!isGeometryMode && sidebarTab === "search" ? (
-                <div className="grid gap-3">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                    <Input
-                      className="pl-9"
-                      placeholder="역명, 노선명, 역번호 검색"
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    {filteredStations.map((station) => (
-                      <button
-                        key={station.id}
-                        type="button"
-                        className={cn(
-                          "rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50",
-                          selectedStationIds.has(station.id)
-                            ? "border-blue-300 bg-blue-50"
-                            : null,
-                        )}
-                        onClick={() => selectStation(station.id)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className="size-2.5 rounded-full"
-                            style={{
-                              backgroundColor: station.colorHex ?? "#64748b",
-                            }}
-                          />
-                          <strong className="truncate text-sm font-semibold">
-                            {station.nameKo}
-                          </strong>
-                        </div>
-                        <p className="mt-1 truncate text-xs font-medium text-slate-500">
-                          {formatStationSubLabel(station)}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
+            {!isGeometryMode && sidebarTab === "search" ? (
+              <div className="grid gap-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    className="pl-9"
+                    placeholder="역명, 노선명, 역번호 검색"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
                 </div>
-              ) : null}
-
-              {!isGeometryMode && sidebarTab === "layers" ? (
                 <div className="grid gap-2">
-                  {layerOptions.map(({ key, label, Icon }) => (
-                    <label
-                      key={String(key)}
-                      className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm font-semibold"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={layers[key]}
-                        onChange={(event) =>
-                          setLayers((previous) => ({
-                            ...previous,
-                            [key]: event.target.checked,
-                          }))
-                        }
-                      />
-                      <Icon className="size-4 text-slate-400" />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-              ) : null}
-
-              {!isGeometryMode && sidebarTab === "transfers" ? (
-                <div className="grid gap-2">
-                  {selectedGroup && selection.type === "multiStation" ? (
-                    <div className="rounded-2xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
-                      <p className="font-semibold">환승 그룹 아이콘으로 선택됨</p>
-                      <p className="mt-1 font-medium">
-                        {selectedGroup.nameKo} · {selectedGroup.stationIds.length}개 하위 역 선택
-                      </p>
-                    </div>
-                  ) : null}
-                  {multiStationIds.length >= 2 ? (
-                    <Button
-                      variant="outline"
-                      onClick={() =>
-                        createTransferGroupFromSelection(multiStationIds)
-                      }
-                    >
-                      선택한 역으로 환승 그룹 생성
-                    </Button>
-                  ) : null}
-                  {overlays.manualTransferGroups.map((group) => (
+                  {filteredStations.map((station) => (
                     <button
-                      key={group.id}
+                      key={station.id}
                       type="button"
-                      className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50"
-                      onClick={() => selectTransferGroup(group.id)}
+                      className={cn(
+                        "rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50",
+                        selectedStationIds.has(station.id)
+                          ? "border-blue-300 bg-blue-50"
+                          : null,
+                      )}
+                      onClick={() => selectStation(station.id)}
                     >
-                      <strong className="text-sm font-semibold">
-                        {group.nameKo}
-                      </strong>
-                      <p className="mt-1 text-xs font-medium text-slate-500">
-                        {group.stationIds.length}개 역 ·{" "}
-                        {group.note || "메모 없음"}
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="size-2.5 rounded-full"
+                          style={{
+                            backgroundColor: station.colorHex ?? "#64748b",
+                          }}
+                        />
+                        <strong className="truncate text-sm font-semibold">
+                          {station.nameKo}
+                        </strong>
+                      </div>
+                      <p className="mt-1 truncate text-xs font-medium text-slate-500">
+                        {formatStationSubLabel(station)}
                       </p>
                     </button>
                   ))}
                 </div>
-              ) : null}
+              </div>
+            ) : null}
 
-              {!isGeometryMode && sidebarTab === "validation" ? (
-                <LineBranchValidationPanel
-                  count={
-                    (overlays.lineBranchOverrides?.length ?? 0) +
-                    (overlays.branchStationExclusions?.length ?? 0)
-                  }
-                  issues={lineBranchIssues}
-                  overlays={overlays}
-                />
-              ) : null}
-              {!isGeometryMode && sidebarTab === "history" ? (
-                <CommandHistoryPanel
-                  undoCount={undoStackRef.current.length}
-                  redoCount={redoStackRef.current.length}
-                  latest={undoStackRef.current.at(-1)}
-                />
-              ) : null}
-            </PanelBody>
+            {!isGeometryMode && sidebarTab === "layers" ? (
+              <div className="grid gap-2">
+                {layerOptions.map(({ key, label, Icon }) => (
+                  <label
+                    key={String(key)}
+                    className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-sm font-semibold"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={layers[key]}
+                      onChange={(event) =>
+                        setLayers((previous) => ({
+                          ...previous,
+                          [key]: event.target.checked,
+                        }))
+                      }
+                    />
+                    <Icon className="size-4 text-slate-400" />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            ) : null}
+
+            {!isGeometryMode && sidebarTab === "transfers" ? (
+              <div className="grid gap-2">
+                {selectedGroup && selection.type === "multiStation" ? (
+                  <div className="rounded-2xl border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900">
+                    <p className="font-semibold">환승 그룹 아이콘으로 선택됨</p>
+                    <p className="mt-1 font-medium">
+                      {selectedGroup.nameKo} · {selectedGroup.stationIds.length}
+                      개 하위 역 선택
+                    </p>
+                  </div>
+                ) : null}
+                {multiStationIds.length >= 2 ? (
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      createTransferGroupFromSelection(multiStationIds)
+                    }
+                  >
+                    선택한 역으로 환승 그룹 생성
+                  </Button>
+                ) : null}
+                {overlays.manualTransferGroups.map((group) => (
+                  <button
+                    key={group.id}
+                    type="button"
+                    className="rounded-2xl border border-slate-200 bg-white p-3 text-left hover:bg-blue-50"
+                    onClick={() => selectTransferGroup(group.id)}
+                  >
+                    <strong className="text-sm font-semibold">
+                      {group.nameKo}
+                    </strong>
+                    <p className="mt-1 text-xs font-medium text-slate-500">
+                      {group.stationIds.length}개 역 ·{" "}
+                      {group.note || "메모 없음"}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+
+            {!isGeometryMode && sidebarTab === "validation" ? (
+              <LineBranchValidationPanel
+                count={
+                  (overlays.lineBranchOverrides?.length ?? 0) +
+                  (overlays.branchStationExclusions?.length ?? 0)
+                }
+                issues={lineBranchIssues}
+                overlays={overlays}
+              />
+            ) : null}
+            {!isGeometryMode && sidebarTab === "history" ? (
+              <CommandHistoryPanel
+                undoCount={undoStackRef.current.length}
+                redoCount={redoStackRef.current.length}
+                latest={undoStackRef.current.at(-1)}
+              />
+            ) : null}
+          </PanelBody>
         </Panel>
 
         <main className="relative min-h-0 overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-xl">
           <div ref={mapContainerRef} className="absolute inset-0 size-full" />
           <div className="pointer-events-none absolute left-4 top-4 flex flex-wrap gap-2">
             <Badge className="bg-white/90 text-slate-700">
-              {selectedGroup ? `환승 그룹 · ${selectedGroup.nameKo}` : selectionLabel(selection)}
+              {selectedGroup
+                ? `환승 그룹 · ${selectedGroup.nameKo}`
+                : selectionLabel(selection)}
             </Badge>
             <Badge className="bg-white/90 text-slate-700">
               Zoom {zoom.toFixed(1)}
@@ -5925,7 +5958,11 @@ export default function UnifiedMapEditor({
               {isGeometryMode ? "Geometry Tools" : "Inspector"}
             </p>
             <h2 className="mt-1 text-lg font-semibold tracking-[-0.03em]">
-              {isGeometryMode ? "전체 선형 편집" : selectedGroup ? `환승 그룹 · ${selectedGroup.nameKo}` : selectionLabel(selection)}
+              {isGeometryMode
+                ? "전체 선형 편집"
+                : selectedGroup
+                  ? `환승 그룹 · ${selectedGroup.nameKo}`
+                  : selectionLabel(selection)}
             </h2>
           </PanelHeader>
           <PanelBody className="min-h-0 flex-1 overflow-y-auto">
@@ -5955,6 +5992,7 @@ export default function UnifiedMapEditor({
                 }
                 canRollbackPosition={selectedStationHasPositionOverride}
                 staleSavedAnchorCount={selectedStationStaleSavedAnchorCount}
+                saving={stationSaveBusy}
                 onSyncSavedAnchors={() =>
                   void syncSelectedStationSavedGeometryAnchors()
                 }
@@ -6476,7 +6514,8 @@ function GeometryModeInspector({
       {summary.validationErrorCount > 0 ? (
         <div className="rounded-2xl border border-red-100 bg-red-50 px-3 py-2 text-[11px] font-semibold leading-4 text-red-700">
           <p>
-            저장 차단 오류 {summary.validationErrorCount.toLocaleString("ko-KR")}개
+            저장 차단 오류{" "}
+            {summary.validationErrorCount.toLocaleString("ko-KR")}개
           </p>
           {validationTargetPreview.length > 0 ? (
             <p className="mt-1 truncate text-red-600">
@@ -6492,7 +6531,8 @@ function GeometryModeInspector({
       {summary.validationWarningCount > 0 ? (
         <div className="rounded-2xl border border-yellow-100 bg-yellow-50 px-3 py-2 text-[11px] font-semibold leading-4 text-yellow-700">
           <p>
-            저장 가능 경고 {summary.validationWarningCount.toLocaleString("ko-KR")}개
+            저장 가능 경고{" "}
+            {summary.validationWarningCount.toLocaleString("ko-KR")}개
           </p>
           {validationWarningTargetPreview.length > 0 ? (
             <p className="mt-1 truncate text-yellow-600">
@@ -6592,6 +6632,7 @@ function StationInspector({
   onRollbackPosition,
   canRollbackPosition,
   staleSavedAnchorCount,
+  saving,
   onSyncSavedAnchors,
   onSetNonTransfer,
   onStartMapPick,
@@ -6611,6 +6652,7 @@ function StationInspector({
   onRollbackPosition: () => void;
   canRollbackPosition: boolean;
   staleSavedAnchorCount: number;
+  saving: boolean;
   onSyncSavedAnchors: () => void;
   onSetNonTransfer: (enabled: boolean) => void;
   onStartMapPick: () => void;
@@ -6763,7 +6805,10 @@ function StationInspector({
           <Input
             value={draft.lat ?? ""}
             onChange={(event) =>
-              onChange({ ...draft, lat: Number(event.target.value) })
+              onChange({
+                ...draft,
+                lat: parseStationCoordinateInput(event.target.value),
+              })
             }
           />
         </Field>
@@ -6771,7 +6816,10 @@ function StationInspector({
           <Input
             value={draft.lng ?? ""}
             onChange={(event) =>
-              onChange({ ...draft, lng: Number(event.target.value) })
+              onChange({
+                ...draft,
+                lng: parseStationCoordinateInput(event.target.value),
+              })
             }
           />
         </Field>
@@ -6784,6 +6832,11 @@ function StationInspector({
           }
         />
       </Field>
+      {saving ? (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-3 text-xs font-medium text-blue-800">
+          저장 중입니다. 지도 클릭을 여러 번 반복하지 않아도 됩니다.
+        </div>
+      ) : null}
       {staleSavedAnchorCount > 0 ? (
         <div className="rounded-2xl border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
           <div className="flex items-start justify-between gap-3">
@@ -6814,13 +6867,14 @@ function StationInspector({
         </Button>
         <Button
           variant={pickMode ? "secondary" : "outline"}
+          disabled={saving}
           onClick={onStartMapPick}
         >
-          지도에서 위치 지정
+          {pickMode ? "지도에서 선택 중" : "지도에서 위치 지정"}
         </Button>
         <Button
           variant="outline"
-          disabled={!canRollbackPosition}
+          disabled={!canRollbackPosition || saving}
           onClick={onRollbackPosition}
         >
           <Undo2 className="mr-1 size-4" />
@@ -6832,9 +6886,9 @@ function StationInspector({
         >
           {nonTransfer ? "환승 가능역" : "미환승역"}
         </Button>
-        <Button onClick={onSave}>
+        <Button disabled={saving} onClick={onSave}>
           <Save className="mr-1 size-4" />
-          저장
+          {saving ? "저장 중" : "저장"}
         </Button>
       </div>
       {branchRemovalOptions.length > 0 ? (
