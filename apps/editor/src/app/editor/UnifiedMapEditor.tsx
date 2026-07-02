@@ -179,6 +179,15 @@ type LineBranchValidationIssue = {
   message: string;
 };
 
+type PublicWebParityStatus = "ok" | "warning" | "error";
+
+type PublicWebParityRow = {
+  label: string;
+  status: PublicWebParityStatus;
+  value: string;
+  description: string;
+};
+
 type LineBranchDirection = "toward-start" | "toward-end";
 
 type LineBranchDirectionOption = {
@@ -882,6 +891,85 @@ function getPublicWebManualChangeTotal(overlays: ManualOverlayBundle) {
     (total, row) => total + row.count,
     0,
   );
+}
+
+function formatParityStatusLabel(status: PublicWebParityStatus) {
+  if (status === "error") return "확인 필요";
+  if (status === "warning") return "주의";
+  return "정상";
+}
+
+function getParityStatusClassName(status: PublicWebParityStatus) {
+  if (status === "error") {
+    return "border-red-100 bg-red-50 text-red-700";
+  }
+  if (status === "warning") {
+    return "border-amber-100 bg-amber-50 text-amber-700";
+  }
+  return "border-emerald-100 bg-emerald-50 text-emerald-700";
+}
+
+function countStationAnchorReferences(points: ManualGeometryOverridePoint[] = []) {
+  return points.filter((point) => point.kind === "station" && point.stationId)
+    .length;
+}
+
+function getPublicWebParityRows(
+  overlays: ManualOverlayBundle,
+  issues: LineBranchValidationIssue[],
+): PublicWebParityRow[] {
+  const stationOverrideCount = overlays.stationOverrides.length;
+  const geometryOverrideCount = overlays.geometryOverrides.length;
+  const lineBranchOverrideCount = overlays.lineBranchOverrides?.length ?? 0;
+  const stationAnchorReferenceCount =
+    overlays.geometryOverrides.reduce(
+      (total, override) => total + countStationAnchorReferences(override.points),
+      0,
+    ) +
+    (overlays.lineBranchOverrides ?? []).reduce(
+      (total, override) =>
+        total + countStationAnchorReferences(override.geometry ?? []),
+      0,
+    );
+
+  return [
+    {
+      label: "역 위치 반영",
+      status: stationOverrideCount > 0 ? "ok" : "warning",
+      value: `${stationOverrideCount.toLocaleString("ko-KR")}개`,
+      description:
+        stationOverrideCount > 0
+          ? "Web에서 역 위치 보정값을 읽어 표시합니다."
+          : "현재 Web에 반영할 역 위치 보정이 없습니다.",
+    },
+    {
+      label: "선형 보정 반영",
+      status: geometryOverrideCount + lineBranchOverrideCount > 0 ? "ok" : "warning",
+      value: `${(geometryOverrideCount + lineBranchOverrideCount).toLocaleString("ko-KR")}개`,
+      description:
+        geometryOverrideCount + lineBranchOverrideCount > 0
+          ? "Web에서 일반 선형 보정과 수동 지선을 함께 읽습니다."
+          : "현재 Web에 반영할 선형 보정이 없습니다.",
+    },
+    {
+      label: "역 anchor 재계산",
+      status: stationAnchorReferenceCount > 0 ? "ok" : "warning",
+      value: `${stationAnchorReferenceCount.toLocaleString("ko-KR")}개`,
+      description:
+        stationAnchorReferenceCount > 0
+          ? "Web에서 station anchor를 현재 역 위치 기준으로 다시 계산합니다."
+          : "현재 점검할 station anchor가 없습니다.",
+    },
+    {
+      label: "검증 오류",
+      status: issues.length > 0 ? "error" : "ok",
+      value: `${issues.length.toLocaleString("ko-KR")}개`,
+      description:
+        issues.length > 0
+          ? "이 오류는 Web 표시에서도 문제를 만들 수 있으니 먼저 고쳐야 합니다."
+          : "현재 저장된 overlay에서 Web 표시를 막을 오류가 없습니다.",
+    },
+  ];
 }
 
 function stationGeometryDistance(left: LngLatTuple, right: LngLatTuple) {
@@ -6954,6 +7042,7 @@ function LineBranchValidationPanel({
 }) {
   const webRows = getPublicWebManualChangeRows(overlays);
   const webChangeTotal = getPublicWebManualChangeTotal(overlays);
+  const parityRows = getPublicWebParityRows(overlays, issues);
 
   return (
     <div className="grid gap-3">
@@ -7002,10 +7091,29 @@ function LineBranchValidationPanel({
             </div>
           ))}
         </div>
+        <div className="mt-3 grid gap-1.5">
+          {parityRows.map((row) => (
+            <div
+              key={row.label}
+              className={cn(
+                "rounded-xl border px-3 py-2 text-[11px] font-medium",
+                getParityStatusClassName(row.status),
+              )}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold">{row.label}</span>
+                <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-bold">
+                  {formatParityStatusLabel(row.status)} · {row.value}
+                </span>
+              </div>
+              <p className="mt-1 leading-4 opacity-85">{row.description}</p>
+            </div>
+          ))}
+        </div>
         <div className="mt-3 rounded-xl border border-blue-100 bg-white/70 px-3 py-2 text-[11px] font-semibold text-blue-800">
           {issues.length === 0
-            ? "선형 검증 오류가 없어 공개 Web 반영 전제 조건이 충족되었습니다."
-            : "선형/anchor 검증 오류가 남아 있으면 공개 Web에서도 같은 오류가 노출될 수 있습니다."}
+            ? "Web 반영 전 기본 점검을 통과했습니다."
+            : "검증 오류가 남아 있으면 Web에서도 표시가 깨질 수 있습니다."}
         </div>
       </div>
       {issues.length === 0 ? (
