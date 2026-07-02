@@ -2,11 +2,13 @@
 
 import "maplibre-gl/dist/maplibre-gl.css";
 
+import { smoothCoordinates } from "@repo/ui/map/renderPolicy";
 import maplibregl, {
   type GeoJSONSource,
   type Map as MapLibreMap,
   type MapLayerMouseEvent,
 } from "maplibre-gl";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type {
   ManualGeometryOverride,
@@ -44,56 +46,6 @@ const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
 
 function isFinitePoint(point: GeometryMapPoint) {
   return Number.isFinite(point.lng) && Number.isFinite(point.lat);
-}
-
-function catmullRomPoint(
-  p0: LngLatTuple,
-  p1: LngLatTuple,
-  p2: LngLatTuple,
-  p3: LngLatTuple,
-  t: number,
-): LngLatTuple {
-  const [p0Lng, p0Lat] = p0;
-  const [p1Lng, p1Lat] = p1;
-  const [p2Lng, p2Lat] = p2;
-  const [p3Lng, p3Lat] = p3;
-  const t2 = t * t;
-  const t3 = t2 * t;
-
-  return [
-    0.5 *
-      (2 * p1Lng +
-        (-p0Lng + p2Lng) * t +
-        (2 * p0Lng - 5 * p1Lng + 4 * p2Lng - p3Lng) * t2 +
-        (-p0Lng + 3 * p1Lng - 3 * p2Lng + p3Lng) * t3),
-    0.5 *
-      (2 * p1Lat +
-        (-p0Lat + p2Lat) * t +
-        (2 * p0Lat - 5 * p1Lat + 4 * p2Lat - p3Lat) * t2 +
-        (-p0Lat + 3 * p1Lat - 3 * p2Lat + p3Lat) * t3),
-  ];
-}
-
-function smoothCoordinates(coordinates: LngLatTuple[]): LngLatTuple[] {
-  if (coordinates.length < 3) return coordinates;
-
-  const result: LngLatTuple[] = [];
-  const samplesPerSegment = 5;
-
-  for (let index = 0; index < coordinates.length - 1; index += 1) {
-    const p0 = coordinates[Math.max(0, index - 1)] ?? coordinates[index];
-    const p1 = coordinates[index];
-    const p2 = coordinates[index + 1];
-    const p3 = coordinates[Math.min(coordinates.length - 1, index + 2)] ?? p2;
-    if (!p0 || !p1 || !p2 || !p3) continue;
-
-    if (index === 0) result.push(p1);
-    for (let step = 1; step <= samplesPerSegment; step += 1) {
-      result.push(catmullRomPoint(p0, p1, p2, p3, step / samplesPerSegment));
-    }
-  }
-
-  return result;
 }
 
 function getBranchCoordinates(branch: GeometryMapBranch) {
@@ -517,14 +469,14 @@ export default function ManualGeometryMapEditor({
           });
           map.on("mousedown", "geometry-control-points", (event: MapLayerMouseEvent) => {
             const feature = event.features?.[0];
-            const props = feature?.properties as Record<string, unknown> | undefined;
-            const index = Number(props?.index);
+            const properties = feature?.properties as Record<string, unknown> | undefined;
+            const index = Number(properties?.index);
             if (!Number.isInteger(index)) return;
 
             event.originalEvent.preventDefault();
             setSelectedPointIndex(index);
 
-            if (props?.kind === "station") return;
+            if (properties?.kind === "station") return;
 
             dragPointIndexRef.current = index;
             map.dragPan.disable();
@@ -583,7 +535,7 @@ export default function ManualGeometryMapEditor({
 
       <aside className="geometry-map-panel">
         <div className="geometry-map-panel-header">
-          <a href="/" className="map-editor-back-link">← Editor</a>
+          <Link href="/" className="map-editor-back-link">← Editor</Link>
           <p className="eyebrow">Geometry Editor</p>
           <h1>노선 선형 보정</h1>
           <p>노선을 선택하고 주황 control point를 추가/드래그해서 선형을 보정합니다.</p>

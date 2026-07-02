@@ -219,6 +219,7 @@
       "parentBranchId": "01:K4:main:I4108:경의·중앙선:0",
       "anchorStationId": "candidate:kric:urban-rail-station:I4108:1265:row-15",
       "branchStationId": "candidate:kric:urban-rail-station:I4108:1251:row-557",
+      "connectedDirection": "toward-end",
       "geometry": [
         {
           "lng": 126.914841,
@@ -404,8 +405,8 @@
           "kind": "control"
         },
         {
-          "lng": 126.964775,
-          "lat": 37.52989,
+          "lng": 126.96482306457216,
+          "lat": 37.529947893472254,
           "kind": "station",
           "stationId": "candidate:kric:urban-rail-station:I4101:1003:row-813"
         },
@@ -979,14 +980,12 @@
         {
           "lng": 127.137556,
           "lat": 37.557167,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:S1108:0809:row-721"
+          "kind": "control"
         },
         {
           "lng": 127.143373,
           "lat": 37.60326,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:I4108:1205:row-129"
+          "kind": "control"
         },
         {
           "lng": 127.1498,
@@ -1154,38 +1153,32 @@
         {
           "lng": 126.964775,
           "lat": 37.52989,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:I4101:1003:row-813"
+          "kind": "control"
         },
         {
-          "lng": 126.9679818,
-          "lat": 37.52919,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:I1104:0430:row-868"
+          "lng": 126.97335383888748,
+          "lat": 37.522424633965684,
+          "kind": "control"
         },
         {
           "lng": 127.017303,
           "lat": 37.541653,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:I1103:0335:row-791"
+          "kind": "control"
         },
         {
           "lng": 127.0370615,
           "lat": 37.561289,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:S1102:0208:row-801"
+          "kind": "control"
         },
         {
           "lng": 127.045063,
           "lat": 37.580148,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:I4101:0124:row-993"
+          "kind": "control"
         },
         {
           "lng": 127.057936,
           "lat": 37.589602,
-          "kind": "station",
-          "stationId": "candidate:kric:urban-rail-station:I4102:1015:row-1091"
+          "kind": "control"
         },
         {
           "lng": 127.076152,

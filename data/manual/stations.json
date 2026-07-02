@@ -24,6 +24,22 @@
       "lng": 127.1079205391614,
       "enabled": true,
       "note": null
+    },
+    {
+      "stationId": "candidate:kric:urban-rail-station:S1105:0514:row-341",
+      "nameKo": "마곡",
+      "lat": 37.560246697596696,
+      "lng": 126.82475789403958,
+      "enabled": true,
+      "note": null
+    },
+    {
+      "stationId": "candidate:kric:urban-rail-station:I4101:1003:row-813",
+      "nameKo": "용산역",
+      "lat": 37.529947893472254,
+      "lng": 126.96482306457216,
+      "enabled": true,
+      "note": null
     }
   ],
   "nonTransferStationIds": [

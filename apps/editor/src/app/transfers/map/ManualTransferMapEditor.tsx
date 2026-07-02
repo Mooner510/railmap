@@ -1,9 +1,11 @@
 "use client";
 
+import { smoothCoordinates } from "@repo/ui/map/renderPolicy";
 import maplibregl, {
   type GeoJSONSource,
   type Map as MapLibreMap,
 } from "maplibre-gl";
+import Link from "next/link";
 import {
   useEffect,
   useMemo,
@@ -61,56 +63,6 @@ function isValidCoordinate(
     Number.isFinite(station.lat) &&
     Number.isFinite(station.lng)
   );
-}
-
-function catmullRomPoint(
-  p0: LngLatTuple,
-  p1: LngLatTuple,
-  p2: LngLatTuple,
-  p3: LngLatTuple,
-  t: number,
-): LngLatTuple {
-  const [p0Lng, p0Lat] = p0;
-  const [p1Lng, p1Lat] = p1;
-  const [p2Lng, p2Lat] = p2;
-  const [p3Lng, p3Lat] = p3;
-  const t2 = t * t;
-  const t3 = t2 * t;
-
-  return [
-    0.5 *
-      (2 * p1Lng +
-        (-p0Lng + p2Lng) * t +
-        (2 * p0Lng - 5 * p1Lng + 4 * p2Lng - p3Lng) * t2 +
-        (-p0Lng + 3 * p1Lng - 3 * p2Lng + p3Lng) * t3),
-    0.5 *
-      (2 * p1Lat +
-        (-p0Lat + p2Lat) * t +
-        (2 * p0Lat - 5 * p1Lat + 4 * p2Lat - p3Lat) * t2 +
-        (-p0Lat + 3 * p1Lat - 3 * p2Lat + p3Lat) * t3),
-  ];
-}
-
-function smoothCoordinates(coordinates: LngLatTuple[]): LngLatTuple[] {
-  if (coordinates.length < 3) return coordinates;
-
-  const result: LngLatTuple[] = [];
-  const samplesPerSegment = 5;
-
-  for (let index = 0; index < coordinates.length - 1; index += 1) {
-    const p0 = coordinates[Math.max(0, index - 1)] ?? coordinates[index];
-    const p1 = coordinates[index];
-    const p2 = coordinates[index + 1];
-    const p3 = coordinates[Math.min(coordinates.length - 1, index + 2)] ?? p2;
-    if (!p0 || !p1 || !p2 || !p3) continue;
-
-    if (index === 0) result.push(p1);
-    for (let step = 1; step <= samplesPerSegment; step += 1) {
-      result.push(catmullRomPoint(p0, p1, p2, p3, step / samplesPerSegment));
-    }
-  }
-
-  return result;
 }
 
 function buildBranchFeatures(branches: TransferMapBranch[]) {
@@ -221,14 +173,6 @@ function createPairMinutes(
   }
 
   return result;
-}
-
-function getHash(value: string) {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) | 0;
-  }
-  return Math.abs(hash);
 }
 
 function formatStationSubLabel(station: EditorStation) {
@@ -603,9 +547,9 @@ export default function ManualTransferMapEditor({
 
         map.on("click", "manual-map-stations-dot", (event) => {
           const feature = event.features?.[0];
-          const props = feature?.properties as
+          const properties = feature?.properties as
             Record<string, unknown> | undefined;
-          const stationId = String(props?.id ?? "");
+          const stationId = String(properties?.id ?? "");
           if (!stationId) return;
 
           setSelectedStationIds((previous) => {
@@ -771,9 +715,9 @@ export default function ManualTransferMapEditor({
       <div ref={selectionBoxRef} className="map-selection-box" />
 
       <header className="map-editor-header-panel">
-        <a href="/" className="compact-back-link">
+        <Link href="/" className="compact-back-link">
           ← 홈
-        </a>
+        </Link>
         <div>
           <p className="eyebrow">Transfer Map Editor</p>
           <h1>수동 환승 그룹 맵 에디터</h1>
