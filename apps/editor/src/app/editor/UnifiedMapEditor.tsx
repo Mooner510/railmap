@@ -159,6 +159,7 @@ const DEFAULT_MANUAL_LINE_DRAFT: ManualLineDraft = {
 type ManualRouteStationDraft = {
   clientId: string;
   stationId?: string;
+  sourceStationId?: string;
   nameKo: string;
   lng: number;
   lat: number;
@@ -172,6 +173,10 @@ type ManualRouteBuilderDraft = {
   pendingStationName: string;
   stations: ManualRouteStationDraft[];
 };
+
+type ManualRouteStationDragState = {
+  clientId: string;
+} | null;
 
 type PendingManualRouteStationPlacement = {
   lng: number;
@@ -3444,8 +3449,11 @@ export default function UnifiedMapEditor({
   const groupByIdRef = useRef<Map<string, ManualTransferGroup>>(new Map());
   const stationLocationPickModeRef = useRef(false);
   const manualRouteBuilderDraftRef = useRef<ManualRouteBuilderDraft | null>(null);
+  const manualRouteStationDragRef = useRef<ManualRouteStationDragState>(null);
   const addManualRouteStationFromMapRef = useRef<(lng: number, lat: number) => void>(() => undefined);
   const copyNearestStationNameToRouteBuilderRef = useRef<(lng: number, lat: number) => void>(() => undefined);
+  const cloneExistingStationToRouteBuilderRef = useRef<(stationId: string) => void>(() => undefined);
+  const cloneNearestStationToRouteBuilderRef = useRef<(lng: number, lat: number) => void>(() => undefined);
   const manualRouteStationMoveClientIdRef = useRef<string | null>(null);
   const pendingAddStationInsertionRef =
     useRef<PendingAddStationInsertion | null>(null);
@@ -4588,6 +4596,19 @@ export default function UnifiedMapEditor({
       });
 
       map.addLayer({
+        id: "railmap-manual-route-builder-stations-hit",
+        type: "circle",
+        source: "railmap-manual-route-builder-preview",
+        filter: ["==", ["get", "kind"], "station"],
+        paint: {
+          "circle-color": "rgba(0,0,0,0)",
+          "circle-radius": 16,
+          "circle-opacity": 0,
+          "circle-stroke-width": 0,
+        },
+      });
+
+      map.addLayer({
         id: "railmap-manual-route-builder-labels",
         type: "symbol",
         source: "railmap-manual-route-builder-preview",
@@ -4735,6 +4756,29 @@ export default function UnifiedMapEditor({
 
     const handleGeometryMouseDown = (event: maplibregl.MapMouseEvent) => {
       const original = event.originalEvent as MouseEvent;
+
+      if (manualRouteBuilderDraftRef.current) {
+        const routeStationFeatures = map.queryRenderedFeatures(event.point, {
+          layers: [
+            "railmap-manual-route-builder-stations-hit",
+            "railmap-manual-route-builder-stations",
+          ].filter((layerId) => map.getLayer(layerId)),
+        });
+        const clientId = firstFeatureId(routeStationFeatures, [
+          "railmap-manual-route-builder-stations-hit",
+          "railmap-manual-route-builder-stations",
+        ]);
+        if (clientId) {
+          original.preventDefault();
+          event.preventDefault();
+          manualRouteStationDragRef.current = { clientId };
+          setManualRouteStationMoveClientId(null);
+          map.dragPan.disable();
+          map.getCanvas().style.cursor = "grabbing";
+          return;
+        }
+      }
+
       const pointFeatures = map.queryRenderedFeatures(event.point, {
         layers: [
           "railmap-geometry-points-hit",
@@ -4923,6 +4967,24 @@ export default function UnifiedMapEditor({
       };
       setCursorPoint({ x: event.point.x, y: event.point.y });
 
+      const routeStationDrag = manualRouteStationDragRef.current;
+      if (routeStationDrag) {
+        setManualRouteBuilderDraft((current) =>
+          current
+            ? {
+                ...current,
+                stations: current.stations.map((station) =>
+                  station.clientId === routeStationDrag.clientId
+                    ? { ...station, lng: event.lngLat.lng, lat: event.lngLat.lat }
+                    : station,
+                ),
+              }
+            : current,
+        );
+        map.getCanvas().style.cursor = "grabbing";
+        return;
+      }
+
       const geometryDrag = geometryPointDragRef.current;
       if (geometryDrag) {
         const targetKey = getGeometryTargetKey(
@@ -5072,6 +5134,18 @@ export default function UnifiedMapEditor({
           showToastRef.current("역 위치를 수정했습니다", "success");
           return;
         }
+        const stationFeatures = map.queryRenderedFeatures(event.point, {
+          layers: ["railmap-stations-hit", "railmap-stations-circle"].filter((layerId) => map.getLayer(layerId)),
+        });
+        const stationId = firstVisibleStationFeatureId(
+          stationFeatures,
+          ["railmap-stations-hit", "railmap-stations-circle"],
+          map.getZoom(),
+        );
+        if (stationId) {
+          cloneExistingStationToRouteBuilderRef.current(stationId);
+          return;
+        }
         addManualRouteStationFromMapRef.current(event.lngLat.lng, event.lngLat.lat);
         return;
       }
@@ -5147,7 +5221,12 @@ export default function UnifiedMapEditor({
       event.preventDefault();
       if (toolModeRef.current === "geometry") return;
       if (manualRouteBuilderDraftRef.current) {
-        copyNearestStationNameToRouteBuilderRef.current(event.lngLat.lng, event.lngLat.lat);
+        const original = event.originalEvent as MouseEvent;
+        if (original.shiftKey) {
+          copyNearestStationNameToRouteBuilderRef.current(event.lngLat.lng, event.lngLat.lat);
+        } else {
+          cloneNearestStationToRouteBuilderRef.current(event.lngLat.lng, event.lngLat.lat);
+        }
         return;
       }
       const collapsedTransferZoom = isCollapsedTransferZoom(map.getZoom());
@@ -5185,6 +5264,28 @@ export default function UnifiedMapEditor({
 
     map.on("mousedown", (event) => {
       mapPointerDownPointRef.current = { x: event.point.x, y: event.point.y };
+      if (manualRouteBuilderDraftRef.current) {
+        const original = event.originalEvent as MouseEvent;
+        const routeStationFeatures = map.queryRenderedFeatures(event.point, {
+          layers: [
+            "railmap-manual-route-builder-stations-hit",
+            "railmap-manual-route-builder-stations",
+          ].filter((layerId) => map.getLayer(layerId)),
+        });
+        const clientId = firstFeatureId(routeStationFeatures, [
+          "railmap-manual-route-builder-stations-hit",
+          "railmap-manual-route-builder-stations",
+        ]);
+        if (clientId) {
+          original.preventDefault();
+          event.preventDefault();
+          manualRouteStationDragRef.current = { clientId };
+          setManualRouteStationMoveClientId(null);
+          map.dragPan.disable();
+          map.getCanvas().style.cursor = "grabbing";
+        }
+        return;
+      }
       if (toolModeRef.current === "geometry") {
         handleGeometryMouseDown(event);
         return;
@@ -5221,6 +5322,14 @@ export default function UnifiedMapEditor({
     });
 
     map.on("mouseup", (event) => {
+      if (manualRouteStationDragRef.current) {
+        manualRouteStationDragRef.current = null;
+        map.dragPan.enable();
+        map.getCanvas().style.cursor = manualRouteBuilderDraftRef.current ? "crosshair" : "grab";
+        showToastRef.current("역 위치를 조정했습니다", "success");
+        return;
+      }
+
       if (geometryPointDragRef.current) {
         const geometryDrag = geometryPointDragRef.current;
         const targetKey = getGeometryTargetKey(
@@ -6312,7 +6421,7 @@ export default function UnifiedMapEditor({
     appendManualRouteStation(lng, lat, typedName);
   }
 
-  function appendManualRouteStation(lng: number, lat: number, nameKo: string) {
+  function appendManualRouteStation(lng: number, lat: number, nameKo: string, sourceStationId?: string) {
     const cleanName = nameKo.trim();
     if (!cleanName) {
       showToast("역 이름을 입력하세요", "error");
@@ -6327,6 +6436,7 @@ export default function UnifiedMapEditor({
           ...current.stations,
           {
             clientId: makeManualRouteStationClientId(),
+            sourceStationId,
             nameKo: cleanName,
             lng,
             lat,
@@ -6335,7 +6445,53 @@ export default function UnifiedMapEditor({
       };
     });
     setPendingManualRouteStationPlacement(null);
-    showToast("역을 추가했습니다", "success");
+    showToast(sourceStationId ? "기존 역 위치를 새 노선용 역으로 복사했습니다" : "역을 추가했습니다", "success");
+  }
+
+  function cloneExistingStationToRouteBuilder(stationId: string) {
+    const station = displayStationById.get(stationId) ?? stationById.get(stationId);
+    if (!station || typeof station.lng !== "number" || typeof station.lat !== "number") {
+      showToast("복사할 역 위치를 찾지 못했습니다", "error");
+      return;
+    }
+    appendManualRouteStation(
+      station.lng,
+      station.lat,
+      stripStationNameQualifier(station.nameKo),
+      station.id,
+    );
+  }
+
+  function findNearestDisplayStation(lng: number, lat: number) {
+    const map = mapRef.current;
+    const sourcePoint = map ? map.project([lng, lat]) : null;
+    let bestStation: EditorStation | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    for (const station of displayStations) {
+      if (typeof station.lng !== "number" || typeof station.lat !== "number") continue;
+      const distance = sourcePoint && map
+        ? (() => {
+            const target = map.project([station.lng, station.lat]);
+            return (target.x - sourcePoint.x) ** 2 + (target.y - sourcePoint.y) ** 2;
+          })()
+        : (station.lng - lng) ** 2 + (station.lat - lat) ** 2;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestStation = station;
+      }
+    }
+
+    return bestStation;
+  }
+
+  function cloneNearestStationToRouteBuilder(lng: number, lat: number) {
+    const station = findNearestDisplayStation(lng, lat);
+    if (!station) {
+      showToast("가까운 기존 역을 찾지 못했습니다", "error");
+      return;
+    }
+    cloneExistingStationToRouteBuilder(station.id);
   }
 
   function copyNearestStationNameToRouteBuilder(lng: number, lat: number) {
@@ -6372,6 +6528,8 @@ export default function UnifiedMapEditor({
   useEffect(() => {
     addManualRouteStationFromMapRef.current = addManualRouteStationFromMap;
     copyNearestStationNameToRouteBuilderRef.current = copyNearestStationNameToRouteBuilder;
+    cloneExistingStationToRouteBuilderRef.current = cloneExistingStationToRouteBuilder;
+    cloneNearestStationToRouteBuilderRef.current = cloneNearestStationToRouteBuilder;
   });
 
   useEffect(() => {
@@ -7425,9 +7583,11 @@ export default function UnifiedMapEditor({
           <SidebarShortcutDock
             title={manualRouteBuilderDraft ? "노선 빌더 단축키" : isGeometryMode ? "선형 편집 단축키" : "기본 단축키"}
             items={manualRouteBuilderDraft ? [
-              { label: "역 추가", keys: "지도 좌클릭", detail: "이름이 비어 있으면 입력창이 열립니다." },
-              { label: "가까운 역 이름 복사", keys: "지도 우클릭", detail: "복사할 때 괄호 보조 표기만 제거합니다." },
-              { label: "위치 수정", keys: "위치 수정 → 지도 클릭", detail: "수정 중에는 Esc 또는 취소 버튼으로 빠져나옵니다." },
+              { label: "역 추가", keys: "빈 곳 좌클릭", detail: "이름이 비어 있으면 입력창이 열립니다." },
+              { label: "기존 역 복사", keys: "기존 역 좌클릭 / 지도 우클릭", detail: "이름과 위치를 새 노선용 역으로 복사합니다." },
+              { label: "위치 미세 조정", keys: "추가한 역 Drag", detail: "복사한 뒤 실제 승강장 위치로 바로 옮길 수 있습니다." },
+              { label: "이름만 복사", keys: "Shift+우클릭", detail: "괄호 보조 표기는 복사값에서만 제거합니다." },
+              { label: "위치 수정", keys: "수정 아이콘 → 지도 클릭", detail: "수정 중에는 Esc 또는 취소 버튼으로 빠져나옵니다." },
               { label: "수정 취소", keys: "Esc" },
               { label: "검색", keys: "Cmd/Ctrl+K" },
             ] : isGeometryMode ? [
@@ -9516,7 +9676,7 @@ function ManualRailLinePanel({
             <div className="min-w-0">
               <p className="text-[11px] font-black uppercase tracking-wide text-emerald-700">노선 빌더 모드</p>
               <strong className="mt-1 block truncate text-lg font-black text-slate-950">{activeLine.nameKo}</strong>
-              <p className="mt-1 text-xs font-semibold text-emerald-700">다른 작업으로 이동하려면 먼저 저장하거나 나가세요.</p>
+              <p className="mt-1 text-xs font-semibold text-emerald-700">기존 역 클릭/우클릭으로 복사하고, 추가한 역은 드래그해 위치를 조정하세요.</p>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={onCancelRouteBuilder}>나가기</Button>
           </div>
@@ -9643,7 +9803,7 @@ function ManualRailLinePanel({
                     </Button>
                   </div>
                   <div className="mt-0.5 flex items-center justify-between gap-2 pl-12 text-[10px] font-semibold text-slate-400">
-                    <span>{station.stationId ? `기존 위치 기반 · ${stationById.get(station.stationId)?.nameKo ?? station.stationId}` : "새 수기 역"}</span>
+                    <span>{station.sourceStationId ? `기존 역 복사 · ${stationById.get(station.sourceStationId)?.nameKo ?? station.sourceStationId}` : station.stationId ? `저장된 수기 역 · ${stationById.get(station.stationId)?.nameKo ?? station.stationId}` : "새 수기 역"}</span>
                     {moveStationClientId === station.clientId ? <span className="text-emerald-600">지도 클릭 · Esc 취소</span> : null}
                   </div>
                 </div>
