@@ -302,6 +302,8 @@ export interface ManualOverlayBundle {
   manualTransferGroups: ManualTransferGroup[];
   manualTransferEdges: ManualTransferEdge[];
   nonTransferStationIds: string[];
+  dismissedTransferGroupSuggestionKeys: string[];
+  transferTimePendingGroupIds: string[];
   stationOverrides: ManualStationOverride[];
   branchOverrides: ManualBranchOverride[];
   branchStationExclusions: ManualBranchStationExclusion[];
@@ -322,6 +324,8 @@ export const EMPTY_MANUAL_OVERLAY_BUNDLE: ManualOverlayBundle = {
   manualTransferGroups: [],
   manualTransferEdges: [],
   nonTransferStationIds: [],
+  dismissedTransferGroupSuggestionKeys: [],
+  transferTimePendingGroupIds: [],
   stationOverrides: [],
   branchOverrides: [],
   branchStationExclusions: [],

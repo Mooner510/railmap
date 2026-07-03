@@ -118,7 +118,7 @@ type Selection =
   | { type: "transferGroup"; id: string }
   | { type: "multiStation"; ids: string[] };
 
-type SidebarTab = "search" | "layers" | "manualLines" | "transfers" | "validation" | "history";
+type SidebarTab = "search" | "layers" | "manualLines" | "transfers" | "transferReview" | "validation" | "history";
 type ToolMode = "select" | "box" | "geometry";
 type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
@@ -185,6 +185,17 @@ type PendingManualRouteStationPlacement = {
   suggestions: string[];
 };
 
+type TransferGroupSuggestion = {
+  key: string;
+  nameKo: string;
+  stationIds: string[];
+  reasonLabels: string[];
+  confidence: "strong" | "weak";
+  maxDistanceMeters: number;
+};
+
+type TransferGroupReviewFilter = "pending" | "dismissed" | "approved" | "all";
+
 type ShortcutItem = {
   label: string;
   keys: string;
@@ -250,6 +261,95 @@ function stripStationNameQualifier(name: string) {
     .replace(/\s*[\(\（][^\)\）]*[\)\）]\s*/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function getTransferSuggestionNameKey(nameKo: string) {
+  return normalizeSearchText(stripStationNameQualifier(nameKo).replace(/역$/g, ""));
+}
+
+function getTransferSuggestionName(nameKo: string) {
+  const stripped = stripStationNameQualifier(nameKo).replace(/역$/g, "").trim();
+  return stripped || stripStationNameQualifier(nameKo) || nameKo;
+}
+
+function getApproxDistanceMeters(left: EditorStation, right: EditorStation) {
+  if (!Number.isFinite(left.lng) || !Number.isFinite(left.lat) || !Number.isFinite(right.lng) || !Number.isFinite(right.lat)) return Number.POSITIVE_INFINITY;
+  const lat = (((left.lat ?? 0) + (right.lat ?? 0)) / 2) * Math.PI / 180;
+  const dx = ((left.lng ?? 0) - (right.lng ?? 0)) * 111_320 * Math.cos(lat);
+  const dy = ((left.lat ?? 0) - (right.lat ?? 0)) * 110_540;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function makeTransferGroupSuggestionKey(stationIds: string[]) {
+  return stationIds.slice().sort().join("|");
+}
+
+function buildTransferGroupSuggestions(
+  stations: EditorStation[],
+  groups: ManualTransferGroup[],
+  dismissedKeys: string[],
+  nonTransferIds: Set<string>,
+): TransferGroupSuggestion[] {
+  void dismissedKeys;
+  const groupedStationIds = new Set(
+    groups.filter((group) => group.enabled !== false).flatMap((group) => group.stationIds),
+  );
+  const byName = new Map<string, EditorStation[]>();
+
+  for (const station of stations) {
+    if (nonTransferIds.has(station.id)) continue;
+    if (groupedStationIds.has(station.id)) continue;
+    if (!Number.isFinite(station.lng) || !Number.isFinite(station.lat)) continue;
+    const key = getTransferSuggestionNameKey(station.nameKo);
+    if (!key) continue;
+    const list = byName.get(key) ?? [];
+    list.push(station);
+    byName.set(key, list);
+  }
+
+  const suggestions: TransferGroupSuggestion[] = [];
+  for (const list of byName.values()) {
+    if (list.length < 2) continue;
+    const sorted = list.slice().sort((a, b) => a.id.localeCompare(b.id));
+    const clusters: EditorStation[][] = [];
+    for (const station of sorted) {
+      const cluster = clusters.find((candidate) =>
+        candidate.some((member) => getApproxDistanceMeters(member, station) <= 350),
+      );
+      if (cluster) cluster.push(station);
+      else clusters.push([station]);
+    }
+
+    for (const cluster of clusters) {
+      if (cluster.length < 2) continue;
+      const stationIds = cluster.map((station) => station.id);
+      const key = makeTransferGroupSuggestionKey(stationIds);
+      let maxDistance = 0;
+      for (let i = 0; i < cluster.length - 1; i += 1) {
+        for (let j = i + 1; j < cluster.length; j += 1) {
+          maxDistance = Math.max(maxDistance, getApproxDistanceMeters(cluster[i]!, cluster[j]!));
+        }
+      }
+      const nameKo = getTransferSuggestionName(cluster[0]?.nameKo ?? "환승 그룹");
+      suggestions.push({
+        key,
+        nameKo,
+        stationIds,
+        confidence: maxDistance <= 180 ? "strong" : "weak",
+        maxDistanceMeters: maxDistance,
+        reasonLabels: [
+          "정규화한 역명이 같음",
+          `반경 ${Math.ceil(maxDistance).toLocaleString("ko-KR")}m 안에 있음`,
+          "아직 환승 그룹에 포함되지 않음",
+        ],
+      });
+    }
+  }
+
+  return suggestions.sort((left, right) => {
+    if (left.confidence !== right.confidence) return left.confidence === "strong" ? -1 : 1;
+    return left.maxDistanceMeters - right.maxDistanceMeters;
+  });
 }
 
 type OverlayCommandRecord = {
@@ -1372,6 +1472,22 @@ function validateManualRailLineReview(
     const list = stationIdsByName.get(key) ?? [];
     list.push(station.id);
     stationIdsByName.set(key, list);
+  }
+
+  for (const groupId of overlays.transferTimePendingGroupIds ?? []) {
+    const group = overlays.manualTransferGroups.find(
+      (candidate) => candidate.id === groupId && candidate.enabled !== false,
+    );
+    if (!group) continue;
+    issues.push(makeValidationIssue({
+      id: `${groupId}:transfer-time-pending`,
+      title: "환승 시간표 입력 보류",
+      message: `${group.nameKo}: 환승 그룹은 저장됐지만 역간 환승 시간이 아직 비어 있습니다.`,
+      category: "manual-line-review",
+      severity: "warning",
+      cause: "환승 그룹 검토에서 시간표를 나중에 입력하도록 보류했습니다.",
+      solution: "환승 그룹 편집에서 역간 환승 시간을 입력하면 이 경고가 사라집니다.",
+    }));
   }
 
   for (const line of enabledLines) {
@@ -3534,6 +3650,8 @@ export default function UnifiedMapEditor({
   const [geometryDraftsByKey, setGeometryDraftsByKey] =
     useState<GeometryDraftMap>({});
   const [shortcutHelpOpen, setShortcutHelpOpen] = useState(false);
+  const [transferReviewFilter, setTransferReviewFilter] = useState<TransferGroupReviewFilter>("pending");
+  const [activeTransferSuggestionKey, setActiveTransferSuggestionKey] = useState<string | null>(null);
   const [pendingTransferSelection, setPendingTransferSelection] =
     useState<PendingTransferSelection | null>(null);
 
@@ -3782,6 +3900,19 @@ export default function UnifiedMapEditor({
   const nonTransferIds = useMemo(
     () => new Set(overlays.nonTransferStationIds),
     [overlays.nonTransferStationIds],
+  );
+  const transferGroupSuggestions = useMemo(
+    () => buildTransferGroupSuggestions(
+      displayStations,
+      overlays.manualTransferGroups,
+      overlays.dismissedTransferGroupSuggestionKeys ?? [],
+      nonTransferIds,
+    ),
+    [displayStations, overlays.manualTransferGroups, overlays.dismissedTransferGroupSuggestionKeys, nonTransferIds],
+  );
+  const approvedTransferSuggestionKeys = useMemo(
+    () => new Set(overlays.manualTransferGroups.map((group) => makeTransferGroupSuggestionKey(group.stationIds))),
+    [overlays.manualTransferGroups],
   );
   const unassignedStations = useMemo(
     () => getUnassignedStations(data.stations, data.branches),
@@ -5950,7 +6081,7 @@ export default function UnifiedMapEditor({
     }
   }
 
-  async function saveTransferDraft() {
+  async function saveTransferDraft(allowPending = false) {
     if (!transferDraft) return;
     const group = toTransferGroup(transferDraft);
     if (group.stationIds.length < 2) {
@@ -5961,16 +6092,25 @@ export default function UnifiedMapEditor({
       transferDraft,
       stationById,
     );
-    if (missingPairs.length > 0) {
+    if (missingPairs.length > 0 && !allowPending) {
       showToast(
-        `환승 시간표 ${missingPairs.length.toLocaleString("ko-KR")}개를 모두 입력해야 저장할 수 있습니다`,
+        `환승 시간표 ${missingPairs.length.toLocaleString("ko-KR")}개를 모두 입력하거나 보류 저장하세요`,
         "error",
       );
       return;
     }
 
+    const pendingIds = new Set(overlays.transferTimePendingGroupIds ?? []);
+    if (missingPairs.length > 0 && allowPending) pendingIds.add(group.id);
+    else pendingIds.delete(group.id);
+
+    const suggestionKeys = new Set(overlays.dismissedTransferGroupSuggestionKeys ?? []);
+    if (activeTransferSuggestionKey) suggestionKeys.add(activeTransferSuggestionKey);
+
     const next: ManualOverlayBundle = {
       ...overlays,
+      dismissedTransferGroupSuggestionKeys: [...suggestionKeys],
+      transferTimePendingGroupIds: [...pendingIds],
       manualTransferGroups: [
         ...overlays.manualTransferGroups.filter(
           (candidate) => candidate.id !== group.id,
@@ -5979,13 +6119,18 @@ export default function UnifiedMapEditor({
       ],
     };
 
-    await executeOverlayCommand(
+    const saved = await executeOverlayCommand(
       transferDraft.id ? "환승 그룹 수정" : "환승 그룹 생성",
       next,
-      "환승 그룹 저장 완료",
+      missingPairs.length > 0 && allowPending
+        ? "환승 그룹을 저장하고 시간표 입력은 보류했습니다"
+        : "환승 그룹 저장 완료",
     );
+    if (!saved) return;
     setSelection({ type: "transferGroup", id: group.id });
     setTransferDraft(makeTransferDraftFromGroup(group));
+    setActiveTransferSuggestionKey(null);
+    await reloadEditorData();
   }
 
   async function deleteTransferGroup(groupId: string) {
@@ -6142,6 +6287,33 @@ export default function UnifiedMapEditor({
     setTransferDraft(makeTransferDraftFromStations(uniqueIds, stationById));
     applyMultiStationSelection(uniqueIds);
     setSidebarTab("transfers");
+  }
+
+
+  function openTransferGroupSuggestion(suggestion: TransferGroupSuggestion) {
+    setActiveTransferSuggestionKey(suggestion.key);
+    setTransferDraft({
+      ...makeTransferDraftFromStations(suggestion.stationIds, stationById),
+      nameKo: suggestion.nameKo,
+      note: `환승 그룹 추천에서 생성: ${suggestion.reasonLabels.join(", ")}`,
+    });
+    applyMultiStationSelection(suggestion.stationIds);
+    setSidebarTab("transferReview");
+  }
+
+  async function dismissTransferGroupSuggestion(suggestion: TransferGroupSuggestion) {
+    const nextKeys = [
+      ...new Set([...(overlays.dismissedTransferGroupSuggestionKeys ?? []), suggestion.key]),
+    ];
+    const saved = await executeOverlayCommand(
+      "환승 그룹 추천 거절",
+      { ...overlays, dismissedTransferGroupSuggestionKeys: nextKeys },
+      `${suggestion.nameKo} 환승 그룹 추천을 거절했습니다`,
+    );
+    if (!saved) return;
+    setActiveTransferSuggestionKey((current) => current === suggestion.key ? null : current);
+    setTransferDraft(null);
+    setSelection({ type: "none" });
   }
 
   async function setStationsNonTransfer(ids: string[], enabled: boolean) {
@@ -7273,6 +7445,12 @@ export default function UnifiedMapEditor({
       badge: overlays.manualTransferGroups.length,
     },
     {
+      value: "transferReview",
+      label: "환승 추천",
+      Icon: Waypoints,
+      badge: transferGroupSuggestions.length,
+    },
+    {
       value: "validation",
       label: "검증",
       Icon: ListChecks,
@@ -7552,6 +7730,20 @@ export default function UnifiedMapEditor({
                   />
                 ) : null}
               </div>
+            ) : null}
+
+            {!isGeometryMode && sidebarTab === "transferReview" ? (
+              <TransferGroupReviewPanel
+                suggestions={transferGroupSuggestions}
+                dismissedKeys={overlays.dismissedTransferGroupSuggestionKeys ?? []}
+                approvedKeys={approvedTransferSuggestionKeys}
+                activeKey={activeTransferSuggestionKey}
+                filter={transferReviewFilter}
+                stationById={displayStationById}
+                onChangeFilter={setTransferReviewFilter}
+                onOpenSuggestion={openTransferGroupSuggestion}
+                onDismissSuggestion={(suggestion) => void dismissTransferGroupSuggestion(suggestion)}
+              />
             ) : null}
 
             {!isGeometryMode && sidebarTab === "validation" ? (
@@ -7850,6 +8042,7 @@ export default function UnifiedMapEditor({
                 stationById={stationById}
                 onChange={setTransferDraft}
                 onSave={() => void saveTransferDraft()}
+                onSavePending={() => void saveTransferDraft(true)}
                 onDelete={() => void deleteTransferGroup(selectedGroup.id)}
               />
             ) : null}
@@ -7859,6 +8052,7 @@ export default function UnifiedMapEditor({
                 stationById={stationById}
                 onChange={setTransferDraft}
                 onSave={() => void saveTransferDraft()}
+                onSavePending={() => void saveTransferDraft(true)}
                 onCancel={() => setTransferDraft(null)}
               />
             ) : null}
@@ -9256,6 +9450,7 @@ function TransferGroupInspector({
   mode = "edit",
   onChange,
   onSave,
+  onSavePending,
   onDelete,
 }: {
   group: ManualTransferGroup;
@@ -9264,6 +9459,7 @@ function TransferGroupInspector({
   mode?: "edit" | "create";
   onChange: (draft: TransferGroupDraft) => void;
   onSave: () => void;
+  onSavePending?: () => void;
   onDelete: () => void;
 }) {
   const [timeModalOpen, setTimeModalOpen] = useState(false);
@@ -9432,6 +9628,11 @@ function TransferGroupInspector({
           <Save className="mr-1 size-4" />
           {mode === "create" ? "환승 그룹 저장" : "저장"}
         </Button>
+        {missingPairs.length > 0 && onSavePending ? (
+          <Button className="col-span-2" variant="outline" onClick={onSavePending}>
+            시간표는 나중에 입력하고 저장
+          </Button>
+        ) : null}
       </div>
       <Dialog
         open={timeModalOpen}
@@ -9543,6 +9744,147 @@ function TransferGroupInspector({
           <Button onClick={() => setTimeModalOpen(false)}>닫기</Button>
         </div>
       </Dialog>
+    </div>
+  );
+}
+
+
+function TransferGroupReviewPanel({
+  suggestions,
+  dismissedKeys,
+  approvedKeys,
+  activeKey,
+  filter,
+  stationById,
+  onChangeFilter,
+  onOpenSuggestion,
+  onDismissSuggestion,
+}: {
+  suggestions: TransferGroupSuggestion[];
+  dismissedKeys: string[];
+  approvedKeys: Set<string>;
+  activeKey: string | null;
+  filter: TransferGroupReviewFilter;
+  stationById: Map<string, EditorStation>;
+  onChangeFilter: (filter: TransferGroupReviewFilter) => void;
+  onOpenSuggestion: (suggestion: TransferGroupSuggestion) => void;
+  onDismissSuggestion: (suggestion: TransferGroupSuggestion) => void;
+}) {
+  const dismissed = new Set(dismissedKeys);
+  const filteredSuggestions = suggestions.filter((suggestion) => {
+    const approved = approvedKeys.has(suggestion.key);
+    const isDismissed = dismissed.has(suggestion.key);
+    if (filter === "approved") return approved;
+    if (filter === "dismissed") return isDismissed;
+    if (filter === "pending") return !approved && !isDismissed;
+    return true;
+  });
+  const activeIndex = Math.max(0, filteredSuggestions.findIndex((suggestion) => suggestion.key === activeKey));
+  const activeSuggestion = filteredSuggestions[activeIndex] ?? filteredSuggestions[0] ?? null;
+
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-3xl border border-violet-200 bg-violet-50 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <strong className="block text-sm font-black text-violet-950">환승 그룹 추천 검토</strong>
+            <p className="mt-1 text-xs font-semibold leading-5 text-violet-700">
+              이름이 같거나 가까운 역 묶음을 검토한 뒤 승인, 수정 후 저장, 거절할 수 있습니다.
+            </p>
+          </div>
+          <Badge className="bg-white/80 text-violet-700">{filteredSuggestions.length}개</Badge>
+        </div>
+        <select
+          className="mt-3 h-9 w-full rounded-xl border border-violet-200 bg-white px-3 text-xs font-bold text-violet-800 outline-none"
+          value={filter}
+          onChange={(event) => onChangeFilter(event.target.value as TransferGroupReviewFilter)}
+        >
+          <option value="pending">검토 필요</option>
+          <option value="all">전체</option>
+          <option value="dismissed">거절됨</option>
+          <option value="approved">승인됨</option>
+        </select>
+      </div>
+
+      {activeSuggestion ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">
+                {activeIndex + 1} / {filteredSuggestions.length}
+              </p>
+              <strong className="mt-1 block truncate text-lg font-black text-slate-950">
+                {activeSuggestion.nameKo}
+              </strong>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                {activeSuggestion.confidence === "strong" ? "강한 추천" : "확인 필요"} · 최대 {Math.ceil(activeSuggestion.maxDistanceMeters).toLocaleString("ko-KR")}m
+              </p>
+            </div>
+            <Badge className={activeSuggestion.confidence === "strong" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}>
+              {activeSuggestion.stationIds.length}개 역
+            </Badge>
+          </div>
+
+          <div className="mt-3 grid gap-1.5">
+            {activeSuggestion.reasonLabels.map((label) => (
+              <span key={label} className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-600">
+                {label}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-3 grid gap-1.5 rounded-2xl border border-slate-100 bg-slate-50 p-2">
+            {activeSuggestion.stationIds.map((stationId) => {
+              const station = stationById.get(stationId);
+              return (
+                <div key={stationId} className="flex items-center gap-2 rounded-xl bg-white px-2 py-1.5">
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: station?.colorHex ?? "#64748b" }}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-black text-slate-800">{station?.nameKo ?? stationId}</span>
+                    <span className="block truncate text-[11px] font-semibold text-slate-400">{station ? formatStationSubLabel(station) : "존재하지 않는 역"}</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Button variant="outline" onClick={() => onDismissSuggestion(activeSuggestion)}>
+              거절
+            </Button>
+            <Button onClick={() => onOpenSuggestion(activeSuggestion)}>
+              수정 후 승인
+            </Button>
+          </div>
+          <p className="mt-2 text-[11px] font-medium leading-5 text-slate-400">
+            승인하면 오른쪽 편집 영역에서 그룹 이름과 포함 역을 조정하고, 환승 시간표를 입력하거나 보류 저장할 수 있습니다.
+          </p>
+        </div>
+      ) : (
+        <Placeholder title="검토할 추천 없음" description="새 수기 역을 더 추가하거나 필터를 전체로 바꿔 확인하세요." />
+      )}
+
+      {filteredSuggestions.length > 1 ? (
+        <div className="grid grid-cols-2 gap-2">
+          <Button
+            variant="outline"
+            disabled={activeIndex <= 0}
+            onClick={() => onOpenSuggestion(filteredSuggestions[Math.max(0, activeIndex - 1)]!)}
+          >
+            이전
+          </Button>
+          <Button
+            variant="outline"
+            disabled={activeIndex >= filteredSuggestions.length - 1}
+            onClick={() => onOpenSuggestion(filteredSuggestions[Math.min(filteredSuggestions.length - 1, activeIndex + 1)]!)}
+          >
+            다음
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -10106,12 +10448,14 @@ function NewTransferGroupInspector({
   stationById,
   onChange,
   onSave,
+  onSavePending,
   onCancel,
 }: {
   draft: TransferGroupDraft;
   stationById: Map<string, EditorStation>;
   onChange: (draft: TransferGroupDraft) => void;
   onSave: () => void;
+  onSavePending?: () => void;
   onCancel: () => void;
 }) {
   const previewGroup = toTransferGroup(draft);
@@ -10124,6 +10468,7 @@ function NewTransferGroupInspector({
       mode="create"
       onChange={onChange}
       onSave={onSave}
+      onSavePending={onSavePending}
       onDelete={onCancel}
     />
   );

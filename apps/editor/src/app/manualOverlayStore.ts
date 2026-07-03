@@ -18,6 +18,7 @@ import {
   type ManualLineDefinition,
   type ManualBranchDefinition,
   type ManualStationOverride,
+  isManualLineCoverageStatus,
   isManualRailStatus,
   isManualRailType,
   isRailLineCategory,
@@ -375,6 +376,7 @@ function normalizeManualLineDefinition(value: unknown): ManualLineDefinition | n
     railType,
     serviceTypes: serviceTypes.length > 0 ? serviceTypes : ["unknown"],
     status: isManualRailStatus(line.status) ? line.status : "open",
+    coverageStatus: isManualLineCoverageStatus(line.coverageStatus) ? line.coverageStatus : "draft",
     enabled: line.enabled !== false,
     source: asString(line.source) ?? "editor",
     note: asNullableString(line.note),
@@ -488,6 +490,30 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
       ]
     : [];
 
+  const dismissedTransferGroupSuggestionKeys = Array.isArray(
+    (data as { dismissedTransferGroupSuggestionKeys?: unknown }).dismissedTransferGroupSuggestionKeys,
+  )
+    ? [
+        ...new Set(
+          (data as { dismissedTransferGroupSuggestionKeys: unknown[] }).dismissedTransferGroupSuggestionKeys
+            .map(asString)
+            .filter((id): id is string => id !== null),
+        ),
+      ]
+    : [];
+
+  const transferTimePendingGroupIds = Array.isArray(
+    (data as { transferTimePendingGroupIds?: unknown }).transferTimePendingGroupIds,
+  )
+    ? [
+        ...new Set(
+          (data as { transferTimePendingGroupIds: unknown[] }).transferTimePendingGroupIds
+            .map(asString)
+            .filter((id): id is string => id !== null),
+        ),
+      ]
+    : [];
+
   return {
     schemaVersion: 1,
     manualTransferGroups,
@@ -496,6 +522,8 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
       ...deriveTransferEdgesFromGroups(manualTransferGroups),
     ],
     nonTransferStationIds,
+    dismissedTransferGroupSuggestionKeys,
+    transferTimePendingGroupIds,
     stationOverrides: Array.isArray(data.stationOverrides)
       ? data.stationOverrides
           .map(normalizeStationOverride)
@@ -606,6 +634,8 @@ async function writeManualOverlaySplitFiles(overlays: ManualOverlayBundle) {
       schemaVersion: overlays.schemaVersion,
       manualTransferGroups: overlays.manualTransferGroups,
       manualTransferEdges: [],
+      dismissedTransferGroupSuggestionKeys: overlays.dismissedTransferGroupSuggestionKeys,
+      transferTimePendingGroupIds: overlays.transferTimePendingGroupIds,
     }),
     writeJson(paths.geometry, {
       schemaVersion: overlays.schemaVersion,
