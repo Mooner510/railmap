@@ -16,6 +16,10 @@ import {
   countRouteStops,
   formatAreaName,
   formatBranchRole,
+  formatRailLineCategory,
+  formatRailServiceType,
+  RAIL_LINE_CATEGORIES,
+  isRailLineCategory,
   formatNumber,
   normalizeSearchText,
   getFirstStop,
@@ -25,6 +29,7 @@ import {
   type CanonicalLine,
   type ManualLineBranchOverride,
   type ManualTransferEdge,
+  type RailLineCategory,
 } from "./railExplorerModel";
 
 interface RailExplorerProps {
@@ -49,6 +54,7 @@ const MANUAL_TRANSFER_PENALTY = 18;
 interface FilterControlsProps {
   areaCodes: string[];
   selectedArea: string;
+  selectedCategory: RailLineCategory | "all";
   searchQuery: string;
   copiedShareUrl: boolean;
   stationResults: RailMapStation[];
@@ -63,6 +69,7 @@ interface FilterControlsProps {
   onToggleMapLines: () => void;
   onToggleMapStations: () => void;
   onSelectArea: (area: string) => void;
+  onSelectCategory: (category: RailLineCategory | "all") => void;
   onSearch: (query: string) => void;
   onClearSearch: () => void;
   onSelectStation: (stationId: string) => void;
@@ -153,6 +160,7 @@ export default function RailExplorer({
   );
 
   const [selectedArea, setSelectedArea] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<RailLineCategory | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLineKey, setSelectedLineKey] = useState<string | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
@@ -191,6 +199,7 @@ export default function RailExplorer({
 
     const area = params.get("area");
     const q = params.get("q");
+    const category = params.get("category");
     const line = params.get("line");
     const branch = params.get("branch");
     const station = params.get("station");
@@ -198,6 +207,9 @@ export default function RailExplorer({
 
     if (area) setSelectedArea(area);
     if (q) setSearchQuery(q);
+    if (isRailLineCategory(category)) {
+      setSelectedCategory(category);
+    }
     if (line) setSelectedLineKey(line);
     if (branch) setSelectedBranchId(branch);
     if (station) setSelectedStationId(station);
@@ -212,6 +224,7 @@ export default function RailExplorer({
     const params = new URLSearchParams();
 
     if (selectedArea !== "all") params.set("area", selectedArea);
+    if (selectedCategory !== "all") params.set("category", selectedCategory);
     if (searchQuery.trim()) params.set("q", searchQuery.trim());
     if (selectedLineKey) params.set("line", selectedLineKey);
     if (selectedBranchId) params.set("branch", selectedBranchId);
@@ -230,6 +243,7 @@ export default function RailExplorer({
     searchQuery,
     selectedArea,
     selectedBranchId,
+    selectedCategory,
     selectedLineKey,
     selectedStationId,
     selectedTransferGroupId,
@@ -257,6 +271,8 @@ export default function RailExplorer({
               formatAreaName(line.mreaWideCd),
               line.canonicalKey,
               line.lnCd,
+              formatRailLineCategory(line.category),
+              ...line.serviceTypes.map(formatRailServiceType),
               ...line.sourceLineNumbers,
               ...line.branches.map((branch) => branch.sourceLineName),
               ...line.branches.map((branch) => branch.sourceLineNumber),
@@ -287,11 +303,13 @@ export default function RailExplorer({
     return sortedLines.filter((line) => {
       if (selectedArea !== "all" && line.mreaWideCd !== selectedArea)
         return false;
+      if (selectedCategory !== "all" && line.category !== selectedCategory)
+        return false;
       if (!shouldFilterBySearch) return true;
 
       return lineSearchIndex.get(line.canonicalKey)?.includes(query) ?? false;
     });
-  }, [deferredSearchQuery, lineSearchIndex, selectedArea, sortedLines]);
+  }, [deferredSearchQuery, lineSearchIndex, selectedArea, selectedCategory, sortedLines]);
 
   const stationSearchResults = useMemo(() => {
     const query = normalizeSearchText(deferredSearchQuery);
@@ -338,6 +356,7 @@ export default function RailExplorer({
 
     for (const line of sortedLines) {
       if (selectedArea !== "all" && line.mreaWideCd !== selectedArea) continue;
+      if (selectedCategory !== "all" && line.category !== selectedCategory) continue;
       if (!(lineSearchIndex.get(line.canonicalKey)?.includes(query) ?? false))
         continue;
 
@@ -347,7 +366,7 @@ export default function RailExplorer({
     }
 
     return results;
-  }, [deferredSearchQuery, lineSearchIndex, selectedArea, sortedLines]);
+  }, [deferredSearchQuery, lineSearchIndex, selectedArea, selectedCategory, sortedLines]);
 
   const selectedLine = useMemo(
     () =>
@@ -583,6 +602,7 @@ export default function RailExplorer({
 
   const resetFilters = () => {
     setSelectedArea("all");
+    setSelectedCategory("all");
     setSearchQuery("");
     setIsSearchResultsOpen(false);
     setSelectedLineKey(null);
@@ -714,6 +734,15 @@ export default function RailExplorer({
     setMobilePanelMode("lines");
   };
 
+  const selectCategory = (category: RailLineCategory | "all") => {
+    setSelectedCategory(category);
+    setSelectedLineKey(null);
+    setSelectedBranchId(null);
+    setSelectedStationId(null);
+    setSelectedTransferGroupId(null);
+    setMobilePanelMode("lines");
+  };
+
   const search = (query: string) => {
     setSearchQuery(query);
     setIsSearchResultsOpen(Boolean(query.trim()));
@@ -800,6 +829,7 @@ export default function RailExplorer({
               <FilterControls
                 areaCodes={areaCodes}
                 selectedArea={selectedArea}
+                selectedCategory={selectedCategory}
                 searchQuery={searchQuery}
                 copiedShareUrl={copiedShareUrl}
                 stationResults={stationSearchResults}
@@ -816,6 +846,7 @@ export default function RailExplorer({
                   setShowMapStations((value) => !value)
                 }
                 onSelectArea={selectArea}
+                onSelectCategory={selectCategory}
                 onSearch={search}
                 onClearSearch={clearSearch}
                 onSelectStation={selectStationFromSearch}
@@ -964,6 +995,7 @@ export default function RailExplorer({
                 <FilterControls
                   areaCodes={areaCodes}
                   selectedArea={selectedArea}
+                  selectedCategory={selectedCategory}
                   searchQuery={searchQuery}
                   copiedShareUrl={copiedShareUrl}
                   stationResults={stationSearchResults}
@@ -980,6 +1012,7 @@ export default function RailExplorer({
                     setShowMapStations((value) => !value)
                   }
                   onSelectArea={selectArea}
+                  onSelectCategory={selectCategory}
                   onSearch={search}
                   onClearSearch={clearSearch}
                   onSelectStation={selectStationFromSearch}
@@ -1304,6 +1337,7 @@ function ExplorerTitle({
 function FilterControls({
   areaCodes,
   selectedArea,
+  selectedCategory,
   searchQuery,
   copiedShareUrl,
   stationResults,
@@ -1318,6 +1352,7 @@ function FilterControls({
   onToggleMapLines,
   onToggleMapStations,
   onSelectArea,
+  onSelectCategory,
   onSearch,
   onClearSearch,
   onSelectStation,
@@ -1400,6 +1435,24 @@ function FilterControls({
             onClick={() => onSelectArea(areaCode)}
           >
             {formatAreaName(areaCode)}
+          </FilterChip>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        <FilterChip
+          active={selectedCategory === "all"}
+          onClick={() => onSelectCategory("all")}
+        >
+          전체 유형
+        </FilterChip>
+        {RAIL_LINE_CATEGORIES.map((category) => (
+          <FilterChip
+            key={category}
+            active={selectedCategory === category}
+            onClick={() => onSelectCategory(category)}
+          >
+            {formatRailLineCategory(category)}
           </FilterChip>
         ))}
       </div>
@@ -1723,13 +1776,16 @@ function LineCard({
             </p>
           </div>
           <p className="mt-1 text-[11px] font-medium text-slate-500">
-            구간 {line.branches.length}개 · 정차역{" "}
+            {formatRailLineCategory(line.category)} · {line.serviceTypes.map(formatRailServiceType).join("/")} · 구간 {line.branches.length}개 · 정차역{" "}
             {formatNumber(countRouteStops(line))}개
           </p>
         </div>
 
         <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
           {formatAreaName(line.mreaWideCd)}
+        </span>
+        <span className="shrink-0 rounded bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+          {formatRailLineCategory(line.category)}
         </span>
       </div>
     </button>
@@ -2672,7 +2728,7 @@ function SelectedLinePanel({
             </h2>
           </div>
           <p className="mt-1 text-[11px] font-medium text-slate-500">
-            {formatAreaName(selectedLine.mreaWideCd)} · 구간{" "}
+            {formatAreaName(selectedLine.mreaWideCd)} · {formatRailLineCategory(selectedLine.category)} · {selectedLine.serviceTypes.map(formatRailServiceType).join("/")} · 구간{" "}
             {formatNumber(selectedLine.branches.length)}개 · 정차역{" "}
             {formatNumber(countRouteStops(selectedLine))}개
           </p>
@@ -2738,6 +2794,8 @@ function SelectedLinePanel({
         <span>canonicalKey: {selectedLine.canonicalKey}</span>
         <span>lnCd: {selectedLine.lnCd}</span>
         <span>권역 코드: {selectedLine.mreaWideCd}</span>
+        <span>철도 유형: {formatRailLineCategory(selectedLine.category)}</span>
+        <span>서비스 타입: {selectedLine.serviceTypes.map(formatRailServiceType).join(", ")}</span>
         {selectedBranch ? (
           <span>sourceLineNumber: {selectedBranch.sourceLineNumber}</span>
         ) : null}
@@ -2804,7 +2862,7 @@ function LineRoutePreview({
           {branch.sourceLineName}
         </p>
         <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 shadow-sm">
-          {branch.isCircular ? "순환" : `${firstName} → ${lastName}`}
+          {("isCircular" in branch && branch.isCircular) ? "순환" : `${firstName} → ${lastName}`}
         </span>
       </div>
       <div className="mt-2 flex min-w-0 items-center overflow-hidden px-1">
