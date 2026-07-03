@@ -4,15 +4,18 @@ import RailExplorer from "./RailExplorer";
 import {
   inferRailLineCategory,
   inferRailServiceTypes,
+  isManualLineCoverageStatus,
   isManualRailStatus,
   isManualRailType,
   isRailLineCategory,
   isRailServiceType,
   manualRailTypeToLineCategory,
+  type ManualLineCoverageStatus,
   type ManualRailStatus,
   type ManualRailType,
   type RailLineCategory,
   type RailServiceType,
+  normalizeManualLineCoverageStatus,
 } from "./railExplorerModel";
 import {
   type RailMapBranch,
@@ -161,6 +164,7 @@ interface ManualLineDefinition {
   railType: ManualRailType;
   serviceTypes: RailServiceType[];
   status: ManualRailStatus;
+  coverageStatus: ManualLineCoverageStatus;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;
@@ -318,6 +322,7 @@ function normalizeManualLineDefinition(value: unknown): ManualLineDefinition | n
     railType: normalizeManualRailType(record.railType),
     serviceTypes: serviceTypes.length > 0 ? serviceTypes : ["unknown"],
     status: normalizeManualRailStatus(record.status),
+    coverageStatus: normalizeManualLineCoverageStatus(record.coverageStatus),
     enabled: record.enabled !== false,
     source: typeof record.source === "string" ? record.source : "editor",
     note: typeof record.note === "string" ? record.note : null,
