@@ -26,6 +26,7 @@ import {
   Command,
   History,
   Layers3,
+  Palette,
   ListChecks,
   LocateFixed,
   MapPin,
@@ -63,11 +64,20 @@ import type {
   ManualGeometryOverridePoint,
   ManualLineBranchOverride,
   ManualOverlayBundle,
+  RailLineCategory,
+  RailServiceType,
+  ManualRailStatus,
+  ManualRailType,
   ManualStationOverride,
   ManualTransferGroup,
 } from "../editorModel";
 import {
   EMPTY_MANUAL_OVERLAY_BUNDLE,
+  MANUAL_RAIL_STATUSES,
+  MANUAL_RAIL_TYPES,
+  RAIL_SERVICE_TYPES,
+  formatManualRailType,
+  formatRailServiceType,
   makeBranchRouteOverrideId,
   makeBranchStationExclusionId,
   makeLineBranchOverrideId,
@@ -102,7 +112,7 @@ type Selection =
   | { type: "transferGroup"; id: string }
   | { type: "multiStation"; ids: string[] };
 
-type SidebarTab = "search" | "layers" | "transfers" | "validation" | "history";
+type SidebarTab = "search" | "layers" | "manualLines" | "transfers" | "validation" | "history";
 type ToolMode = "select" | "box" | "geometry";
 type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
@@ -119,6 +129,50 @@ type ContextMenuState = {
   stationId?: string;
   branchId?: string;
 } | null;
+
+type ManualLineDraft = {
+  nameKo: string;
+  colorHex: string;
+  railType: ManualRailType;
+  serviceTypes: RailServiceType[];
+  status: ManualRailStatus;
+  note: string;
+};
+
+const DEFAULT_MANUAL_LINE_DRAFT: ManualLineDraft = {
+  nameKo: "",
+  colorHex: "#2563eb",
+  railType: "trunk_rail",
+  serviceTypes: ["unknown"],
+  status: "open",
+  note: "",
+};
+
+function formatManualRailStatus(status: ManualRailStatus) {
+  switch (status) {
+    case "open":
+      return "개통";
+    case "construction":
+      return "공사중";
+    case "planned":
+      return "계획";
+    case "closed":
+      return "폐지/미사용";
+  }
+}
+
+function makeManualRailLineId(nameKo: string, existingIds: Set<string>) {
+  const normalized = normalizeSearchText(nameKo)
+    .replace(/[^0-9A-Za-z가-힣._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  const base = `manual.line.${normalized || "rail-line"}`;
+  if (!existingIds.has(base)) return base;
+
+  let suffix = 2;
+  while (existingIds.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
 
 type OverlayCommandRecord = {
   id: string;
@@ -3220,6 +3274,10 @@ export default function UnifiedMapEditor({
   const [geometryHistoryVersion, setGeometryHistoryVersion] = useState(0);
   const [stationLocationPickMode, setStationLocationPickMode] = useState(false);
   const [addStationModalOpen, setAddStationModalOpen] = useState(false);
+  const [manualLineDialogOpen, setManualLineDialogOpen] = useState(false);
+  const [manualLineDraft, setManualLineDraft] = useState<ManualLineDraft>(
+    DEFAULT_MANUAL_LINE_DRAFT,
+  );
   const [pendingAddStationInsertion, setPendingAddStationInsertion] =
     useState<PendingAddStationInsertion | null>(null);
   const [stationSaveBusy, setStationSaveBusy] = useState(false);
@@ -5795,6 +5853,98 @@ export default function UnifiedMapEditor({
     setSidebarTab("validation");
   }
 
+  async function createManualRailLine(draft: ManualLineDraft) {
+    const nameKo = draft.nameKo.trim();
+    if (!nameKo) {
+      showToast("노선 이름을 입력하세요", "error");
+      return;
+    }
+    if (!/^#[0-9A-Fa-f]{6}$/.test(draft.colorHex)) {
+      showToast("노선 색상은 #RRGGBB 형식이어야 합니다", "error");
+      return;
+    }
+
+    const existingLineIds = new Set([
+      ...data.lines.map((line) => line.id),
+      ...overlays.manualLineDefinitions.map((line) => line.id),
+    ]);
+    const id = makeManualRailLineId(nameKo, existingLineIds);
+    const serviceTypes = draft.serviceTypes.length > 0 ? draft.serviceTypes : (["unknown"] as RailServiceType[]);
+    const nextLine = {
+      id,
+      nameKo,
+      colorHex: draft.colorHex,
+      railType: draft.railType,
+      serviceTypes,
+      status: draft.status,
+      enabled: true,
+      source: "editor",
+      note: draft.note.trim() || null,
+    };
+
+    const next: ManualOverlayBundle = {
+      ...overlays,
+      manualLineDefinitions: [
+        ...overlays.manualLineDefinitions.filter((line) => line.id !== id),
+        nextLine,
+      ],
+    };
+
+    const saved = await executeOverlayCommand(
+      "수기 노선 생성",
+      next,
+      `${nameKo} 수기 노선을 만들었습니다`,
+    );
+    if (!saved) return;
+
+    setManualLineDialogOpen(false);
+    setManualLineDraft(DEFAULT_MANUAL_LINE_DRAFT);
+    await reloadEditorData();
+    setSidebarTab("manualLines");
+  }
+
+  async function updateLineMetadata(
+    lineId: string,
+    category: RailLineCategory,
+    serviceTypes: RailServiceType[],
+  ) {
+    const nextOverride = {
+      lineId,
+      category,
+      serviceTypes: serviceTypes.length > 0 ? serviceTypes : (["unknown"] as RailServiceType[]),
+      enabled: true,
+      source: "editor",
+      note: null,
+    };
+    const existing = overlays.lineMetadataOverrides ?? [];
+    const next = {
+      ...overlays,
+      lineMetadataOverrides: [
+        ...existing.filter((override) => override.lineId !== lineId),
+        nextOverride,
+      ],
+    };
+
+    await executeOverlayCommand(
+      "노선 철도 유형 변경",
+      next,
+      "노선 철도 유형과 서비스 타입을 저장했습니다",
+    );
+    setData((current) => ({
+      ...current,
+      branches: current.branches.map((branch) =>
+        branch.canonicalLineId === lineId
+          ? { ...branch, category, serviceTypes: nextOverride.serviceTypes }
+          : branch,
+      ),
+      lines: current.lines.map((line) =>
+        line.id === lineId
+          ? { ...line, category, serviceTypes: nextOverride.serviceTypes }
+          : line,
+      ),
+    }));
+  }
+
   async function deleteLineBranchOverride(id: string) {
     const next: ManualOverlayBundle = {
       ...overlays,
@@ -6313,6 +6463,12 @@ export default function UnifiedMapEditor({
     { value: "search", label: "검색", Icon: Search },
     { value: "layers", label: "레이어", Icon: Layers3 },
     {
+      value: "manualLines",
+      label: "수기 노선",
+      Icon: Route,
+      badge: overlays.manualLineDefinitions.length,
+    },
+    {
       value: "transfers",
       label: "환승",
       Icon: Waypoints,
@@ -6525,6 +6681,16 @@ export default function UnifiedMapEditor({
               </div>
             ) : null}
 
+            {!isGeometryMode && sidebarTab === "manualLines" ? (
+              <ManualRailLinePanel
+                lines={overlays.manualLineDefinitions}
+                onCreate={() => {
+                  setManualLineDraft(DEFAULT_MANUAL_LINE_DRAFT);
+                  setManualLineDialogOpen(true);
+                }}
+              />
+            ) : null}
+
             {!isGeometryMode && sidebarTab === "transfers" ? (
               <div className="grid gap-2">
                 {selectedGroup && selection.type === "multiStation" ? (
@@ -6652,6 +6818,18 @@ export default function UnifiedMapEditor({
                 >
                   <Plus className="size-4" />
                   새 역
+                </button>
+                <button
+                  type="button"
+                  className="flex shrink-0 items-center gap-1 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-[11px] font-bold text-emerald-700 transition hover:bg-emerald-100"
+                  onClick={() => {
+                    setManualLineDraft(DEFAULT_MANUAL_LINE_DRAFT);
+                    setManualLineDialogOpen(true);
+                  }}
+                  title="새 수기 노선 생성"
+                >
+                  <Route className="size-4" />
+                  새 노선
                 </button>
               </>
             ) : null}
@@ -6840,6 +7018,13 @@ export default function UnifiedMapEditor({
                 onSetCircular={(circular) =>
                   void setBranchCircular(activeGeometryBranch.id, circular)
                 }
+                onUpdateLineMetadata={(category, serviceTypes) =>
+                  void updateLineMetadata(
+                    activeGeometryBranch.canonicalLineId,
+                    category,
+                    serviceTypes,
+                  )
+                }
               />
             ) : null}
             {!isGeometryMode && selectedGroup && transferDraft ? (
@@ -6914,6 +7099,15 @@ export default function UnifiedMapEditor({
         branches={data.branches}
         onClose={() => setAddStationModalOpen(false)}
         onSelect={startAddStationInsertion}
+      />
+
+      <ManualRailLineDialog
+        open={manualLineDialogOpen}
+        draft={manualLineDraft}
+        existingLines={overlays.manualLineDefinitions}
+        onChange={setManualLineDraft}
+        onClose={() => setManualLineDialogOpen(false)}
+        onSave={() => void createManualRailLine(manualLineDraft)}
       />
 
       <Dialog open={commandOpen} className="flex h-[520px] max-w-xl flex-col">
@@ -8404,6 +8598,281 @@ function TransferGroupInspector({
         </div>
       </Dialog>
     </div>
+  );
+}
+
+function ManualRailLinePanel({
+  lines,
+  onCreate,
+}: {
+  lines: Array<{
+    id: string;
+    nameKo: string;
+    colorHex: string;
+    railType: ManualRailType;
+    serviceTypes: RailServiceType[];
+    status: ManualRailStatus;
+    enabled: boolean;
+    note?: string | null;
+  }>;
+  onCreate: () => void;
+}) {
+  const enabledLines = lines.filter((line) => line.enabled !== false);
+
+  return (
+    <div className="grid gap-3">
+      <button
+        type="button"
+        className="rounded-3xl border border-emerald-100 bg-emerald-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-100"
+        onClick={onCreate}
+      >
+        <div className="flex items-center gap-3">
+          <span className="grid size-10 place-items-center rounded-2xl bg-white text-emerald-700 shadow-sm">
+            <Route className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <strong className="block text-sm font-black text-emerald-900">
+              새 노선 만들기
+            </strong>
+            <span className="mt-1 block text-xs font-medium leading-5 text-emerald-700">
+              이름, 색상, 철도 유형, 서비스 타입을 먼저 저장합니다.
+            </span>
+          </span>
+          <Plus className="size-4 text-emerald-700" />
+        </div>
+      </button>
+
+      <div className="flex items-center justify-between px-1 text-[11px] font-semibold text-slate-400">
+        <span>수기 노선 {enabledLines.length.toLocaleString("ko-KR")}개</span>
+        <span>전체 {lines.length.toLocaleString("ko-KR")}개</span>
+      </div>
+
+      <div className="grid gap-2">
+        {enabledLines.map((line) => (
+          <div
+            key={line.id}
+            className="rounded-2xl border border-slate-200 bg-white p-3"
+          >
+            <div className="flex items-start gap-3">
+              <span
+                className="mt-1 h-9 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: line.colorHex }}
+              />
+              <div className="min-w-0 flex-1">
+                <strong className="block truncate text-sm font-semibold text-slate-900">
+                  {line.nameKo}
+                </strong>
+                <p className="mt-1 truncate text-[11px] font-medium text-slate-500">
+                  {formatManualRailType(line.railType)} · {formatManualRailStatus(line.status)}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {line.serviceTypes.map((serviceType) => (
+                    <span
+                      key={serviceType}
+                      className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600"
+                    >
+                      {formatRailServiceType(serviceType)}
+                    </span>
+                  ))}
+                </div>
+                {line.note ? (
+                  <p className="mt-2 line-clamp-2 text-[11px] font-medium leading-4 text-slate-400">
+                    {line.note}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ))}
+        {enabledLines.length === 0 ? (
+          <Placeholder
+            title="수기 노선 없음"
+            description="일반철도/고속철도는 먼저 새 노선을 만들고, 다음 단계에서 역을 순서대로 추가합니다."
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ManualRailLineDialog({
+  open,
+  draft,
+  existingLines,
+  onChange,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  draft: ManualLineDraft;
+  existingLines: Array<{ id: string; nameKo: string }>;
+  onChange: (draft: ManualLineDraft) => void;
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const existingIds = new Set(existingLines.map((line) => line.id));
+  const previewId = makeManualRailLineId(draft.nameKo || "새 노선", existingIds);
+
+  function toggleServiceType(serviceType: RailServiceType) {
+    const next = draft.serviceTypes.includes(serviceType)
+      ? draft.serviceTypes.filter((item) => item !== serviceType)
+      : [...draft.serviceTypes.filter((item) => item !== "unknown"), serviceType];
+    onChange({ ...draft, serviceTypes: next.length > 0 ? next : ["unknown"] });
+  }
+
+  return (
+    <Dialog open={open} className="flex max-h-[min(760px,calc(100vh-2rem))] max-w-2xl flex-col overflow-hidden">
+      <div className="shrink-0 border-b border-slate-200 px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <strong className="block text-sm font-black text-slate-950">
+              새 수기 노선 만들기
+            </strong>
+            <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+              이번 단계에서는 노선 메타데이터만 저장합니다. 역 순서 추가는 다음 패치의 노선 빌더에서 진행합니다.
+            </p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="grid gap-4">
+          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center gap-3">
+              <span
+                className="h-12 w-3 rounded-full"
+                style={{ backgroundColor: draft.colorHex }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-lg font-black text-slate-950">
+                  {draft.nameKo.trim() || "새 노선"}
+                </p>
+                <p className="mt-1 truncate text-xs font-medium text-slate-500">
+                  {formatManualRailType(draft.railType)} · {formatManualRailStatus(draft.status)} · {previewId}
+                </p>
+              </div>
+              <Palette className="size-5 text-slate-400" />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-xs font-bold text-slate-500">노선 이름</label>
+            <Input
+              autoFocus
+              placeholder="예: 경부선, 경부고속선, 호남선"
+              value={draft.nameKo}
+              onChange={(event) => onChange({ ...draft, nameKo: event.target.value })}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-xs font-bold text-slate-500">노선 색상</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                className="h-10 w-14 rounded-xl border border-slate-200 bg-white p-1"
+                value={draft.colorHex}
+                onChange={(event) => onChange({ ...draft, colorHex: event.target.value })}
+                aria-label="노선 색상"
+              />
+              <Input
+                value={draft.colorHex}
+                onChange={(event) => onChange({ ...draft, colorHex: event.target.value })}
+                placeholder="#2563eb"
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-xs font-bold text-slate-500">철도 유형</label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {MANUAL_RAIL_TYPES.map((railType) => (
+                <button
+                  key={railType}
+                  type="button"
+                  className={cn(
+                    "rounded-2xl border px-3 py-2 text-xs font-bold transition",
+                    draft.railType === railType
+                      ? "border-blue-300 bg-blue-50 text-blue-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                  )}
+                  onClick={() => onChange({ ...draft, railType })}
+                >
+                  {formatManualRailType(railType)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-xs font-bold text-slate-500">서비스 타입</label>
+            <div className="flex flex-wrap gap-2">
+              {RAIL_SERVICE_TYPES.map((serviceType) => {
+                const active = draft.serviceTypes.includes(serviceType);
+                return (
+                  <button
+                    key={serviceType}
+                    type="button"
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-[11px] font-bold transition",
+                      active
+                        ? "border-blue-300 bg-blue-50 text-blue-700"
+                        : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
+                    )}
+                    onClick={() => toggleServiceType(serviceType)}
+                  >
+                    {formatRailServiceType(serviceType)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-xs font-bold text-slate-500">운영 상태</label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {MANUAL_RAIL_STATUSES.map((status) => (
+                <button
+                  key={status}
+                  type="button"
+                  className={cn(
+                    "rounded-2xl border px-3 py-2 text-xs font-bold transition",
+                    draft.status === status
+                      ? "border-blue-300 bg-blue-50 text-blue-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                  )}
+                  onClick={() => onChange({ ...draft, status })}
+                >
+                  {formatManualRailStatus(status)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-xs font-bold text-slate-500">메모</label>
+            <Textarea
+              value={draft.note}
+              placeholder="출처, 보정 필요 사항, 작업 메모"
+              onChange={(event) => onChange({ ...draft, note: event.target.value })}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 px-4 py-3">
+        <p className="text-[11px] font-medium text-slate-500">
+          저장 후 수기 노선 탭에서 확인할 수 있습니다.
+        </p>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={onClose}>취소</Button>
+          <Button onClick={onSave}>노선 저장</Button>
+        </div>
+      </div>
+    </Dialog>
   );
 }
 
