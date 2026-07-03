@@ -4018,6 +4018,52 @@ export default function UnifiedMapEditor({
     [stationById],
   );
 
+  const focusStationCluster = useCallback(
+    (stationIds: string[]) => {
+      const coordinates = stationIds
+        .map((stationId) => displayStationById.get(stationId) ?? stationById.get(stationId))
+        .filter((station): station is EditorStation => Boolean(station && isValidStation(station)))
+        .map((station) => [station.lng, station.lat] as [number, number]);
+      if (coordinates.length === 0) return;
+      const map = mapRef.current;
+      if (!map) return;
+      if (coordinates.length === 1) {
+        map.flyTo({ center: coordinates[0], zoom: Math.max(map.getZoom(), 15), duration: 450 });
+        return;
+      }
+      const bounds = coordinates.reduce(
+        (nextBounds, coordinate) => nextBounds.extend(coordinate),
+        new maplibregl.LngLatBounds(coordinates[0], coordinates[0]),
+      );
+      map.fitBounds(bounds, { padding: 96, maxZoom: 16, duration: 550 });
+    },
+    [displayStationById, stationById],
+  );
+
+  useEffect(() => {
+    if (sidebarTab !== "transferReview") return;
+    const dismissed = new Set(overlays.dismissedTransferGroupSuggestionKeys ?? []);
+    const candidates = transferGroupSuggestions.filter((suggestion) => {
+      const approved = approvedTransferSuggestionKeys.has(suggestion.key);
+      const isDismissed = dismissed.has(suggestion.key);
+      if (transferReviewFilter === "approved") return approved;
+      if (transferReviewFilter === "dismissed") return isDismissed;
+      if (transferReviewFilter === "pending") return !approved && !isDismissed;
+      return true;
+    });
+    const activeSuggestion = candidates.find((suggestion) => suggestion.key === activeTransferSuggestionKey) ?? candidates[0];
+    if (!activeSuggestion) return;
+    focusStationCluster(activeSuggestion.stationIds);
+  }, [
+    activeTransferSuggestionKey,
+    approvedTransferSuggestionKeys,
+    focusStationCluster,
+    overlays.dismissedTransferGroupSuggestionKeys,
+    sidebarTab,
+    transferGroupSuggestions,
+    transferReviewFilter,
+  ]);
+
   const applyStationSelection = useCallback(
     (stationId: string, shouldFocus = true) => {
       setSelection({ type: "station", id: stationId });
@@ -6297,6 +6343,7 @@ export default function UnifiedMapEditor({
       nameKo: suggestion.nameKo,
       note: `환승 그룹 추천에서 생성: ${suggestion.reasonLabels.join(", ")}`,
     });
+    focusStationCluster(suggestion.stationIds);
     applyMultiStationSelection(suggestion.stationIds);
     setSidebarTab("transferReview");
   }
@@ -8173,7 +8220,7 @@ export default function UnifiedMapEditor({
 
       <Dialog open={Boolean(pendingManualRouteStationPlacement)} className="max-w-sm overflow-hidden">
         <div className="border-b border-slate-200 px-4 py-3">
-          <strong className="block text-sm font-black text-slate-950">역 이름 지정</strong>
+          <strong className="block text-sm font-semibold text-slate-950">역 이름 지정</strong>
           <p className="mt-1 text-xs font-medium text-slate-500">Enter를 누르면 바로 노선에 추가됩니다.</p>
         </div>
         <form
@@ -8258,7 +8305,7 @@ function SidebarShortcutDock({
     <div className="shrink-0 border-t border-slate-200 bg-white px-3 py-2">
       <button
         type="button"
-        className="flex w-full items-center justify-between text-left text-[11px] font-black text-slate-700"
+        className="flex w-full items-center justify-between text-left text-[11px] font-semibold text-slate-700"
         onClick={onToggle}
       >
         {title}
@@ -8270,13 +8317,13 @@ function SidebarShortcutDock({
         {primaryItems.map((item) => (
           <div key={`${item.label}:${item.keys}`} className="flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-500">
             <span className="truncate">{item.label}</span>
-            <kbd className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black text-slate-600">{item.keys}</kbd>
+            <kbd className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">{item.keys}</kbd>
           </div>
         ))}
       </div>
       <Dialog open={open} className="flex h-[min(720px,calc(100dvh-24px))] w-[min(920px,calc(100vw-24px))] max-w-none flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <strong className="text-sm font-black text-slate-950">{title}</strong>
+          <strong className="text-sm font-semibold text-slate-950">{title}</strong>
           <Button variant="ghost" size="icon" onClick={onToggle}>
             <X className="size-4" />
           </Button>
@@ -8287,7 +8334,7 @@ function SidebarShortcutDock({
             <div key={`${item.label}:${item.keys}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-bold text-slate-700">{item.label}</span>
-                <kbd className="rounded-md bg-white px-2 py-1 text-[10px] font-black text-slate-700 shadow-sm">{item.keys}</kbd>
+                <kbd className="rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 shadow-sm">{item.keys}</kbd>
               </div>
               {item.detail ? <p className="mt-1 text-[11px] font-medium text-slate-500">{item.detail}</p> : null}
             </div>
@@ -9543,10 +9590,10 @@ function TransferGroupInspector({
       <div className="grid gap-2 rounded-3xl border border-slate-200 p-2">
         <div className="flex items-center justify-between px-1">
           <strong className="text-xs font-medium text-slate-600">
-            환승 그룹 역 목록
+            포함 역
           </strong>
           <span className="text-[11px] font-semibold text-slate-400">
-            최소 2개 필요
+            2개 이상
           </span>
         </div>
         {draft.stationIds.map((stationId) => {
@@ -9604,18 +9651,17 @@ function TransferGroupInspector({
               )}
             >
               {missingPairs.length > 0
-                ? `${missingPairs.length.toLocaleString("ko-KR")}개 구간을 더 입력해야 저장할 수 있습니다.`
-                : `모든 ${pairKeys.length.toLocaleString("ko-KR")}개 구간 시간이 입력됐습니다.`}
+                ? `${missingPairs.length.toLocaleString("ko-KR")}개 구간 미입력`
+                : `모든 구간 입력 완료`}
             </p>
           </div>
           <Button variant="outline" onClick={() => setTimeModalOpen(true)}>
-            시간표 크게 편집
+            전체화면 편집
           </Button>
         </div>
         {missingPairs.length > 0 ? (
           <p className="line-clamp-2 text-[11px] font-medium leading-5 text-amber-700">
-            누락: {missingPairs.slice(0, 4).join(", ")}
-            {missingPairs.length > 4 ? ` 외 ${missingPairs.length - 4}개` : ""}
+            미입력 {missingPairs.length.toLocaleString("ko-KR")}개
           </p>
         ) : null}
       </div>
@@ -9636,12 +9682,12 @@ function TransferGroupInspector({
       </div>
       <Dialog
         open={timeModalOpen}
-        className="flex h-[calc(100dvh-24px)] w-[calc(100vw-24px)] max-w-none flex-col overflow-hidden"
+        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none rounded-none flex-col overflow-hidden"
       >
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-4 py-3">
           <div>
             <strong className="block text-sm font-semibold text-slate-950">
-              역간 환승 시간표 편집
+              환승 시간표
             </strong>
           </div>
           <Button variant="ghost" size="icon" onClick={() => setTimeModalOpen(false)}>
@@ -9653,7 +9699,7 @@ function TransferGroupInspector({
             <thead>
               <tr>
                 <th className="sticky left-0 top-0 z-20 min-w-36 rounded-xl bg-white px-2 py-2 text-left font-semibold text-slate-500 shadow-sm">
-                  행 / 열
+                  역
                 </th>
                 {draft.stationIds.map((colId) => {
                   const station = stationById.get(colId);
@@ -9738,8 +9784,8 @@ function TransferGroupInspector({
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 px-4 py-3">
           <p className="text-xs font-medium text-slate-500">
             {missingPairs.length > 0
-              ? `아직 ${missingPairs.length.toLocaleString("ko-KR")}개 구간이 비어 있습니다.`
-              : "모든 구간이 입력되었습니다."}
+              ? `${missingPairs.length.toLocaleString("ko-KR")}개 구간 미입력`
+              : "모든 구간 입력 완료"}
           </p>
           <Button onClick={() => setTimeModalOpen(false)}>닫기</Button>
         </div>
@@ -9783,19 +9829,17 @@ function TransferGroupReviewPanel({
   const activeSuggestion = filteredSuggestions[activeIndex] ?? filteredSuggestions[0] ?? null;
 
   return (
-    <div className="grid gap-3">
-      <div className="rounded-3xl border border-violet-200 bg-violet-50 p-3">
-        <div className="flex items-start justify-between gap-3">
+    <div className="grid gap-2">
+      <div className="rounded-2xl border border-violet-100 bg-white p-3 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <strong className="block text-sm font-black text-violet-950">환승 그룹 추천 검토</strong>
-            <p className="mt-1 text-xs font-semibold leading-5 text-violet-700">
-              이름이 같거나 가까운 역 묶음을 검토한 뒤 승인, 수정 후 저장, 거절할 수 있습니다.
-            </p>
+            <strong className="block truncate text-sm font-semibold text-slate-900">환승 추천</strong>
+            <p className="mt-0.5 text-[11px] font-medium text-slate-500">선택하면 지도도 후보 위치로 이동합니다.</p>
           </div>
-          <Badge className="bg-white/80 text-violet-700">{filteredSuggestions.length}개</Badge>
+          <Badge className="bg-violet-50 text-violet-700">{filteredSuggestions.length}개</Badge>
         </div>
         <select
-          className="mt-3 h-9 w-full rounded-xl border border-violet-200 bg-white px-3 text-xs font-bold text-violet-800 outline-none"
+          className="mt-2 h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
           value={filter}
           onChange={(event) => onChangeFilter(event.target.value as TransferGroupReviewFilter)}
         >
@@ -9807,16 +9851,16 @@ function TransferGroupReviewPanel({
       </div>
 
       {activeSuggestion ? (
-        <div className="rounded-3xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-wide text-slate-400">
+              <p className="text-[11px] font-medium text-slate-400">
                 {activeIndex + 1} / {filteredSuggestions.length}
               </p>
-              <strong className="mt-1 block truncate text-lg font-black text-slate-950">
+              <strong className="mt-0.5 block truncate text-base font-semibold text-slate-950">
                 {activeSuggestion.nameKo}
               </strong>
-              <p className="mt-1 text-xs font-semibold text-slate-500">
+              <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
                 {activeSuggestion.confidence === "strong" ? "강한 추천" : "확인 필요"} · 최대 {Math.ceil(activeSuggestion.maxDistanceMeters).toLocaleString("ko-KR")}m
               </p>
             </div>
@@ -9825,26 +9869,26 @@ function TransferGroupReviewPanel({
             </Badge>
           </div>
 
-          <div className="mt-3 grid gap-1.5">
+          <div className="mt-2 flex flex-wrap gap-1">
             {activeSuggestion.reasonLabels.map((label) => (
-              <span key={label} className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-600">
+              <span key={label} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
                 {label}
               </span>
             ))}
           </div>
 
-          <div className="mt-3 grid gap-1.5 rounded-2xl border border-slate-100 bg-slate-50 p-2">
+          <div className="mt-2 grid gap-1 rounded-2xl border border-slate-100 bg-slate-50 p-1.5">
             {activeSuggestion.stationIds.map((stationId) => {
               const station = stationById.get(stationId);
               return (
-                <div key={stationId} className="flex items-center gap-2 rounded-xl bg-white px-2 py-1.5">
+                <div key={stationId} className="flex min-w-0 items-center gap-2 rounded-xl bg-white px-2 py-1.5">
                   <span
-                    className="size-2 rounded-full"
+                    className="size-2 shrink-0 rounded-full"
                     style={{ backgroundColor: station?.colorHex ?? "#64748b" }}
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-black text-slate-800">{station?.nameKo ?? stationId}</span>
-                    <span className="block truncate text-[11px] font-semibold text-slate-400">{station ? formatStationSubLabel(station) : "존재하지 않는 역"}</span>
+                    <span className="block truncate text-xs font-semibold text-slate-800">{station?.nameKo ?? stationId}</span>
+                    <span className="block truncate text-[10px] font-medium text-slate-400">{station ? formatStationSubLabel(station) : "존재하지 않는 역"}</span>
                   </span>
                 </div>
               );
@@ -9859,12 +9903,9 @@ function TransferGroupReviewPanel({
               수정 후 승인
             </Button>
           </div>
-          <p className="mt-2 text-[11px] font-medium leading-5 text-slate-400">
-            승인하면 오른쪽 편집 영역에서 그룹 이름과 포함 역을 조정하고, 환승 시간표를 입력하거나 보류 저장할 수 있습니다.
-          </p>
         </div>
       ) : (
-        <Placeholder title="검토할 추천 없음" description="새 수기 역을 더 추가하거나 필터를 전체로 바꿔 확인하세요." />
+        <Placeholder title="검토할 추천 없음" description="필터를 전체로 바꾸거나 수기 역을 더 추가하세요." />
       )}
 
       {filteredSuggestions.length > 1 ? (
@@ -9965,7 +10006,7 @@ function ManualRailLinePanel({
         items.push({
           label: "역 수",
           tone: stationCount >= 2 ? "emerald" : "red",
-          text: stationCount >= 2 ? `${stationCount.toLocaleString("ko-KR")}개 · 저장 가능` : `${stationCount.toLocaleString("ko-KR")}개 · 최소 2개 필요`,
+          text: stationCount >= 2 ? `${stationCount.toLocaleString("ko-KR")}개 · 저장 가능` : `${stationCount.toLocaleString("ko-KR")}개 · 2개 이상`,
         });
         if (emptyNameCount > 0) items.push({ label: "이름", tone: "red", text: `${emptyNameCount.toLocaleString("ko-KR")}개 비어 있음` });
         if (missingCoordinateCount > 0) items.push({ label: "위치", tone: "red", text: `${missingCoordinateCount.toLocaleString("ko-KR")}개 없음` });
@@ -10016,8 +10057,8 @@ function ManualRailLinePanel({
         <div className="shrink-0 border-b border-emerald-100 bg-emerald-50/80 px-3 py-3">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-wide text-emerald-700">노선 빌더 모드</p>
-              <strong className="mt-1 block truncate text-lg font-black text-slate-950">{activeLine.nameKo}</strong>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">노선 빌더 모드</p>
+              <strong className="mt-1 block truncate text-lg font-semibold text-slate-950">{activeLine.nameKo}</strong>
               <p className="mt-1 text-xs font-semibold text-emerald-700">기존 역 클릭/우클릭으로 복사하고, 추가한 역은 드래그해 위치를 조정하세요.</p>
             </div>
             <Button type="button" variant="outline" size="sm" onClick={onCancelRouteBuilder}>나가기</Button>
@@ -10031,7 +10072,7 @@ function ManualRailLinePanel({
                   item.tone === "red" ? "border-red-100 bg-red-50 text-red-700" : item.tone === "amber" ? "border-amber-100 bg-amber-50 text-amber-700" : "border-emerald-100 bg-white text-emerald-700",
                 )}
               >
-                <div className="text-[10px] font-black">{item.label}</div>
+                <div className="text-[10px] font-semibold">{item.label}</div>
                 <div className="mt-0.5 truncate text-[11px] font-bold">{item.text}</div>
               </div>
             ))}
@@ -10042,7 +10083,7 @@ function ManualRailLinePanel({
           {movingStation ? (
             <div className="flex items-center justify-between gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2">
               <div className="min-w-0">
-                <p className="text-[11px] font-black text-emerald-800">위치 수정 중</p>
+                <p className="text-[11px] font-semibold text-emerald-800">위치 수정 중</p>
                 <p className="truncate text-xs font-semibold text-emerald-700">{movingStation.nameKo} · 지도에서 새 위치 클릭</p>
               </div>
               <Button type="button" variant="outline" size="sm" onClick={onCancelMoveRouteStation}>취소</Button>
@@ -10112,7 +10153,7 @@ function ManualRailLinePanel({
                 >
                   <div className="flex items-center gap-2">
                     <GripVertical className="size-4 shrink-0 cursor-grab text-slate-300" />
-                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-slate-900 text-[10px] font-black text-white">{index + 1}</span>
+                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-slate-900 text-[10px] font-semibold text-white">{index + 1}</span>
                     {editing ? (
                       <Input
                         autoFocus
@@ -10190,7 +10231,7 @@ function ManualRailLinePanel({
         <div className="flex items-center gap-3">
           <span className="grid size-10 place-items-center rounded-2xl bg-white text-emerald-700 shadow-sm"><Route className="size-5" /></span>
           <span className="min-w-0 flex-1">
-            <strong className="block text-sm font-black text-emerald-900">새 노선 만들기</strong>
+            <strong className="block text-sm font-semibold text-emerald-900">새 노선 만들기</strong>
             <span className="mt-1 block text-xs font-medium leading-5 text-emerald-700">이름, 색상, 철도 유형을 정합니다.</span>
           </span>
           <Plus className="size-4 text-emerald-700" />
@@ -10268,7 +10309,7 @@ function ManualRailLineDialog({
       <div className="shrink-0 border-b border-slate-200 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <strong className="block text-sm font-black text-slate-950">
+            <strong className="block text-sm font-semibold text-slate-950">
               새 수기 노선 만들기
             </strong>
             <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
@@ -10290,7 +10331,7 @@ function ManualRailLineDialog({
                 style={{ backgroundColor: draft.colorHex }}
               />
               <div className="min-w-0 flex-1">
-                <p className="truncate text-lg font-black text-slate-950">
+                <p className="truncate text-lg font-semibold text-slate-950">
                   {draft.nameKo.trim() || "새 노선"}
                 </p>
                 <p className="mt-1 truncate text-xs font-medium text-slate-500">
