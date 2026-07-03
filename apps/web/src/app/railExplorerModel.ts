@@ -41,6 +41,14 @@ export const MANUAL_RAIL_STATUSES = [
 
 export type ManualRailStatus = (typeof MANUAL_RAIL_STATUSES)[number];
 
+export const MANUAL_LINE_COVERAGE_STATUSES = [
+  "draft",
+  "partial",
+  "complete",
+] as const;
+
+export type ManualLineCoverageStatus = (typeof MANUAL_LINE_COVERAGE_STATUSES)[number];
+
 export function isManualRailType(value: unknown): value is ManualRailType {
   return typeof value === "string" && MANUAL_RAIL_TYPES.includes(value as ManualRailType);
 }
@@ -48,6 +56,15 @@ export function isManualRailType(value: unknown): value is ManualRailType {
 export function isManualRailStatus(value: unknown): value is ManualRailStatus {
   return typeof value === "string" && MANUAL_RAIL_STATUSES.includes(value as ManualRailStatus);
 }
+
+export function isManualLineCoverageStatus(value: unknown): value is ManualLineCoverageStatus {
+  return typeof value === "string" && MANUAL_LINE_COVERAGE_STATUSES.includes(value as ManualLineCoverageStatus);
+}
+
+export function normalizeManualLineCoverageStatus(value: unknown): ManualLineCoverageStatus {
+  return isManualLineCoverageStatus(value) ? value : "draft";
+}
+
 
 export function manualRailTypeToLineCategory(railType: ManualRailType): RailLineCategory {
   if (railType === "high_speed_rail") return "high_speed_rail";
@@ -272,6 +289,7 @@ export interface ManualLineDefinition {
   railType: ManualRailType;
   serviceTypes: RailServiceType[];
   status: ManualRailStatus;
+  coverageStatus?: ManualLineCoverageStatus;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;

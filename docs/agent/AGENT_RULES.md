@@ -151,3 +151,10 @@ Implementation agents should:
 5. run app-specific type checks where possible;
 6. preserve manual data;
 7. report any validation risk instead of guessing.
+
+## 일반철도/고속철 line metadata 정책
+
+- 기존 도시철도 데이터는 기본 `urban_rail` + `subway`로 읽어야 하며, GTX는 `gtx` + `gtx`로 분류한다.
+- 일반철도와 고속철도 확장은 기존 `Line -> Branch -> RouteStop -> Station` 구조에 `category`와 `serviceTypes`를 추가하는 방식으로 진행한다.
+- `KTX선`, `SRT선`이라는 Line 이름은 금지한다. `경부고속선`, `호남고속선`, `수서평택고속선`처럼 선로/노선명을 Line으로 사용한다.
+- 같은 물리 역을 여러 선로 체계에서 공유해야 할 때는 stationId를 공유하지 말고 별도 stationId + 환승 그룹으로 표현한다.

@@ -1,3 +1,5 @@
+import type { RailLineCategory, RailServiceType } from "./line-metadata.js";
+
 export type MatchStatus =
   | "exact"
   | "normalized-code"
@@ -124,6 +126,8 @@ export interface AppCanonicalLine {
   lnCd: string;
   mreaWideCd: string;
   nameKo: string;
+  category: RailLineCategory;
+  serviceTypes: RailServiceType[];
   branches: AppBranch[];
   sourceLineNumbers: string[];
 }

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { findRepoRoot, readJsonl, writeJson } from "../shared/fs.js";
+import { inferRailLineCategory, inferRailServiceTypes } from "./line-metadata.js";
 
 type JsonRecord = Record<string, any>;
 
@@ -639,6 +640,8 @@ export function buildKricCanonicalAppBundle() {
       lnCd: allowlistRow.lnCd,
       mreaWideCd: allowlistRow.mreaWideCd,
       nameKo: allowlistRow.nameKo,
+      category: inferRailLineCategory(allowlistRow),
+      serviceTypes: inferRailServiceTypes(allowlistRow),
       colorHex: color?.colorHex ?? "#64748b",
       colorSource: color ? "data/manual/kric-canonical-line-colors.csv" : "fallback",
       branches,
