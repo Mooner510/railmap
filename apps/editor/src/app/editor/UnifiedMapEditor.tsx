@@ -30,7 +30,9 @@ import {
   ListChecks,
   LocateFixed,
   MapPin,
+  MoreHorizontal,
   MousePointer2,
+  Pencil,
   Plus,
   Redo2,
   Route,
@@ -66,6 +68,7 @@ import type {
   ManualOverlayBundle,
   RailLineCategory,
   RailServiceType,
+  ManualLineCoverageStatus,
   ManualRailStatus,
   ManualRailType,
   ManualStationOverride,
@@ -73,9 +76,11 @@ import type {
 } from "../editorModel";
 import {
   EMPTY_MANUAL_OVERLAY_BUNDLE,
+  MANUAL_LINE_COVERAGE_STATUSES,
   MANUAL_RAIL_STATUSES,
   MANUAL_RAIL_TYPES,
   RAIL_SERVICE_TYPES,
+  formatManualLineCoverageStatus,
   formatManualRailType,
   formatRailServiceType,
   makeBranchRouteOverrideId,
@@ -136,6 +141,7 @@ type ManualLineDraft = {
   railType: ManualRailType;
   serviceTypes: RailServiceType[];
   status: ManualRailStatus;
+  coverageStatus: ManualLineCoverageStatus;
   note: string;
 };
 
@@ -145,7 +151,37 @@ const DEFAULT_MANUAL_LINE_DRAFT: ManualLineDraft = {
   railType: "trunk_rail",
   serviceTypes: ["unknown"],
   status: "open",
+  coverageStatus: "draft",
   note: "",
+};
+
+type ManualRouteStationDraft = {
+  clientId: string;
+  stationId?: string;
+  nameKo: string;
+  lng: number;
+  lat: number;
+};
+
+type ManualRouteBuilderDraft = {
+  lineId: string;
+  branchNameKo: string;
+  coverageStatus: ManualLineCoverageStatus;
+  circular: boolean;
+  pendingStationName: string;
+  stations: ManualRouteStationDraft[];
+};
+
+type PendingManualRouteStationPlacement = {
+  lng: number;
+  lat: number;
+  nameKo: string;
+};
+
+type ShortcutItem = {
+  label: string;
+  keys: string;
+  detail?: string;
 };
 
 function formatManualRailStatus(status: ManualRailStatus) {
@@ -172,6 +208,41 @@ function makeManualRailLineId(nameKo: string, existingIds: Set<string>) {
   let suffix = 2;
   while (existingIds.has(`${base}-${suffix}`)) suffix += 1;
   return `${base}-${suffix}`;
+}
+
+function makeManualRailBranchId(lineId: string, existingIds: Set<string>) {
+  const safeLineId = lineId.replace(/[^0-9A-Za-z가-힣._-]+/g, "-");
+  const base = `manual.branch.${safeLineId}.main`;
+  if (!existingIds.has(base)) return base;
+
+  let suffix = 2;
+  while (existingIds.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+function makeManualRailStationId(lineId: string, stationNameKo: string, existingIds: Set<string>) {
+  const safeLineId = lineId.replace(/[^0-9A-Za-z가-힣._-]+/g, "-");
+  const normalizedStation = normalizeSearchText(stationNameKo || "station")
+    .replace(/[^0-9A-Za-z가-힣._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  const base = `manual.station.${safeLineId}.${normalizedStation || "station"}`;
+  if (!existingIds.has(base)) return base;
+
+  let suffix = 2;
+  while (existingIds.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+function makeManualRouteStationClientId() {
+  return `manual-route-station:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function stripStationNameQualifier(name: string) {
+  return name
+    .replace(/\s*[\(\（][^\)\）]*[\)\）]\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 type OverlayCommandRecord = {
@@ -3217,6 +3288,10 @@ export default function UnifiedMapEditor({
   );
   const groupByIdRef = useRef<Map<string, ManualTransferGroup>>(new Map());
   const stationLocationPickModeRef = useRef(false);
+  const manualRouteBuilderDraftRef = useRef<ManualRouteBuilderDraft | null>(null);
+  const addManualRouteStationFromMapRef = useRef<(lng: number, lat: number) => void>(() => undefined);
+  const copyNearestStationNameToRouteBuilderRef = useRef<(lng: number, lat: number) => void>(() => undefined);
+  const manualRouteStationMoveClientIdRef = useRef<string | null>(null);
   const pendingAddStationInsertionRef =
     useRef<PendingAddStationInsertion | null>(null);
   const stationSaveBusyRef = useRef(false);
@@ -3278,6 +3353,12 @@ export default function UnifiedMapEditor({
   const [manualLineDraft, setManualLineDraft] = useState<ManualLineDraft>(
     DEFAULT_MANUAL_LINE_DRAFT,
   );
+  const [manualRouteBuilderDraft, setManualRouteBuilderDraft] =
+    useState<ManualRouteBuilderDraft | null>(null);
+  const [pendingManualRouteStationPlacement, setPendingManualRouteStationPlacement] =
+    useState<PendingManualRouteStationPlacement | null>(null);
+  const [manualRouteStationMoveClientId, setManualRouteStationMoveClientId] =
+    useState<string | null>(null);
   const [pendingAddStationInsertion, setPendingAddStationInsertion] =
     useState<PendingAddStationInsertion | null>(null);
   const [stationSaveBusy, setStationSaveBusy] = useState(false);
@@ -3613,6 +3694,11 @@ export default function UnifiedMapEditor({
   useEffect(() => {
     pendingAddStationInsertionRef.current = pendingAddStationInsertion;
   }, [pendingAddStationInsertion]);
+
+  useEffect(() => {
+    manualRouteBuilderDraftRef.current = manualRouteBuilderDraft;
+    manualRouteStationMoveClientIdRef.current = manualRouteStationMoveClientId;
+  }, [manualRouteBuilderDraft, manualRouteStationMoveClientId]);
 
   useEffect(() => {
     stationDraftRef.current = stationDraft;
@@ -4083,6 +4169,10 @@ export default function UnifiedMapEditor({
         type: "geojson",
         data: EMPTY_FEATURE_COLLECTION,
       });
+      map.addSource("railmap-manual-route-builder-preview", {
+        type: "geojson",
+        data: EMPTY_FEATURE_COLLECTION,
+      });
 
       map.addLayer({
         id: "railmap-branches-line",
@@ -4306,6 +4396,53 @@ export default function UnifiedMapEditor({
           "circle-color": "rgba(0,0,0,0)",
           "circle-opacity": 0,
           "circle-stroke-width": 0,
+        },
+      });
+
+      map.addLayer({
+        id: "railmap-manual-route-builder-line",
+        type: "line",
+        source: "railmap-manual-route-builder-preview",
+        filter: ["==", ["get", "kind"], "line"],
+        paint: {
+          "line-color": ["get", "colorHex"],
+          "line-width": 5,
+          "line-opacity": 0.95,
+        },
+        layout: { "line-cap": "round", "line-join": "round" },
+      });
+
+      map.addLayer({
+        id: "railmap-manual-route-builder-stations",
+        type: "circle",
+        source: "railmap-manual-route-builder-preview",
+        filter: ["==", ["get", "kind"], "station"],
+        paint: {
+          "circle-color": ["get", "colorHex"],
+          "circle-radius": 6.5,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 2.5,
+          "circle-opacity": 1,
+        },
+      });
+
+      map.addLayer({
+        id: "railmap-manual-route-builder-labels",
+        type: "symbol",
+        source: "railmap-manual-route-builder-preview",
+        filter: ["==", ["get", "kind"], "station"],
+        layout: {
+          "text-field": ["get", "nameKo"],
+          "text-size": 11,
+          "text-font": ["Open Sans Regular"],
+          "text-offset": [0, 1.2],
+          "text-anchor": "top",
+          "text-allow-overlap": true,
+        },
+        paint: {
+          "text-color": "#0f172a",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 1.6,
         },
       });
 
@@ -4656,6 +4793,8 @@ export default function UnifiedMapEditor({
           }
         }
         map.getCanvas().style.cursor = "grabbing";
+      } else if (manualRouteBuilderDraftRef.current) {
+        map.getCanvas().style.cursor = "crosshair";
       } else if (stationLocationPickModeRef.current) {
         map.getCanvas().style.cursor = "crosshair";
       } else if (!selectionBoxStartRef.current) {
@@ -4751,6 +4890,31 @@ export default function UnifiedMapEditor({
       if (isClickAfterDrag(event.point)) return;
       if (toolModeRef.current === "geometry") return;
 
+      if (manualRouteBuilderDraftRef.current) {
+        const original = event.originalEvent as MouseEvent;
+        if (original.shiftKey) return;
+        const moveClientId = manualRouteStationMoveClientIdRef.current;
+        if (moveClientId) {
+          setManualRouteBuilderDraft((current) =>
+            current
+              ? {
+                  ...current,
+                  stations: current.stations.map((station) =>
+                    station.clientId === moveClientId
+                      ? { ...station, lng: event.lngLat.lng, lat: event.lngLat.lat }
+                      : station,
+                  ),
+                }
+              : current,
+          );
+          setManualRouteStationMoveClientId(null);
+          showToastRef.current("역 위치를 수정했습니다", "success");
+          return;
+        }
+        addManualRouteStationFromMapRef.current(event.lngLat.lng, event.lngLat.lat);
+        return;
+      }
+
       if (stationLocationPickModeRef.current) {
         const original = event.originalEvent as MouseEvent;
         if (original.shiftKey) return;
@@ -4821,6 +4985,10 @@ export default function UnifiedMapEditor({
     map.on("contextmenu", (event) => {
       event.preventDefault();
       if (toolModeRef.current === "geometry") return;
+      if (manualRouteBuilderDraftRef.current) {
+        copyNearestStationNameToRouteBuilderRef.current(event.lngLat.lng, event.lngLat.lat);
+        return;
+      }
       const collapsedTransferZoom = isCollapsedTransferZoom(map.getZoom());
       const queryLayers = [
         ...(collapsedTransferZoom
@@ -5877,6 +6045,7 @@ export default function UnifiedMapEditor({
       railType: draft.railType,
       serviceTypes,
       status: draft.status,
+      coverageStatus: draft.coverageStatus,
       enabled: true,
       source: "editor",
       note: draft.note.trim() || null,
@@ -5900,6 +6069,287 @@ export default function UnifiedMapEditor({
     setManualLineDialogOpen(false);
     setManualLineDraft(DEFAULT_MANUAL_LINE_DRAFT);
     await reloadEditorData();
+    setSidebarTab("manualLines");
+  }
+
+  function startManualRouteBuilder(lineId: string) {
+    const line = overlays.manualLineDefinitions.find((candidate) => candidate.id === lineId);
+    if (!line) {
+      showToast("수기 노선을 찾지 못했습니다", "error");
+      return;
+    }
+
+    const existingBranch = overlays.manualBranchDefinitions.find(
+      (branch) => branch.lineId === lineId && branch.enabled !== false,
+    );
+    const stations: ManualRouteStationDraft[] = [];
+    for (const stationId of existingBranch?.stationIds ?? []) {
+      const station = displayStationById.get(stationId) ?? stationById.get(stationId);
+      if (!station || typeof station.lng !== "number" || typeof station.lat !== "number") continue;
+      stations.push({
+        clientId: makeManualRouteStationClientId(),
+        stationId,
+        nameKo: station.nameKo,
+        lng: station.lng,
+        lat: station.lat,
+      });
+    }
+
+    setManualRouteBuilderDraft({
+      lineId,
+      branchNameKo: existingBranch?.nameKo ?? `${line.nameKo} 본선`,
+      coverageStatus: line.coverageStatus ?? "draft",
+      circular: existingBranch?.circular === true,
+      pendingStationName: "",
+      stations,
+    });
+    setSidebarTab("manualLines");
+    showToast("지도에서 역 위치를 순서대로 클릭하세요", "info");
+  }
+
+  function addManualRouteStationFromMap(lng: number, lat: number) {
+    const current = manualRouteBuilderDraftRef.current;
+    if (!current) return;
+    const typedName = current.pendingStationName.trim();
+    if (!typedName) {
+      setPendingManualRouteStationPlacement({
+        lng,
+        lat,
+        nameKo: `역 ${current.stations.length + 1}`,
+      });
+      return;
+    }
+    appendManualRouteStation(lng, lat, typedName);
+  }
+
+  function appendManualRouteStation(lng: number, lat: number, nameKo: string) {
+    const cleanName = nameKo.trim();
+    if (!cleanName) {
+      showToast("역 이름을 입력하세요", "error");
+      return;
+    }
+    setManualRouteBuilderDraft((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        pendingStationName: "",
+        stations: [
+          ...current.stations,
+          {
+            clientId: makeManualRouteStationClientId(),
+            nameKo: cleanName,
+            lng,
+            lat,
+          },
+        ],
+      };
+    });
+    setPendingManualRouteStationPlacement(null);
+    showToast("역을 추가했습니다", "success");
+  }
+
+  function copyNearestStationNameToRouteBuilder(lng: number, lat: number) {
+    const map = mapRef.current;
+    const sourcePoint = map ? map.project([lng, lat]) : null;
+    let bestName: string | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+
+    for (const station of displayStations) {
+      if (typeof station.lng !== "number" || typeof station.lat !== "number") continue;
+      const distance = sourcePoint && map
+        ? (() => {
+            const target = map.project([station.lng, station.lat]);
+            return (target.x - sourcePoint.x) ** 2 + (target.y - sourcePoint.y) ** 2;
+          })()
+        : (station.lng - lng) ** 2 + (station.lat - lat) ** 2;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestName = stripStationNameQualifier(station.nameKo);
+      }
+    }
+
+    if (!bestName) {
+      showToast("가까운 역 이름을 찾지 못했습니다", "error");
+      return;
+    }
+
+    setManualRouteBuilderDraft((current) =>
+      current ? { ...current, pendingStationName: bestName ?? current.pendingStationName } : current,
+    );
+    showToast(`가까운 역 이름을 복사했습니다: ${bestName}`, "success");
+  }
+
+  useEffect(() => {
+    addManualRouteStationFromMapRef.current = addManualRouteStationFromMap;
+    copyNearestStationNameToRouteBuilderRef.current = copyNearestStationNameToRouteBuilder;
+  });
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const source = map?.getSource("railmap-manual-route-builder-preview") as GeoJSONSource | undefined;
+    if (!mapLoaded || !source) return;
+
+    if (!manualRouteBuilderDraft) {
+      source.setData(EMPTY_FEATURE_COLLECTION);
+      return;
+    }
+
+    const line = overlays.manualLineDefinitions.find((candidate) => candidate.id === manualRouteBuilderDraft.lineId);
+    const colorHex = line?.colorHex ?? "#10b981";
+    const pointFeatures = manualRouteBuilderDraft.stations.map((station, index) => ({
+      type: "Feature" as const,
+      properties: {
+        id: station.clientId,
+        kind: "station",
+        nameKo: station.nameKo,
+        index: index + 1,
+        colorHex,
+      },
+      geometry: { type: "Point" as const, coordinates: [station.lng, station.lat] },
+    }));
+    const lineFeature = manualRouteBuilderDraft.stations.length >= 2
+      ? [{
+          type: "Feature" as const,
+          properties: { id: `${manualRouteBuilderDraft.lineId}:preview`, kind: "line", colorHex },
+          geometry: {
+            type: "LineString" as const,
+            coordinates: manualRouteBuilderDraft.stations.map((station) => [station.lng, station.lat]),
+          },
+        }]
+      : [];
+
+    source.setData({
+      type: "FeatureCollection",
+      features: [...lineFeature, ...pointFeatures],
+    });
+  }, [mapLoaded, manualRouteBuilderDraft, overlays.manualLineDefinitions]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapLoaded || !map) return;
+    const dimmed = Boolean(manualRouteBuilderDraft);
+    const paintUpdates: Array<[string, string, number]> = [
+      ["railmap-branches-line", "line-opacity", dimmed ? 0.14 : 0.72],
+      ["railmap-selected-branches-line", "line-opacity", dimmed ? 0.22 : 0.95],
+      ["railmap-line-branches-casing", "line-opacity", dimmed ? 0.08 : 0.88],
+      ["railmap-line-branches-line", "line-opacity", dimmed ? 0.12 : 0.78],
+      ["railmap-stations-circle", "circle-opacity", dimmed ? 0.24 : 0.96],
+      ["railmap-stations-label", "text-opacity", dimmed ? 0.2 : 1],
+      ["railmap-selected-stations-label", "text-opacity", dimmed ? 0.24 : 1],
+      ["railmap-transfer-group-icon", "icon-opacity", dimmed ? 0.18 : 1],
+      ["railmap-transfer-group-label", "text-opacity", dimmed ? 0.18 : 1],
+    ];
+    for (const [layerId, property, value] of paintUpdates) {
+      if (map.getLayer(layerId)) map.setPaintProperty(layerId, property, value);
+    }
+  }, [mapLoaded, manualRouteBuilderDraft]);
+
+  async function saveManualRouteBuilder() {
+    const draft = manualRouteBuilderDraftRef.current;
+    if (!draft) return;
+
+    const line = overlays.manualLineDefinitions.find((candidate) => candidate.id === draft.lineId);
+    if (!line) {
+      showToast("수기 노선을 찾지 못했습니다", "error");
+      return;
+    }
+    if (draft.stations.length < 2) {
+      showToast("노선을 저장하려면 최소 2개 역이 필요합니다", "error");
+      return;
+    }
+
+    const existingStationIds = new Set([
+      ...data.stations.map((station) => station.id),
+      ...overlays.stationOverrides.map((station) => station.stationId),
+    ]);
+    const existingBranchIds = new Set([
+      ...data.branches.map((branch) => branch.id),
+      ...overlays.manualBranchDefinitions.map((branch) => branch.id),
+    ]);
+    const existingBranch = overlays.manualBranchDefinitions.find(
+      (branch) => branch.lineId === draft.lineId && branch.enabled !== false,
+    );
+    const branchId = existingBranch?.id ?? makeManualRailBranchId(draft.lineId, existingBranchIds);
+    const nextStationOverrides: ManualStationOverride[] = [];
+    const stationIds: string[] = [];
+
+    for (const [index, stationDraft] of draft.stations.entries()) {
+      const nameKo = stationDraft.nameKo.trim() || `역 ${index + 1}`;
+      const stationId = stationDraft.stationId ?? makeManualRailStationId(draft.lineId, nameKo, existingStationIds);
+      existingStationIds.add(stationId);
+      stationIds.push(stationId);
+      nextStationOverrides.push({
+        stationId,
+        nameKo,
+        stationNumber: String(index + 1),
+        lineNameKo: line.nameKo,
+        lineNumber: draft.lineId,
+        colorHex: line.colorHex,
+        lat: stationDraft.lat,
+        lng: stationDraft.lng,
+        enabled: true,
+        note: "수기 노선 빌더에서 생성한 물리 노선 역",
+      });
+    }
+
+    const nextLine = {
+      ...line,
+      coverageStatus: draft.coverageStatus,
+    };
+    const nextBranch = {
+      id: branchId,
+      lineId: draft.lineId,
+      nameKo: draft.branchNameKo.trim() || `${line.nameKo} 본선`,
+      stationIds,
+      circular: draft.circular,
+      enabled: true,
+      source: "editor",
+      note: "수기 노선 빌더에서 생성한 물리 노선 정차 순서",
+    };
+    const nextGeometry = {
+      branchId,
+      points: nextStationOverrides.map((station) => ({
+        lng: station.lng ?? 0,
+        lat: station.lat ?? 0,
+        kind: "station" as const,
+        stationId: station.stationId,
+      })),
+      enabled: true,
+      note: "수기 노선 빌더 기본 직선 선형",
+    };
+
+    const next: ManualOverlayBundle = {
+      ...overlays,
+      manualLineDefinitions: [
+        ...overlays.manualLineDefinitions.filter((candidate) => candidate.id !== draft.lineId),
+        nextLine,
+      ],
+      stationOverrides: [
+        ...overlays.stationOverrides.filter((candidate) => !stationIds.includes(candidate.stationId)),
+        ...nextStationOverrides,
+      ],
+      manualBranchDefinitions: [
+        ...overlays.manualBranchDefinitions.filter((candidate) => candidate.id !== branchId),
+        nextBranch,
+      ],
+      geometryOverrides: [
+        ...overlays.geometryOverrides.filter((candidate) => candidate.branchId !== branchId),
+        nextGeometry,
+      ],
+    };
+
+    const saved = await executeOverlayCommand(
+      "수기 노선 역 목록 저장",
+      next,
+      `${line.nameKo} 역 목록과 기본 선형을 저장했습니다`,
+    );
+    if (!saved) return;
+
+    setManualRouteBuilderDraft(null);
+    const nextData = await reloadEditorData();
+    if (nextData?.branches.some((branch) => branch.id === branchId)) {
+      setSelection({ type: "branch", id: branchId });
+    }
     setSidebarTab("manualLines");
   }
 
@@ -6684,10 +7134,23 @@ export default function UnifiedMapEditor({
             {!isGeometryMode && sidebarTab === "manualLines" ? (
               <ManualRailLinePanel
                 lines={overlays.manualLineDefinitions}
+                branches={overlays.manualBranchDefinitions}
+                stationById={displayStationById}
+                routeBuilderDraft={manualRouteBuilderDraft}
                 onCreate={() => {
                   setManualLineDraft(DEFAULT_MANUAL_LINE_DRAFT);
                   setManualLineDialogOpen(true);
                 }}
+                onStartRouteBuilder={startManualRouteBuilder}
+                moveStationClientId={manualRouteStationMoveClientId}
+                onCancelRouteBuilder={() => {
+                  setManualRouteBuilderDraft(null);
+                  setManualRouteStationMoveClientId(null);
+                  setPendingManualRouteStationPlacement(null);
+                }}
+                onChangeRouteBuilder={setManualRouteBuilderDraft}
+                onMoveRouteStation={(clientId) => setManualRouteStationMoveClientId(clientId)}
+                onSaveRouteBuilder={() => void saveManualRouteBuilder()}
               />
             ) : null}
 
@@ -6766,6 +7229,25 @@ export default function UnifiedMapEditor({
               />
             ) : null}
           </PanelBody>
+          <SidebarShortcutDock
+            title={manualRouteBuilderDraft ? "노선 빌더 단축키" : isGeometryMode ? "선형 편집 단축키" : "기본 단축키"}
+            items={manualRouteBuilderDraft ? [
+              { label: "역 추가", keys: "지도 좌클릭", detail: "이름이 비어 있으면 입력창이 열립니다." },
+              { label: "가까운 역 이름 복사", keys: "지도 우클릭", detail: "복사할 때 괄호 보조 표기만 제거합니다." },
+              { label: "위치 수정", keys: "위치 수정 → 지도 클릭" },
+              { label: "검색", keys: "Cmd/Ctrl+K" },
+            ] : isGeometryMode ? [
+              { label: "검색", keys: "Cmd/Ctrl+K" },
+              { label: "보정점 제거", keys: "Cmd/Ctrl+Click" },
+              { label: "역 위치 변경", keys: "주황점 Drag" },
+            ] : [
+              { label: "검색", keys: "Cmd/Ctrl+K" },
+              { label: "되돌리기", keys: "Cmd/Ctrl+Z" },
+              { label: "다시 실행", keys: "Cmd/Ctrl+Shift+Z" },
+            ]}
+            open={shortcutHelpOpen}
+            onToggle={() => setShortcutHelpOpen((open) => !open)}
+          />
         </Panel>
 
         <main className="relative min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
@@ -6852,26 +7334,6 @@ export default function UnifiedMapEditor({
               />
             </div>
           ) : null}
-          <div className="pointer-events-none absolute bottom-3 left-3 max-w-[min(440px,calc(100%-1.5rem))] rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium leading-5 text-slate-600 shadow-lg backdrop-blur">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span>
-                {isGeometryMode
-                  ? "선형을 선택하고 지도 위 점/구간을 드래그해 보정합니다."
-                  : "지도 객체 선택, 드래그 박스 다중 선택, Cmd/Ctrl+K 검색을 사용할 수 있습니다."}
-              </span>
-              {!isGeometryMode && validationBadgeCount > 0 ? (
-                <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-black text-red-700">검증 {validationBadgeCount}개</span>
-              ) : null}
-              {!isGeometryMode && overlays.manualTransferGroups.length > 0 ? (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-600">환승 {overlays.manualTransferGroups.length}개</span>
-              ) : null}
-            </div>
-          </div>
-          <div className="absolute bottom-3 right-3 rounded-2xl border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium text-slate-600 shadow-lg backdrop-blur">
-            {cursorLngLat
-              ? `${cursorLngLat.lng.toFixed(6)}, ${cursorLngLat.lat.toFixed(6)}`
-              : "좌표 없음"}
-          </div>
           {contextMenu ? (
             <ContextMenu
               state={contextMenu}
@@ -7161,8 +7623,103 @@ export default function UnifiedMapEditor({
         </div>
       </Dialog>
 
+      <Dialog open={Boolean(pendingManualRouteStationPlacement)} className="max-w-sm overflow-hidden">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <strong className="block text-sm font-black text-slate-950">역 이름 지정</strong>
+          <p className="mt-1 text-xs font-medium text-slate-500">Enter를 누르면 바로 노선에 추가됩니다.</p>
+        </div>
+        <form
+          className="grid gap-3 p-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!pendingManualRouteStationPlacement) return;
+            appendManualRouteStation(
+              pendingManualRouteStationPlacement.lng,
+              pendingManualRouteStationPlacement.lat,
+              pendingManualRouteStationPlacement.nameKo,
+            );
+          }}
+        >
+          <Input
+            autoFocus
+            value={pendingManualRouteStationPlacement?.nameKo ?? ""}
+            onChange={(event) =>
+              setPendingManualRouteStationPlacement((current) =>
+                current ? { ...current, nameKo: event.target.value } : current,
+              )
+            }
+            placeholder="역 이름"
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPendingManualRouteStationPlacement(null)}
+            >
+              취소
+            </Button>
+            <Button type="submit">추가</Button>
+          </div>
+        </form>
+      </Dialog>
+
       <Toast message={toast.message} tone={toast.tone} />
     </AppShell>
+  );
+}
+
+function SidebarShortcutDock({
+  title,
+  items,
+  open,
+  onToggle,
+}: {
+  title: string;
+  items: ShortcutItem[];
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const primaryItems = items.slice(0, 3);
+  return (
+    <div className="shrink-0 border-t border-slate-200 bg-white px-3 py-2">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between text-left text-[11px] font-black text-slate-700"
+        onClick={onToggle}
+      >
+        {title}
+        <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+          더보기 <MoreHorizontal className="size-3" />
+        </span>
+      </button>
+      <div className="mt-2 grid gap-1">
+        {primaryItems.map((item) => (
+          <div key={`${item.label}:${item.keys}`} className="flex items-center justify-between gap-2 text-[10px] font-semibold text-slate-500">
+            <span className="truncate">{item.label}</span>
+            <kbd className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black text-slate-600">{item.keys}</kbd>
+          </div>
+        ))}
+      </div>
+      <Dialog open={open} className="max-w-md overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <strong className="text-sm font-black text-slate-950">{title}</strong>
+          <Button variant="ghost" size="icon" onClick={onToggle}>
+            <X className="size-4" />
+          </Button>
+        </div>
+        <div className="grid gap-2 p-4">
+          {items.map((item) => (
+            <div key={`${item.label}:${item.keys}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs font-bold text-slate-700">{item.label}</span>
+                <kbd className="rounded-md bg-white px-2 py-1 text-[10px] font-black text-slate-700 shadow-sm">{item.keys}</kbd>
+              </div>
+              {item.detail ? <p className="mt-1 text-[11px] font-medium text-slate-500">{item.detail}</p> : null}
+            </div>
+          ))}
+        </div>
+      </Dialog>
+    </div>
   );
 }
 
@@ -8603,7 +9160,16 @@ function TransferGroupInspector({
 
 function ManualRailLinePanel({
   lines,
+  branches,
+  stationById,
+  routeBuilderDraft,
   onCreate,
+  onStartRouteBuilder,
+  moveStationClientId,
+  onCancelRouteBuilder,
+  onChangeRouteBuilder,
+  onMoveRouteStation,
+  onSaveRouteBuilder,
 }: {
   lines: Array<{
     id: string;
@@ -8612,18 +9178,73 @@ function ManualRailLinePanel({
     railType: ManualRailType;
     serviceTypes: RailServiceType[];
     status: ManualRailStatus;
+    coverageStatus?: ManualLineCoverageStatus;
     enabled: boolean;
     note?: string | null;
   }>;
+  branches: Array<{
+    id: string;
+    lineId: string;
+    nameKo?: string | null;
+    stationIds: string[];
+    circular?: boolean;
+    enabled: boolean;
+  }>;
+  stationById: Map<string, EditorStation>;
+  routeBuilderDraft: ManualRouteBuilderDraft | null;
   onCreate: () => void;
+  onStartRouteBuilder: (lineId: string) => void;
+  moveStationClientId: string | null;
+  onCancelRouteBuilder: () => void;
+  onChangeRouteBuilder: (draft: ManualRouteBuilderDraft) => void;
+  onMoveRouteStation: (clientId: string) => void;
+  onSaveRouteBuilder: () => void;
 }) {
   const enabledLines = lines.filter((line) => line.enabled !== false);
+  const branchByLineId = new Map(
+    branches
+      .filter((branch) => branch.enabled !== false)
+      .map((branch) => [branch.lineId, branch]),
+  );
+  const activeLine = routeBuilderDraft
+    ? lines.find((line) => line.id === routeBuilderDraft.lineId) ?? null
+    : null;
+
+  function updateRouteStation(clientId: string, patch: Partial<ManualRouteStationDraft>) {
+    if (!routeBuilderDraft) return;
+    onChangeRouteBuilder({
+      ...routeBuilderDraft,
+      stations: routeBuilderDraft.stations.map((station) =>
+        station.clientId === clientId ? { ...station, ...patch } : station,
+      ),
+    });
+  }
+
+  function moveRouteStation(clientId: string, delta: -1 | 1) {
+    if (!routeBuilderDraft) return;
+    const index = routeBuilderDraft.stations.findIndex((station) => station.clientId === clientId);
+    const nextIndex = index + delta;
+    if (index < 0 || nextIndex < 0 || nextIndex >= routeBuilderDraft.stations.length) return;
+    const stations = routeBuilderDraft.stations.slice();
+    const [item] = stations.splice(index, 1);
+    if (!item) return;
+    stations.splice(nextIndex, 0, item);
+    onChangeRouteBuilder({ ...routeBuilderDraft, stations });
+  }
+
+  function removeRouteStation(clientId: string) {
+    if (!routeBuilderDraft) return;
+    onChangeRouteBuilder({
+      ...routeBuilderDraft,
+      stations: routeBuilderDraft.stations.filter((station) => station.clientId !== clientId),
+    });
+  }
 
   return (
     <div className="grid gap-3">
       <button
         type="button"
-        className="rounded-3xl border border-emerald-100 bg-emerald-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-100"
+        className="rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-left transition hover:border-emerald-200 hover:bg-emerald-100"
         onClick={onCreate}
       >
         <div className="flex items-center gap-3">
@@ -8635,12 +9256,134 @@ function ManualRailLinePanel({
               새 노선 만들기
             </strong>
             <span className="mt-1 block text-xs font-medium leading-5 text-emerald-700">
-              이름, 색상, 철도 유형, 서비스 타입을 먼저 저장합니다.
+              이름, 색상, 철도 유형만 먼저 정합니다.
             </span>
           </span>
           <Plus className="size-4 text-emerald-700" />
         </div>
       </button>
+
+      {routeBuilderDraft && activeLine ? (
+        <div className="grid gap-2 rounded-2xl border border-emerald-200 bg-white p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-bold uppercase text-emerald-600">Route Builder</p>
+              <strong className="mt-1 block truncate text-base font-black text-slate-950">
+                {activeLine.nameKo} 역 목록
+              </strong>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                {routeBuilderDraft.stations.length.toLocaleString("ko-KR")}개 역 · {routeBuilderDraft.stations.length < 2 ? "2개 이상 필요" : "저장 가능"}
+              </p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={onCancelRouteBuilder}>
+              <X className="size-4" />
+            </Button>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-xs font-bold text-slate-500">지선/본선 이름</label>
+            <Input
+              value={routeBuilderDraft.branchNameKo}
+              onChange={(event) => onChangeRouteBuilder({ ...routeBuilderDraft, branchNameKo: event.target.value })}
+              placeholder={`${activeLine.nameKo} 본선`}
+            />
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-xs font-bold text-slate-500">역 목록 완성도</label>
+            <div className="grid grid-cols-3 gap-2">
+              {MANUAL_LINE_COVERAGE_STATUSES.map((coverageStatus) => (
+                <button
+                  key={coverageStatus}
+                  type="button"
+                  className={cn(
+                    "rounded-2xl border px-2 py-2 text-[11px] font-bold transition",
+                    routeBuilderDraft.coverageStatus === coverageStatus
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                  )}
+                  onClick={() => onChangeRouteBuilder({ ...routeBuilderDraft, coverageStatus })}
+                >
+                  {formatManualLineCoverageStatus(coverageStatus)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
+            <input
+              type="checkbox"
+              className="size-4 accent-emerald-600"
+              checked={routeBuilderDraft.circular}
+              onChange={(event) => onChangeRouteBuilder({ ...routeBuilderDraft, circular: event.target.checked })}
+            />
+            순환 노선으로 저장
+          </label>
+
+          <div className="grid gap-2">
+            <label className="text-xs font-bold text-slate-500">빠른 추가 이름</label>
+            <Input
+              value={routeBuilderDraft.pendingStationName}
+              onChange={(event) => onChangeRouteBuilder({ ...routeBuilderDraft, pendingStationName: event.target.value })}
+              placeholder="비워두고 지도 클릭 시 입력창 열림"
+            />
+          </div>
+
+          <div className="grid max-h-96 gap-1.5 overflow-y-auto pr-1">
+            {routeBuilderDraft.stations.map((station, index) => (
+              <div
+                key={station.clientId}
+                className={cn(
+                  "rounded-xl border bg-white px-2 py-1.5",
+                  moveStationClientId === station.clientId
+                    ? "border-emerald-300 ring-2 ring-emerald-100"
+                    : "border-slate-200",
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-slate-900 text-[10px] font-black text-white">
+                    {index + 1}
+                  </span>
+                  <Input
+                    className="h-8 min-w-0 flex-1 border-0 bg-slate-50 px-2 text-xs font-semibold shadow-none"
+                    value={station.nameKo}
+                    onChange={(event) => updateRouteStation(station.clientId, { nameKo: event.target.value })}
+                    placeholder="역 이름"
+                  />
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <Button variant="ghost" size="icon" onClick={() => moveRouteStation(station.clientId, -1)} disabled={index === 0} title="앞으로 이동">
+                      ↑
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => moveRouteStation(station.clientId, 1)} disabled={index === routeBuilderDraft.stations.length - 1} title="뒤로 이동">
+                      ↓
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => onMoveRouteStation(station.clientId)} title="지도에서 위치 수정">
+                      <Pencil className="size-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => removeRouteStation(station.clientId)} title="삭제">
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-2 px-1 text-[10px] font-semibold text-slate-400">
+                  <span>{station.stationId ? `기존 위치 기반 · ${stationById.get(station.stationId)?.nameKo ?? station.stationId}` : "새 수기 역"}</span>
+                  {moveStationClientId === station.clientId ? <span className="text-emerald-600">지도에서 새 위치 클릭</span> : null}
+                </div>
+              </div>
+            ))}
+            {routeBuilderDraft.stations.length === 0 ? (
+              <Placeholder
+                title="아직 역 없음"
+                description="지도에서 시작역 위치를 클릭하면 이 목록에 추가됩니다."
+              />
+            ) : null}
+          </div>
+
+          <Button onClick={onSaveRouteBuilder} disabled={routeBuilderDraft.stations.length < 2}>
+            역 목록과 기본 선형 저장
+          </Button>
+        </div>
+      ) : null}
 
       <div className="flex items-center justify-between px-1 text-[11px] font-semibold text-slate-400">
         <span>수기 노선 {enabledLines.length.toLocaleString("ko-KR")}개</span>
@@ -8648,46 +9391,60 @@ function ManualRailLinePanel({
       </div>
 
       <div className="grid gap-2">
-        {enabledLines.map((line) => (
-          <div
-            key={line.id}
-            className="rounded-2xl border border-slate-200 bg-white p-3"
-          >
-            <div className="flex items-start gap-3">
-              <span
-                className="mt-1 h-9 w-2 shrink-0 rounded-full"
-                style={{ backgroundColor: line.colorHex }}
-              />
-              <div className="min-w-0 flex-1">
-                <strong className="block truncate text-sm font-semibold text-slate-900">
-                  {line.nameKo}
-                </strong>
-                <p className="mt-1 truncate text-[11px] font-medium text-slate-500">
-                  {formatManualRailType(line.railType)} · {formatManualRailStatus(line.status)}
-                </p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {line.serviceTypes.map((serviceType) => (
-                    <span
-                      key={serviceType}
-                      className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600"
-                    >
-                      {formatRailServiceType(serviceType)}
-                    </span>
-                  ))}
-                </div>
-                {line.note ? (
-                  <p className="mt-2 line-clamp-2 text-[11px] font-medium leading-4 text-slate-400">
-                    {line.note}
+        {enabledLines.map((line) => {
+          const branch = branchByLineId.get(line.id);
+          return (
+            <div
+              key={line.id}
+              className={cn(
+                "rounded-2xl border border-slate-200 bg-white p-3",
+                routeBuilderDraft?.lineId === line.id ? "border-emerald-300 ring-2 ring-emerald-100" : null,
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <span
+                  className="mt-1 h-9 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: line.colorHex }}
+                />
+                <div className="min-w-0 flex-1">
+                  <strong className="block truncate text-sm font-semibold text-slate-900">
+                    {line.nameKo}
+                  </strong>
+                  <p className="mt-1 truncate text-[11px] font-medium text-slate-500">
+                    {formatManualRailType(line.railType)} · {formatManualRailStatus(line.status)} · {formatManualLineCoverageStatus(line.coverageStatus ?? "draft")}
                   </p>
-                ) : null}
+                  <p className="mt-1 text-[11px] font-medium text-slate-400">
+                    {branch ? `${branch.stationIds.length.toLocaleString("ko-KR")}개 역 · ${branch.nameKo ?? "본선"}` : "아직 역 목록 없음"}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {line.serviceTypes.map((serviceType) => (
+                      <span
+                        key={serviceType}
+                        className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600"
+                      >
+                        {formatRailServiceType(serviceType)}
+                      </span>
+                    ))}
+                  </div>
+                  {line.note ? (
+                    <p className="mt-2 line-clamp-2 text-[11px] font-medium leading-4 text-slate-400">
+                      {line.note}
+                    </p>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => onStartRouteBuilder(line.id)}>
+                      {branch ? "역 목록 수정" : "역 목록 만들기"}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
         {enabledLines.length === 0 ? (
           <Placeholder
             title="수기 노선 없음"
-            description="일반철도/고속철도는 먼저 새 노선을 만들고, 다음 단계에서 역을 순서대로 추가합니다."
+            description="일반철도/고속철도는 먼저 새 노선을 만들고, 그 다음 역을 순서대로 추가합니다."
           />
         ) : null}
       </div>
@@ -8729,7 +9486,7 @@ function ManualRailLineDialog({
               새 수기 노선 만들기
             </strong>
             <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
-              이번 단계에서는 노선 메타데이터만 저장합니다. 역 순서 추가는 다음 패치의 노선 빌더에서 진행합니다.
+              노선은 물리 선로/철도 노선 기준으로 저장합니다. 서비스 타입은 이 노선을 운행할 수 있는 열차 종류이며, 실제 정차 패턴은 후속 시간표/서비스 패턴에서 분리합니다.
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
@@ -8850,6 +9607,30 @@ function ManualRailLineDialog({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-xs font-bold text-slate-500">역 목록 완성도</label>
+            <div className="grid grid-cols-3 gap-2">
+              {MANUAL_LINE_COVERAGE_STATUSES.map((coverageStatus) => (
+                <button
+                  key={coverageStatus}
+                  type="button"
+                  className={cn(
+                    "rounded-2xl border px-3 py-2 text-xs font-bold transition",
+                    draft.coverageStatus === coverageStatus
+                      ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                  )}
+                  onClick={() => onChange({ ...draft, coverageStatus })}
+                >
+                  {formatManualLineCoverageStatus(coverageStatus)}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] font-medium leading-4 text-slate-400">
+              전체 역을 아직 다 입력하지 못했다면 “일부 역만 입력”으로 두세요.
+            </p>
           </div>
 
           <div className="grid gap-2">

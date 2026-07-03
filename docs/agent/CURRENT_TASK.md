@@ -141,3 +141,26 @@ Recommended scope:
 - 저장 후 editor data를 reload해서 수기 노선 목록에 반영한다.
 - 이번 단계에서는 아직 지도에서 역을 연속으로 찍어 정차 순서를 만드는 기능은 넣지 않는다.
 - 다음 단계는 `13.25.0-manual-route-station-builder`로, 수기 노선에 역을 순서대로 추가하고 `manualBranchDefinitions`를 생성하는 기능이다.
+
+## 13.25.0-manual-route-station-builder
+
+- 수기 노선을 물리 선로/철도 노선 기준으로 만드는 정책을 editor UX에 반영한다.
+- `coverageStatus`를 추가해 큰 일반철도 노선을 `draft`/`partial`/`complete`로 관리한다.
+- 수기 노선 탭에서 노선별 `역 목록 만들기/수정`을 제공한다.
+- 지도 클릭으로 시작역부터 종점역까지 수기 역을 순서대로 추가한다.
+- 저장 시 다음 항목을 한 번에 생성/갱신한다.
+  - `stationOverrides`: 수기 노선 전용 stationId와 좌표
+  - `manualBranchDefinitions`: 해당 노선의 정차역 순서
+  - `geometryOverrides`: 역 좌표를 직선 연결한 1차 선형
+  - `manualLineDefinitions.coverageStatus`: 구축 상태
+- KTX/SRT/무궁화/수도권 전철은 Line이 아니라 serviceTypes/후속 정차 패턴으로 분리한다.
+
+## 13.26.0-manual-route-builder-ux-cleanup
+
+- 지도 하단 안내/위경도 표시를 제거해 지도 공간을 확보한다.
+- 수기 노선 빌더를 물리 노선 역 목록 작성에 집중하도록 단순화한다.
+- 역 이름이 비어 있는 상태에서 지도 좌클릭 시 역 이름 입력 dialog를 띄우고 Enter로 즉시 추가한다.
+- 수기 노선 빌더 중 지도 우클릭 시 가장 가까운 기존 역 이름을 빠른 추가 이름으로 복사한다. 이때 기존 데이터의 실제 역명은 바꾸지 않고, 복사값에서 괄호 보조 표기만 제거한다.
+- 빌더 중 작성 중인 노선 preview line/station을 지도에 즉시 표시하고, 기존 노선/역/환승 아이콘은 반투명 처리한다.
+- 역 목록 카드에서 위도/경도 노출을 제거하고 조밀한 목록, 순서 조정, 위치 수정 버튼을 제공한다.
+- 왼쪽 사이드바 하단에 현재 모드 단축키 dock과 더보기 modal을 추가한다.
