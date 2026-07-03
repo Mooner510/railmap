@@ -1539,5 +1539,8 @@
       "enabled": true,
       "note": "경의중앙선 본선 표시 보정: 서울역 지선 분리 후 용산-청량리 경유 구간 좌표 보강"
     }
-  ]
+  ],
+  "lineMetadataOverrides": [],
+  "manualLineDefinitions": [],
+  "manualBranchDefinitions": []
 }

@@ -2,6 +2,19 @@ import fs from "node:fs";
 import path from "node:path";
 import RailExplorer from "./RailExplorer";
 import {
+  inferRailLineCategory,
+  inferRailServiceTypes,
+  isManualRailStatus,
+  isManualRailType,
+  isRailLineCategory,
+  isRailServiceType,
+  manualRailTypeToLineCategory,
+  type ManualRailStatus,
+  type ManualRailType,
+  type RailLineCategory,
+  type RailServiceType,
+} from "./railExplorerModel";
+import {
   type RailMapBranch,
   type RailMapStation,
   type RailMapTransferGroup,
@@ -46,6 +59,8 @@ interface CanonicalLine {
   nameKo: string;
   colorHex: string;
   colorSource: string;
+  category: RailLineCategory;
+  serviceTypes: RailServiceType[];
   branches: CanonicalBranch[];
   sourceLineNumbers: string[];
 }
@@ -130,6 +145,38 @@ interface ManualLineBranchOverride {
   note?: string | null;
 }
 
+interface ManualLineMetadataOverride {
+  lineId: string;
+  category?: RailLineCategory;
+  serviceTypes?: RailServiceType[];
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
+interface ManualLineDefinition {
+  id: string;
+  nameKo: string;
+  colorHex: string;
+  railType: ManualRailType;
+  serviceTypes: RailServiceType[];
+  status: ManualRailStatus;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
+interface ManualBranchDefinition {
+  id: string;
+  lineId: string;
+  nameKo?: string | null;
+  stationIds: string[];
+  circular?: boolean;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 interface ManualTransferGroup {
   id: string;
   nameKo: string;
@@ -183,6 +230,9 @@ interface ManualOverlays {
   branchRouteOverrides: ManualBranchRouteOverride[];
   lineBranchOverrides: ManualLineBranchOverride[];
   geometryOverrides: ManualGeometryOverride[];
+  lineMetadataOverrides: ManualLineMetadataOverride[];
+  manualLineDefinitions: ManualLineDefinition[];
+  manualBranchDefinitions: ManualBranchDefinition[];
 }
 
 function makeTransferPairKey(stationIdA: string, stationIdB: string) {
@@ -223,6 +273,103 @@ function deriveTransferEdgesFromGroups(
   }
 
   return edges;
+}
+
+function normalizeLineMetadataOverride(value: unknown): ManualLineMetadataOverride | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const lineId = typeof record.lineId === "string" && record.lineId.trim() ? record.lineId.trim() : null;
+  if (!lineId) return null;
+  const category = isRailLineCategory(record.category) ? record.category : undefined;
+  const serviceTypes = Array.isArray(record.serviceTypes)
+    ? [...new Set(record.serviceTypes.filter(isRailServiceType))]
+    : undefined;
+  return {
+    lineId,
+    category,
+    serviceTypes: serviceTypes && serviceTypes.length > 0 ? serviceTypes : undefined,
+    enabled: record.enabled !== false,
+    source: typeof record.source === "string" ? record.source : "editor",
+    note: typeof record.note === "string" ? record.note : null,
+  };
+}
+
+function normalizeManualRailType(value: unknown) {
+  return isManualRailType(value) ? value : "trunk_rail";
+}
+
+function normalizeManualRailStatus(value: unknown) {
+  return isManualRailStatus(value) ? value : "open";
+}
+
+function normalizeManualLineDefinition(value: unknown): ManualLineDefinition | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const id = typeof record.id === "string" && record.id.trim() ? record.id.trim() : null;
+  const nameKo = typeof record.nameKo === "string" && record.nameKo.trim() ? record.nameKo.trim() : null;
+  if (!id || !nameKo) return null;
+  const serviceTypes = Array.isArray(record.serviceTypes)
+    ? [...new Set(record.serviceTypes.filter(isRailServiceType))]
+    : [];
+  return {
+    id,
+    nameKo,
+    colorHex: typeof record.colorHex === "string" && record.colorHex.trim() ? record.colorHex.trim() : "#64748b",
+    railType: normalizeManualRailType(record.railType),
+    serviceTypes: serviceTypes.length > 0 ? serviceTypes : ["unknown"],
+    status: normalizeManualRailStatus(record.status),
+    enabled: record.enabled !== false,
+    source: typeof record.source === "string" ? record.source : "editor",
+    note: typeof record.note === "string" ? record.note : null,
+  };
+}
+
+function normalizeManualBranchDefinition(value: unknown): ManualBranchDefinition | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const id = typeof record.id === "string" && record.id.trim() ? record.id.trim() : null;
+  const lineId = typeof record.lineId === "string" && record.lineId.trim() ? record.lineId.trim() : null;
+  if (!id || !lineId) return null;
+  const stationIds = Array.isArray(record.stationIds)
+    ? [...new Set(record.stationIds.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim()))]
+    : [];
+  return {
+    id,
+    lineId,
+    nameKo: typeof record.nameKo === "string" && record.nameKo.trim() ? record.nameKo.trim() : null,
+    stationIds,
+    circular: record.circular === true,
+    enabled: record.enabled !== false,
+    source: typeof record.source === "string" ? record.source : "editor",
+    note: typeof record.note === "string" ? record.note : null,
+  };
+}
+
+function applyLineMetadataOverrides(
+  lines: CanonicalLine[],
+  overrides: ManualLineMetadataOverride[],
+): CanonicalLine[] {
+  const overrideByLineId = new Map(
+    overrides
+      .filter((override) => override.enabled !== false)
+      .map((override) => [override.lineId, override]),
+  );
+
+  return lines.map((line) => {
+    const fallbackCategory = line.category ?? inferRailLineCategory(line);
+    const fallbackServiceTypes =
+      line.serviceTypes && line.serviceTypes.length > 0
+        ? line.serviceTypes
+        : inferRailServiceTypes(line);
+    const override = overrideByLineId.get(line.canonicalKey ?? line.id ?? line.nameKo);
+    return {
+      ...line,
+      category: override?.category ?? fallbackCategory,
+      serviceTypes: override?.serviceTypes?.length
+        ? override.serviceTypes
+        : fallbackServiceTypes,
+    };
+  });
 }
 
 function readManualOverlays(): ManualOverlays {
@@ -272,6 +419,21 @@ function readManualOverlays(): ManualOverlays {
       geometryOverrides: Array.isArray(parsed.geometryOverrides)
         ? parsed.geometryOverrides
         : [],
+      lineMetadataOverrides: Array.isArray((parsed as { lineMetadataOverrides?: unknown }).lineMetadataOverrides)
+        ? (parsed as { lineMetadataOverrides: unknown[] }).lineMetadataOverrides
+            .map(normalizeLineMetadataOverride)
+            .filter((override): override is ManualLineMetadataOverride => override !== null)
+        : [],
+      manualLineDefinitions: Array.isArray((parsed as { manualLineDefinitions?: unknown }).manualLineDefinitions)
+        ? (parsed as { manualLineDefinitions: unknown[] }).manualLineDefinitions
+            .map(normalizeManualLineDefinition)
+            .filter((line): line is ManualLineDefinition => line !== null)
+        : [],
+      manualBranchDefinitions: Array.isArray((parsed as { manualBranchDefinitions?: unknown }).manualBranchDefinitions)
+        ? (parsed as { manualBranchDefinitions: unknown[] }).manualBranchDefinitions
+            .map(normalizeManualBranchDefinition)
+            .filter((branch): branch is ManualBranchDefinition => branch !== null)
+        : [],
     };
   }
 
@@ -285,6 +447,9 @@ function readManualOverlays(): ManualOverlays {
     branchRouteOverrides: [],
     lineBranchOverrides: [],
     geometryOverrides: [],
+    lineMetadataOverrides: [],
+    manualLineDefinitions: [],
+    manualBranchDefinitions: [],
   };
 }
 
@@ -564,6 +729,90 @@ function applyStationOverrides(
   return [...updatedStations, ...manualStations];
 }
 
+function applyManualLineDefinitions(
+  bundle: CanonicalBundle,
+  lineDefinitions: ManualLineDefinition[],
+  branchDefinitions: ManualBranchDefinition[],
+): CanonicalBundle {
+  const enabledLines = lineDefinitions.filter((line) => line.enabled !== false);
+  const enabledBranches = branchDefinitions.filter((branch) => branch.enabled !== false);
+  if (enabledLines.length === 0) return bundle;
+
+  const lineIds = new Set(bundle.lines.map((line) => line.canonicalKey ?? line.id));
+  const stationIds = new Set(bundle.stations.map((station) => station.id));
+  const manualLines: CanonicalLine[] = [];
+  const manualRouteStops: CanonicalRouteStop[] = [];
+
+  for (const line of enabledLines) {
+    if (lineIds.has(line.id)) continue;
+    const branches = enabledBranches
+      .filter((branch) => branch.lineId === line.id)
+      .map((branch): CanonicalBranch => {
+        const routeStops = branch.stationIds
+          .filter((stationId) => stationIds.has(stationId))
+          .map((stationId, index): CanonicalRouteStop => {
+            const station = bundle.stations.find((item) => item.id === stationId);
+            return {
+              id: `${branch.id}:manual-route:${index + 1}:${stationId}`,
+              canonicalLineId: line.id,
+              branchId: branch.id,
+              sourceLineNumber: line.id,
+              sourceLineName: branch.nameKo ?? line.nameKo,
+              role: "main",
+              sequence: index + 1,
+              stationId,
+              sourceStationCode: station?.stationNumber ?? "MANUAL",
+              displayNameKo: station?.nameKo ?? stationId,
+              matchStatus: "manual",
+              confidence: "manual",
+              sourceCandidateId: stationId,
+              diagnostics: ["manual-line-definition"],
+            };
+          });
+        manualRouteStops.push(...routeStops);
+        return {
+          id: branch.id,
+          canonicalLineId: line.id,
+          role: "main",
+          sourceLineNumber: line.id,
+          sourceLineName: branch.nameKo ?? line.nameKo,
+          origin: routeStops[0]?.displayNameKo ?? null,
+          terminal: routeStops[routeStops.length - 1]?.displayNameKo ?? null,
+          routeStops,
+          isCircular: branch.circular === true,
+        };
+      });
+
+    manualLines.push({
+      id: line.id,
+      canonicalKey: line.id,
+      lnCd: line.id,
+      mreaWideCd: "manual",
+      nameKo: line.nameKo,
+      colorHex: line.colorHex,
+      colorSource: "manual-line-definition",
+      category: manualRailTypeToLineCategory(line.railType),
+      serviceTypes: line.serviceTypes,
+      branches,
+      sourceLineNumbers: [line.id],
+    });
+  }
+
+  if (manualLines.length === 0) return bundle;
+
+  return {
+    ...bundle,
+    counts: {
+      ...bundle.counts,
+      canonicalLines: bundle.counts.canonicalLines + manualLines.length,
+      branches: bundle.counts.branches + manualLines.reduce((sum, line) => sum + line.branches.length, 0),
+      routeStops: bundle.counts.routeStops + manualRouteStops.length,
+    },
+    lines: [...bundle.lines, ...manualLines],
+    routeStops: [...(bundle.routeStops ?? []), ...manualRouteStops],
+  };
+}
+
 function readBundle(): CanonicalBundle {
   const bundlePath = path.join(
     process.cwd(),
@@ -580,18 +829,25 @@ function readBundle(): CanonicalBundle {
     manualOverlays.stationOverrides,
   );
 
+  const withManualLines = applyManualLineDefinitions(
+    {
+      ...bundle,
+      lines: applyLineMetadataOverrides(bundle.lines, manualOverlays.lineMetadataOverrides),
+      stations,
+      manualTransferGroups: manualOverlays.manualTransferGroups,
+      manualTransferEdges: [
+        ...(bundle.manualTransferEdges ?? []),
+        ...manualOverlays.manualTransferEdges,
+      ].filter((edge) => edge.enabled),
+    },
+    manualOverlays.manualLineDefinitions,
+    manualOverlays.manualBranchDefinitions,
+  );
+
   return normalizeSingleLineStationMappings(
     applyBranchStationExclusions(
       applyBranchRouteOverrides(
-        {
-          ...bundle,
-          stations,
-          manualTransferGroups: manualOverlays.manualTransferGroups,
-          manualTransferEdges: [
-            ...(bundle.manualTransferEdges ?? []),
-            ...manualOverlays.manualTransferEdges,
-          ].filter((edge) => edge.enabled),
-        },
+        withManualLines,
         manualOverlays.branchRouteOverrides,
       ),
       manualOverlays.branchStationExclusions,

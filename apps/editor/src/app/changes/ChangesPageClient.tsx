@@ -57,6 +57,18 @@ const CATEGORIES = [
     description: "노선 이름, 표시명, 메모를 고친 항목",
     impact: "노선 목록과 지도 표시 이름에 반영됩니다.",
   },
+  {
+    key: "manualLineDefinitions",
+    label: "수기 노선",
+    description: "공식 데이터에 없는 노선의 이름, 색상, 철도 유형, 서비스 타입",
+    impact: "Web 지도와 editor에서 새 노선 뼈대가 생성됩니다.",
+  },
+  {
+    key: "manualBranchDefinitions",
+    label: "수기 노선 정차 순서",
+    description: "수기 노선에 속한 역 순서와 순환 여부",
+    impact: "Web 지도와 경로 그래프의 수기 노선 정차 순서에 반영됩니다.",
+  },
 ] as const;
 
 type CategoryKey = (typeof CATEGORIES)[number]["key"];

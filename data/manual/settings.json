@@ -3,5 +3,8 @@
   "editor": {
     "autosave": false,
     "unifiedEditor": true
-  }
+  },
+  "lineMetadataOverrides": [],
+  "manualLineDefinitions": [],
+  "manualBranchDefinitions": []
 }

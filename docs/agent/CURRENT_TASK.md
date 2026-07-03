@@ -99,3 +99,27 @@ Recommended scope:
 - Do not treat `apps/web/public/data` as the canonical manual source.
 - Do not use old documentation that says UI implementation is not allowed.
 - Do not silently auto-fix risky geometry problems without user-visible diagnostics.
+
+## 13.22.0 rail line category and intercity policy
+
+- `Line`은 기존 `Line -> Branch -> RouteStop -> Station` 구조를 유지하되 `category`와 `serviceTypes` 메타데이터를 가진다.
+- 허용 category: `urban_rail`, `gtx`, `conventional_rail`, `high_speed_rail`.
+- 허용 serviceTypes: `subway`, `gtx`, `ktx`, `srt`, `itx`, `saemaeul`, `mugunghwa`, `nuriro`, `airport_rail`, `unknown`.
+- 일반철도/고속철도는 별도 거대 모델로 갈아엎지 않는다. `경부선`, `호남선`, `장항선`, `경부고속선`, `호남고속선`, `수서평택고속선` 같은 선로/노선명을 `Line`으로 사용한다.
+- `KTX선`, `SRT선`은 만들지 않는다. KTX/SRT/ITX/무궁화 등은 `serviceTypes` 또는 후속 timetable metadata로 표현한다.
+- 같은 물리 역이어도 노선/선로 체계가 다르면 별도 `stationId`를 만들고, 같은 물리 역 연결은 환승 그룹으로 처리한다.
+
+## 13.23.0 manual rail line model
+
+일반철도/고속철 공식 데이터가 도시철도 수준으로 제공되지 않는 상황을 기준으로, 다음 단계는 자동 수집기보다 수기 노선 빌더 기반으로 전환한다.
+
+이번 단계는 UI 빌더를 한 번에 넣지 않고 안전하게 데이터 모델 기반만 추가한다.
+
+- `manualLineDefinitions`: canonical bundle에 없는 수기 Line 생성용 source-of-truth.
+- `manualBranchDefinitions`: 수기 Line의 정차역 순서/순환 여부 정의.
+- `railType`: `high_speed_rail`, `semi_high_speed_rail`, `trunk_rail`, `branch_rail`, `urban_rail`.
+- `serviceTypes`: KTX/SRT/ITX/새마을/무궁화/누리로/도시철도 등 서비스 메타데이터.
+- 수기 노선의 정차역은 기존 stationId 재사용이 아니라, 원칙적으로 해당 노선용 별도 stationId를 `stationOverrides`로 생성한 뒤 참조한다.
+- 같은 물리 역 연결은 stationId 공유가 아니라 환승 그룹으로 처리한다.
+
+후속 단계는 editor에서 노선 이름, 색상, 철도 유형, 서비스 타입을 입력하고 지도에서 역을 연속 선택하는 builder UI다.

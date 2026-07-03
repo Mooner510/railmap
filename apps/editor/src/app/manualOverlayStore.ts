@@ -14,7 +14,14 @@ import {
   type ManualLineBranchGeometryPoint,
   type ManualLineBranchMode,
   type ManualLineBranchOverride,
+  type ManualLineMetadataOverride,
+  type ManualLineDefinition,
+  type ManualBranchDefinition,
   type ManualStationOverride,
+  isManualRailStatus,
+  isManualRailType,
+  isRailLineCategory,
+  isRailServiceType,
   type ManualTransferEdge,
   type ManualTransferGroup,
 } from "./editorModel";
@@ -322,6 +329,82 @@ function normalizeLineBranchOverride(
   };
 }
 
+function normalizeLineMetadataOverride(
+  value: unknown,
+): ManualLineMetadataOverride | null {
+  if (!value || typeof value !== "object") return null;
+
+  const override = value as Record<string, unknown>;
+  const lineId = asString(override.lineId);
+  if (!lineId) return null;
+
+  const category = isRailLineCategory(override.category)
+    ? override.category
+    : undefined;
+  const serviceTypes = Array.isArray(override.serviceTypes)
+    ? [...new Set(override.serviceTypes.filter(isRailServiceType))]
+    : undefined;
+
+  return {
+    lineId,
+    category,
+    serviceTypes: serviceTypes && serviceTypes.length > 0 ? serviceTypes : undefined,
+    enabled: override.enabled !== false,
+    source: asString(override.source) ?? "editor",
+    note: asNullableString(override.note),
+  };
+}
+
+function normalizeManualLineDefinition(value: unknown): ManualLineDefinition | null {
+  if (!value || typeof value !== "object") return null;
+
+  const line = value as Record<string, unknown>;
+  const id = asString(line.id);
+  const nameKo = asString(line.nameKo);
+  if (!id || !nameKo) return null;
+
+  const railType = isManualRailType(line.railType) ? line.railType : "trunk_rail";
+  const serviceTypes = Array.isArray(line.serviceTypes)
+    ? [...new Set(line.serviceTypes.filter(isRailServiceType))]
+    : [];
+
+  return {
+    id,
+    nameKo,
+    colorHex: asString(line.colorHex) ?? "#64748b",
+    railType,
+    serviceTypes: serviceTypes.length > 0 ? serviceTypes : ["unknown"],
+    status: isManualRailStatus(line.status) ? line.status : "open",
+    enabled: line.enabled !== false,
+    source: asString(line.source) ?? "editor",
+    note: asNullableString(line.note),
+  };
+}
+
+function normalizeManualBranchDefinition(value: unknown): ManualBranchDefinition | null {
+  if (!value || typeof value !== "object") return null;
+
+  const branch = value as Record<string, unknown>;
+  const id = asString(branch.id);
+  const lineId = asString(branch.lineId);
+  if (!id || !lineId) return null;
+
+  const stationIds = Array.isArray(branch.stationIds)
+    ? [...new Set(branch.stationIds.map(asString).filter((id): id is string => id !== null))]
+    : [];
+
+  return {
+    id,
+    lineId,
+    nameKo: asNullableString(branch.nameKo),
+    stationIds,
+    circular: branch.circular === true,
+    enabled: branch.enabled !== false,
+    source: asString(branch.source) ?? "editor",
+    note: asNullableString(branch.note),
+  };
+}
+
 function normalizeGeometryOverride(
   value: unknown,
 ): ManualGeometryOverride | null {
@@ -460,6 +543,30 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
             (override): override is ManualGeometryOverride => override !== null,
           )
       : [],
+    lineMetadataOverrides: Array.isArray(
+      (data as { lineMetadataOverrides?: unknown }).lineMetadataOverrides,
+    )
+      ? (data as { lineMetadataOverrides: unknown[] }).lineMetadataOverrides
+          .map(normalizeLineMetadataOverride)
+          .filter(
+            (override): override is ManualLineMetadataOverride =>
+              override !== null,
+          )
+      : [],
+    manualLineDefinitions: Array.isArray(
+      (data as { manualLineDefinitions?: unknown }).manualLineDefinitions,
+    )
+      ? (data as { manualLineDefinitions: unknown[] }).manualLineDefinitions
+          .map(normalizeManualLineDefinition)
+          .filter((line): line is ManualLineDefinition => line !== null)
+      : [],
+    manualBranchDefinitions: Array.isArray(
+      (data as { manualBranchDefinitions?: unknown }).manualBranchDefinitions,
+    )
+      ? (data as { manualBranchDefinitions: unknown[] }).manualBranchDefinitions
+          .map(normalizeManualBranchDefinition)
+          .filter((branch): branch is ManualBranchDefinition => branch !== null)
+      : [],
   };
 }
 
@@ -511,6 +618,9 @@ async function writeManualOverlaySplitFiles(overlays: ManualOverlayBundle) {
     writeJson(paths.settings, {
       schemaVersion: overlays.schemaVersion,
       editor: { autosave: false, unifiedEditor: true },
+      lineMetadataOverrides: overlays.lineMetadataOverrides,
+      manualLineDefinitions: overlays.manualLineDefinitions,
+      manualBranchDefinitions: overlays.manualBranchDefinitions,
     }),
   ]);
 }
