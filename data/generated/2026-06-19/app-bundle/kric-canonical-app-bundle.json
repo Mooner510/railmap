@@ -1,7 +1,7 @@
 {
   "bundleId": "kric-canonical-app-bundle",
   "acquiredDate": "2026-06-19",
-  "generatedAt": "2026-07-02T07:01:42.578Z",
+  "generatedAt": "2026-07-03T05:41:25.230Z",
   "policy": {
     "canonicalLineSource": "data/manual/kric-subway-route-info-line-map.csv",
     "canonicalSourceLineMap": "data/manual/kric-canonical-source-line-map.csv",
@@ -28,6 +28,10 @@
       "lnCd": "K5",
       "mreaWideCd": "01",
       "nameKo": "경강선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#003DA5",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -245,6 +249,10 @@
       "lnCd": "K4",
       "mreaWideCd": "01",
       "nameKo": "경의중앙선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#77C4A3",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -1028,6 +1036,10 @@
       "lnCd": "K2",
       "mreaWideCd": "01",
       "nameKo": "경춘선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#0C8E72",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -1357,6 +1369,10 @@
       "lnCd": "A1",
       "mreaWideCd": "01",
       "nameKo": "공항철도",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "airport_rail"
+      ],
       "colorHex": "#0090D2",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -1606,6 +1622,10 @@
       "lnCd": "G1",
       "mreaWideCd": "01",
       "nameKo": "김포골드라인",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#A17800",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -1811,6 +1831,10 @@
       "lnCd": "1",
       "mreaWideCd": "01",
       "nameKo": "1호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#0052A4",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -3586,6 +3610,10 @@
       "lnCd": "2",
       "mreaWideCd": "01",
       "nameKo": "2호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#00A84D",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -4554,6 +4582,10 @@
       "lnCd": "3",
       "mreaWideCd": "01",
       "nameKo": "3호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#EF7C1C",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -5191,6 +5223,10 @@
       "lnCd": "4",
       "mreaWideCd": "01",
       "nameKo": "4호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#00A5DE",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -6032,6 +6068,10 @@
       "lnCd": "5",
       "mreaWideCd": "01",
       "nameKo": "5호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#996CAC",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -7051,6 +7091,10 @@
       "lnCd": "6",
       "mreaWideCd": "01",
       "nameKo": "6호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#CD7C2F",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -7778,6 +7822,10 @@
       "lnCd": "7",
       "mreaWideCd": "01",
       "nameKo": "7호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#747F00",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -8746,6 +8794,10 @@
       "lnCd": "8",
       "mreaWideCd": "01",
       "nameKo": "8호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#E6186C",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -9157,6 +9209,10 @@
       "lnCd": "9",
       "mreaWideCd": "01",
       "nameKo": "9호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#BDB092",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -9790,6 +9846,10 @@
       "lnCd": "K1",
       "mreaWideCd": "01",
       "nameKo": "수인분당선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#F5A200",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -10779,6 +10839,10 @@
       "lnCd": "D1",
       "mreaWideCd": "01",
       "nameKo": "신분당선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#D4003B",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -11092,6 +11156,10 @@
       "lnCd": "L1",
       "mreaWideCd": "01",
       "nameKo": "신림선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#6789CA",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -11293,6 +11361,10 @@
       "lnCd": "E1",
       "mreaWideCd": "01",
       "nameKo": "용인에버라인",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#56AD2D",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -11558,6 +11630,10 @@
       "lnCd": "UI",
       "mreaWideCd": "01",
       "nameKo": "우이신설선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#B0CE18",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -11791,6 +11867,10 @@
       "lnCd": "U1",
       "mreaWideCd": "01",
       "nameKo": "의정부 경전철",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#FDA600",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -12056,6 +12136,10 @@
       "lnCd": "I1",
       "mreaWideCd": "01",
       "nameKo": "인천1호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#7CA8D5",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -12561,6 +12645,10 @@
       "lnCd": "I2",
       "mreaWideCd": "01",
       "nameKo": "인천2호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#ED8B00",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -13018,6 +13106,10 @@
       "lnCd": "M1",
       "mreaWideCd": "01",
       "nameKo": "자기부상",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#FFCD12",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -13139,6 +13231,10 @@
       "lnCd": "WS",
       "mreaWideCd": "01",
       "nameKo": "서해선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#8FC31F",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -13404,6 +13500,10 @@
       "lnCd": "1",
       "mreaWideCd": "02",
       "nameKo": "부산1호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#F06A00",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -14069,6 +14169,10 @@
       "lnCd": "2",
       "mreaWideCd": "02",
       "nameKo": "부산2호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#81BF48",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -14782,6 +14886,10 @@
       "lnCd": "3",
       "mreaWideCd": "02",
       "nameKo": "부산3호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#BB8C00",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -15079,6 +15187,10 @@
       "lnCd": "4",
       "mreaWideCd": "02",
       "nameKo": "부산4호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#217DCB",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -15328,6 +15440,10 @@
       "lnCd": "B1",
       "mreaWideCd": "02",
       "nameKo": "부산김해경전철",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#8652A1",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -15731,6 +15847,10 @@
       "lnCd": "1",
       "mreaWideCd": "03",
       "nameKo": "대구1호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#D93F5C",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -16316,6 +16436,10 @@
       "lnCd": "2",
       "mreaWideCd": "03",
       "nameKo": "대구2호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#00AA80",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -16805,6 +16929,10 @@
       "lnCd": "3",
       "mreaWideCd": "03",
       "nameKo": "대구3호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#FFB100",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -17310,6 +17438,10 @@
       "lnCd": "1",
       "mreaWideCd": "04",
       "nameKo": "광주1호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#009088",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [
@@ -17695,6 +17827,10 @@
       "lnCd": "1",
       "mreaWideCd": "05",
       "nameKo": "대전1호선",
+      "category": "urban_rail",
+      "serviceTypes": [
+        "subway"
+      ],
       "colorHex": "#007448",
       "colorSource": "data/manual/kric-canonical-line-colors.csv",
       "branches": [

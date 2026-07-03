@@ -79,6 +79,7 @@ type ManualOverlayBundle = {
     railType?: string;
     serviceTypes?: string[];
     status?: string;
+    coverageStatus?: string;
     enabled?: boolean;
   }>;
   manualBranchDefinitions?: Array<{
@@ -596,6 +597,7 @@ function validateManualLineDefinitions(
     "urban_rail",
   ]);
   const validStatuses = new Set(["open", "construction", "planned", "closed"]);
+  const validCoverageStatuses = new Set(["draft", "partial", "complete"]);
   const validServiceTypes = new Set([
     "subway",
     "gtx",
@@ -644,6 +646,16 @@ function validateManualLineDefinitions(
         message: "지원하지 않는 수기 노선 운영 상태입니다.",
         cause: "status가 허용 enum에 없습니다.",
         fix: "open, construction, planned, closed 중 하나로 수정하세요.",
+      });
+    }
+    if (line.coverageStatus && !validCoverageStatuses.has(line.coverageStatus)) {
+      addIssue(issues, {
+        severity: "error",
+        code: "invalid-manual-line-coverage-status",
+        where,
+        message: "지원하지 않는 수기 노선 구축 상태입니다.",
+        cause: "coverageStatus가 허용 enum에 없습니다.",
+        fix: "draft, partial, complete 중 하나로 수정하세요.",
       });
     }
     for (const serviceType of line.serviceTypes ?? []) {

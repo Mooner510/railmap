@@ -10,7 +10,8 @@ export type LineBranchValidationIssueCategory =
   | "station-line-identity"
   | "stale-anchor"
   | "detached-geometry"
-  | "missing-geometry";
+  | "missing-geometry"
+  | "manual-line-review";
 
 export type LineBranchValidationIssueSeverity = "error" | "warning";
 
@@ -69,6 +70,7 @@ function getValidationCategoryLabel(category: LineBranchValidationIssueCategory)
   if (category === "stale-anchor") return "저장 선형 anchor 불일치";
   if (category === "detached-geometry") return "선형 좌표 문제";
   if (category === "missing-geometry") return "선형 없음";
+  if (category === "manual-line-review") return "수기 노선 점검";
   return "기타 문제";
 }
 
@@ -79,6 +81,7 @@ function getValidationCategoryDescription(category: LineBranchValidationIssueCat
   if (category === "stale-anchor") return "역 위치 변경 후 저장 선형의 station anchor가 이전 좌표에 남아 있습니다.";
   if (category === "detached-geometry") return "station anchor가 실제 역 위치와 너무 멀거나 좌표 품질이 낮습니다.";
   if (category === "missing-geometry") return "정차역은 있지만 지도에 그릴 선형 좌표가 없습니다.";
+  if (category === "manual-line-review") return "수기 노선 빌더로 만든 노선의 역 목록, 좌표, 환승 그룹 후보를 점검합니다.";
   return "추가 확인이 필요한 문제입니다.";
 }
 
@@ -92,6 +95,8 @@ function getPublicWebManualChangeRows(overlays: ManualOverlayBundle) {
     { label: "지선 overlay", count: (overlays.lineBranchOverrides ?? []).length, description: "지선 추가/노선 결합으로 만든 수동 지선 선형입니다." },
     { label: "선형 보정", count: overlays.geometryOverrides.length, description: "일반 branch의 수동 station anchor/control point 보정입니다." },
     { label: "노선 보정", count: overlays.branchOverrides.length, description: "노선 단위 표시/메타 보정입니다." },
+    { label: "수기 노선", count: overlays.manualLineDefinitions.length, description: "공식 데이터에 없는 일반철도/고속철도 노선을 수기로 추가한 항목입니다." },
+    { label: "수기 노선 정차 순서", count: overlays.manualBranchDefinitions.length, description: "수기 노선의 시작역부터 종점역까지의 역 목록입니다." },
   ];
 }
 

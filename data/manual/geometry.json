@@ -241,6 +241,32 @@
       "enabled": true,
       "source": "editor",
       "note": null
+    },
+    {
+      "id": "manual-line-branch:connect-line:01:2:branch:S1122:수도권 도시철도 2호선:2:candidate:kric:urban-rail-station:S1122:2341:row-281:01:2:main:S1102:수도권 도시철도 2호선:0:candidate:kric:urban-rail-station:S1102:0234:row-668:toward-start",
+      "mode": "connect-line",
+      "parentBranchId": "01:2:branch:S1122:수도권 도시철도 2호선:2",
+      "anchorStationId": "candidate:kric:urban-rail-station:S1122:2341:row-281",
+      "connectedBranchId": "01:2:main:S1102:수도권 도시철도 2호선:0",
+      "connectedEndpointStationId": "candidate:kric:urban-rail-station:S1102:0234:row-668",
+      "connectedDirection": "toward-start",
+      "geometry": [
+        {
+          "lng": 126.882586,
+          "lat": 37.5145589,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1122:2341:row-281"
+        },
+        {
+          "lng": 126.891222,
+          "lat": 37.508815,
+          "kind": "station",
+          "stationId": "candidate:kric:urban-rail-station:S1102:0234:row-668"
+        }
+      ],
+      "enabled": true,
+      "source": "editor",
+      "note": null
     }
   ],
   "geometryOverrides": [
@@ -1301,6 +1327,67 @@
       ],
       "enabled": true,
       "note": "경의중앙선 본선 표시 보정: 서울역 지선 분리 후 용산-청량리 경유 구간 좌표 보강"
+    },
+    {
+      "branchId": "manual.branch.manual.line.경부선.main",
+      "points": [
+        {
+          "lng": 126.97077510245055,
+          "lat": 37.55454115869405,
+          "kind": "station",
+          "stationId": "manual.station.manual.line.경부선.서울역"
+        },
+        {
+          "lng": 126.97131498181716,
+          "lat": 37.54054239909135,
+          "kind": "station",
+          "stationId": "manual.station.manual.line.경부선.남영역"
+        },
+        {
+          "lng": 126.96490837920447,
+          "lat": 37.52986158616589,
+          "kind": "station",
+          "stationId": "manual.station.manual.line.경부선.용산역"
+        },
+        {
+          "lng": 126.9420192975266,
+          "lat": 37.514228753743836,
+          "kind": "station",
+          "stationId": "manual.station.manual.line.경부선.노량진역"
+        },
+        {
+          "lng": 126.92656491514936,
+          "lat": 37.513356214855364,
+          "kind": "station",
+          "stationId": "manual.station.manual.line.경부선.대방역"
+        },
+        {
+          "lng": 126.91840405408743,
+          "lat": 37.516764483585106,
+          "kind": "station",
+          "stationId": "manual.station.manual.line.경부선.신길"
+        },
+        {
+          "lng": 126.90694540628402,
+          "lat": 37.515340011488746,
+          "kind": "station",
+          "stationId": "manual.station.manual.line.경부선.영등포"
+        },
+        {
+          "lng": 126.89172138340422,
+          "lat": 37.50900855657662,
+          "kind": "station",
+          "stationId": "manual.station.manual.line.경부선.신도림역"
+        },
+        {
+          "lng": 126.88250068284901,
+          "lat": 37.50344540578287,
+          "kind": "station",
+          "stationId": "manual.station.manual.line.경부선.구로역"
+        }
+      ],
+      "enabled": true,
+      "note": "수기 노선 빌더 기본 직선 선형"
     }
   ]
 }

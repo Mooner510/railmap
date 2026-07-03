@@ -113,3 +113,13 @@ collector/build/export 단계는 수기 보정 원본을 공개 web 경로로 �
 - `trunk_rail`: 간선철도
 - `branch_rail`: 지선철도
 - `urban_rail`: 도시철도
+
+### 수기 노선 구축 상태와 역 목록 빌더
+
+`manualLineDefinitions.coverageStatus`는 수기 노선의 구축 범위를 나타낸다.
+
+- `draft`: 노선 메타데이터만 있거나 검토 전 상태.
+- `partial`: 경부선처럼 큰 물리 노선을 주요역부터 부분 구축한 상태.
+- `complete`: 현재 기준으로 물리 노선의 역 목록을 모두 구축한 상태.
+
+수기 노선의 역 목록은 물리 선로/철도 노선 기준으로 만든다. 예를 들어 `경부선`에는 원칙적으로 해당 물리 구간의 역을 포함하고, KTX/SRT/무궁화/수도권 전철 같은 운행계통의 실제 정차역은 후속 service pattern/timetable 모델에서 분리한다.

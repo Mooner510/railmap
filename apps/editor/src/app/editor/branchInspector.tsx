@@ -1,11 +1,17 @@
 import { Button } from "@repo/ui/button";
 import { cn } from "@repo/ui/utils";
 import { ChevronRight, Trash2 } from "lucide-react";
-import type {
-  EditorStation,
-  ManualBranchRouteOverride,
-  ManualBranchStationExclusion,
-  ManualLineBranchOverride,
+import {
+  RAIL_LINE_CATEGORIES,
+  RAIL_SERVICE_TYPES,
+  formatRailLineCategory,
+  formatRailServiceType,
+  type EditorStation,
+  type ManualBranchRouteOverride,
+  type ManualBranchStationExclusion,
+  type ManualLineBranchOverride,
+  type RailLineCategory,
+  type RailServiceType,
 } from "../editorModel";
 import type { EditorMapBranch } from "../editorData";
 import { isBranchCircular } from "./branchRules";
@@ -156,6 +162,7 @@ export function BranchInspector({
   onUpdateRoute,
   onResetRoute,
   onSetCircular,
+  onUpdateLineMetadata,
 }: {
   branch: EditorMapBranch;
   branches: EditorMapBranch[];
@@ -168,6 +175,7 @@ export function BranchInspector({
   onUpdateRoute: (stationIds: string[], label: string, circular?: boolean) => void;
   onResetRoute: () => void;
   onSetCircular: (circular: boolean) => void;
+  onUpdateLineMetadata: (category: RailLineCategory, serviceTypes: RailServiceType[]) => void;
 }) {
   const branchStations = getBranchStopStations(branch);
   const relatedLineBranches = lineBranchOverrides.filter(
@@ -243,6 +251,67 @@ export function BranchInspector({
             <p className="mt-1 truncate text-xs font-bold text-slate-700">
               {branch.terminal ?? "-"}
             </p>
+          </div>
+        </div>
+
+        <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <strong className="text-xs font-semibold text-slate-800">
+                철도 유형 / 서비스
+              </strong>
+              <p className="mt-1 text-[11px] font-medium leading-4 text-slate-500">
+                일반철도와 고속철 확장을 위한 노선 메타데이터입니다. KTX/SRT는 노선명이 아니라 서비스 타입으로만 표시합니다.
+              </p>
+            </div>
+            <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+              {formatRailLineCategory(branch.category)}
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-1.5">
+            {RAIL_LINE_CATEGORIES.map((category) => (
+              <button
+                key={category}
+                type="button"
+                className={cn(
+                  "rounded-xl border px-2 py-1.5 text-[11px] font-bold transition",
+                  branch.category === category
+                    ? "border-sky-300 bg-sky-50 text-sky-800"
+                    : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
+                )}
+                onClick={() => onUpdateLineMetadata(category, branch.serviceTypes)}
+              >
+                {formatRailLineCategory(category)}
+              </button>
+            ))}
+          </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {RAIL_SERVICE_TYPES.map((serviceType) => {
+              const active = branch.serviceTypes.includes(serviceType);
+              const nextServiceTypes = active
+                ? branch.serviceTypes.filter((item) => item !== serviceType)
+                : [...branch.serviceTypes, serviceType];
+              return (
+                <button
+                  key={serviceType}
+                  type="button"
+                  className={cn(
+                    "rounded-full border px-2 py-1 text-[11px] font-bold transition",
+                    active
+                      ? "border-blue-200 bg-blue-50 text-blue-700"
+                      : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
+                  )}
+                  onClick={() =>
+                    onUpdateLineMetadata(
+                      branch.category,
+                      nextServiceTypes.length > 0 ? nextServiceTypes : ["unknown"],
+                    )
+                  }
+                >
+                  {formatRailServiceType(serviceType)}
+                </button>
+              );
+            })}
           </div>
         </div>
         <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
