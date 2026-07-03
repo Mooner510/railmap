@@ -42,6 +42,14 @@ export const MANUAL_RAIL_STATUSES = [
 
 export type ManualRailStatus = (typeof MANUAL_RAIL_STATUSES)[number];
 
+export const MANUAL_LINE_COVERAGE_STATUSES = [
+  "draft",
+  "partial",
+  "complete",
+] as const;
+
+export type ManualLineCoverageStatus = (typeof MANUAL_LINE_COVERAGE_STATUSES)[number];
+
 export function isManualRailType(value: unknown): value is ManualRailType {
   return typeof value === "string" && MANUAL_RAIL_TYPES.includes(value as ManualRailType);
 }
@@ -50,10 +58,25 @@ export function isManualRailStatus(value: unknown): value is ManualRailStatus {
   return typeof value === "string" && MANUAL_RAIL_STATUSES.includes(value as ManualRailStatus);
 }
 
+export function isManualLineCoverageStatus(value: unknown): value is ManualLineCoverageStatus {
+  return typeof value === "string" && MANUAL_LINE_COVERAGE_STATUSES.includes(value as ManualLineCoverageStatus);
+}
+
 export function manualRailTypeToLineCategory(railType: ManualRailType): RailLineCategory {
   if (railType === "high_speed_rail") return "high_speed_rail";
   if (railType === "urban_rail") return "urban_rail";
   return "conventional_rail";
+}
+
+export function formatManualLineCoverageStatus(status: ManualLineCoverageStatus) {
+  switch (status) {
+    case "draft":
+      return "작성 중";
+    case "partial":
+      return "일부 역만 입력";
+    case "complete":
+      return "전체 역 입력 완료";
+  }
 }
 
 export function formatManualRailType(railType: ManualRailType) {
@@ -146,6 +169,7 @@ export interface ManualLineDefinition {
   railType: ManualRailType;
   serviceTypes: RailServiceType[];
   status: ManualRailStatus;
+  coverageStatus?: ManualLineCoverageStatus;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;
