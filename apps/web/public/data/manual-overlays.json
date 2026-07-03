@@ -1704,5 +1704,6 @@
     }
   ],
   "dismissedTransferGroupSuggestionKeys": [],
-  "transferTimePendingGroupIds": []
+  "transferTimePendingGroupIds": [],
+  "dismissedTransferGroupSuggestionNotes": {}
 }

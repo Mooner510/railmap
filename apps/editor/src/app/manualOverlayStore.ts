@@ -502,6 +502,18 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
       ]
     : [];
 
+
+
+  const dismissedTransferGroupSuggestionNotes = (() => {
+    const raw = (data as { dismissedTransferGroupSuggestionNotes?: unknown }).dismissedTransferGroupSuggestionNotes;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {} as Record<string, string>;
+    return Object.fromEntries(
+      Object.entries(raw as Record<string, unknown>)
+        .map(([key, value]) => [key, asString(value)] as const)
+        .filter((entry): entry is readonly [string, string] => Boolean(entry[0]) && entry[1] !== null),
+    );
+  })();
+
   const transferTimePendingGroupIds = Array.isArray(
     (data as { transferTimePendingGroupIds?: unknown }).transferTimePendingGroupIds,
   )
@@ -523,6 +535,7 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
     ],
     nonTransferStationIds,
     dismissedTransferGroupSuggestionKeys,
+    dismissedTransferGroupSuggestionNotes,
     transferTimePendingGroupIds,
     stationOverrides: Array.isArray(data.stationOverrides)
       ? data.stationOverrides
@@ -635,6 +648,7 @@ async function writeManualOverlaySplitFiles(overlays: ManualOverlayBundle) {
       manualTransferGroups: overlays.manualTransferGroups,
       manualTransferEdges: [],
       dismissedTransferGroupSuggestionKeys: overlays.dismissedTransferGroupSuggestionKeys,
+      dismissedTransferGroupSuggestionNotes: overlays.dismissedTransferGroupSuggestionNotes,
       transferTimePendingGroupIds: overlays.transferTimePendingGroupIds,
     }),
     writeJson(paths.geometry, {

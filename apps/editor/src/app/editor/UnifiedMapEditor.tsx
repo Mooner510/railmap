@@ -280,6 +280,12 @@ function getApproxDistanceMeters(left: EditorStation, right: EditorStation) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
+function formatApproxDistanceMeters(value: number) {
+  if (!Number.isFinite(value)) return "-";
+  if (value >= 1000) return `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}km`;
+  return `${Math.round(value).toLocaleString("ko-KR")}m`;
+}
+
 function makeTransferGroupSuggestionKey(stationIds: string[]) {
   return stationIds.slice().sort().join("|");
 }
@@ -6426,13 +6432,19 @@ export default function UnifiedMapEditor({
     setSidebarTab("transferReview");
   }
 
-  async function dismissTransferGroupSuggestion(suggestion: TransferGroupSuggestion) {
+  async function dismissTransferGroupSuggestion(suggestion: TransferGroupSuggestion, reason?: string) {
     const nextKeys = [
       ...new Set([...(overlays.dismissedTransferGroupSuggestionKeys ?? []), suggestion.key]),
     ];
+    const nextNotes = { ...(overlays.dismissedTransferGroupSuggestionNotes ?? {}) };
+    if (reason?.trim()) nextNotes[suggestion.key] = reason.trim();
     const saved = await executeOverlayCommand(
       "환승 그룹 추천 거절",
-      { ...overlays, dismissedTransferGroupSuggestionKeys: nextKeys },
+      {
+        ...overlays,
+        dismissedTransferGroupSuggestionKeys: nextKeys,
+        dismissedTransferGroupSuggestionNotes: nextNotes,
+      },
       `${suggestion.nameKo} 환승 그룹 추천을 거절했습니다`,
     );
     if (!saved) return;
@@ -7861,6 +7873,7 @@ export default function UnifiedMapEditor({
               <TransferGroupReviewPanel
                 suggestions={transferGroupSuggestions}
                 dismissedKeys={overlays.dismissedTransferGroupSuggestionKeys ?? []}
+                dismissedNotes={overlays.dismissedTransferGroupSuggestionNotes ?? {}}
                 approvedKeys={approvedTransferSuggestionKeys}
                 activeKey={activeTransferSuggestionKey}
                 filter={transferReviewFilter}
@@ -7868,7 +7881,7 @@ export default function UnifiedMapEditor({
                 onChangeFilter={setTransferReviewFilter}
                 onOpenSuggestion={openTransferGroupSuggestion}
                 onSelectSuggestion={(suggestion) => setActiveTransferSuggestionKey(suggestion.key)}
-                onDismissSuggestion={(suggestion) => void dismissTransferGroupSuggestion(suggestion)}
+                onDismissSuggestion={(suggestion, reason) => void dismissTransferGroupSuggestion(suggestion, reason)}
               />
             ) : null}
 
@@ -8170,6 +8183,8 @@ export default function UnifiedMapEditor({
                 onSave={() => void saveTransferDraft()}
                 onSavePending={() => void saveTransferDraft(true)}
                 onDelete={() => void deleteTransferGroup(selectedGroup.id)}
+                onFocusStation={focusStation}
+                onFocusStations={focusStationCluster}
               />
             ) : null}
             {!isGeometryMode && !selectedGroup && transferDraft ? (
@@ -8180,6 +8195,8 @@ export default function UnifiedMapEditor({
                 onSave={() => void saveTransferDraft()}
                 onSavePending={() => void saveTransferDraft(true)}
                 onCancel={() => setTransferDraft(null)}
+                onFocusStation={focusStation}
+                onFocusStations={focusStationCluster}
               />
             ) : null}
             {!isGeometryMode && multiStationIds.length > 0 && !transferDraft ? (
@@ -9578,6 +9595,8 @@ function TransferGroupInspector({
   onSave,
   onSavePending,
   onDelete,
+  onFocusStation,
+  onFocusStations,
 }: {
   group: ManualTransferGroup;
   draft: TransferGroupDraft;
@@ -9587,9 +9606,12 @@ function TransferGroupInspector({
   onSave: () => void;
   onSavePending?: () => void;
   onDelete: () => void;
+  onFocusStation?: (stationId: string) => void;
+  onFocusStations?: (stationIds: string[]) => void;
 }) {
   const [timeModalOpen, setTimeModalOpen] = useState(false);
   const [selectedTransferCell, setSelectedTransferCell] = useState<{ rowId: string; colId: string } | null>(null);
+  const [focusedTransferStationId, setFocusedTransferStationId] = useState<string | null>(null);
   const pairKeys = getTransferPairKeys(draft.stationIds);
   const missingPairs = getMissingTransferMinutePairLabels(draft, stationById);
   const title = mode === "create" ? "새 환승 그룹 만들기" : group.nameKo;
@@ -9630,7 +9652,7 @@ function TransferGroupInspector({
     const baseStations = draft.stationIds
       .map((stationId) => stationById.get(stationId))
       .filter((station): station is EditorStation => Boolean(station && isValidStation(station)));
-    if (baseStations.length === 0) return [] as EditorStation[];
+    if (baseStations.length === 0) return [] as { station: EditorStation; nameMatch: boolean; distance: number }[];
     const nameKeys = new Set(baseStations.map((station) => getManualStationNameKey(station.nameKo)).filter(Boolean));
     return [...stationById.values()]
       .filter((station) => !included.has(station.id) && isValidStation(station))
@@ -9641,8 +9663,7 @@ function TransferGroupInspector({
       })
       .filter((candidate) => candidate.nameMatch || candidate.distance <= 280)
       .sort((a, b) => Number(b.nameMatch) - Number(a.nameMatch) || a.distance - b.distance)
-      .slice(0, 6)
-      .map((candidate) => candidate.station);
+      .slice(0, 8);
   }, [draft.stationIds, stationById]);
 
   function addStation(stationId: string) {
@@ -9655,6 +9676,13 @@ function TransferGroupInspector({
         draft.transferMinutesByPair,
       ),
     });
+    setFocusedTransferStationId(stationId);
+    onFocusStation?.(stationId);
+  }
+
+  function focusTransferStation(stationId: string) {
+    setFocusedTransferStationId(stationId);
+    onFocusStation?.(stationId);
   }
 
   return (
@@ -9698,62 +9726,90 @@ function TransferGroupInspector({
           onChange={(event) => onChange({ ...draft, note: event.target.value })}
         />
       </Field>
-      <div className="grid gap-2 rounded-3xl border border-slate-200 p-2">
+      <div className="grid gap-2 rounded-3xl border border-slate-200 bg-white p-2">
         <div className="flex items-center justify-between px-1">
-          <strong className="text-xs font-medium text-slate-600">
-            포함 역
-          </strong>
-          <span className="text-[11px] font-semibold text-slate-400">
-            2개 이상
-          </span>
+          <strong className="text-xs font-medium text-slate-600">포함 역</strong>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-normal text-slate-400">{draft.stationIds.length}개</span>
+            <Button size="sm" variant="ghost" onClick={() => onFocusStations?.(draft.stationIds)}>지도 보기</Button>
+          </div>
         </div>
-        {draft.stationIds.map((stationId) => {
-          const station = stationById.get(stationId);
-          return (
-            <div
-              key={stationId}
-              className="flex items-center justify-between gap-2 rounded-2xl bg-slate-50 px-3 py-2"
-            >
-              <span className="min-w-0 text-xs font-medium text-slate-700">
-                <span className="block truncate">
-                  {station?.nameKo ?? stationId}
-                </span>
-                <span className="block truncate text-[11px] text-slate-400">
-                  {station
-                    ? formatStationSubLabel(station)
-                    : "존재하지 않는 역"}
-                </span>
-              </span>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => removeStation(stationId)}
-                disabled={draft.stationIds.length <= 2}
-                title="환승 그룹에서 제거"
+        <div className="grid gap-1">
+          {draft.stationIds.map((stationId) => {
+            const station = stationById.get(stationId);
+            const selected = focusedTransferStationId === stationId;
+            return (
+              <div
+                key={stationId}
+                className={cn(
+                  "group flex items-center gap-2 rounded-xl border px-2 py-1.5 transition",
+                  selected ? "border-violet-200 bg-violet-50" : "border-transparent bg-slate-50 hover:border-slate-200 hover:bg-white",
+                )}
               >
-                <Trash2 className="size-3" />
-              </Button>
-            </div>
-          );
-        })}
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => focusTransferStation(stationId)}
+                  title={station ? formatStationSubLabel(station) : stationId}
+                >
+                  <span className="block truncate text-xs font-medium text-slate-800">
+                    {station?.nameKo ?? stationId}
+                  </span>
+                  <span className="block truncate text-[10px] font-normal text-slate-400">
+                    {station ? formatStationSubLabel(station) : "존재하지 않는 역"}
+                  </span>
+                </button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => focusTransferStation(stationId)}
+                  title="지도에서 보기"
+                >
+                  <LocateFixed className="size-3" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    if (draft.stationIds.length <= 2) return;
+                    if (!window.confirm(`${station?.nameKo ?? stationId} 역을 환승 그룹에서 제거할까요?`)) return;
+                    removeStation(stationId);
+                  }}
+                  disabled={draft.stationIds.length <= 2}
+                  title="환승 그룹에서 제거"
+                >
+                  <X className="size-3" />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
       </div>
       {nearbyStationCandidates.length > 0 ? (
         <div className="grid gap-2 rounded-3xl border border-slate-200 bg-white p-2">
           <div className="flex items-center justify-between px-1">
-            <strong className="text-xs font-medium text-slate-600">주변 후보</strong>
-            <span className="text-[11px] font-normal text-slate-400">추가할 역 선택</span>
+            <strong className="text-xs font-medium text-slate-600">추가 후보</strong>
+            <span className="text-[11px] font-normal text-slate-400">가까운 역</span>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {nearbyStationCandidates.map((station) => (
-              <button
+          <div className="grid gap-1">
+            {nearbyStationCandidates.map(({ station, nameMatch, distance }) => (
+              <div
                 key={station.id}
-                type="button"
-                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-normal text-slate-700 hover:border-violet-200 hover:bg-violet-50"
-                onClick={() => addStation(station.id)}
-                title={formatStationSubLabel(station)}
+                className="flex items-center gap-2 rounded-xl bg-slate-50 px-2 py-1.5"
               >
-                {station.nameKo}
-              </button>
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 text-left"
+                  onClick={() => onFocusStation?.(station.id)}
+                  title={formatStationSubLabel(station)}
+                >
+                  <span className="block truncate text-xs font-medium text-slate-800">{station.nameKo}</span>
+                  <span className="block truncate text-[10px] font-normal text-slate-400">
+                    {nameMatch ? "이름 일치" : formatApproxDistanceMeters(distance)} · {station.lineNameKo ?? "-"}
+                  </span>
+                </button>
+                <Button size="sm" variant="outline" onClick={() => addStation(station.id)}>추가</Button>
+              </div>
             ))}
           </div>
         </div>
@@ -9931,6 +9987,7 @@ function TransferGroupInspector({
 function TransferGroupReviewPanel({
   suggestions,
   dismissedKeys,
+  dismissedNotes,
   approvedKeys,
   activeKey,
   filter,
@@ -9942,6 +9999,7 @@ function TransferGroupReviewPanel({
 }: {
   suggestions: TransferGroupSuggestion[];
   dismissedKeys: string[];
+  dismissedNotes: Record<string, string>;
   approvedKeys: Set<string>;
   activeKey: string | null;
   filter: TransferGroupReviewFilter;
@@ -9949,9 +10007,10 @@ function TransferGroupReviewPanel({
   onChangeFilter: (filter: TransferGroupReviewFilter) => void;
   onOpenSuggestion: (suggestion: TransferGroupSuggestion) => void;
   onSelectSuggestion: (suggestion: TransferGroupSuggestion) => void;
-  onDismissSuggestion: (suggestion: TransferGroupSuggestion) => void;
+  onDismissSuggestion: (suggestion: TransferGroupSuggestion, reason?: string) => void;
 }) {
   const dismissed = new Set(dismissedKeys);
+  const [dismissReason, setDismissReason] = useState("환승역 아님");
   const filteredSuggestions = suggestions.filter((suggestion) => {
     const approved = approvedKeys.has(suggestion.key);
     const isDismissed = dismissed.has(suggestion.key);
@@ -9999,9 +10058,16 @@ function TransferGroupReviewPanel({
                 {activeSuggestion.confidence === "strong" ? "강한 추천" : "확인 필요"} · 최대 {Math.ceil(activeSuggestion.maxDistanceMeters).toLocaleString("ko-KR")}m
               </p>
             </div>
-            <Badge className={activeSuggestion.confidence === "strong" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}>
-              {activeSuggestion.stationIds.length}개 역
-            </Badge>
+            <div className="grid justify-items-end gap-1">
+              <Badge className={activeSuggestion.confidence === "strong" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}>
+                {activeSuggestion.stationIds.length}개 역
+              </Badge>
+              {approvedKeys.has(activeSuggestion.key) ? (
+                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">승인됨</span>
+              ) : dismissed.has(activeSuggestion.key) ? (
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">거절됨</span>
+              ) : null}
+            </div>
           </div>
 
           <div className="mt-2 flex flex-wrap gap-1">
@@ -10011,6 +10077,12 @@ function TransferGroupReviewPanel({
               </span>
             ))}
           </div>
+
+          {dismissed.has(activeSuggestion.key) && dismissedNotes[activeSuggestion.key] ? (
+            <p className="mt-2 rounded-xl bg-slate-100 px-3 py-2 text-[11px] font-normal text-slate-600">
+              거절 사유: {dismissedNotes[activeSuggestion.key]}
+            </p>
+          ) : null}
 
           <div className="mt-2 grid gap-1 rounded-2xl border border-slate-100 bg-slate-50 p-1.5">
             {activeSuggestion.stationIds.map((stationId) => {
@@ -10030,14 +10102,28 @@ function TransferGroupReviewPanel({
             })}
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={() => onDismissSuggestion(activeSuggestion)}>
-              거절
-            </Button>
-            <Button onClick={() => onOpenSuggestion(activeSuggestion)}>
-              수정 후 승인
-            </Button>
-          </div>
+          {!approvedKeys.has(activeSuggestion.key) && !dismissed.has(activeSuggestion.key) ? (
+            <div className="mt-3 grid gap-2">
+              <select
+                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-normal text-slate-700 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
+                value={dismissReason}
+                onChange={(event) => setDismissReason(event.target.value)}
+              >
+                <option value="환승역 아님">환승역 아님</option>
+                <option value="거리가 멂">거리가 멂</option>
+                <option value="동명이역">동명이역</option>
+                <option value="나중에 재검토">나중에 재검토</option>
+              </select>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={() => onDismissSuggestion(activeSuggestion, dismissReason)}>
+                  거절
+                </Button>
+                <Button onClick={() => onOpenSuggestion(activeSuggestion)}>
+                  수정 후 승인
+                </Button>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : (
         <Placeholder title="검토할 추천 없음" description="필터를 전체로 바꾸거나 수기 역을 더 추가하세요." />
@@ -10626,6 +10712,8 @@ function NewTransferGroupInspector({
   onSave,
   onSavePending,
   onCancel,
+  onFocusStation,
+  onFocusStations,
 }: {
   draft: TransferGroupDraft;
   stationById: Map<string, EditorStation>;
@@ -10633,6 +10721,8 @@ function NewTransferGroupInspector({
   onSave: () => void;
   onSavePending?: () => void;
   onCancel: () => void;
+  onFocusStation?: (stationId: string) => void;
+  onFocusStations?: (stationIds: string[]) => void;
 }) {
   const previewGroup = toTransferGroup(draft);
 
@@ -10646,6 +10736,8 @@ function NewTransferGroupInspector({
       onSave={onSave}
       onSavePending={onSavePending}
       onDelete={onCancel}
+      onFocusStation={onFocusStation}
+      onFocusStations={onFocusStations}
     />
   );
 }
