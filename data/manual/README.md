@@ -78,3 +78,38 @@ collector/build/export 단계는 수기 보정 원본을 공개 web 경로로 �
 - 같은 이름이라는 이유만으로 역 병합 금지
 - foreign stationId를 geometry station point로 저장 금지
 - 추정 이동 시간 저장 금지
+
+## Line metadata override
+
+`manual-overlays.json`의 `lineMetadataOverrides`는 일반철도/고속철 확장용 노선 메타데이터를 수기 보정한다.
+
+```json
+{
+  "lineId": "01:1",
+  "category": "urban_rail",
+  "serviceTypes": ["subway"],
+  "enabled": true,
+  "source": "editor",
+  "note": null
+}
+```
+
+고속열차 브랜드명은 Line 이름으로 쓰지 않는다. 예를 들어 `KTX선`이 아니라 `경부고속선`을 Line으로 만들고 `serviceTypes`에 `ktx`를 둔다.
+
+## Manual rail line definitions
+
+`manualLineDefinitions`와 `manualBranchDefinitions`는 공식 데이터로 생성되지 않는 일반철도/고속철/계획 노선의 뼈대를 수동으로 만들기 위한 구조다.
+
+- `manualLineDefinitions`: 노선 이름, 색상, 철도 유형, 서비스 타입, 운영 상태를 정의한다.
+- `manualBranchDefinitions`: 해당 노선의 정차역 순서와 순환 여부를 정의한다.
+- 정차역은 `stationOverrides`에 별도 stationId로 먼저 만들어야 한다.
+- 같은 물리 역이라도 노선/선로 체계가 다르면 stationId를 공유하지 않고 환승 그룹으로 묶는다.
+- KTX/SRT는 Line 이름이 아니라 `serviceTypes`로 표현한다.
+
+허용 철도 유형:
+
+- `high_speed_rail`: 고속선
+- `semi_high_speed_rail`: 준고속선
+- `trunk_rail`: 간선철도
+- `branch_rail`: 지선철도
+- `urban_rail`: 도시철도

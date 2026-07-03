@@ -1,8 +1,13 @@
 import fs from "node:fs/promises";
 import { getBundlePath, readManualOverlays } from "./manualOverlayStore";
 import {
+  inferRailLineCategory,
+  inferRailServiceTypes,
+  manualRailTypeToLineCategory,
   normalizeSearchText,
   type EditorStation,
+  type RailLineCategory,
+  type RailServiceType,
   type ManualBranchStationExclusion,
   type ManualBranchRouteOverride,
   type ManualGeometryOverride,
@@ -27,6 +32,7 @@ export type CanonicalBranch = {
   origin?: string | null;
   terminal?: string | null;
   routeStops: CanonicalRouteStop[];
+  isCircular?: boolean;
 };
 
 export type CanonicalLine = {
@@ -35,6 +41,8 @@ export type CanonicalLine = {
   lnCd?: string | null;
   nameKo: string;
   colorHex?: string | null;
+  category?: RailLineCategory | null;
+  serviceTypes?: RailServiceType[] | null;
   sourceLineNumbers?: string[] | null;
   branches?: CanonicalBranch[];
 };
@@ -44,6 +52,8 @@ export type EditorMapBranch = {
   canonicalLineId: string;
   canonicalLineNameKo: string;
   colorHex: string;
+  category: RailLineCategory;
+  serviceTypes: RailServiceType[];
   role: string;
   sourceLineNumber: string;
   sourceLineName: string;
@@ -66,6 +76,8 @@ export type EditorMapLine = {
   id: string;
   nameKo: string;
   colorHex: string;
+  category: RailLineCategory;
+  serviceTypes: RailServiceType[];
   branchCount: number;
 };
 
@@ -381,6 +393,99 @@ function applyBranchRouteOverride(
   });
 }
 
+function applyLineMetadataOverrides(
+  lines: CanonicalLine[] | undefined,
+  overlays: ManualOverlayBundle,
+): CanonicalLine[] | undefined {
+  if (!lines) return lines;
+  const overrideByLineId = new Map(
+    (overlays.lineMetadataOverrides ?? [])
+      .filter((override) => override.enabled !== false)
+      .map((override) => [override.lineId, override]),
+  );
+
+  return lines.map((line) => {
+    const lineId = line.canonicalKey ?? line.id ?? line.nameKo;
+    const fallbackCategory = line.category ?? inferRailLineCategory(line);
+    const fallbackServiceTypes =
+      line.serviceTypes && line.serviceTypes.length > 0
+        ? line.serviceTypes
+        : inferRailServiceTypes(line);
+    const override = overrideByLineId.get(lineId);
+
+    return {
+      ...line,
+      category: override?.category ?? fallbackCategory,
+      serviceTypes: override?.serviceTypes?.length
+        ? override.serviceTypes
+        : fallbackServiceTypes,
+    };
+  });
+}
+
+function applyManualLineDefinitions(bundle: CanonicalBundle, overlays: ManualOverlayBundle): CanonicalBundle {
+  const enabledLines = overlays.manualLineDefinitions.filter((line) => line.enabled !== false);
+  const enabledBranches = overlays.manualBranchDefinitions.filter((branch) => branch.enabled !== false);
+  if (enabledLines.length === 0) return bundle;
+
+  const existingLineIds = new Set((bundle.lines ?? []).map((line) => line.canonicalKey ?? line.id ?? line.nameKo));
+  const stationById = new Map(bundle.stations.map((station) => [station.id, station]));
+
+  const manualLines: CanonicalLine[] = [];
+
+  for (const line of enabledLines) {
+    if (existingLineIds.has(line.id)) continue;
+
+    const branches: CanonicalBranch[] = enabledBranches
+      .filter((branch) => branch.lineId === line.id)
+      .map((branch): CanonicalBranch => {
+        const routeStops = branch.stationIds
+          .filter((stationId) => stationById.has(stationId))
+          .map((stationId, index): CanonicalRouteStop => {
+            const station = stationById.get(stationId);
+            return {
+              id: `${branch.id}:manual-route:${index + 1}:${stationId}`,
+              sequence: index + 1,
+              stationId,
+              station: { id: stationId },
+              displayNameKo: station?.nameKo ?? stationId,
+              confidence: "manual",
+            };
+          });
+
+        return {
+          id: branch.id,
+          role: "main",
+          sourceLineNumber: line.id,
+          sourceLineName: branch.nameKo ?? line.nameKo,
+          origin: routeStops[0]?.displayNameKo ?? null,
+          terminal: routeStops[routeStops.length - 1]?.displayNameKo ?? null,
+          routeStops,
+          isCircular: branch.circular === true,
+        };
+      });
+
+    manualLines.push({
+      id: line.id,
+      canonicalKey: line.id,
+      lnCd: line.id,
+      nameKo: line.nameKo,
+      colorHex: line.colorHex,
+      category: manualRailTypeToLineCategory(line.railType),
+      serviceTypes: line.serviceTypes,
+      sourceLineNumbers: [line.id],
+      branches,
+    });
+  }
+
+  if (manualLines.length === 0) return bundle;
+
+  return {
+    ...bundle,
+    lines: [...(bundle.lines ?? []), ...manualLines],
+  };
+}
+
 function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geometryOverrides: ManualGeometryOverride[], branchStationExclusions: ManualBranchStationExclusion[], branchRouteOverrides: ManualBranchRouteOverride[]): EditorMapBranch[] {
   const stationById = new Map(stations.map((station) => [station.id, station]));
   const exclusionByBranchId = buildBranchStationExclusionIndex(branchStationExclusions);
@@ -420,16 +525,18 @@ function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geome
         canonicalLineId: line.canonicalKey ?? line.id ?? branch.id,
         canonicalLineNameKo: line.nameKo,
         colorHex: line.colorHex ?? "#0284c7",
+        category: line.category ?? inferRailLineCategory(line),
+        serviceTypes: line.serviceTypes?.length ? line.serviceTypes : inferRailServiceTypes(line),
         role: branch.role,
         sourceLineNumber: branch.sourceLineNumber,
         sourceLineName: branch.sourceLineName,
         origin: branch.origin ?? null,
         terminal: branch.terminal ?? null,
         geometryOverrideCoordinates,
-        geometryCoordinates: routeOverrideByBranchId.get(branch.id)?.circular && geometryCoordinates.length >= 2
+        geometryCoordinates: (routeOverrideByBranchId.get(branch.id)?.circular === true || branch.isCircular === true) && geometryCoordinates.length >= 2
           ? [...geometryCoordinates, geometryCoordinates[0]!]
           : geometryCoordinates,
-        isCircular: routeOverrideByBranchId.get(branch.id)?.circular === true,
+        isCircular: routeOverrideByBranchId.get(branch.id)?.circular === true || branch.isCircular === true,
         routeStopCount: routeStops.length,
         routeStops: routeStops.map((stop) => {
           const stationId = getRouteStopStationId(stop);
@@ -453,6 +560,8 @@ function toMapLines(lines: CanonicalLine[] | undefined): EditorMapLine[] {
     id: line.canonicalKey ?? line.id ?? line.nameKo,
     nameKo: line.nameKo,
     colorHex: line.colorHex ?? "#0284c7",
+    category: line.category ?? inferRailLineCategory(line),
+    serviceTypes: line.serviceTypes?.length ? line.serviceTypes : inferRailServiceTypes(line),
     branchCount: line.branches?.length ?? 0,
   }));
 }
@@ -461,10 +570,16 @@ export async function readUnifiedEditorData(): Promise<UnifiedEditorData> {
   const body = await fs.readFile(getBundlePath(), "utf8");
   const rawBundle = JSON.parse(body) as CanonicalBundle;
   const overlays = await readManualOverlays();
-  const bundle = normalizeSingleLineStationMappings({
-    ...rawBundle,
-    stations: applyStationOverrides(rawBundle.stations, overlays.stationOverrides),
-  });
+  const bundle = normalizeSingleLineStationMappings(
+    applyManualLineDefinitions(
+      {
+        ...rawBundle,
+        lines: applyLineMetadataOverrides(rawBundle.lines, overlays),
+        stations: applyStationOverrides(rawBundle.stations, overlays.stationOverrides),
+      },
+      overlays,
+    ),
+  );
   const colorIndex = buildStationColorIndex(bundle.lines);
   const stations = bundle.stations
     .map((station) => ({

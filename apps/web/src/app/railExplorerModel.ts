@@ -1,3 +1,119 @@
+export const RAIL_LINE_CATEGORIES = [
+  "urban_rail",
+  "gtx",
+  "conventional_rail",
+  "high_speed_rail",
+] as const;
+
+export type RailLineCategory = (typeof RAIL_LINE_CATEGORIES)[number];
+
+export const RAIL_SERVICE_TYPES = [
+  "subway",
+  "gtx",
+  "ktx",
+  "srt",
+  "itx",
+  "saemaeul",
+  "mugunghwa",
+  "nuriro",
+  "airport_rail",
+  "unknown",
+] as const;
+
+export type RailServiceType = (typeof RAIL_SERVICE_TYPES)[number];
+
+export const MANUAL_RAIL_TYPES = [
+  "high_speed_rail",
+  "semi_high_speed_rail",
+  "trunk_rail",
+  "branch_rail",
+  "urban_rail",
+] as const;
+
+export type ManualRailType = (typeof MANUAL_RAIL_TYPES)[number];
+
+export const MANUAL_RAIL_STATUSES = [
+  "open",
+  "construction",
+  "planned",
+  "closed",
+] as const;
+
+export type ManualRailStatus = (typeof MANUAL_RAIL_STATUSES)[number];
+
+export function isManualRailType(value: unknown): value is ManualRailType {
+  return typeof value === "string" && MANUAL_RAIL_TYPES.includes(value as ManualRailType);
+}
+
+export function isManualRailStatus(value: unknown): value is ManualRailStatus {
+  return typeof value === "string" && MANUAL_RAIL_STATUSES.includes(value as ManualRailStatus);
+}
+
+export function manualRailTypeToLineCategory(railType: ManualRailType): RailLineCategory {
+  if (railType === "high_speed_rail") return "high_speed_rail";
+  if (railType === "urban_rail") return "urban_rail";
+  return "conventional_rail";
+}
+
+export function isRailLineCategory(value: unknown): value is RailLineCategory {
+  return typeof value === "string" && RAIL_LINE_CATEGORIES.includes(value as RailLineCategory);
+}
+
+export function isRailServiceType(value: unknown): value is RailServiceType {
+  return typeof value === "string" && RAIL_SERVICE_TYPES.includes(value as RailServiceType);
+}
+
+export function inferRailLineCategory(line: { canonicalKey?: string | null; lnCd?: string | null; nameKo?: string | null }): RailLineCategory {
+  const key = `${line.canonicalKey ?? ""} ${line.lnCd ?? ""} ${line.nameKo ?? ""}`.toLowerCase();
+  if (key.includes("gtx") || key.includes("수도권광역급행철도")) return "gtx";
+  return "urban_rail";
+}
+
+export function inferRailServiceTypes(line: { canonicalKey?: string | null; lnCd?: string | null; nameKo?: string | null }): RailServiceType[] {
+  const category = inferRailLineCategory(line);
+  if (category === "gtx") return ["gtx"];
+  if ((line.nameKo ?? "").includes("공항철도")) return ["airport_rail"];
+  return ["subway"];
+}
+
+export function formatRailLineCategory(category: RailLineCategory) {
+  switch (category) {
+    case "urban_rail":
+      return "도시철도";
+    case "gtx":
+      return "GTX";
+    case "conventional_rail":
+      return "일반철도";
+    case "high_speed_rail":
+      return "고속철도";
+  }
+}
+
+export function formatRailServiceType(serviceType: RailServiceType) {
+  switch (serviceType) {
+    case "subway":
+      return "지하철";
+    case "gtx":
+      return "GTX";
+    case "ktx":
+      return "KTX";
+    case "srt":
+      return "SRT";
+    case "itx":
+      return "ITX";
+    case "saemaeul":
+      return "새마을";
+    case "mugunghwa":
+      return "무궁화";
+    case "nuriro":
+      return "누리로";
+    case "airport_rail":
+      return "공항철도";
+    case "unknown":
+      return "미정";
+  }
+}
+
 export interface CanonicalRouteStop {
   id: string;
   canonicalLineId: string;
@@ -24,6 +140,7 @@ export interface CanonicalBranch {
   origin: string | null;
   terminal: string | null;
   routeStops: CanonicalRouteStop[];
+  isCircular?: boolean;
 }
 
 export interface CanonicalLine {
@@ -34,6 +151,8 @@ export interface CanonicalLine {
   nameKo: string;
   colorHex: string;
   colorSource: string;
+  category: RailLineCategory;
+  serviceTypes: RailServiceType[];
   branches: CanonicalBranch[];
   sourceLineNumbers: string[];
 }
@@ -137,6 +256,38 @@ export interface ManualGeometryOverride {
   note?: string | null;
 }
 
+export interface ManualLineMetadataOverride {
+  lineId: string;
+  category?: RailLineCategory;
+  serviceTypes?: RailServiceType[];
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
+export interface ManualLineDefinition {
+  id: string;
+  nameKo: string;
+  colorHex: string;
+  railType: ManualRailType;
+  serviceTypes: RailServiceType[];
+  status: ManualRailStatus;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
+export interface ManualBranchDefinition {
+  id: string;
+  lineId: string;
+  nameKo?: string | null;
+  stationIds: string[];
+  circular?: boolean;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 export interface ManualOverlayBundle {
   schemaVersion: 1;
   manualTransferGroups: ManualTransferGroup[];
@@ -148,6 +299,9 @@ export interface ManualOverlayBundle {
   branchRouteOverrides: ManualBranchRouteOverride[];
   lineBranchOverrides: ManualLineBranchOverride[];
   geometryOverrides: ManualGeometryOverride[];
+  lineMetadataOverrides: ManualLineMetadataOverride[];
+  manualLineDefinitions: ManualLineDefinition[];
+  manualBranchDefinitions: ManualBranchDefinition[];
 }
 
 export interface ManualOverlayValidationIssue {
@@ -172,6 +326,9 @@ export const EMPTY_MANUAL_OVERLAY_BUNDLE: ManualOverlayBundle = {
   branchRouteOverrides: [],
   lineBranchOverrides: [],
   geometryOverrides: [],
+  lineMetadataOverrides: [],
+  manualLineDefinitions: [],
+  manualBranchDefinitions: [],
 };
 
 export interface CanonicalBundle {

@@ -66,6 +66,29 @@ type ManualOverlayBundle = {
     enabled?: boolean;
     points?: Array<{ lng?: number; lat?: number; kind?: string; stationId?: string }>;
   }>;
+  lineMetadataOverrides?: Array<{
+    lineId?: string;
+    category?: string;
+    serviceTypes?: string[];
+    enabled?: boolean;
+  }>;
+  manualLineDefinitions?: Array<{
+    id?: string;
+    nameKo?: string;
+    colorHex?: string;
+    railType?: string;
+    serviceTypes?: string[];
+    status?: string;
+    enabled?: boolean;
+  }>;
+  manualBranchDefinitions?: Array<{
+    id?: string;
+    lineId?: string;
+    nameKo?: string;
+    stationIds?: string[];
+    circular?: boolean;
+    enabled?: boolean;
+  }>;
 };
 
 const REQUIRED_OVERLAY_ARRAY_KEYS = [
@@ -75,6 +98,9 @@ const REQUIRED_OVERLAY_ARRAY_KEYS = [
   "branchStationExclusions",
   "lineBranchOverrides",
   "geometryOverrides",
+  "lineMetadataOverrides",
+  "manualLineDefinitions",
+  "manualBranchDefinitions",
 ] as const;
 
 function readJson(filePath: string): JsonRecord | null {
@@ -165,6 +191,28 @@ function collectDuplicateIds(
   }
 }
 
+function buildLineById(bundle: JsonRecord) {
+  const lineById = new Map<string, JsonRecord>();
+  for (const line of (bundle.lines ?? []) as JsonRecord[]) {
+    if (typeof line.id === "string") lineById.set(line.id, line);
+    if (typeof line.canonicalKey === "string") lineById.set(line.canonicalKey, line);
+  }
+  return lineById;
+}
+
+function addManualLinesToLineIndex(lineById: Map<string, JsonRecord>, overlays: ManualOverlayBundle) {
+  for (const line of overlays.manualLineDefinitions ?? []) {
+    if (line.enabled === false || !line.id) continue;
+    lineById.set(line.id, {
+      id: line.id,
+      canonicalKey: line.id,
+      nameKo: line.nameKo,
+      category: line.railType,
+      serviceTypes: line.serviceTypes ?? [],
+    });
+  }
+}
+
 function buildBranchById(bundle: JsonRecord) {
   const branchById = new Map<string, JsonRecord & { lineNameKo?: string }>();
   for (const line of (bundle.lines ?? []) as JsonRecord[]) {
@@ -175,6 +223,35 @@ function buildBranchById(bundle: JsonRecord) {
     }
   }
   return branchById;
+}
+
+function addManualBranchesToBranchIndex(
+  branchById: Map<string, JsonRecord & { lineNameKo?: string }>,
+  overlays: ManualOverlayBundle,
+) {
+  const manualLineById = new Map(
+    (overlays.manualLineDefinitions ?? [])
+      .filter((line) => line.enabled !== false && line.id)
+      .map((line) => [String(line.id), line]),
+  );
+
+  for (const branch of overlays.manualBranchDefinitions ?? []) {
+    if (branch.enabled === false || !branch.id || !branch.lineId) continue;
+    const line = manualLineById.get(branch.lineId);
+    if (!line) continue;
+    branchById.set(branch.id, {
+      id: branch.id,
+      canonicalLineId: branch.lineId,
+      role: "main",
+      sourceLineNumber: branch.lineId,
+      sourceLineName: branch.nameKo ?? line.nameKo ?? branch.lineId,
+      routeStops: (branch.stationIds ?? []).map((stationId, index) => ({
+        stationId,
+        sequence: index + 1,
+      })),
+      lineNameKo: line.nameKo,
+    });
+  }
 }
 
 function buildStationById(bundle: JsonRecord, overlays: ManualOverlayBundle) {
@@ -444,17 +521,211 @@ function validatePublicExportParity(
   }
 }
 
+function validateLineMetadataOverrides(
+  issues: ValidationIssue[],
+  lineById: Map<string, JsonRecord>,
+  overlays: ManualOverlayBundle,
+) {
+  const validCategories = new Set([
+    "urban_rail",
+    "gtx",
+    "conventional_rail",
+    "high_speed_rail",
+  ]);
+  const validServiceTypes = new Set([
+    "subway",
+    "gtx",
+    "ktx",
+    "srt",
+    "itx",
+    "saemaeul",
+    "mugunghwa",
+    "nuriro",
+    "airport_rail",
+    "unknown",
+  ]);
+
+  for (const override of overlays.lineMetadataOverrides ?? []) {
+    if (override.enabled === false) continue;
+    const where = `lineMetadataOverrides:${override.lineId ?? "-"}`;
+    if (!override.lineId || !lineById.has(override.lineId)) {
+      addIssue(issues, {
+        severity: "error",
+        code: "invalid-line-metadata-line",
+        where,
+        message: "노선 메타데이터가 존재하지 않는 lineId를 참조합니다.",
+        cause: "lineMetadataOverrides.lineId가 canonical line id/canonicalKey와 일치하지 않습니다.",
+        fix: "편집기에서 실제 노선을 다시 선택하거나 lineId를 현재 bundle의 canonicalKey로 수정하세요.",
+      });
+    }
+    if (override.category && !validCategories.has(override.category)) {
+      addIssue(issues, {
+        severity: "error",
+        code: "invalid-line-category",
+        where,
+        message: "지원하지 않는 철도 유형입니다.",
+        cause: "category가 허용 enum에 없습니다.",
+        fix: "urban_rail, gtx, conventional_rail, high_speed_rail 중 하나로 수정하세요.",
+      });
+    }
+    for (const serviceType of override.serviceTypes ?? []) {
+      if (!validServiceTypes.has(serviceType)) {
+        addIssue(issues, {
+          severity: "error",
+          code: "invalid-line-service-type",
+          where,
+          message: "지원하지 않는 서비스 타입입니다.",
+          cause: "serviceTypes에 허용되지 않은 값이 포함되어 있습니다.",
+          fix: "subway, gtx, ktx, srt, itx, saemaeul, mugunghwa, nuriro, airport_rail, unknown 중 하나로 수정하세요.",
+        });
+      }
+    }
+  }
+}
+
+function validateManualLineDefinitions(
+  issues: ValidationIssue[],
+  overlays: ManualOverlayBundle,
+  stationById: Map<string, JsonRecord>,
+) {
+  const validRailTypes = new Set([
+    "high_speed_rail",
+    "semi_high_speed_rail",
+    "trunk_rail",
+    "branch_rail",
+    "urban_rail",
+  ]);
+  const validStatuses = new Set(["open", "construction", "planned", "closed"]);
+  const validServiceTypes = new Set([
+    "subway",
+    "gtx",
+    "ktx",
+    "srt",
+    "itx",
+    "saemaeul",
+    "mugunghwa",
+    "nuriro",
+    "airport_rail",
+    "unknown",
+  ]);
+
+  const enabledLineIds = new Set<string>();
+
+  for (const line of overlays.manualLineDefinitions ?? []) {
+    if (line.enabled === false) continue;
+    const where = `manualLineDefinitions:${line.id ?? "-"}`;
+    if (!line.id || !line.nameKo) {
+      addIssue(issues, {
+        severity: "error",
+        code: "invalid-manual-line-definition",
+        where,
+        message: "수기 노선 정의에 id 또는 노선명이 없습니다.",
+        cause: "수기 노선은 canonical bundle에 없는 Line을 생성하므로 고유 id와 표시 이름이 필수입니다.",
+        fix: "노선 id와 nameKo를 입력하거나 해당 수기 노선 항목을 삭제하세요.",
+      });
+      continue;
+    }
+    enabledLineIds.add(line.id);
+    if (line.railType && !validRailTypes.has(line.railType)) {
+      addIssue(issues, {
+        severity: "error",
+        code: "invalid-manual-rail-type",
+        where,
+        message: "지원하지 않는 수기 철도 유형입니다.",
+        cause: "railType이 허용 enum에 없습니다.",
+        fix: "high_speed_rail, semi_high_speed_rail, trunk_rail, branch_rail, urban_rail 중 하나로 수정하세요.",
+      });
+    }
+    if (line.status && !validStatuses.has(line.status)) {
+      addIssue(issues, {
+        severity: "error",
+        code: "invalid-manual-rail-status",
+        where,
+        message: "지원하지 않는 수기 노선 운영 상태입니다.",
+        cause: "status가 허용 enum에 없습니다.",
+        fix: "open, construction, planned, closed 중 하나로 수정하세요.",
+      });
+    }
+    for (const serviceType of line.serviceTypes ?? []) {
+      if (!validServiceTypes.has(serviceType)) {
+        addIssue(issues, {
+          severity: "error",
+          code: "invalid-manual-line-service-type",
+          where,
+          message: "수기 노선에 지원하지 않는 서비스 타입이 있습니다.",
+          cause: "serviceTypes에 허용되지 않은 값이 포함되어 있습니다.",
+          fix: "KTX/SRT/ITX/무궁화 등은 허용 enum 값으로 저장하세요.",
+        });
+      }
+    }
+  }
+
+  const branchIds = new Set<string>();
+  for (const branch of overlays.manualBranchDefinitions ?? []) {
+    if (branch.enabled === false) continue;
+    const where = `manualBranchDefinitions:${branch.id ?? "-"}`;
+    if (!branch.id || !branch.lineId) {
+      addIssue(issues, {
+        severity: "error",
+        code: "invalid-manual-branch-definition",
+        where,
+        message: "수기 지선 정의에 id 또는 lineId가 없습니다.",
+        cause: "수기 지선은 어떤 수기 노선에 속하는지 명확해야 합니다.",
+        fix: "branch id와 lineId를 입력하거나 해당 수기 지선 항목을 삭제하세요.",
+      });
+      continue;
+    }
+    if (branchIds.has(branch.id)) {
+      addIssue(issues, {
+        severity: "error",
+        code: "duplicate-manual-branch-definition",
+        where,
+        message: "수기 지선 id가 중복되었습니다.",
+        cause: "동일한 branch id가 여러 번 정의되면 routeStop 병합 결과가 불안정합니다.",
+        fix: "중복 branch id 중 하나를 변경하거나 삭제하세요.",
+      });
+    }
+    branchIds.add(branch.id);
+    if (!enabledLineIds.has(branch.lineId)) {
+      addIssue(issues, {
+        severity: "error",
+        code: "unknown-manual-branch-line",
+        where,
+        message: "수기 지선이 존재하지 않는 수기 노선을 참조합니다.",
+        cause: "manualBranchDefinitions.lineId가 활성 manualLineDefinitions.id와 일치하지 않습니다.",
+        fix: "lineId를 실제 수기 노선 id로 수정하거나 먼저 수기 노선을 생성하세요.",
+      });
+    }
+    if ((branch.stationIds ?? []).length < 2) {
+      addIssue(issues, {
+        severity: "warning",
+        code: "manual-branch-too-few-stations",
+        where,
+        message: "수기 지선의 정차역이 2개 미만입니다.",
+        cause: "노선 지도 선형을 만들려면 최소 2개 역이 필요합니다.",
+        fix: "지도에서 시작역과 종착역 이상을 추가한 뒤 저장하세요.",
+      });
+    }
+    for (const stationId of branch.stationIds ?? []) {
+      validateStationReference(issues, stationById, stationId, where, "수기 노선 정차역");
+    }
+  }
+}
+
 function validateReferences(
   issues: ValidationIssue[],
   overlays: ManualOverlayBundle,
   stationById: Map<string, JsonRecord>,
   branchById: Map<string, JsonRecord>,
+  lineById: Map<string, JsonRecord>,
 ) {
   collectDuplicateIds(issues, overlays.manualTransferGroups, "manualTransferGroups");
   collectDuplicateIds(issues, overlays.manualTransferEdges, "manualTransferEdges");
   collectDuplicateIds(issues, overlays.branchStationExclusions, "branchStationExclusions");
   collectDuplicateIds(issues, overlays.branchRouteOverrides, "branchRouteOverrides");
   collectDuplicateIds(issues, overlays.lineBranchOverrides, "lineBranchOverrides");
+  validateLineMetadataOverrides(issues, lineById, overlays);
+  validateManualLineDefinitions(issues, overlays, stationById);
 
   for (const override of overlays.stationOverrides ?? []) {
     if (override.enabled === false || !override.stationId) continue;
@@ -573,10 +844,14 @@ export function validateManualOverlayPipeline() {
 
   const issues: ValidationIssue[] = [];
   const stationById = buildStationById(generatedBundle, manualOverlays);
-  const branchById = buildBranchById(generatedBundle);
+  const referenceBundle = publicBundle ?? generatedBundle;
+  const branchById = buildBranchById(referenceBundle);
+  addManualBranchesToBranchIndex(branchById, manualOverlays);
+  const lineById = buildLineById(referenceBundle);
+  addManualLinesToLineIndex(lineById, manualOverlays);
 
   validateManualOverlaySchema(issues, manualOverlays);
-  validateReferences(issues, manualOverlays, stationById, branchById);
+  validateReferences(issues, manualOverlays, stationById, branchById, lineById);
   validateCircularConnectionRules(issues, manualOverlays, branchById);
   validateBranchGeometryCoverage(issues, generatedBundle, manualOverlays, stationById);
   validatePublicExportParity(
