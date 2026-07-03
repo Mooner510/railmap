@@ -489,6 +489,14 @@ const KOREA_MAX_BOUNDS: [[number, number], [number, number]] = [
   [134.3, 43.1],
 ];
 
+type BaseMapStyleKey = "osm" | "light" | "satellite";
+
+const baseMapStyleOptions: Array<{ key: BaseMapStyleKey; label: string; layerId: string }> = [
+  { key: "osm", label: "기본", layerId: "base-osm" },
+  { key: "light", label: "라이트", layerId: "base-light" },
+  { key: "satellite", label: "위성", layerId: "base-satellite" },
+];
+
 const baseMapStyle = {
   version: 8,
   sources: {
@@ -498,9 +506,29 @@ const baseMapStyle = {
       tileSize: 256,
       attribution: "© OpenStreetMap contributors",
     },
+    cartoLight: {
+      type: "raster",
+      tiles: [
+        "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        "https://b.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+        "https://c.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+      ],
+      tileSize: 256,
+      attribution: "© OpenStreetMap contributors © CARTO",
+    },
+    esriSatellite: {
+      type: "raster",
+      tiles: ["https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
+      tileSize: 256,
+      attribution: "Tiles © Esri",
+    },
   },
   glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
-  layers: [{ id: "osm", type: "raster", source: "osm" }],
+  layers: [
+    { id: "base-osm", type: "raster", source: "osm" },
+    { id: "base-light", type: "raster", source: "cartoLight", layout: { visibility: "none" } },
+    { id: "base-satellite", type: "raster", source: "esriSatellite", layout: { visibility: "none" } },
+  ],
 } as const;
 
 type RailFeatureCollection = {
@@ -3619,6 +3647,7 @@ export default function UnifiedMapEditor({
     height: number;
   } | null>(null);
   const [layers, setLayers] = useState(defaultLayers);
+  const [baseMapStyleKey, setBaseMapStyleKey] = useState<BaseMapStyleKey>("osm");
   const [zoom, setZoom] = useState(7);
   const [transferDetailVisible, setTransferDetailVisible] = useState(false);
   const [cursorLngLat, setCursorLngLat] = useState<{
@@ -5654,6 +5683,20 @@ export default function UnifiedMapEditor({
       mapRef.current = null;
     };
   }, []);
+
+
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return;
+    const map = mapRef.current;
+    for (const option of baseMapStyleOptions) {
+      if (!map.getLayer(option.layerId)) continue;
+      map.setLayoutProperty(
+        option.layerId,
+        "visibility",
+        option.key === baseMapStyleKey ? "visible" : "none",
+      );
+    }
+  }, [baseMapStyleKey, mapLoaded]);
 
   useEffect(() => {
     if (!mapLoaded || dataLoading) return;
@@ -7770,7 +7813,19 @@ export default function UnifiedMapEditor({
             ) : null}
 
             {!isGeometryMode && sidebarTab === "layers" ? (
-              <div className="grid gap-2">
+              <div className="grid gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                  <label className="text-xs font-medium text-slate-500">지도 스타일</label>
+                  <select
+                    className="mt-2 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+                    value={baseMapStyleKey}
+                    onChange={(event) => setBaseMapStyleKey(event.target.value as BaseMapStyleKey)}
+                  >
+                    {baseMapStyleOptions.map((option) => (
+                      <option key={option.key} value={option.key}>{option.label}</option>
+                    ))}
+                  </select>
+                </div>
                 {layerOptions.map(({ key, label, Icon }) => (
                   <label
                     key={String(key)}
@@ -8226,6 +8281,7 @@ export default function UnifiedMapEditor({
 
       <Dialog
         open={Boolean(pendingTransferSelection)}
+        onClose={keepTransferDraftSelection}
         className="max-w-md overflow-hidden"
       >
         <div className="border-b border-slate-200 px-4 py-3">
@@ -8263,7 +8319,7 @@ export default function UnifiedMapEditor({
         onSave={() => void createManualRailLine(manualLineDraft)}
       />
 
-      <Dialog open={commandOpen} className="flex h-[520px] max-w-xl flex-col">
+      <Dialog open={commandOpen} onClose={() => setCommandOpen(false)} className="flex h-[520px] max-w-xl flex-col">
         <div className="shrink-0 border-b border-slate-200 p-3">
           <div className="flex items-center gap-3">
             <Command className="size-5 text-slate-400" />
@@ -8314,7 +8370,7 @@ export default function UnifiedMapEditor({
         </div>
       </Dialog>
 
-      <Dialog open={Boolean(pendingManualRouteStationPlacement)} className="max-w-sm overflow-hidden">
+      <Dialog open={Boolean(pendingManualRouteStationPlacement)} onClose={() => setPendingManualRouteStationPlacement(null)} className="max-w-sm overflow-hidden">
         <div className="border-b border-slate-200 px-4 py-3">
           <strong className="block text-sm font-semibold text-slate-950">역 이름 지정</strong>
           <p className="mt-1 text-xs font-medium text-slate-500">Enter를 누르면 바로 노선에 추가됩니다.</p>
@@ -8417,7 +8473,7 @@ function SidebarShortcutDock({
           </div>
         ))}
       </div>
-      <Dialog open={open} className="flex h-[min(720px,calc(100dvh-24px))] w-[min(920px,calc(100vw-24px))] max-w-none flex-col overflow-hidden">
+      <Dialog open={open} onClose={onToggle} className="flex h-[min(720px,calc(100dvh-24px))] w-[min(920px,calc(100vw-24px))] max-w-none flex-col overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <strong className="text-sm font-semibold text-slate-950">{title}</strong>
           <Button variant="ghost" size="icon" onClick={onToggle}>
@@ -9844,7 +9900,7 @@ function TransferGroupInspector({
             </p>
           </div>
           <Button variant="outline" onClick={() => setTimeModalOpen(true)}>
-            크게 편집
+            편집
           </Button>
         </div>
         {missingPairs.length > 0 ? (
@@ -9864,13 +9920,15 @@ function TransferGroupInspector({
         </Button>
         {missingPairs.length > 0 && onSavePending ? (
           <Button className="col-span-2" variant="outline" onClick={onSavePending}>
+            <Save className="mr-1 size-4" />
             시간표는 나중에 입력하고 저장
           </Button>
         ) : null}
       </div>
       <Dialog
         open={timeModalOpen}
-        className="flex h-[min(820px,calc(100dvh-40px))] w-[min(1180px,calc(100vw-40px))] max-w-none flex-col overflow-hidden rounded-[28px]"
+        onClose={() => setTimeModalOpen(false)}
+        className="flex h-[min(780px,calc(100dvh-56px))] w-[min(1120px,calc(100vw-56px))] max-w-none flex-col overflow-hidden rounded-3xl border-slate-200 bg-white shadow-xl"
       >
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4">
           <div>
@@ -9883,12 +9941,12 @@ function TransferGroupInspector({
             <X className="size-4" />
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto bg-slate-50 p-4">
-          <table className="min-w-max border-separate border-spacing-1 text-[12px]">
+        <div className="min-h-0 flex-1 overflow-auto bg-slate-50/70 p-4">
+          <table className="min-w-max border-separate border-spacing-1.5 text-[12px]">
             <thead>
               <tr>
                 <th className="sticky left-0 top-0 z-20 min-w-40 rounded-xl bg-white px-3 py-2 text-left font-medium text-slate-500 shadow-sm">
-                  출발 / 도착
+                  기준 역
                 </th>
                 {draft.stationIds.map((colId) => {
                   const station = stationById.get(colId);
@@ -9900,10 +9958,11 @@ function TransferGroupInspector({
                         selectedTransferCell?.colId === colId ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "bg-white text-slate-600",
                       )}
                     >
-                      <span className="block truncate">
-                        {station?.nameKo ?? colId}
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: station?.colorHex ?? "#94a3b8" }} />
+                        <span className="truncate">{station?.nameKo ?? colId}</span>
                       </span>
-                      <span className="block truncate text-[10px] font-medium text-slate-400">
+                      <span className="block truncate pl-3.5 text-[10px] font-normal text-slate-400">
                         {station?.lineNameKo ?? "-"}
                       </span>
                     </th>
@@ -9920,10 +9979,11 @@ function TransferGroupInspector({
                       "sticky left-0 z-10 min-w-40 max-w-48 rounded-xl px-3 py-2 text-left font-medium shadow-sm",
                       selectedTransferCell?.rowId === rowId ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "bg-white text-slate-600",
                     )}>
-                      <span className="block truncate">
-                        {rowStation?.nameKo ?? rowId}
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: rowStation?.colorHex ?? "#94a3b8" }} />
+                        <span className="truncate">{rowStation?.nameKo ?? rowId}</span>
                       </span>
-                      <span className="block truncate text-[10px] font-medium text-slate-400">
+                      <span className="block truncate pl-3.5 text-[10px] font-normal text-slate-400">
                         {rowStation?.lineNameKo ?? "-"}
                       </span>
                     </th>
@@ -10011,6 +10071,7 @@ function TransferGroupReviewPanel({
 }) {
   const dismissed = new Set(dismissedKeys);
   const [dismissReason, setDismissReason] = useState("환승역 아님");
+  const [dismissTarget, setDismissTarget] = useState<TransferGroupSuggestion | null>(null);
   const filteredSuggestions = suggestions.filter((suggestion) => {
     const approved = approvedKeys.has(suggestion.key);
     const isDismissed = dismissed.has(suggestion.key);
@@ -10103,25 +10164,16 @@ function TransferGroupReviewPanel({
           </div>
 
           {!approvedKeys.has(activeSuggestion.key) && !dismissed.has(activeSuggestion.key) ? (
-            <div className="mt-3 grid gap-2">
-              <select
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-normal text-slate-700 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
-                value={dismissReason}
-                onChange={(event) => setDismissReason(event.target.value)}
-              >
-                <option value="환승역 아님">환승역 아님</option>
-                <option value="거리가 멂">거리가 멂</option>
-                <option value="동명이역">동명이역</option>
-                <option value="나중에 재검토">나중에 재검토</option>
-              </select>
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" onClick={() => onDismissSuggestion(activeSuggestion, dismissReason)}>
-                  거절
-                </Button>
-                <Button onClick={() => onOpenSuggestion(activeSuggestion)}>
-                  수정 후 승인
-                </Button>
-              </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => {
+                setDismissReason("환승역 아님");
+                setDismissTarget(activeSuggestion);
+              }}>
+                거절
+              </Button>
+              <Button onClick={() => onOpenSuggestion(activeSuggestion)}>
+                수정 후 승인
+              </Button>
             </div>
           ) : null}
         </div>
@@ -10147,6 +10199,41 @@ function TransferGroupReviewPanel({
           </Button>
         </div>
       ) : null}
+
+      <Dialog open={Boolean(dismissTarget)} onClose={() => setDismissTarget(null)} className="max-w-md overflow-hidden rounded-[28px]">
+        <div className="border-b border-slate-200 px-4 py-3">
+          <strong className="block text-sm font-medium text-slate-950">추천 거절</strong>
+          <p className="mt-1 text-xs font-normal text-slate-500">거절 사유를 선택한 뒤 반영하세요.</p>
+        </div>
+        <div className="grid gap-3 p-4">
+          <div className="rounded-2xl bg-slate-50 px-3 py-2">
+            <p className="text-xs font-medium text-slate-500">대상</p>
+            <p className="mt-0.5 truncate text-sm font-medium text-slate-900">{dismissTarget?.nameKo ?? "환승 추천"}</p>
+          </div>
+          <select
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
+            value={dismissReason}
+            onChange={(event) => setDismissReason(event.target.value)}
+          >
+            <option value="환승역 아님">환승역 아님</option>
+            <option value="거리가 멂">거리가 멂</option>
+            <option value="동명이역">동명이역</option>
+            <option value="나중에 재검토">나중에 재검토</option>
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3">
+          <Button variant="outline" onClick={() => setDismissTarget(null)}>취소</Button>
+          <Button
+            onClick={() => {
+              if (!dismissTarget) return;
+              onDismissSuggestion(dismissTarget, dismissReason);
+              setDismissTarget(null);
+            }}
+          >
+            거절 반영
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }
@@ -10197,6 +10284,12 @@ function ManualRailLinePanel({
 }) {
   const [editingStationClientId, setEditingStationClientId] = useState<string | null>(null);
   const [draggingStationClientId, setDraggingStationClientId] = useState<string | null>(null);
+  const [bulkEntryOpen, setBulkEntryOpen] = useState(false);
+  const [bulkEntryText, setBulkEntryText] = useState("");
+  const [bulkEntryResult, setBulkEntryResult] = useState<string | null>(null);
+  const [bulkEntryMissingNames, setBulkEntryMissingNames] = useState<string[]>([]);
+  const [bulkEntryResolveName, setBulkEntryResolveName] = useState("");
+  const [bulkEntryResolveQuery, setBulkEntryResolveQuery] = useState("");
   const enabledLines = lines.filter((line) => line.enabled !== false);
   const branchByLineId = new Map(
     branches
@@ -10209,6 +10302,16 @@ function ManualRailLinePanel({
   const movingStation = routeBuilderDraft && moveStationClientId
     ? routeBuilderDraft.stations.find((station) => station.clientId === moveStationClientId) ?? null
     : null;
+  const bulkResolveCandidates = useMemo(() => {
+    const query = normalizeSearchText(bulkEntryResolveQuery);
+    if (!query) return [];
+    return [...stationById.values()]
+      .filter((station) => {
+        if (!isValidStation(station)) return false;
+        return normalizeSearchText(`${station.nameKo} ${station.lineNameKo ?? ""} ${station.stationNumber ?? ""}`).includes(query);
+      })
+      .slice(0, 8);
+  }, [bulkEntryResolveQuery, stationById]);
   const routeBuilderReviewItems = routeBuilderDraft
     ? (() => {
         const items: Array<{ label: string; tone: "red" | "amber" | "emerald"; text: string }> = [];
@@ -10272,6 +10375,101 @@ function ManualRailLinePanel({
     if (editingStationClientId === clientId) setEditingStationClientId(null);
   }
 
+  function parseBulkStationNames(value: string) {
+    const seen = new Set<string>();
+    return value
+      .split(/[\n,]+/)
+      .map((item) => item.replace(/^\s*\d+[\).:-]?\s*/, "").trim())
+      .filter(Boolean)
+      .map(stripStationNameQualifier)
+      .filter((name) => {
+        const key = getManualStationNameKey(name);
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
+
+  function findBulkStationMatch(nameKo: string) {
+    const key = getManualStationNameKey(nameKo);
+    if (!key) return null;
+    const exact = [...stationById.values()].find(
+      (station) => getManualStationNameKey(stripStationNameQualifier(station.nameKo)) === key && isValidStation(station),
+    );
+    if (exact) return exact;
+    return [...stationById.values()].find(
+      (station) => getManualStationNameKey(stripStationNameQualifier(station.nameKo)).includes(key) && isValidStation(station),
+    ) ?? null;
+  }
+
+  function applyBulkRouteStations() {
+    if (!routeBuilderDraft) return;
+    const names = parseBulkStationNames(bulkEntryText);
+    const matched: ManualRouteStationDraft[] = [];
+    const missing: string[] = [];
+    const existingKeys = new Set(routeBuilderDraft.stations.map((station) => getManualStationNameKey(station.nameKo)).filter(Boolean));
+
+    for (const name of names) {
+      const key = getManualStationNameKey(name);
+      if (!key || existingKeys.has(key)) continue;
+      const station = findBulkStationMatch(name);
+      if (!station || typeof station.lng !== "number" || typeof station.lat !== "number") {
+        missing.push(name);
+        continue;
+      }
+      existingKeys.add(key);
+      matched.push({
+        clientId: makeManualRouteStationClientId(),
+        sourceStationId: station.id,
+        nameKo: stripStationNameQualifier(station.nameKo),
+        lng: station.lng,
+        lat: station.lat,
+      });
+    }
+
+    setBulkEntryMissingNames(missing);
+    setBulkEntryResolveName(missing[0] ?? "");
+
+    if (matched.length === 0) {
+      setBulkEntryResult(missing.length > 0 ? `미매칭 ${missing.length.toLocaleString("ko-KR")}개 · 아래에서 보정하세요.` : "추가할 역이 없습니다.");
+      return;
+    }
+
+    onChangeRouteBuilder({
+      ...routeBuilderDraft,
+      stations: [...routeBuilderDraft.stations, ...matched],
+    });
+    setBulkEntryResult(`${matched.length.toLocaleString("ko-KR")}개 역을 기존 역 위치로 추가했습니다${missing.length > 0 ? ` · 미매칭 ${missing.length.toLocaleString("ko-KR")}개` : ""}.`);
+  }
+
+  function useMissingNameOnMap(nameKo: string) {
+    if (!routeBuilderDraft) return;
+    onChangeRouteBuilder({ ...routeBuilderDraft, pendingStationName: nameKo });
+    setBulkEntryOpen(false);
+  }
+
+  function resolveMissingNameWithStation(station: EditorStation) {
+    if (!routeBuilderDraft || typeof station.lng !== "number" || typeof station.lat !== "number") return;
+    const nameKo = bulkEntryResolveName.trim() || stripStationNameQualifier(station.nameKo);
+    onChangeRouteBuilder({
+      ...routeBuilderDraft,
+      stations: [
+        ...routeBuilderDraft.stations,
+        {
+          clientId: makeManualRouteStationClientId(),
+          sourceStationId: station.id,
+          nameKo,
+          lng: station.lng,
+          lat: station.lat,
+        },
+      ],
+    });
+    setBulkEntryMissingNames((previous) => previous.filter((name) => name !== bulkEntryResolveName));
+    setBulkEntryResolveName("");
+    setBulkEntryResolveQuery("");
+    setBulkEntryResult(`${nameKo} 위치를 기존 역에서 복사했습니다.`);
+  }
+
   if (routeBuilderDraft && activeLine) {
     return (
       <div className="flex h-[calc(100dvh-156px)] min-h-0 flex-col rounded-3xl border border-emerald-200 bg-white shadow-sm">
@@ -10333,6 +10531,21 @@ function ManualRailLinePanel({
               onChange={(event) => onChangeRouteBuilder({ ...routeBuilderDraft, pendingStationName: event.target.value })}
               placeholder="다음 역 이름 · 비우면 지도 클릭 시 추천"
             />
+            <Button
+              type="button"
+              variant="outline"
+              className="justify-start"
+              onClick={() => {
+                setBulkEntryResult(null);
+                setBulkEntryMissingNames([]);
+                setBulkEntryResolveName("");
+                setBulkEntryResolveQuery("");
+                setBulkEntryOpen(true);
+              }}
+            >
+              <ListChecks className="mr-1 size-4" />
+              역 이름 여러 줄 붙여넣기
+            </Button>
             <label className="flex items-center gap-2 text-xs font-bold text-slate-600">
               <input
                 type="checkbox"
@@ -10438,6 +10651,105 @@ function ManualRailLinePanel({
             역 목록과 기본 선형 저장
           </Button>
         </div>
+
+        <Dialog open={bulkEntryOpen} onClose={() => setBulkEntryOpen(false)} className="max-w-xl overflow-hidden rounded-[28px]">
+          <div className="border-b border-slate-200 px-4 py-3">
+            <strong className="block text-sm font-medium text-slate-950">역 이름 붙여넣기</strong>
+            <p className="mt-1 text-xs font-normal text-slate-500">한 줄에 하나씩 입력하면 같은 이름의 기존 역 위치를 복사합니다.</p>
+          </div>
+          <div className="grid gap-3 p-4">
+            <Textarea
+              className="min-h-48 resize-y"
+              value={bulkEntryText}
+              onChange={(event) => {
+                setBulkEntryText(event.target.value);
+                setBulkEntryResult(null);
+                setBulkEntryMissingNames([]);
+              }}
+              placeholder={"서울\n영등포\n수원\n천안\n대전"}
+            />
+            {bulkEntryResult ? (
+              <p className="rounded-2xl bg-slate-50 px-3 py-2 text-xs font-normal text-slate-600">{bulkEntryResult}</p>
+            ) : null}
+            {bulkEntryMissingNames.length > 0 ? (
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <strong className="text-xs font-medium text-amber-900">미매칭 역</strong>
+                  <span className="text-[11px] font-normal text-amber-700">{bulkEntryMissingNames.length}개</span>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {bulkEntryMissingNames.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                        bulkEntryResolveName === name ? "border-amber-300 bg-white text-amber-900" : "border-amber-100 bg-amber-100/70 text-amber-800",
+                      )}
+                      onClick={() => {
+                        setBulkEntryResolveName(name);
+                        setBulkEntryResolveQuery(name);
+                      }}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 grid gap-2">
+                  <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <Input
+                      value={bulkEntryResolveName}
+                      onChange={(event) => setBulkEntryResolveName(event.target.value)}
+                      placeholder="보정할 역 이름"
+                    />
+                    <Button variant="outline" onClick={() => bulkEntryResolveName ? useMissingNameOnMap(bulkEntryResolveName) : undefined}>
+                      지도에서 찍기
+                    </Button>
+                  </div>
+                  <Input
+                    value={bulkEntryResolveQuery}
+                    onChange={(event) => setBulkEntryResolveQuery(event.target.value)}
+                    placeholder="기존 역 검색해서 위치 복사"
+                  />
+                  {bulkResolveCandidates.length > 0 ? (
+                    <div className="grid max-h-44 gap-1 overflow-y-auto">
+                      {bulkResolveCandidates.map((station) => (
+                        <button
+                          key={station.id}
+                          type="button"
+                          className="flex items-center gap-2 rounded-xl bg-white px-2 py-1.5 text-left hover:bg-amber-50"
+                          onClick={() => resolveMissingNameWithStation(station)}
+                        >
+                          <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: station.colorHex ?? "#94a3b8" }} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-xs font-medium text-slate-800">{station.nameKo}</span>
+                            <span className="block truncate text-[10px] font-normal text-slate-400">{formatStationSubLabel(station)}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-3 gap-2 border-t border-slate-200 px-4 py-3">
+            <Button variant="outline" onClick={() => setBulkEntryOpen(false)}>닫기</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setBulkEntryText("");
+                setBulkEntryResult(null);
+                setBulkEntryMissingNames([]);
+                setBulkEntryResolveName("");
+                setBulkEntryResolveQuery("");
+              }}
+            >
+              비우기
+            </Button>
+            <Button onClick={applyBulkRouteStations}>추가</Button>
+          </div>
+        </Dialog>
       </div>
     );
   }
@@ -10526,7 +10838,7 @@ function ManualRailLineDialog({
   }
 
   return (
-    <Dialog open={open} className="flex max-h-[min(760px,calc(100vh-2rem))] max-w-2xl flex-col overflow-hidden">
+    <Dialog open={open} onClose={onClose} className="flex max-h-[min(760px,calc(100vh-2rem))] max-w-2xl flex-col overflow-hidden">
       <div className="shrink-0 border-b border-slate-200 px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
