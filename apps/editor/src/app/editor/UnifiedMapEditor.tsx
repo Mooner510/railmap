@@ -3914,6 +3914,24 @@ export default function UnifiedMapEditor({
     () => new Set(overlays.manualTransferGroups.map((group) => makeTransferGroupSuggestionKey(group.stationIds))),
     [overlays.manualTransferGroups],
   );
+  const activeTransferSuggestion = useMemo(() => {
+    const dismissed = new Set(overlays.dismissedTransferGroupSuggestionKeys ?? []);
+    const candidates = transferGroupSuggestions.filter((suggestion) => {
+      const approved = approvedTransferSuggestionKeys.has(suggestion.key);
+      const isDismissed = dismissed.has(suggestion.key);
+      if (transferReviewFilter === "approved") return approved;
+      if (transferReviewFilter === "dismissed") return isDismissed;
+      if (transferReviewFilter === "pending") return !approved && !isDismissed;
+      return true;
+    });
+    return candidates.find((suggestion) => suggestion.key === activeTransferSuggestionKey) ?? candidates[0] ?? null;
+  }, [
+    activeTransferSuggestionKey,
+    approvedTransferSuggestionKeys,
+    overlays.dismissedTransferGroupSuggestionKeys,
+    transferGroupSuggestions,
+    transferReviewFilter,
+  ]);
   const unassignedStations = useMemo(
     () => getUnassignedStations(data.stations, data.branches),
     [data.branches, data.stations],
@@ -4041,28 +4059,35 @@ export default function UnifiedMapEditor({
   );
 
   useEffect(() => {
-    if (sidebarTab !== "transferReview") return;
-    const dismissed = new Set(overlays.dismissedTransferGroupSuggestionKeys ?? []);
-    const candidates = transferGroupSuggestions.filter((suggestion) => {
-      const approved = approvedTransferSuggestionKeys.has(suggestion.key);
-      const isDismissed = dismissed.has(suggestion.key);
-      if (transferReviewFilter === "approved") return approved;
-      if (transferReviewFilter === "dismissed") return isDismissed;
-      if (transferReviewFilter === "pending") return !approved && !isDismissed;
-      return true;
+    if (sidebarTab !== "transferReview" || !activeTransferSuggestion) return;
+    focusStationCluster(activeTransferSuggestion.stationIds);
+  }, [activeTransferSuggestion, focusStationCluster, sidebarTab]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    const source = map?.getSource("railmap-transfer-review-highlight") as GeoJSONSource | undefined;
+    if (!mapLoaded || !source) return;
+    if (sidebarTab !== "transferReview" || !activeTransferSuggestion) {
+      source.setData(EMPTY_FEATURE_COLLECTION);
+      return;
+    }
+    source.setData({
+      type: "FeatureCollection",
+      features: activeTransferSuggestion.stationIds
+        .map((stationId) => displayStationById.get(stationId) ?? stationById.get(stationId))
+        .filter((station): station is EditorStation => Boolean(station && isValidStation(station)))
+        .map((station) => ({
+          type: "Feature" as const,
+          properties: {
+            id: station.id,
+            kind: "station",
+            nameKo: station.nameKo,
+            colorHex: station.colorHex ?? "#7c3aed",
+          },
+          geometry: { type: "Point" as const, coordinates: [station.lng, station.lat] },
+        })),
     });
-    const activeSuggestion = candidates.find((suggestion) => suggestion.key === activeTransferSuggestionKey) ?? candidates[0];
-    if (!activeSuggestion) return;
-    focusStationCluster(activeSuggestion.stationIds);
-  }, [
-    activeTransferSuggestionKey,
-    approvedTransferSuggestionKeys,
-    focusStationCluster,
-    overlays.dismissedTransferGroupSuggestionKeys,
-    sidebarTab,
-    transferGroupSuggestions,
-    transferReviewFilter,
-  ]);
+  }, [activeTransferSuggestion, displayStationById, mapLoaded, sidebarTab, stationById]);
 
   const applyStationSelection = useCallback(
     (stationId: string, shouldFocus = true) => {
@@ -4519,6 +4544,10 @@ export default function UnifiedMapEditor({
         type: "geojson",
         data: EMPTY_FEATURE_COLLECTION,
       });
+      map.addSource("railmap-transfer-review-highlight", {
+        type: "geojson",
+        data: EMPTY_FEATURE_COLLECTION,
+      });
 
       map.addLayer({
         id: "railmap-branches-line",
@@ -4742,6 +4771,55 @@ export default function UnifiedMapEditor({
           "circle-color": "rgba(0,0,0,0)",
           "circle-opacity": 0,
           "circle-stroke-width": 0,
+        },
+      });
+
+      map.addLayer({
+        id: "railmap-transfer-review-highlight-ring",
+        type: "circle",
+        source: "railmap-transfer-review-highlight",
+        filter: ["==", ["get", "kind"], "station"],
+        paint: {
+          "circle-color": "rgba(255,255,255,0)",
+          "circle-radius": 13,
+          "circle-stroke-color": "#7c3aed",
+          "circle-stroke-width": 3,
+          "circle-stroke-opacity": 0.95,
+        },
+      });
+
+      map.addLayer({
+        id: "railmap-transfer-review-highlight-dot",
+        type: "circle",
+        source: "railmap-transfer-review-highlight",
+        filter: ["==", ["get", "kind"], "station"],
+        paint: {
+          "circle-color": ["get", "colorHex"],
+          "circle-radius": 5.8,
+          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 1.8,
+          "circle-opacity": 1,
+        },
+      });
+
+      map.addLayer({
+        id: "railmap-transfer-review-highlight-label",
+        type: "symbol",
+        source: "railmap-transfer-review-highlight",
+        filter: ["==", ["get", "kind"], "station"],
+        layout: {
+          "text-field": ["get", "nameKo"],
+          "text-size": 11,
+          "text-font": ["Open Sans Regular"],
+          "text-offset": [0, 1.35],
+          "text-anchor": "top",
+          "text-allow-overlap": true,
+          "text-ignore-placement": true,
+        },
+        paint: {
+          "text-color": "#4c1d95",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 1.7,
         },
       });
 
@@ -7789,6 +7867,7 @@ export default function UnifiedMapEditor({
                 stationById={displayStationById}
                 onChangeFilter={setTransferReviewFilter}
                 onOpenSuggestion={openTransferGroupSuggestion}
+                onSelectSuggestion={(suggestion) => setActiveTransferSuggestionKey(suggestion.key)}
                 onDismissSuggestion={(suggestion) => void dismissTransferGroupSuggestion(suggestion)}
               />
             ) : null}
@@ -9546,6 +9625,38 @@ function TransferGroupInspector({
     });
   }
 
+  const nearbyStationCandidates = useMemo(() => {
+    const included = new Set(draft.stationIds);
+    const baseStations = draft.stationIds
+      .map((stationId) => stationById.get(stationId))
+      .filter((station): station is EditorStation => Boolean(station && isValidStation(station)));
+    if (baseStations.length === 0) return [] as EditorStation[];
+    const nameKeys = new Set(baseStations.map((station) => getManualStationNameKey(station.nameKo)).filter(Boolean));
+    return [...stationById.values()]
+      .filter((station) => !included.has(station.id) && isValidStation(station))
+      .map((station) => {
+        const nameMatch = nameKeys.has(getManualStationNameKey(station.nameKo));
+        const distance = Math.min(...baseStations.map((base) => getApproxDistanceMeters(base, station)));
+        return { station, nameMatch, distance };
+      })
+      .filter((candidate) => candidate.nameMatch || candidate.distance <= 280)
+      .sort((a, b) => Number(b.nameMatch) - Number(a.nameMatch) || a.distance - b.distance)
+      .slice(0, 6)
+      .map((candidate) => candidate.station);
+  }, [draft.stationIds, stationById]);
+
+  function addStation(stationId: string) {
+    const stationIds = [...new Set([...draft.stationIds, stationId])];
+    onChange({
+      ...draft,
+      stationIds,
+      transferMinutesByPair: normalizeTransferGroupDraftPairs(
+        stationIds,
+        draft.transferMinutesByPair,
+      ),
+    });
+  }
+
   return (
     <div className="grid gap-3">
       <div
@@ -9626,6 +9737,27 @@ function TransferGroupInspector({
           );
         })}
       </div>
+      {nearbyStationCandidates.length > 0 ? (
+        <div className="grid gap-2 rounded-3xl border border-slate-200 bg-white p-2">
+          <div className="flex items-center justify-between px-1">
+            <strong className="text-xs font-medium text-slate-600">주변 후보</strong>
+            <span className="text-[11px] font-normal text-slate-400">추가할 역 선택</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {nearbyStationCandidates.map((station) => (
+              <button
+                key={station.id}
+                type="button"
+                className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-normal text-slate-700 hover:border-violet-200 hover:bg-violet-50"
+                onClick={() => addStation(station.id)}
+                title={formatStationSubLabel(station)}
+              >
+                {station.nameKo}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div
         className={cn(
           "grid gap-2 rounded-3xl border p-3",
@@ -9656,7 +9788,7 @@ function TransferGroupInspector({
             </p>
           </div>
           <Button variant="outline" onClick={() => setTimeModalOpen(true)}>
-            전체화면 편집
+            크게 편집
           </Button>
         </div>
         {missingPairs.length > 0 ? (
@@ -9682,24 +9814,25 @@ function TransferGroupInspector({
       </div>
       <Dialog
         open={timeModalOpen}
-        className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none rounded-none flex-col overflow-hidden"
+        className="flex h-[min(820px,calc(100dvh-40px))] w-[min(1180px,calc(100vw-40px))] max-w-none flex-col overflow-hidden rounded-[28px]"
       >
-        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-4 py-3">
+        <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-white px-5 py-4">
           <div>
-            <strong className="block text-sm font-semibold text-slate-950">
+            <strong className="block text-base font-medium text-slate-950">
               환승 시간표
             </strong>
+            <p className="mt-1 text-xs font-normal text-slate-500">선택한 행과 열이 강조됩니다.</p>
           </div>
           <Button variant="ghost" size="icon" onClick={() => setTimeModalOpen(false)}>
             <X className="size-4" />
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto p-3">
-          <table className="min-w-max border-separate border-spacing-1 text-[11px]">
+        <div className="min-h-0 flex-1 overflow-auto bg-slate-50 p-4">
+          <table className="min-w-max border-separate border-spacing-1 text-[12px]">
             <thead>
               <tr>
-                <th className="sticky left-0 top-0 z-20 min-w-36 rounded-xl bg-white px-2 py-2 text-left font-semibold text-slate-500 shadow-sm">
-                  역
+                <th className="sticky left-0 top-0 z-20 min-w-40 rounded-xl bg-white px-3 py-2 text-left font-medium text-slate-500 shadow-sm">
+                  출발 / 도착
                 </th>
                 {draft.stationIds.map((colId) => {
                   const station = stationById.get(colId);
@@ -9707,7 +9840,7 @@ function TransferGroupInspector({
                     <th
                       key={colId}
                       className={cn(
-                        "sticky top-0 z-10 min-w-32 max-w-40 rounded-xl px-2 py-2 text-left font-semibold shadow-sm",
+                        "sticky top-0 z-10 min-w-36 max-w-44 rounded-xl px-3 py-2 text-left font-medium shadow-sm",
                         selectedTransferCell?.colId === colId ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "bg-white text-slate-600",
                       )}
                     >
@@ -9728,7 +9861,7 @@ function TransferGroupInspector({
                 return (
                   <tr key={rowId}>
                     <th className={cn(
-                      "sticky left-0 z-10 min-w-36 max-w-44 rounded-xl px-2 py-2 text-left font-semibold shadow-sm",
+                      "sticky left-0 z-10 min-w-40 max-w-48 rounded-xl px-3 py-2 text-left font-medium shadow-sm",
                       selectedTransferCell?.rowId === rowId ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "bg-white text-slate-600",
                     )}>
                       <span className="block truncate">
@@ -9765,7 +9898,7 @@ function TransferGroupInspector({
                           <Input
                             type="number"
                             min={0}
-                            className="h-8 min-w-24 px-2 text-[11px]"
+                            className="h-9 min-w-24 rounded-lg bg-white px-2 text-center text-xs"
                             value={value ?? ""}
                             placeholder="분"
                             onChange={(event) =>
@@ -9781,7 +9914,7 @@ function TransferGroupInspector({
             </tbody>
           </table>
         </div>
-        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-200 bg-white px-5 py-4">
           <p className="text-xs font-medium text-slate-500">
             {missingPairs.length > 0
               ? `${missingPairs.length.toLocaleString("ko-KR")}개 구간 미입력`
@@ -9804,6 +9937,7 @@ function TransferGroupReviewPanel({
   stationById,
   onChangeFilter,
   onOpenSuggestion,
+  onSelectSuggestion,
   onDismissSuggestion,
 }: {
   suggestions: TransferGroupSuggestion[];
@@ -9814,6 +9948,7 @@ function TransferGroupReviewPanel({
   stationById: Map<string, EditorStation>;
   onChangeFilter: (filter: TransferGroupReviewFilter) => void;
   onOpenSuggestion: (suggestion: TransferGroupSuggestion) => void;
+  onSelectSuggestion: (suggestion: TransferGroupSuggestion) => void;
   onDismissSuggestion: (suggestion: TransferGroupSuggestion) => void;
 }) {
   const dismissed = new Set(dismissedKeys);
@@ -9833,13 +9968,13 @@ function TransferGroupReviewPanel({
       <div className="rounded-2xl border border-violet-100 bg-white p-3 shadow-sm">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <strong className="block truncate text-sm font-semibold text-slate-900">환승 추천</strong>
-            <p className="mt-0.5 text-[11px] font-medium text-slate-500">선택하면 지도도 후보 위치로 이동합니다.</p>
+            <strong className="block truncate text-sm font-medium text-slate-900">환승 추천</strong>
+            <p className="mt-0.5 text-[11px] font-normal text-slate-500">후보 선택 시 지도에 강조됩니다.</p>
           </div>
           <Badge className="bg-violet-50 text-violet-700">{filteredSuggestions.length}개</Badge>
         </div>
         <select
-          className="mt-2 h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
+          className="mt-2 h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-normal text-slate-700 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
           value={filter}
           onChange={(event) => onChangeFilter(event.target.value as TransferGroupReviewFilter)}
         >
@@ -9857,7 +9992,7 @@ function TransferGroupReviewPanel({
               <p className="text-[11px] font-medium text-slate-400">
                 {activeIndex + 1} / {filteredSuggestions.length}
               </p>
-              <strong className="mt-0.5 block truncate text-base font-semibold text-slate-950">
+              <strong className="mt-0.5 block truncate text-base font-medium text-slate-950">
                 {activeSuggestion.nameKo}
               </strong>
               <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
@@ -9887,7 +10022,7 @@ function TransferGroupReviewPanel({
                     style={{ backgroundColor: station?.colorHex ?? "#64748b" }}
                   />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-semibold text-slate-800">{station?.nameKo ?? stationId}</span>
+                    <span className="block truncate text-xs font-medium text-slate-800">{station?.nameKo ?? stationId}</span>
                     <span className="block truncate text-[10px] font-medium text-slate-400">{station ? formatStationSubLabel(station) : "존재하지 않는 역"}</span>
                   </span>
                 </div>
@@ -9913,14 +10048,14 @@ function TransferGroupReviewPanel({
           <Button
             variant="outline"
             disabled={activeIndex <= 0}
-            onClick={() => onOpenSuggestion(filteredSuggestions[Math.max(0, activeIndex - 1)]!)}
+            onClick={() => onSelectSuggestion(filteredSuggestions[Math.max(0, activeIndex - 1)]!)}
           >
             이전
           </Button>
           <Button
             variant="outline"
             disabled={activeIndex >= filteredSuggestions.length - 1}
-            onClick={() => onOpenSuggestion(filteredSuggestions[Math.min(filteredSuggestions.length - 1, activeIndex + 1)]!)}
+            onClick={() => onSelectSuggestion(filteredSuggestions[Math.min(filteredSuggestions.length - 1, activeIndex + 1)]!)}
           >
             다음
           </Button>
