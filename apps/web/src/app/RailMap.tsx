@@ -1119,7 +1119,7 @@ export default function RailMap({
             paint: {
               "line-color": ["coalesce", ["get", "colorHex"], "#0284c7"],
               "line-width": MAP_RENDER_POLICY.branchLineWidth,
-              "line-opacity": 0.76,
+              "line-opacity": highlightedRouteStationIds.length > 0 ? 0.18 : 0.76,
             },
             layout: {
               "line-cap": "round",
@@ -1162,7 +1162,7 @@ export default function RailMap({
             paint: {
               "line-color": ["get", "colorHex"],
               "line-width": MAP_RENDER_POLICY.lineBranchLineWidth,
-              "line-opacity": 0.78,
+              "line-opacity": highlightedRouteStationIds.length > 0 ? 0.16 : 0.78,
             },
             layout: { "line-cap": "round", "line-join": "round" },
           });
@@ -1173,9 +1173,9 @@ export default function RailMap({
             source: "route-result-transfer-lines",
             paint: {
               "line-color": "#64748b",
-              "line-width": 3.2,
-              "line-opacity": 0.86,
-              "line-dasharray": [0.4, 1.3],
+              "line-width": 3.6,
+              "line-opacity": 0.9,
+              "line-dasharray": [0.25, 1.15],
             },
             layout: {
               "line-cap": "round",
@@ -1204,8 +1204,8 @@ export default function RailMap({
             source: "route-result-lines",
             paint: {
               "line-color": "#10b981",
-              "line-width": 4.2,
-              "line-opacity": 0.96,
+              "line-width": 4.8,
+              "line-opacity": 0.98,
             },
             layout: {
               "line-cap": "round",
