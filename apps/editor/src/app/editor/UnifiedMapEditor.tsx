@@ -8073,13 +8073,29 @@ export default function UnifiedMapEditor({
       return;
     }
 
-    const confirmed = window.confirm(
-      `${formatStationDisplayName(selectedStation)} 역을 ${targetBranches.length.toLocaleString("ko-KR")}개 노선별 stationId로 분할할까요?\n\n대표 노선 하나는 기존 stationId를 유지하고, 나머지 노선은 새 stationId로 만들어 환승 그룹으로 묶습니다.`,
-    );
-    if (!confirmed) return;
-
     const keepBranch = targetBranches[0];
     const splitBranches = targetBranches.slice(1);
+    const affectedPatternCount = overlays.manualServicePatterns.filter((pattern) =>
+      pattern.branchId && splitBranches.some((branch) => branch.id === pattern.branchId),
+    ).length;
+    const affectedTrainRunCount = overlays.manualTrainRuns.filter((run) => {
+      const pattern = overlays.manualServicePatterns.find((candidate) => candidate.id === run.patternId);
+      return Boolean(pattern?.branchId && splitBranches.some((branch) => branch.id === pattern.branchId));
+    }).length;
+    const previewLines = [
+      `${formatStationDisplayName(selectedStation)} 역을 ${targetBranches.length.toLocaleString("ko-KR")}개 노선별 stationId로 분할합니다.`,
+      "",
+      `대표 유지: ${keepBranch ? formatBranchDisplayName(keepBranch) : "첫 번째 노선"}`,
+      ...splitBranches.slice(0, 8).map((branch) => `분할 생성: ${formatBranchDisplayName(branch)}`),
+      splitBranches.length > 8 ? `외 ${splitBranches.length - 8}개 노선` : null,
+      "",
+      `영향 범위: 정차 패턴 ${affectedPatternCount.toLocaleString("ko-KR")}개 · 시간표 ${affectedTrainRunCount.toLocaleString("ko-KR")}개`,
+      "생성된 역은 같은 물리 역 환승 그룹으로 묶고, 환승 시간표는 보류 상태로 둡니다.",
+    ].filter((line): line is string => line !== null);
+
+    const confirmed = window.confirm(previewLines.join("\n"));
+    if (!confirmed) return;
+
     const existingStationIds = new Set([
       ...data.stations.map((station) => station.id),
       ...overlays.stationOverrides.map((override) => override.stationId),
