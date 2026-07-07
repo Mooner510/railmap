@@ -67,6 +67,9 @@ import type {
   ManualGeometryOverridePoint,
   ManualLineBranchOverride,
   ManualOverlayBundle,
+  ManualServicePattern,
+  ManualTrainRun,
+  ManualTransferReviewEvent,
   RailLineCategory,
   RailServiceType,
   ManualLineCoverageStatus,
@@ -128,6 +131,36 @@ const SAVED_STATION_ANCHOR_TOLERANCE = 0.0000001;
 const GEOMETRY_NEAR_ZERO_SEGMENT_DISTANCE = 0.000001;
 const KOREA_GEOMETRY_LNG_RANGE = [124, 132] as const;
 const KOREA_GEOMETRY_LAT_RANGE = [33, 39.5] as const;
+
+function makeManualTransferReviewEvent(input: {
+  type: ManualTransferReviewEvent["type"];
+  transferGroupId?: string | null;
+  suggestionKey?: string | null;
+  nameKo: string;
+  stationIds: string[];
+  reason?: string | null;
+  note?: string | null;
+}): ManualTransferReviewEvent {
+  const decidedAt = new Date().toISOString();
+  return {
+    id: `manual-transfer-review-event:${decidedAt}:${input.type}:${input.suggestionKey ?? input.transferGroupId ?? input.nameKo}`,
+    type: input.type,
+    transferGroupId: input.transferGroupId ?? null,
+    suggestionKey: input.suggestionKey ?? null,
+    nameKo: input.nameKo,
+    stationIds: [...new Set(input.stationIds)],
+    decidedAt,
+    reason: input.reason ?? null,
+    note: input.note ?? null,
+  };
+}
+
+function appendManualTransferReviewEvent(
+  overlays: ManualOverlayBundle,
+  event: ManualTransferReviewEvent,
+): ManualTransferReviewEvent[] {
+  return [...(overlays.manualTransferReviewEvents ?? []), event].slice(-200);
+}
 
 type ContextMenuState = {
   x: number;
@@ -6280,10 +6313,28 @@ export default function UnifiedMapEditor({
     const suggestionKeys = new Set(overlays.dismissedTransferGroupSuggestionKeys ?? []);
     if (activeTransferSuggestionKey) suggestionKeys.add(activeTransferSuggestionKey);
 
+    const transferReviewEvent = makeManualTransferReviewEvent({
+      type: missingPairs.length > 0 && allowPending
+        ? "transfer-time-pending"
+        : activeTransferSuggestionKey
+          ? "suggestion-approved"
+          : transferDraft.id
+            ? "group-updated"
+            : "group-created",
+      transferGroupId: group.id,
+      suggestionKey: activeTransferSuggestionKey,
+      nameKo: group.nameKo,
+      stationIds: group.stationIds,
+      note: missingPairs.length > 0 && allowPending
+        ? "환승 시간표 입력을 나중으로 보류"
+        : null,
+    });
+
     const next: ManualOverlayBundle = {
       ...overlays,
       dismissedTransferGroupSuggestionKeys: [...suggestionKeys],
       transferTimePendingGroupIds: [...pendingIds],
+      manualTransferReviewEvents: appendManualTransferReviewEvent(overlays, transferReviewEvent),
       manualTransferGroups: [
         ...overlays.manualTransferGroups.filter(
           (candidate) => candidate.id !== group.id,
@@ -6307,8 +6358,17 @@ export default function UnifiedMapEditor({
   }
 
   async function deleteTransferGroup(groupId: string) {
+    const deletedGroup = overlays.manualTransferGroups.find((group) => group.id === groupId);
     const next: ManualOverlayBundle = {
       ...overlays,
+      manualTransferReviewEvents: deletedGroup
+        ? appendManualTransferReviewEvent(overlays, makeManualTransferReviewEvent({
+            type: "group-deleted",
+            transferGroupId: deletedGroup.id,
+            nameKo: deletedGroup.nameKo,
+            stationIds: deletedGroup.stationIds,
+          }))
+        : overlays.manualTransferReviewEvents,
       manualTransferGroups: overlays.manualTransferGroups.filter(
         (group) => group.id !== groupId,
       ),
@@ -6487,6 +6547,13 @@ export default function UnifiedMapEditor({
         ...overlays,
         dismissedTransferGroupSuggestionKeys: nextKeys,
         dismissedTransferGroupSuggestionNotes: nextNotes,
+        manualTransferReviewEvents: appendManualTransferReviewEvent(overlays, makeManualTransferReviewEvent({
+          type: "suggestion-dismissed",
+          suggestionKey: suggestion.key,
+          nameKo: suggestion.nameKo,
+          stationIds: suggestion.stationIds,
+          reason: reason?.trim() || null,
+        })),
       },
       `${suggestion.nameKo} 환승 그룹 추천을 거절했습니다`,
     );
@@ -7963,6 +8030,9 @@ export default function UnifiedMapEditor({
                 undoCount={undoStackRef.current.length}
                 redoCount={redoStackRef.current.length}
                 latest={undoStackRef.current.at(-1)}
+                transferReviewEvents={overlays.manualTransferReviewEvents ?? []}
+                servicePatterns={overlays.manualServicePatterns ?? []}
+                trainRuns={overlays.manualTrainRuns ?? []}
               />
             ) : null}
           </PanelBody>
@@ -8498,33 +8568,91 @@ function SidebarShortcutDock({
   );
 }
 
+function formatTransferReviewEventType(type: ManualTransferReviewEvent["type"]) {
+  switch (type) {
+    case "suggestion-approved":
+      return "추천 승인";
+    case "suggestion-dismissed":
+      return "추천 거절";
+    case "group-created":
+      return "그룹 생성";
+    case "group-updated":
+      return "그룹 수정";
+    case "group-deleted":
+      return "그룹 삭제";
+    case "transfer-time-pending":
+      return "시간표 보류";
+    case "transfer-time-completed":
+      return "시간표 완료";
+  }
+}
+
 function CommandHistoryPanel({
   undoCount,
   redoCount,
   latest,
+  transferReviewEvents,
+  servicePatterns,
+  trainRuns,
 }: {
   undoCount: number;
   redoCount: number;
   latest?: OverlayCommandRecord;
+  transferReviewEvents: ManualTransferReviewEvent[];
+  servicePatterns: ManualServicePattern[];
+  trainRuns: ManualTrainRun[];
 }) {
+  const latestTransferEvents = transferReviewEvents.slice(-6).reverse();
+
   return (
     <div className="grid gap-3">
       <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-        <strong className="text-sm font-semibold text-slate-700">
-          Command History
-        </strong>
-        <p className="mt-2 text-xs font-medium text-slate-500">
+        <strong className="text-sm font-medium text-slate-700">작업 기록</strong>
+        <p className="mt-2 text-xs font-normal text-slate-500">
           Undo {undoCount} · Redo {redoCount}
         </p>
       </div>
-      {latest ? (
-        <InfoRow label="최근 작업" value={latest.label} />
-      ) : (
-        <Placeholder
-          title="작업 기록 없음"
-          description="저장 작업을 실행하면 command history에 기록됩니다."
-        />
-      )}
+
+      {latest ? <InfoRow label="최근 작업" value={latest.label} /> : null}
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <strong className="text-sm font-medium text-slate-800">환승 그룹 검토 이력</strong>
+          <Badge className="bg-slate-100 text-slate-600">
+            {transferReviewEvents.length.toLocaleString("ko-KR")}건
+          </Badge>
+        </div>
+        <div className="mt-3 grid gap-2">
+          {latestTransferEvents.map((event) => (
+            <div key={event.id} className="rounded-2xl bg-slate-50 px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-xs font-medium text-slate-800">{event.nameKo}</span>
+                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                  {formatTransferReviewEventType(event.type)}
+                </span>
+              </div>
+              <p className="mt-1 truncate text-[11px] font-normal text-slate-500">
+                {event.stationIds.length.toLocaleString("ko-KR")}개 역
+                {event.reason ? ` · ${event.reason}` : ""}
+              </p>
+            </div>
+          ))}
+          {latestTransferEvents.length === 0 ? (
+            <Placeholder title="환승 검토 이력 없음" description="추천 승인/거절 또는 보류 저장을 하면 기록됩니다." />
+          ) : null}
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-4">
+        <strong className="text-sm font-medium text-slate-800">운행 패턴 / 시간표 모델</strong>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <InfoRow label="정차 패턴" value={`${servicePatterns.length.toLocaleString("ko-KR")}개`} />
+          <InfoRow label="열차 시간표" value={`${trainRuns.length.toLocaleString("ko-KR")}개`} />
+        </div>
+        <p className="mt-3 text-xs font-normal leading-5 text-slate-500">
+          노선은 물리 선로, 정차 패턴은 열차/운행계통, 시간표는 열차번호별 시각으로 분리됩니다.
+        </p>
+      </div>
     </div>
   );
 }

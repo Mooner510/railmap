@@ -36,16 +36,14 @@
         "manual.station.manual.line.경부선.남영역",
         "manual.station.manual.line.경부선.용산역",
         "manual.station.manual.line.경부선.노량진역",
-        "manual.station.manual.line.경부선.대방역",
-        "manual.station.manual.line.경부선.신길",
-        "manual.station.manual.line.경부선.영등포",
-        "manual.station.manual.line.경부선.신도림역",
-        "manual.station.manual.line.경부선.구로역"
+        "manual.station.manual.line.경부선.대방역"
       ],
       "circular": false,
       "enabled": true,
       "source": "editor",
       "note": "수기 노선 빌더에서 생성한 물리 노선 정차 순서"
     }
-  ]
+  ],
+  "manualServicePatterns": [],
+  "manualTrainRuns": []
 }

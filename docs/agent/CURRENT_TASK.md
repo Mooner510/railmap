@@ -275,3 +275,13 @@ Recommended scope:
 - 반영 대기 목록의 역은 개별 제외, 이름 수정, 위/아래 이동이 가능하다.
 - 중복/이미 추가된 역은 제외 목록에 분리하고, 보정 완료/반영 대기/제외 개수를 일관되게 표시한다.
 - 반영 버튼을 누르면 반영 대기 목록만 실제 역 목록에 추가한다. 미매칭 역이 남아 있으면 modal을 유지해 이어서 보정할 수 있다.
+
+## 13.40.0-transfer-history-and-service-timetable-foundation
+
+- 환승 그룹 추천/승인/거절/시간표 보류 작업을 `manualTransferReviewEvents`로 기록하는 기반을 추가했다.
+- 기록 탭에서 최근 환승 그룹 검토 이력을 확인할 수 있게 했다.
+- 보류 저장, 추천 승인, 추천 거절, 그룹 생성/수정/삭제를 작업 이력으로 남긴다.
+- `manualServicePatterns`를 추가해 물리 노선과 열차/운행계통의 정차 패턴을 분리하는 기반을 만들었다.
+- `manualTrainRuns`를 추가해 열차번호별 실제 도착/출발 시각을 정차 패턴과 별도로 저장할 수 있는 기반을 만들었다.
+- collector validation에서 service pattern과 train run의 line/branch/station/pattern 참조를 검증한다.
+- 아직 시간표 입력 UI는 만들지 않았으며, 다음 단계에서 service pattern 생성/편집 UX를 추가한다.

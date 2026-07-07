@@ -90,6 +90,33 @@ type ManualOverlayBundle = {
     circular?: boolean;
     enabled?: boolean;
   }>;
+  manualTransferReviewEvents?: Array<{
+    id?: string;
+    type?: string;
+    transferGroupId?: string | null;
+    suggestionKey?: string | null;
+    nameKo?: string;
+    stationIds?: string[];
+    decidedAt?: string;
+    reason?: string | null;
+  }>;
+  manualServicePatterns?: Array<{
+    id?: string;
+    nameKo?: string;
+    lineId?: string | null;
+    branchId?: string | null;
+    serviceType?: string;
+    stops?: Array<{ stationId?: string; sequence?: number }>;
+    enabled?: boolean;
+  }>;
+  manualTrainRuns?: Array<{
+    id?: string;
+    patternId?: string | null;
+    trainNumber?: string | null;
+    serviceType?: string;
+    stopTimes?: Array<{ stationId?: string; sequence?: number; arrivalTime?: string | null; departureTime?: string | null }>;
+    enabled?: boolean;
+  }>;
 };
 
 const REQUIRED_OVERLAY_ARRAY_KEYS = [
@@ -102,6 +129,9 @@ const REQUIRED_OVERLAY_ARRAY_KEYS = [
   "lineMetadataOverrides",
   "manualLineDefinitions",
   "manualBranchDefinitions",
+  "manualTransferReviewEvents",
+  "manualServicePatterns",
+  "manualTrainRuns",
 ] as const;
 
 function readJson(filePath: string): JsonRecord | null {
@@ -724,6 +754,118 @@ function validateManualLineDefinitions(
   }
 }
 
+function validateServicePatternsAndTimetables(
+  issues: ValidationIssue[],
+  overlays: ManualOverlayBundle,
+  stationById: Map<string, JsonRecord>,
+  branchById: Map<string, JsonRecord>,
+  lineById: Map<string, JsonRecord>,
+) {
+  const validServiceTypes = new Set([
+    "subway",
+    "gtx",
+    "ktx",
+    "srt",
+    "itx",
+    "saemaeul",
+    "mugunghwa",
+    "nuriro",
+    "airport_rail",
+    "unknown",
+  ]);
+
+  const patternIds = new Set<string>();
+
+  for (const pattern of overlays.manualServicePatterns ?? []) {
+    if (pattern.enabled === false) continue;
+    const where = `manualServicePatterns:${pattern.id ?? "-"}`;
+    if (!pattern.id || !pattern.nameKo) {
+      addIssue(issues, {
+        severity: "error",
+        code: "invalid-service-pattern",
+        where,
+        message: "운행 패턴에 id 또는 이름이 없습니다.",
+        cause: "정차 패턴은 시간표와 연결되는 기준 데이터라 고유 id와 이름이 필요합니다.",
+        fix: "패턴 id/nameKo를 입력하거나 해당 항목을 삭제하세요.",
+      });
+      continue;
+    }
+    patternIds.add(pattern.id);
+    if (pattern.lineId && !lineById.has(pattern.lineId)) {
+      addIssue(issues, {
+        severity: "error",
+        code: "unknown-service-pattern-line",
+        where,
+        message: "운행 패턴이 존재하지 않는 lineId를 참조합니다.",
+        cause: "lineId가 canonical/manual line에 없습니다.",
+        fix: "실제 노선 id로 수정하거나 lineId를 비워 미분류 패턴으로 두세요.",
+      });
+    }
+    if (pattern.branchId && !branchById.has(pattern.branchId)) {
+      addIssue(issues, {
+        severity: "error",
+        code: "unknown-service-pattern-branch",
+        where,
+        message: "운행 패턴이 존재하지 않는 branchId를 참조합니다.",
+        cause: "branchId가 canonical/manual branch에 없습니다.",
+        fix: "실제 branch id로 수정하거나 branchId를 비워 노선 단위 패턴으로 두세요.",
+      });
+    }
+    if (pattern.serviceType && !validServiceTypes.has(pattern.serviceType)) {
+      addIssue(issues, {
+        severity: "error",
+        code: "invalid-service-pattern-type",
+        where,
+        message: "운행 패턴의 서비스 타입이 잘못되었습니다.",
+        cause: "serviceType이 허용 enum에 없습니다.",
+        fix: "KTX/SRT/ITX/무궁화 등 허용 enum으로 수정하세요.",
+      });
+    }
+    for (const [index, stop] of (pattern.stops ?? []).entries()) {
+      validateStationReference(issues, stationById, stop.stationId, `${where}:stops:${index}`, "운행 패턴 정차역");
+    }
+  }
+
+  for (const run of overlays.manualTrainRuns ?? []) {
+    if (run.enabled === false) continue;
+    const where = `manualTrainRuns:${run.id ?? "-"}`;
+    if (!run.id) {
+      addIssue(issues, {
+        severity: "error",
+        code: "invalid-train-run",
+        where,
+        message: "열차 시간표에 id가 없습니다.",
+        cause: "열차번호/시간표 데이터는 고유 id가 필요합니다.",
+        fix: "시간표 id를 입력하거나 해당 항목을 삭제하세요.",
+      });
+      continue;
+    }
+    if (run.patternId && !patternIds.has(run.patternId)) {
+      addIssue(issues, {
+        severity: "error",
+        code: "unknown-train-run-pattern",
+        where,
+        message: "열차 시간표가 존재하지 않는 정차 패턴을 참조합니다.",
+        cause: "patternId가 manualServicePatterns.id와 일치하지 않습니다.",
+        fix: "정차 패턴을 먼저 만들거나 patternId를 올바르게 수정하세요.",
+      });
+    }
+    if (run.serviceType && !validServiceTypes.has(run.serviceType)) {
+      addIssue(issues, {
+        severity: "error",
+        code: "invalid-train-run-service-type",
+        where,
+        message: "열차 시간표의 서비스 타입이 잘못되었습니다.",
+        cause: "serviceType이 허용 enum에 없습니다.",
+        fix: "KTX/SRT/ITX/무궁화 등 허용 enum으로 수정하세요.",
+      });
+    }
+    for (const [index, stop] of (run.stopTimes ?? []).entries()) {
+      validateStationReference(issues, stationById, stop.stationId, `${where}:stopTimes:${index}`, "시간표 정차역");
+    }
+  }
+}
+
 function validateReferences(
   issues: ValidationIssue[],
   overlays: ManualOverlayBundle,
@@ -738,6 +880,7 @@ function validateReferences(
   collectDuplicateIds(issues, overlays.lineBranchOverrides, "lineBranchOverrides");
   validateLineMetadataOverrides(issues, lineById, overlays);
   validateManualLineDefinitions(issues, overlays, stationById);
+  validateServicePatternsAndTimetables(issues, overlays, stationById, branchById, lineById);
 
   for (const override of overlays.stationOverrides ?? []) {
     if (override.enabled === false || !override.stationId) continue;
