@@ -122,7 +122,7 @@ type Selection =
   | { type: "transferGroup"; id: string }
   | { type: "multiStation"; ids: string[] };
 
-type SidebarTab = "search" | "layers" | "manualLines" | "transfers" | "transferReview" | "patterns" | "validation" | "history";
+type SidebarTab = "search" | "layers" | "manualLines" | "transfers" | "transferReview" | "patterns" | "validation" | "audit" | "history";
 type ToolMode = "select" | "box" | "geometry";
 type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
@@ -8439,6 +8439,12 @@ export default function UnifiedMapEditor({
       Icon: ListChecks,
       badge: validationBadgeCount,
     },
+    {
+      value: "audit",
+      label: "감사",
+      Icon: ListChecks,
+      badge: validationBadgeCount + (overlays.transferTimePendingGroupIds?.length ?? 0),
+    },
     { value: "history", label: "기록", Icon: History },
   ];
 
@@ -8775,6 +8781,14 @@ export default function UnifiedMapEditor({
                 onApplyAllSafeFixes={() => void applyAllSafeValidationFixes()}
               />
             ) : null}
+            {!isGeometryMode && sidebarTab === "audit" ? (
+              <ManualDataAuditDashboard
+                overlays={overlays}
+                stationById={displayStationById}
+                validationIssues={lineBranchIssues}
+              />
+            ) : null}
+
             {!isGeometryMode && sidebarTab === "history" ? (
               <CommandHistoryPanel
                 undoCount={undoStackRef.current.length}
@@ -9339,6 +9353,98 @@ function formatTransferReviewEventType(type: ManualTransferReviewEvent["type"]) 
     case "transfer-time-completed":
       return "시간표 완료";
   }
+}
+
+function ManualDataAuditDashboard({
+  overlays,
+  stationById,
+  validationIssues,
+}: {
+  overlays: ManualOverlayBundle;
+  stationById: Map<string, EditorStation>;
+  validationIssues: LineBranchValidationIssue[];
+}) {
+  const enabledManualLines = overlays.manualLineDefinitions.filter((line) => line.enabled !== false);
+  const enabledTransferGroups = overlays.manualTransferGroups.filter((group) => group.enabled !== false);
+  const enabledPatterns = overlays.manualServicePatterns.filter((pattern) => pattern.enabled !== false);
+  const enabledTrainRuns = overlays.manualTrainRuns.filter((run) => run.enabled !== false);
+  const patternIdsWithTrainRuns = new Set(enabledTrainRuns.map((run) => run.patternId).filter(Boolean));
+  const patternsWithoutTrainRuns = enabledPatterns.filter((pattern) => !patternIdsWithTrainRuns.has(pattern.id));
+  const transferGroupsWithoutTime = enabledTransferGroups.filter((group) => {
+    const stationIds = group.stationIds.filter(Boolean);
+    if (stationIds.length < 2) return false;
+    for (let i = 0; i < stationIds.length - 1; i += 1) {
+      for (let j = i + 1; j < stationIds.length; j += 1) {
+        const fromStationId = stationIds[i];
+        const toStationId = stationIds[j];
+        if (!fromStationId || !toStationId) continue;
+        const pairKey = makeTransferPairKey(fromStationId, toStationId);
+        if (typeof group.transferMinutesByPair?.[pairKey] !== "number") return true;
+      }
+    }
+    return false;
+  });
+  const missingStationReferences = enabledPatterns.flatMap((pattern) =>
+    pattern.stops
+      .filter((stop) => !stationById.has(stop.stationId))
+      .map((stop) => `${pattern.nameKo}: ${stop.stationId}`),
+  );
+  const trainRunsWithSparseTimes = enabledTrainRuns.filter((run) =>
+    run.stopTimes.filter((stop) => stop.arrivalTime || stop.departureTime).length < 2,
+  );
+  const auditItems = [
+    { label: "수기 노선", value: enabledManualLines.length, detail: `${overlays.manualBranchDefinitions.length.toLocaleString("ko-KR")}개 지선` },
+    { label: "환승 그룹", value: enabledTransferGroups.length, detail: `${transferGroupsWithoutTime.length.toLocaleString("ko-KR")}개 시간 확인` },
+    { label: "정차 패턴", value: enabledPatterns.length, detail: `${patternsWithoutTrainRuns.length.toLocaleString("ko-KR")}개 시간표 없음` },
+    { label: "시간표", value: enabledTrainRuns.length, detail: `${trainRunsWithSparseTimes.length.toLocaleString("ko-KR")}개 시각 부족` },
+    { label: "검증 이슈", value: validationIssues.length, detail: `${missingStationReferences.length.toLocaleString("ko-KR")}개 역 참조 확인` },
+  ];
+  const riskItems = [
+    transferGroupsWithoutTime.length > 0 ? `환승 시간 미입력 ${transferGroupsWithoutTime.length.toLocaleString("ko-KR")}개` : null,
+    patternsWithoutTrainRuns.length > 0 ? `시간표 없는 정차 패턴 ${patternsWithoutTrainRuns.length.toLocaleString("ko-KR")}개` : null,
+    trainRunsWithSparseTimes.length > 0 ? `시각 부족 시간표 ${trainRunsWithSparseTimes.length.toLocaleString("ko-KR")}개` : null,
+    missingStationReferences.length > 0 ? `없는 역 참조 ${missingStationReferences.length.toLocaleString("ko-KR")}개` : null,
+    validationIssues.length > 0 ? `검증 패널 이슈 ${validationIssues.length.toLocaleString("ko-KR")}개` : null,
+  ].filter((item): item is string => Boolean(item));
+
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-3xl border border-slate-200 bg-white p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <strong className="block text-sm font-semibold text-slate-900">수기 데이터 감사</strong>
+            <p className="mt-1 text-xs font-medium text-slate-500">노선·환승·정차 패턴·시간표 상태를 한 번에 확인합니다.</p>
+          </div>
+          <Badge className={riskItems.length > 0 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}>
+            {riskItems.length > 0 ? "확인 필요" : "양호"}
+          </Badge>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {auditItems.map((item) => (
+            <div key={item.label} className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2">
+              <p className="text-[10px] font-semibold text-slate-400">{item.label}</p>
+              <strong className="mt-1 block text-lg font-semibold text-slate-900">{item.value.toLocaleString("ko-KR")}</strong>
+              <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-4">
+        <strong className="text-sm font-semibold text-slate-900">위험 항목</strong>
+        <div className="mt-3 grid gap-1.5">
+          {riskItems.map((item) => (
+            <div key={item} className="rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+              {item}
+            </div>
+          ))}
+          {riskItems.length === 0 ? (
+            <Placeholder title="위험 항목 없음" description="현재 수기 데이터 감사 기준에서는 큰 누락이 보이지 않습니다." />
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function CommandHistoryPanel({
