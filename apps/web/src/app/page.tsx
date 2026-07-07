@@ -1062,6 +1062,8 @@ export default function Home() {
         transferGroups={toMapTransferGroups(
           manualOverlays.manualTransferGroups,
         )}
+        servicePatterns={manualOverlays.manualServicePatterns.filter((pattern) => pattern.enabled !== false)}
+        trainRuns={manualOverlays.manualTrainRuns.filter((run) => run.enabled !== false)}
       />
     </main>
   );

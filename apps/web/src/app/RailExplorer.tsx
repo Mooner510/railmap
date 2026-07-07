@@ -28,6 +28,8 @@ import {
   type CanonicalBundle,
   type CanonicalLine,
   type ManualLineBranchOverride,
+  type ManualServicePattern,
+  type ManualTrainRun,
   type ManualTransferEdge,
   type RailLineCategory,
 } from "./railExplorerModel";
@@ -38,6 +40,8 @@ interface RailExplorerProps {
   mapBranches: RailMapBranch[];
   lineBranchOverrides: ManualLineBranchOverride[];
   transferGroups: RailMapTransferGroup[];
+  servicePatterns: ManualServicePattern[];
+  trainRuns: ManualTrainRun[];
 }
 
 type MobilePanelMode = "search" | "selected" | "lines";
@@ -120,6 +124,8 @@ interface SelectedLinePanelProps {
   selectedLine: CanonicalLine | null;
   selectedBranchId: string | null;
   selectedBranch: CanonicalBranch | null;
+  servicePatterns: ManualServicePattern[];
+  trainRuns: ManualTrainRun[];
   onSelectBranch: (branchId: string) => void;
   onClearBranch: () => void;
 }
@@ -153,6 +159,8 @@ export default function RailExplorer({
   mapBranches,
   lineBranchOverrides,
   transferGroups,
+  servicePatterns,
+  trainRuns,
 }: RailExplorerProps) {
   const areaCodes = useMemo(
     () => [...new Set(bundle.lines.map((line) => line.mreaWideCd))].sort(),
@@ -960,6 +968,8 @@ export default function RailExplorer({
                   selectedLine={selectedLine}
                   selectedBranchId={selectedBranchId}
                   selectedBranch={selectedBranch}
+                  servicePatterns={servicePatterns}
+                  trainRuns={trainRuns}
                   onSelectBranch={setSelectedBranchId}
                   onClearBranch={() => setSelectedBranchId(null)}
                 />
@@ -1073,6 +1083,8 @@ export default function RailExplorer({
                     selectedLine={selectedLine}
                     selectedBranchId={selectedBranchId}
                     selectedBranch={selectedBranch}
+                    servicePatterns={servicePatterns}
+                    trainRuns={trainRuns}
                     onSelectBranch={setSelectedBranchId}
                     onClearBranch={() => setSelectedBranchId(null)}
                     compact
@@ -2698,6 +2710,8 @@ function SelectedLinePanel({
   selectedLine,
   selectedBranchId,
   selectedBranch,
+  servicePatterns,
+  trainRuns,
   onSelectBranch,
   onClearBranch,
   compact = false,
@@ -2713,6 +2727,14 @@ function SelectedLinePanel({
       </section>
     );
   }
+
+  const lineServicePatterns = servicePatterns.filter(
+    (pattern) => pattern.enabled !== false && (pattern.lineId === selectedLine.id || pattern.lineId === selectedLine.canonicalKey),
+  );
+  const linePatternIds = new Set(lineServicePatterns.map((pattern) => pattern.id));
+  const lineTrainRuns = trainRuns.filter(
+    (run) => run.enabled !== false && run.patternId && linePatternIds.has(run.patternId),
+  );
 
   return (
     <section className="border border-slate-200 bg-white p-2.5">
@@ -2746,6 +2768,11 @@ function SelectedLinePanel({
       <LineRoutePreview
         line={selectedLine}
         branch={selectedBranch ?? selectedLine.branches[0] ?? null}
+      />
+
+      <LineServicePatternSummary
+        patterns={lineServicePatterns}
+        trainRuns={lineTrainRuns}
       />
 
       {selectedBranch ? (
@@ -2812,6 +2839,104 @@ function SelectedLinePanel({
         onClearBranch={onClearBranch}
         compact={compact}
       />
+    </section>
+  );
+}
+
+
+function formatPatternDirectionLabel(direction: string | null | undefined) {
+  switch (direction) {
+    case "up":
+      return "상행";
+    case "down":
+      return "하행";
+    case "loop":
+      return "순환";
+    default:
+      return "미정";
+  }
+}
+
+function formatOperatingDays(days: string[] | undefined) {
+  if (!days || days.length === 0) return "운행일 미지정";
+  if (days.length > 3) return `${days.slice(0, 3).join(", ")} 외 ${days.length - 3}`;
+  return days.join(", ");
+}
+
+function getTrainRunPrimaryTime(run: ManualTrainRun) {
+  const first = run.stopTimes
+    .slice()
+    .sort((a, b) => a.sequence - b.sequence)
+    .find((stop) => stop.departureTime || stop.arrivalTime);
+  return first?.departureTime ?? first?.arrivalTime ?? "시각 미정";
+}
+
+function LineServicePatternSummary({
+  patterns,
+  trainRuns,
+}: {
+  patterns: ManualServicePattern[];
+  trainRuns: ManualTrainRun[];
+}) {
+  if (patterns.length === 0 && trainRuns.length === 0) return null;
+
+  const runsByPatternId = new Map<string, ManualTrainRun[]>();
+  for (const run of trainRuns) {
+    if (!run.patternId) continue;
+    const runs = runsByPatternId.get(run.patternId) ?? [];
+    runs.push(run);
+    runsByPatternId.set(run.patternId, runs);
+  }
+
+  return (
+    <section className="mt-2 border border-slate-200 bg-white px-2 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold text-slate-900">정차 패턴 · 시간표</h3>
+        <span className="text-[11px] text-slate-400">
+          패턴 {formatNumber(patterns.length)} · 열차 {formatNumber(trainRuns.length)}
+        </span>
+      </div>
+      <div className="mt-1.5 grid gap-1.5">
+        {patterns.slice(0, 4).map((pattern) => {
+          const runs = (runsByPatternId.get(pattern.id) ?? [])
+            .slice()
+            .sort((a, b) => getTrainRunPrimaryTime(a).localeCompare(getTrainRunPrimaryTime(b)));
+          return (
+            <div key={pattern.id} className="rounded border border-slate-100 bg-slate-50 px-2 py-1.5">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-slate-900">{pattern.nameKo}</p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {formatRailServiceType(pattern.serviceType)} · {formatPatternDirectionLabel(pattern.direction)} · 정차 {formatNumber(pattern.stops.length)}역
+                  </p>
+                </div>
+                <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
+                  열차 {formatNumber(runs.length)}
+                </span>
+              </div>
+              {runs.length > 0 ? (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {runs.slice(0, 3).map((run) => (
+                    <span key={run.id} className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                      {run.trainNumber || run.nameKo || "열차"} · {getTrainRunPrimaryTime(run)} · {formatOperatingDays(run.operatingDays)}
+                    </span>
+                  ))}
+                  {runs.length > 3 ? (
+                    <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+                      +{runs.length - 3}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+      {patterns.length > 4 ? (
+        <p className="mt-1.5 text-[11px] text-slate-400">
+          외 {formatNumber(patterns.length - 4)}개 패턴
+        </p>
+      ) : null}
     </section>
   );
 }
