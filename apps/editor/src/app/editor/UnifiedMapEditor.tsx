@@ -10412,13 +10412,58 @@ function ManualRailLinePanel({
     setBulkEntryResolveQuery(nextName);
   }
 
+  function getBulkExistingNameKeys(extraStations: ManualRouteStationDraft[] = []) {
+    const keys = new Set<string>();
+    if (!routeBuilderDraft) return keys;
+    for (const station of [...routeBuilderDraft.stations, ...extraStations]) {
+      const key = getManualStationNameKey(station.nameKo);
+      if (key) keys.add(key);
+    }
+    return keys;
+  }
+
+  function updateBulkPendingStation(clientId: string, patch: Partial<ManualRouteStationDraft>) {
+    setBulkEntryPendingStations((previous) => previous.map((station) => station.clientId === clientId ? { ...station, ...patch } : station));
+  }
+
+  function removeBulkPendingStation(clientId: string) {
+    setBulkEntryPendingStations((previous) => {
+      const next = previous.filter((station) => station.clientId !== clientId);
+      setBulkEntrySummary((summary) => summary ? { ...summary, added: next.length } : summary);
+      return next;
+    });
+  }
+
+  function moveBulkPendingStation(clientId: string, direction: -1 | 1) {
+    setBulkEntryPendingStations((previous) => {
+      const index = previous.findIndex((station) => station.clientId === clientId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= previous.length) return previous;
+      const next = previous.slice();
+      const [item] = next.splice(index, 1);
+      if (!item) return previous;
+      next.splice(nextIndex, 0, item);
+      return next;
+    });
+  }
+
+  function resetBulkEntryReview() {
+    setBulkEntryResult(null);
+    setBulkEntrySummary(null);
+    setBulkEntryPendingStations([]);
+    setBulkEntrySkippedNames([]);
+    setBulkEntryMissingNames([]);
+    setBulkEntryResolveName("");
+    setBulkEntryResolveQuery("");
+  }
+
   function applyBulkRouteStations() {
     if (!routeBuilderDraft) return;
     const names = parseBulkStationNames(bulkEntryText);
     const matched: ManualRouteStationDraft[] = [];
     const missing: string[] = [];
     const skipped: string[] = [];
-    const existingKeys = new Set(routeBuilderDraft.stations.map((station) => getManualStationNameKey(station.nameKo)).filter(Boolean));
+    const existingKeys = getBulkExistingNameKeys();
 
     for (const name of names) {
       const key = getManualStationNameKey(name);
@@ -10448,12 +10493,16 @@ function ManualRailLinePanel({
     setBulkEntrySummary({ added: matched.length, missing: missing.length, skipped: skipped.length });
     selectNextBulkMissingName(missing);
 
+    if (matched.length === 0 && missing.length === 0 && skipped.length === 0) {
+      setBulkEntryResult("분석할 역 이름이 없습니다.");
+      return;
+    }
     if (matched.length === 0) {
-      setBulkEntryResult(missing.length > 0 ? "보정할 역을 확인하세요." : skipped.length > 0 ? "이미 있는 역만 제외했습니다." : "추가할 역이 없습니다.");
+      setBulkEntryResult(missing.length > 0 ? "위치가 필요한 역을 보정하세요." : "이미 있는 역만 제외했습니다.");
       return;
     }
 
-    setBulkEntryResult(missing.length > 0 ? "추가 후보와 보정할 역을 확인한 뒤 반영하세요." : "추가 후보를 확인한 뒤 반영하세요.");
+    setBulkEntryResult("반영 대기 목록을 확인한 뒤 필요한 항목만 반영하세요.");
   }
 
   function commitBulkPendingStations() {
@@ -10462,9 +10511,13 @@ function ManualRailLinePanel({
       ...routeBuilderDraft,
       stations: [...routeBuilderDraft.stations, ...bulkEntryPendingStations],
     });
-    setBulkEntryResult(`${bulkEntryPendingStations.length.toLocaleString("ko-KR")}개 역을 목록에 반영했습니다.`);
+    const committedCount = bulkEntryPendingStations.length;
     setBulkEntryPendingStations([]);
     setBulkEntrySummary((previous) => previous ? { ...previous, added: 0 } : previous);
+    setBulkEntryResult(`${committedCount.toLocaleString("ko-KR")}개 역을 목록에 반영했습니다.`);
+    if (bulkEntryMissingNames.length === 0) {
+      setBulkEntryOpen(false);
+    }
   }
 
   function useMissingNameOnMap(nameKo: string) {
@@ -10480,29 +10533,43 @@ function ManualRailLinePanel({
   }
 
   function resolveMissingNameWithStation(station: EditorStation) {
-    if (!routeBuilderDraft || typeof station.lng !== "number" || typeof station.lat !== "number") return;
-    const selectedName = bulkEntryResolveName;
-    const nameKo = selectedName.trim() || stripStationNameQualifier(station.nameKo);
-    onChangeRouteBuilder({
-      ...routeBuilderDraft,
-      stations: [
-        ...routeBuilderDraft.stations,
-        {
-          clientId: makeManualRouteStationClientId(),
-          sourceStationId: station.id,
-          nameKo,
-          lng: station.lng,
-          lat: station.lat,
-        },
-      ],
+    if (typeof station.lng !== "number" || typeof station.lat !== "number") return;
+    const selectedName = bulkEntryResolveName.trim();
+    const nameKo = selectedName || stripStationNameQualifier(station.nameKo);
+    const key = getManualStationNameKey(nameKo);
+    if (!key) return;
+    const existingKeys = getBulkExistingNameKeys(bulkEntryPendingStations);
+    if (existingKeys.has(key)) {
+      setBulkEntrySkippedNames((previous) => previous.includes(nameKo) ? previous : [...previous, nameKo]);
+      setBulkEntryMissingNames((previous) => {
+        const next = previous.filter((name) => name !== selectedName);
+        selectNextBulkMissingName(next);
+        return next;
+      });
+      setBulkEntrySummary((previous) => previous ? { added: bulkEntryPendingStations.length, missing: Math.max(0, previous.missing - 1), skipped: previous.skipped + 1 } : previous);
+      setBulkEntryResult(`${nameKo}은 이미 목록에 있어 제외했습니다.`);
+      return;
+    }
+
+    const nextPendingStation: ManualRouteStationDraft = {
+      clientId: makeManualRouteStationClientId(),
+      sourceStationId: station.id,
+      nameKo,
+      lng: station.lng,
+      lat: station.lat,
+    };
+    setBulkEntryPendingStations((previous) => {
+      const next = [...previous, nextPendingStation];
+      setBulkEntrySummary((summary) => summary ? { ...summary, added: next.length } : summary);
+      return next;
     });
     setBulkEntryMissingNames((previous) => {
       const next = previous.filter((name) => name !== selectedName);
       selectNextBulkMissingName(next);
       return next;
     });
-    setBulkEntrySummary((previous) => previous ? { added: previous.added + 1, missing: Math.max(0, previous.missing - 1), skipped: previous.skipped } : previous);
-    setBulkEntryResult(`${nameKo} 위치를 기존 역에서 복사했습니다.`);
+    setBulkEntrySummary((previous) => previous ? { ...previous, missing: Math.max(0, previous.missing - 1) } : previous);
+    setBulkEntryResult(`${nameKo}을 반영 대기에 추가했습니다.`);
   }
 
   if (routeBuilderDraft && activeLine) {
@@ -10690,162 +10757,185 @@ function ManualRailLinePanel({
           </Button>
         </div>
 
-        <Dialog open={bulkEntryOpen} onClose={() => setBulkEntryOpen(false)} className="max-w-xl overflow-hidden rounded-[28px]">
-          <div className="border-b border-slate-200 px-4 py-3">
-            <strong className="block text-sm font-medium text-slate-950">역 이름 붙여넣기</strong>
-            <p className="mt-1 text-xs font-normal text-slate-500">한 줄에 하나씩 입력하면 같은 이름의 기존 역 위치를 복사합니다.</p>
+        <Dialog open={bulkEntryOpen} onClose={() => setBulkEntryOpen(false)} className="flex max-h-[min(840px,calc(100vh-2rem))] max-w-4xl flex-col overflow-hidden rounded-[28px]">
+          <div className="shrink-0 border-b border-slate-200 px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <strong className="block text-sm font-medium text-slate-950">역 이름 대량 입력</strong>
+                <p className="mt-1 text-xs font-normal text-slate-500">분석 후 반영 대기 목록을 확인하고 필요한 역만 추가합니다.</p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => setBulkEntryOpen(false)}>
+                <X className="size-4" />
+              </Button>
+            </div>
           </div>
-          <div className="grid gap-3 p-4">
-            <Textarea
-              className="min-h-48 resize-y"
-              value={bulkEntryText}
-              onChange={(event) => {
-                setBulkEntryText(event.target.value);
-                setBulkEntryResult(null);
-                setBulkEntrySummary(null);
-                setBulkEntryPendingStations([]);
-                setBulkEntrySkippedNames([]);
-                setBulkEntryMissingNames([]);
-              }}
-              placeholder={"서울\n영등포\n수원\n천안\n대전"}
-            />
-            {bulkEntrySummary ? (
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: "추가", value: bulkEntrySummary.added, className: "bg-emerald-50 text-emerald-700" },
-                  { label: "보정", value: bulkEntryMissingNames.length, className: "bg-amber-50 text-amber-700" },
-                  { label: "제외", value: bulkEntrySummary.skipped, className: "bg-slate-50 text-slate-500" },
-                ].map((item) => (
-                  <div key={item.label} className={cn("rounded-2xl px-3 py-2", item.className)}>
-                    <span className="block text-[10px] font-normal">{item.label}</span>
-                    <strong className="mt-0.5 block text-lg font-medium">{item.value.toLocaleString("ko-KR")}</strong>
+
+          <div className="grid min-h-0 flex-1 grid-cols-[minmax(280px,0.9fr)_minmax(360px,1.1fr)] gap-0 overflow-hidden">
+            <div className="min-h-0 overflow-y-auto border-r border-slate-200 p-4">
+              <div className="grid gap-3">
+                <Textarea
+                  className="min-h-56 resize-y"
+                  value={bulkEntryText}
+                  onChange={(event) => {
+                    setBulkEntryText(event.target.value);
+                    resetBulkEntryReview();
+                  }}
+                  placeholder={"서울\n영등포\n수원\n천안\n대전"}
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={resetBulkEntryReview}>결과 초기화</Button>
+                  <Button onClick={applyBulkRouteStations}>분석</Button>
+                </div>
+                {bulkEntrySummary ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: "대기", value: bulkEntryPendingStations.length, className: "bg-emerald-50 text-emerald-700" },
+                      { label: "보정", value: bulkEntryMissingNames.length, className: "bg-amber-50 text-amber-700" },
+                      { label: "제외", value: bulkEntrySkippedNames.length, className: "bg-slate-50 text-slate-500" },
+                    ].map((item) => (
+                      <div key={item.label} className={cn("rounded-2xl px-3 py-2", item.className)}>
+                        <span className="block text-[10px] font-normal">{item.label}</span>
+                        <strong className="mt-0.5 block text-lg font-medium">{item.value.toLocaleString("ko-KR")}</strong>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : null}
-            {bulkEntryResult ? (
-              <p className="rounded-2xl bg-slate-50 px-3 py-2 text-xs font-normal text-slate-600">{bulkEntryResult}</p>
-            ) : null}
-            {bulkEntryPendingStations.length > 0 ? (
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <strong className="text-xs font-medium text-emerald-900">반영 대기</strong>
-                  <span className="text-[11px] font-normal text-emerald-700">{bulkEntryPendingStations.length.toLocaleString("ko-KR")}개</span>
-                </div>
-                <div className="mt-2 grid max-h-44 gap-1 overflow-y-auto pr-1">
-                  {bulkEntryPendingStations.map((station, index) => (
-                    <div key={station.clientId} className="grid grid-cols-[auto_1fr] gap-2 rounded-xl bg-white px-2 py-1.5">
-                      <span className="text-[11px] font-medium text-emerald-700">{index + 1}</span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-xs font-medium text-slate-800">{station.nameKo}</span>
-                        <span className="block truncate text-[10px] font-normal text-slate-400">{station.sourceStationId ? `기존 역 복사 · ${stationById.get(station.sourceStationId)?.nameKo ?? station.sourceStationId}` : "새 수기 역"}</span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-            {bulkEntrySkippedNames.length > 0 ? (
-              <div className="rounded-2xl bg-slate-50 px-3 py-2">
-                <span className="text-[11px] font-normal text-slate-500">이미 목록에 있어 제외됨</span>
-                <p className="mt-1 line-clamp-2 text-xs font-normal text-slate-600">{bulkEntrySkippedNames.join(", ")}</p>
-              </div>
-            ) : null}
-            {bulkEntryMissingNames.length > 0 ? (
-              <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <strong className="text-xs font-medium text-amber-900">보정할 역</strong>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] font-normal text-amber-700">{bulkEntryMissingNames.length}개</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 px-2 text-[11px]"
-                      onClick={() => {
-                        const currentIndex = bulkEntryMissingNames.findIndex((name) => name === bulkEntryResolveName);
-                        const nextName = bulkEntryMissingNames[(currentIndex + 1) % bulkEntryMissingNames.length] ?? bulkEntryMissingNames[0] ?? "";
-                        setBulkEntryResolveName(nextName);
-                        setBulkEntryResolveQuery(nextName);
-                      }}
-                    >
-                      다음
-                    </Button>
+                ) : null}
+                {bulkEntryResult ? (
+                  <p className="rounded-2xl bg-slate-50 px-3 py-2 text-xs font-normal text-slate-600">{bulkEntryResult}</p>
+                ) : null}
+                {bulkEntrySkippedNames.length > 0 ? (
+                  <div className="rounded-2xl bg-slate-50 px-3 py-2">
+                    <span className="text-[11px] font-normal text-slate-500">제외됨</span>
+                    <p className="mt-1 line-clamp-4 text-xs font-normal text-slate-600">{bulkEntrySkippedNames.join(", ")}</p>
                   </div>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {bulkEntryMissingNames.map((name) => (
-                    <button
-                      key={name}
-                      type="button"
-                      className={cn(
-                        "rounded-full border px-2.5 py-1 text-[11px] font-medium",
-                        bulkEntryResolveName === name ? "border-amber-300 bg-white text-amber-900" : "border-amber-100 bg-amber-100/70 text-amber-800",
-                      )}
-                      onClick={() => {
-                        setBulkEntryResolveName(name);
-                        setBulkEntryResolveQuery(name);
-                      }}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-3 grid gap-2">
-                  <div className="grid grid-cols-[1fr_auto] gap-2">
-                    <Input
-                      value={bulkEntryResolveName}
-                      onChange={(event) => setBulkEntryResolveName(event.target.value)}
-                      placeholder="보정할 역 이름"
-                    />
-                    <Button variant="outline" onClick={() => bulkEntryResolveName ? useMissingNameOnMap(bulkEntryResolveName) : undefined}>
-                      지도에서 찍기
-                    </Button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="min-h-0 overflow-y-auto p-4">
+              <div className="grid gap-3">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <strong className="text-xs font-medium text-emerald-900">반영 대기</strong>
+                    <span className="text-[11px] font-normal text-emerald-700">{bulkEntryPendingStations.length.toLocaleString("ko-KR")}개</span>
                   </div>
-                  <Input
-                    value={bulkEntryResolveQuery}
-                    onChange={(event) => setBulkEntryResolveQuery(event.target.value)}
-                    placeholder="기존 역 검색해서 위치 복사"
-                  />
-                  {bulkResolveCandidates.length > 0 ? (
-                    <div className="grid max-h-44 gap-1 overflow-y-auto">
-                      {bulkResolveCandidates.map((station) => (
-                        <button
-                          key={station.id}
-                          type="button"
-                          className="flex items-center gap-2 rounded-xl bg-white px-2 py-1.5 text-left hover:bg-amber-50"
-                          onClick={() => resolveMissingNameWithStation(station)}
-                        >
-                          <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: station.colorHex ?? "#94a3b8" }} />
-                          <span className="min-w-0 flex-1">
-                            <span className="block truncate text-xs font-medium text-slate-800">{station.nameKo}</span>
-                            <span className="block truncate text-[10px] font-normal text-slate-400">{formatStationSubLabel(station)}</span>
+                  {bulkEntryPendingStations.length > 0 ? (
+                    <div className="mt-2 grid gap-1.5">
+                      {bulkEntryPendingStations.map((station, index) => (
+                        <div key={station.clientId} className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-xl bg-white px-2 py-1.5">
+                          <span className="grid size-6 place-items-center rounded-full bg-emerald-100 text-[10px] font-medium text-emerald-700">{index + 1}</span>
+                          <span className="min-w-0">
+                            <Input
+                              className="h-8 border-slate-200 bg-white px-2 text-xs font-medium shadow-none"
+                              value={station.nameKo}
+                              onChange={(event) => updateBulkPendingStation(station.clientId, { nameKo: event.target.value })}
+                            />
+                            <span className="mt-0.5 block truncate text-[10px] font-normal text-slate-400">
+                              {station.sourceStationId ? `기존 역 복사 · ${stationById.get(station.sourceStationId)?.nameKo ?? station.sourceStationId}` : "새 수기 역"}
+                            </span>
                           </span>
+                          <span className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon" disabled={index === 0} onClick={() => moveBulkPendingStation(station.clientId, -1)} title="위로">
+                              <ChevronRight className="size-3 rotate-[-90deg]" />
+                            </Button>
+                            <Button variant="ghost" size="icon" disabled={index === bulkEntryPendingStations.length - 1} onClick={() => moveBulkPendingStation(station.clientId, 1)} title="아래로">
+                              <ChevronRight className="size-3 rotate-90" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => removeBulkPendingStation(station.clientId)} title="제외">
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-normal text-slate-500">분석 후 추가할 역이 여기에 표시됩니다.</p>
+                  )}
+                </div>
+
+                {bulkEntryMissingNames.length > 0 ? (
+                  <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <strong className="text-xs font-medium text-amber-900">위치 보정</strong>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-normal text-amber-700">{bulkEntryMissingNames.length}개</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-[11px]"
+                          onClick={() => {
+                            const currentIndex = bulkEntryMissingNames.findIndex((name) => name === bulkEntryResolveName);
+                            const nextName = bulkEntryMissingNames[(currentIndex + 1) % bulkEntryMissingNames.length] ?? bulkEntryMissingNames[0] ?? "";
+                            setBulkEntryResolveName(nextName);
+                            setBulkEntryResolveQuery(nextName);
+                          }}
+                        >
+                          다음
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {bulkEntryMissingNames.map((name) => (
+                        <button
+                          key={name}
+                          type="button"
+                          className={cn(
+                            "rounded-full border px-2.5 py-1 text-[11px] font-medium",
+                            bulkEntryResolveName === name ? "border-amber-300 bg-white text-amber-900" : "border-amber-100 bg-amber-100/70 text-amber-800",
+                          )}
+                          onClick={() => {
+                            setBulkEntryResolveName(name);
+                            setBulkEntryResolveQuery(name);
+                          }}
+                        >
+                          {name}
                         </button>
                       ))}
                     </div>
-                  ) : null}
-                </div>
+                    <div className="mt-3 grid gap-2">
+                      <div className="grid grid-cols-[1fr_auto] gap-2">
+                        <Input
+                          value={bulkEntryResolveName}
+                          onChange={(event) => setBulkEntryResolveName(event.target.value)}
+                          placeholder="보정할 역 이름"
+                        />
+                        <Button variant="outline" onClick={() => bulkEntryResolveName ? useMissingNameOnMap(bulkEntryResolveName) : undefined}>
+                          지도에서 찍기
+                        </Button>
+                      </div>
+                      <Input
+                        value={bulkEntryResolveQuery}
+                        onChange={(event) => setBulkEntryResolveQuery(event.target.value)}
+                        placeholder="기존 역 검색해서 위치 복사"
+                      />
+                      {bulkResolveCandidates.length > 0 ? (
+                        <div className="grid max-h-60 gap-1 overflow-y-auto pr-1">
+                          {bulkResolveCandidates.map((station) => (
+                            <button
+                              key={station.id}
+                              type="button"
+                              className="flex items-center gap-2 rounded-xl bg-white px-2 py-1.5 text-left hover:bg-amber-50"
+                              onClick={() => resolveMissingNameWithStation(station)}
+                            >
+                              <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: station.colorHex ?? "#94a3b8" }} />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-xs font-medium text-slate-800">{station.nameKo}</span>
+                                <span className="block truncate text-[10px] font-normal text-slate-400">{formatStationSubLabel(station)}</span>
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
+            </div>
           </div>
-          <div className="grid grid-cols-4 gap-2 border-t border-slate-200 px-4 py-3">
+
+          <div className="grid shrink-0 grid-cols-[1fr_auto_auto] gap-2 border-t border-slate-200 px-4 py-3">
             <Button variant="outline" onClick={() => setBulkEntryOpen(false)}>닫기</Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setBulkEntryText("");
-                setBulkEntryResult(null);
-                setBulkEntrySummary(null);
-                setBulkEntryPendingStations([]);
-                setBulkEntrySkippedNames([]);
-                setBulkEntryMissingNames([]);
-                setBulkEntryResolveName("");
-                setBulkEntryResolveQuery("");
-              }}
-            >
-              비우기
-            </Button>
-            <Button variant="outline" onClick={applyBulkRouteStations}>분석</Button>
+            <Button variant="outline" onClick={resetBulkEntryReview}>초기화</Button>
             <Button onClick={commitBulkPendingStations} disabled={bulkEntryPendingStations.length === 0}>반영</Button>
           </div>
         </Dialog>
