@@ -457,3 +457,9 @@ Recommended scope:
 - Strengthened public route-search map highlighting.
 - Route result lines now use each route segment's actual line color instead of a single green color.
 - Route casing and transfer dotted lines were tuned so selected routes read more naturally against dimmed non-route map layers.
+
+## 13.67.0 - timetable import review
+
+- 시간표 CSV/붙여넣기 결과를 바로 입력칸에 반영하지 않고, 먼저 반영 전 리뷰 영역에 표시한다.
+- 리뷰 영역에서 도착/출발 시각을 수정하거나 개별 항목을 제외한 뒤 반영할 수 있다.
+- 미매칭, 시각 오류, 중복 제외 항목을 별도로 요약한다.
