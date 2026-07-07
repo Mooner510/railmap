@@ -35,7 +35,6 @@ import {
   type RailLineCategory,
   type RailServiceType,
 } from "./railExplorerModel";
-import {cn} from "@repo/ui/utils";
 
 interface RailExplorerProps {
   bundle: CanonicalBundle;
@@ -146,9 +145,10 @@ interface RouteSearchResult {
   stationIds: string[];
   edges: RouteGraphEdge[];
   transferCount: number;
-  criteria: Array<"fastest" | "minimumTransfers">;
-  totalDurationMinutes: number;
+  totalMinutes: number;
   totalDistanceMeters: number;
+  criterion: "fastest" | "fewest-transfers";
+  label: string;
 }
 
 interface SelectedLinePanelProps {
@@ -219,7 +219,8 @@ export default function RailExplorer({
   const [routeSearchMessage, setRouteSearchMessage] = useState<string | null>(
     null,
   );
-  const [routeSearchResults, setRouteSearchResults] = useState<RouteSearchResult[]>([]);
+  const [routeSearchResults, setRouteSearchResults] =
+    useState<RouteSearchResult[]>([]);
   const [selectedRouteResultIndex, setSelectedRouteResultIndex] = useState(0);
   const [isHydratedFromUrl, setIsHydratedFromUrl] = useState(false);
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
@@ -465,6 +466,8 @@ export default function RailExplorer({
     [mapStations, routeDestinationStationId],
   );
 
+  const activeRouteSearchResult = routeSearchResults[selectedRouteResultIndex] ?? routeSearchResults[0] ?? null;
+
   const routeGraph = useMemo(
     () =>
       buildRouteGraph(
@@ -477,16 +480,14 @@ export default function RailExplorer({
       ),
     [bundle.lines, bundle.manualTransferEdges, lineBranchOverrides, servicePatterns, trainRuns, mapBranches],
   );
-  const routeSearchResult = routeSearchResults[selectedRouteResultIndex] ?? null;
-
   const routeResultStationIds = useMemo(
-    () => routeSearchResult?.stationIds ?? [],
-    [routeSearchResult],
+    () => activeRouteSearchResult?.stationIds ?? [],
+    [activeRouteSearchResult],
   );
 
   const routeResultBranchIds = useMemo(
-    () => routeSearchResult?.edges.map((edge) => edge.branchId) ?? [],
-    [routeSearchResult],
+    () => activeRouteSearchResult?.edges.map((edge) => edge.branchId) ?? [],
+    [activeRouteSearchResult],
   );
 
   const stationServingIndex = useMemo(() => {
@@ -633,12 +634,12 @@ export default function RailExplorer({
       }
     }
 
-    for (const stationId of routeSearchResult?.stationIds ?? []) {
+    for (const stationId of activeRouteSearchResult?.stationIds ?? []) {
       ids.add(stationId);
     }
 
     return ids;
-  }, [routeSearchResult, visibleMapBranches]);
+  }, [activeRouteSearchResult, visibleMapBranches]);
 
   const visibleMapStations = useMemo(
     () => mapStations.filter((station) => visibleStationIds.has(station.id)),
@@ -713,7 +714,7 @@ export default function RailExplorer({
   const submitRouteSearch = () => {
     if (!routeOriginStationId || !routeDestinationStationId) {
       setRouteSearchResults([]);
-    setSelectedRouteResultIndex(0);
+      setSelectedRouteResultIndex(0);
       setRouteSearchMessage("출발역과 도착역을 모두 지정해 주세요.");
       setMobilePanelMode("selected");
       setMapFocusVersion((version) => version + 1);
@@ -722,7 +723,7 @@ export default function RailExplorer({
 
     if (routeOriginStationId === routeDestinationStationId) {
       setRouteSearchResults([]);
-    setSelectedRouteResultIndex(0);
+      setSelectedRouteResultIndex(0);
       setRouteSearchMessage(
         "출발역과 도착역이 같습니다. 다른 역을 선택해 주세요.",
       );
@@ -731,7 +732,7 @@ export default function RailExplorer({
       return;
     }
 
-    const results = findRouteOptions(
+    const results = findRouteResults(
       routeGraph,
       routeOriginStationId,
       routeDestinationStationId,
@@ -973,12 +974,11 @@ export default function RailExplorer({
                   originStation={routeOriginStation}
                   destinationStation={routeDestinationStation}
                   message={routeSearchMessage}
-                  result={routeSearchResult}
                   results={routeSearchResults}
-                  selectedResultIndex={selectedRouteResultIndex}
-                  onSelectResult={setSelectedRouteResultIndex}
+                  activeResultIndex={selectedRouteResultIndex}
                   stationById={stationById}
-                  stations={mapStations}
+                  allStations={mapStations}
+                  onSelectResult={setSelectedRouteResultIndex}
                   onSetRoutePoint={setRoutePoint}
                   onClearOrigin={() => clearRoutePoint("origin")}
                   onClearDestination={() => clearRoutePoint("destination")}
@@ -1092,12 +1092,11 @@ export default function RailExplorer({
                       originStation={routeOriginStation}
                       destinationStation={routeDestinationStation}
                       message={routeSearchMessage}
-                      result={routeSearchResult}
                       results={routeSearchResults}
-                      selectedResultIndex={selectedRouteResultIndex}
-                      onSelectResult={setSelectedRouteResultIndex}
+                      activeResultIndex={selectedRouteResultIndex}
                       stationById={stationById}
-                      stations={mapStations}
+                      allStations={mapStations}
+                      onSelectResult={setSelectedRouteResultIndex}
                       onSetRoutePoint={setRoutePoint}
                       onClearOrigin={() => clearRoutePoint("origin")}
                       onClearDestination={() => clearRoutePoint("destination")}
@@ -1967,65 +1966,6 @@ function estimateBranchSegmentDistanceMeters(branch: RailMapBranch | undefined, 
   return total > 0 ? total : fallbackDistance;
 }
 
-
-function formatRouteCriteria(criteria: Array<"fastest" | "minimumTransfers">) {
-  const labels = criteria.map((criterion) => criterion === "minimumTransfers" ? "최소 환승" : "최단 시간");
-  return labels.join(" · ");
-}
-
-function getRouteTotalDurationMinutes(edges: RouteGraphEdge[]) {
-  return Math.ceil(edges.reduce((sum, edge) => {
-    if (edge.kind === "manual-transfer") return sum + (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY);
-    return sum + (edge.durationMinutes ?? 1);
-  }, 0));
-}
-
-function getRouteTotalDistanceMeters(edges: RouteGraphEdge[]) {
-  return edges.reduce((sum, edge) => sum + (edge.distanceMeters ?? 0), 0);
-}
-
-function getRouteSignature(result: RouteSearchResult) {
-  return `${result.stationIds.join(">")}|${result.edges.map((edge) => edge.branchId).join(">")}`;
-}
-
-function finalizeRouteResult(result: Omit<RouteSearchResult, "criteria" | "totalDurationMinutes" | "totalDistanceMeters">, criterion: "fastest" | "minimumTransfers"): RouteSearchResult {
-  return {
-    ...result,
-    criteria: [criterion],
-    totalDurationMinutes: getRouteTotalDurationMinutes(result.edges),
-    totalDistanceMeters: getRouteTotalDistanceMeters(result.edges),
-  };
-}
-
-function findRouteOptions(
-  graph: Map<string, RouteGraphEdge[]>,
-  originStationId: string,
-  destinationStationId: string,
-): RouteSearchResult[] {
-  const candidates = [
-    findRoute(graph, originStationId, destinationStationId, "minimumTransfers"),
-    findRoute(graph, originStationId, destinationStationId, "fastest"),
-  ].filter((result): result is RouteSearchResult => Boolean(result));
-
-  const bySignature = new Map<string, RouteSearchResult>();
-  for (const result of candidates) {
-    const signature = getRouteSignature(result);
-    const existing = bySignature.get(signature);
-    if (existing) {
-      existing.criteria = [...new Set([...existing.criteria, ...result.criteria])];
-    } else {
-      bySignature.set(signature, result);
-    }
-  }
-
-  return [...bySignature.values()].sort(
-    (a, b) =>
-      a.transferCount - b.transferCount ||
-      a.totalDurationMinutes - b.totalDurationMinutes ||
-      a.edges.length - b.edges.length,
-  );
-}
-
 function buildRouteGraph(
   lines: CanonicalLine[],
   manualTransferEdges: ManualTransferEdge[] = [],
@@ -2149,7 +2089,7 @@ function buildRouteGraph(
     const baseEdge: Omit<RouteGraphEdge, "toStationId"> = {
       branchId: `manual-transfer:${transfer.id}`,
       lineNameKo: transfer.labelKo ?? "환승",
-      sourceLineName: "수동 환승",
+      sourceLineName: "환승",
       colorHex: "#64748b",
       kind: "manual-transfer",
       transferMinutes: transfer.transferMinutes ?? null,
@@ -2191,11 +2131,48 @@ function buildRouteGraph(
   return graph;
 }
 
+function findRouteResults(
+  graph: Map<string, RouteGraphEdge[]>,
+  originStationId: string,
+  destinationStationId: string,
+): RouteSearchResult[] {
+  const fastest = findRoute(graph, originStationId, destinationStationId, "fastest");
+  const fewestTransfers = findRoute(
+    graph,
+    originStationId,
+    destinationStationId,
+    "fewest-transfers",
+  );
+  const results = [fastest, fewestTransfers].filter(
+    (result): result is RouteSearchResult => result !== null,
+  );
+  const deduped: RouteSearchResult[] = [];
+  const signatures = new Set<string>();
+
+  for (const result of results) {
+    const signature = `${result.stationIds.join(">")}|${result.edges.map((edge) => `${edge.kind}:${edge.branchId}:${edge.toStationId}`).join(">")}`;
+    if (signatures.has(signature)) continue;
+    signatures.add(signature);
+    deduped.push(result);
+  }
+
+  if (deduped.length <= 1) return deduped;
+
+  const [first, second] = deduped;
+  if (first && second) {
+    const minutesGap = Math.abs(first.totalMinutes - second.totalMinutes);
+    const transferGap = Math.abs(first.transferCount - second.transferCount);
+    if (minutesGap <= 2 && transferGap === 0) return [first];
+  }
+
+  return deduped.slice(0, 2);
+}
+
 function findRoute(
   graph: Map<string, RouteGraphEdge[]>,
   originStationId: string,
   destinationStationId: string,
-  criterion: "fastest" | "minimumTransfers",
+  criterion: "fastest" | "fewest-transfers",
 ): RouteSearchResult | null {
   const originKey = makeRouteStateKey(originStationId, null);
   const open: Array<{
@@ -2205,6 +2182,7 @@ function findRoute(
     score: number;
     stopCount: number;
     transferCount: number;
+    totalMinutes: number;
   }> = [
     {
       stationId: originStationId,
@@ -2213,6 +2191,7 @@ function findRoute(
       score: 0,
       stopCount: 0,
       transferCount: 0,
+      totalMinutes: 0,
     },
   ];
   const bestScore = new Map<string, number>([[originKey, 0]]);
@@ -2226,6 +2205,7 @@ function findRoute(
     open.sort(
       (a, b) =>
         a.score - b.score ||
+        a.totalMinutes - b.totalMinutes ||
         a.transferCount - b.transferCount ||
         a.stopCount - b.stopCount,
     );
@@ -2247,7 +2227,6 @@ function findRoute(
 
     for (const edge of graph.get(current.stationId) ?? []) {
       const isManualTransfer = edge.kind === "manual-transfer";
-      const isTimetable = edge.kind === "timetable";
       const isTransfer = Boolean(
         isManualTransfer ||
         (current.previousBranchId &&
@@ -2260,12 +2239,14 @@ function findRoute(
           : current.previousLineNameKo === edge.lineNameKo
             ? SAME_LINE_BRANCH_CHANGE_PENALTY
             : ROUTE_TRANSFER_PENALTY;
-      const durationCost = isManualTransfer
+      const durationMinutes = isManualTransfer
         ? (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY)
         : (edge.durationMinutes ?? 1);
-      const nextScore = criterion === "minimumTransfers"
-        ? current.score + (isTransfer ? 10000 : 0) + durationCost
-        : current.score + durationCost + transferPenalty;
+      const transferCount = current.transferCount + (isTransfer ? 1 : 0);
+      const totalMinutes = current.totalMinutes + Math.max(0.2, durationMinutes);
+      const nextScore = criterion === "fewest-transfers"
+        ? transferCount * 10000 + totalMinutes + current.stopCount
+        : totalMinutes + transferPenalty;
       const nextPreviousBranchId = isManualTransfer ? null : edge.branchId;
       const nextPreviousLineNameKo = isManualTransfer ? null : edge.lineNameKo;
       const nextKey = makeRouteStateKey(edge.toStationId, nextPreviousBranchId);
@@ -2285,7 +2266,8 @@ function findRoute(
         previousLineNameKo: nextPreviousLineNameKo,
         score: nextScore,
         stopCount: current.stopCount + 1,
-        transferCount: current.transferCount + (isTransfer ? 1 : 0),
+        transferCount,
+        totalMinutes,
       });
     }
   }
@@ -2307,8 +2289,15 @@ function findRoute(
 
   let transferCount = 0;
   let previousBranchId: string | null = null;
+  let totalMinutes = 0;
+  let totalDistanceMeters = 0;
 
   for (const edge of edges) {
+    totalMinutes += edge.kind === "manual-transfer"
+      ? (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY)
+      : (edge.durationMinutes ?? 1);
+    totalDistanceMeters += edge.distanceMeters ?? 0;
+
     if (edge.kind === "manual-transfer") {
       transferCount += 1;
       previousBranchId = null;
@@ -2320,7 +2309,15 @@ function findRoute(
     previousBranchId = edge.branchId;
   }
 
-  return finalizeRouteResult({ stationIds, edges, transferCount }, criterion);
+  return {
+    stationIds,
+    edges,
+    transferCount,
+    totalMinutes: Math.ceil(totalMinutes),
+    totalDistanceMeters,
+    criterion,
+    label: criterion === "fewest-transfers" ? "최소 환승" : "최단 시간",
+  };
 }
 
 function makeRouteStateKey(stationId: string, branchId: string | null) {
@@ -2328,12 +2325,19 @@ function makeRouteStateKey(stationId: string, branchId: string | null) {
 }
 
 function RouteResultSummary({
-  result,
+  results,
+  activeResultIndex,
   stationById,
+  onSelectResult,
 }: {
-  result: RouteSearchResult;
+  results: RouteSearchResult[];
+  activeResultIndex: number;
   stationById: Map<string, RailMapStation>;
+  onSelectResult: (index: number) => void;
 }) {
+  const result = results[activeResultIndex] ?? results[0];
+  if (!result) return null;
+
   const originName =
     stationById.get(result.stationIds[0] ?? "")?.nameKo ?? "출발";
   const destinationName =
@@ -2342,7 +2346,6 @@ function RouteResultSummary({
   const timedEdgeCount = result.edges.filter((edge) => edge.kind === "timetable").length;
   const rideEdgeCount = result.edges.filter((edge) => edge.kind === "ride").length;
   const transferEdgeCount = result.edges.filter((edge) => edge.kind === "manual-transfer").length;
-  const distanceKm = result.totalDistanceMeters > 0 ? result.totalDistanceMeters / 1000 : null;
 
   const segments: Array<{
     branchId: string;
@@ -2388,35 +2391,51 @@ function RouteResultSummary({
   }
 
   return (
-    <div className="mt-2 min-w-0 overflow-hidden border border-emerald-200 bg-white">
-      <div className="border-b border-emerald-100 bg-emerald-50 px-2.5 py-2">
-        <div className="flex min-w-0 items-center justify-between gap-2">
-          <p className="text-[10px] font-bold tracking-wide text-emerald-700 uppercase">
-            경로 결과
-          </p>
-          <p className="shrink-0 text-[10px] font-semibold text-emerald-700">
-            {formatRouteCriteria(result.criteria)}
-          </p>
+    <div className="mt-3 min-w-0 overflow-hidden rounded-[22px] border border-emerald-100 bg-white shadow-sm shadow-emerald-950/5">
+      <div className="border-b border-emerald-100 bg-gradient-to-br from-emerald-50 to-white px-3 py-3">
+        <div className="flex min-w-0 items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold tracking-wide text-emerald-600 uppercase">
+              추천 경로
+            </p>
+            <p className="mt-1 break-words text-sm font-semibold leading-5 text-slate-950">
+              {originName} → {destinationName}
+            </p>
+          </div>
+          <div className="shrink-0 rounded-2xl bg-emerald-600 px-3 py-1.5 text-right text-white shadow-sm shadow-emerald-900/15">
+            <p className="text-[10px] font-medium opacity-80">예상</p>
+            <p className="text-sm font-semibold">{formatNumber(result.totalMinutes)}분</p>
+          </div>
         </div>
-        <p className="mt-1 break-words text-xs font-bold leading-4 text-slate-950">
-          {originName} → {destinationName}
-        </p>
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">약 {formatNumber(result.totalDurationMinutes)}분</span>
-          <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">환승 {formatNumber(result.transferCount)}회</span>
-          <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-600">{formatNumber(result.stationIds.length)}역</span>
-          {distanceKm ? <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-600">{distanceKm.toFixed(1)}km</span> : null}
-          <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">노선 {formatNumber(rideEdgeCount)}</span>
-          {timedEdgeCount > 0 ? (
-            <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-blue-700">시간표 {formatNumber(timedEdgeCount)}</span>
-          ) : null}
-          {transferEdgeCount > 0 ? (
-            <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-600">수동 환승 {formatNumber(transferEdgeCount)}</span>
-          ) : null}
+
+        {results.length > 1 ? (
+          <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-2xl bg-emerald-100/60 p-1">
+            {results.map((candidate, index) => (
+              <button
+                key={`${candidate.criterion}:${index}`}
+                type="button"
+                className={`rounded-xl px-2 py-1.5 text-[11px] font-semibold transition ${index === activeResultIndex ? "bg-white text-emerald-700 shadow-sm" : "text-emerald-700/70 hover:bg-white/60"}`}
+                onClick={() => onSelectResult(index)}
+              >
+                {candidate.label} · {formatNumber(candidate.totalMinutes)}분
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="mt-3 grid grid-cols-3 gap-1.5">
+          <RouteMetric label="역" value={`${formatNumber(result.stationIds.length)}개`} />
+          <RouteMetric label="환승" value={`${formatNumber(result.transferCount)}회`} />
+          <RouteMetric label="거리" value={formatDistance(result.totalDistanceMeters)} />
+        </div>
+        <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+          <RouteMetric label="이동" value={`${formatNumber(rideEdgeCount)}구간`} />
+          <RouteMetric label="시간표" value={`${formatNumber(timedEdgeCount)}구간`} />
+          <RouteMetric label="환승 연결" value={`${formatNumber(transferEdgeCount)}회`} />
         </div>
       </div>
 
-      <div className="grid min-w-0 gap-2 px-2.5 py-2">
+      <div className="grid min-w-0 gap-2.5 px-3 py-3">
         {segments.map((segment, index) => {
           const fromName =
             stationById.get(segment.fromStationId)?.nameKo ?? "이전 역";
@@ -2472,6 +2491,21 @@ function RouteResultSummary({
   );
 }
 
+function RouteMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-white/75 px-2 py-1.5 text-center shadow-sm shadow-slate-950/5">
+      <p className="text-[10px] font-medium text-slate-400">{label}</p>
+      <p className="mt-0.5 text-xs font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function formatDistance(distanceMeters: number) {
+  if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) return "-";
+  if (distanceMeters >= 1000) return `${formatNumber(Math.round(distanceMeters / 100) / 10)}km`;
+  return `${formatNumber(Math.round(distanceMeters))}m`;
+}
+
 function RouteTimedSegment({
   colorHex,
   lineName,
@@ -2513,10 +2547,10 @@ function RouteTransferConnection({
   transferMinutes?: number | null;
 }) {
   return (
-    <div className="min-w-0 rounded border border-dashed border-slate-300 bg-slate-50 px-2 py-1.5">
+    <div className="min-w-0 rounded-2xl border border-dashed border-slate-300 bg-slate-50/85 px-3 py-2">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white">
-          수동 환승
+        <span className="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-white">
+          환승
         </span>
         <p className="min-w-0 break-words text-[11px] font-bold leading-4 text-slate-700">
           {fromStationName === toStationName
@@ -2535,7 +2569,7 @@ function RouteTransferConnection({
 
 function RouteTransferStep({ stationName }: { stationName: string }) {
   return (
-    <div className="mb-1.5 flex min-w-0 items-center gap-2 rounded border border-dashed border-slate-300 bg-slate-50 px-2 py-1.5">
+    <div className="mb-1.5 flex min-w-0 items-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50/85 px-3 py-2">
       <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white">
         환승
       </span>
@@ -2569,20 +2603,20 @@ function RouteRoadmapSegment({
       : lineName;
 
   return (
-    <div className="min-w-0 overflow-hidden border border-slate-200 bg-white">
+    <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
       <div className="flex min-w-0 items-center gap-2 border-b border-slate-100 bg-slate-50 px-2 py-1.5">
         <span
           className="h-3 w-3 shrink-0 rounded-full"
           style={{ backgroundColor: colorHex }}
         />
-        <p className="min-w-0 break-words text-xs font-black leading-4 text-slate-950">
+        <p className="min-w-0 break-words text-xs font-semibold leading-4 text-slate-950">
           {lineLabel}
         </p>
       </div>
 
       <div className="grid min-w-0 grid-cols-[18px_minmax(0,1fr)] px-2 py-2">
         <RouteRoadmapStationDot colorHex={colorHex} />
-        <p className="min-w-0 break-words text-xs font-bold leading-4 text-slate-950">
+        <p className="min-w-0 break-words text-xs font-semibold leading-4 text-slate-950">
           {fromStationName}
         </p>
 
@@ -2598,7 +2632,7 @@ function RouteRoadmapSegment({
         </div>
 
         <RouteRoadmapStationDot colorHex={colorHex} />
-        <p className="min-w-0 break-words text-xs font-bold leading-4 text-slate-950">
+        <p className="min-w-0 break-words text-xs font-semibold leading-4 text-slate-950">
           {toStationName}
         </p>
       </div>
@@ -2619,12 +2653,11 @@ function RouteDraftCard({
   originStation,
   destinationStation,
   message,
-  result,
   results,
-  selectedResultIndex,
-  onSelectResult,
+  activeResultIndex,
   stationById,
-  stations,
+  allStations,
+  onSelectResult,
   onSetRoutePoint,
   onClearOrigin,
   onClearDestination,
@@ -2635,12 +2668,11 @@ function RouteDraftCard({
   originStation: RailMapStation | null;
   destinationStation: RailMapStation | null;
   message: string | null;
-  result: RouteSearchResult | null;
   results: RouteSearchResult[];
-  selectedResultIndex: number;
-  onSelectResult: (index: number) => void;
+  activeResultIndex: number;
   stationById: Map<string, RailMapStation>;
-  stations: RailMapStation[];
+  allStations: RailMapStation[];
+  onSelectResult: (index: number) => void;
   onSetRoutePoint: (role: RoutePointRole, stationId: string) => void;
   onClearOrigin: () => void;
   onClearDestination: () => void;
@@ -2648,6 +2680,8 @@ function RouteDraftCard({
   onSubmit: () => void;
   compact?: boolean;
 }) {
+  const [originQuery, setOriginQuery] = useState("");
+  const [destinationQuery, setDestinationQuery] = useState("");
   const hasBothStations = Boolean(originStation && destinationStation);
   const isSameStation = Boolean(
     originStation &&
@@ -2658,20 +2692,18 @@ function RouteDraftCard({
   const statusText = isSameStation
     ? "출발역과 도착역이 같습니다."
     : (message ?? "출발역과 도착역을 지정해 주세요.");
-  const [originQuery, setOriginQuery] = useState("");
-  const [destinationQuery, setDestinationQuery] = useState("");
 
   return (
     <section
       className={
         compact
-          ? "min-w-0 overflow-hidden border border-slate-200 bg-slate-50 p-2"
-          : "min-w-0 overflow-hidden border border-slate-200 bg-slate-50 p-2.5"
+          ? "min-w-0 overflow-visible rounded-2xl border border-white/70 bg-white/95 p-2 shadow-sm shadow-slate-950/5"
+          : "min-w-0 overflow-visible rounded-[22px] border border-white/70 bg-white/95 p-3 shadow-lg shadow-slate-950/10 backdrop-blur"
       }
     >
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">
+          <p className="text-[10px] font-semibold tracking-wide text-slate-400 uppercase">
             경로 검색
           </p>
           <p className="mt-0.5 line-clamp-2 break-words text-[11px] font-medium leading-4 text-slate-500">
@@ -2680,7 +2712,7 @@ function RouteDraftCard({
         </div>
         <button
           type="button"
-          className="h-6 shrink-0 rounded border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-600 transition duration-150 ease-out hover:bg-slate-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+          className="h-7 shrink-0 rounded-full border border-slate-200 bg-white px-2.5 text-[10px] font-semibold text-slate-600 transition duration-150 ease-out hover:bg-slate-50 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
           onClick={onSwap}
           disabled={!originStation && !destinationStation}
         >
@@ -2689,26 +2721,26 @@ function RouteDraftCard({
       </div>
 
       <div className="mt-2 grid gap-2">
-        <RouteStationPicker
-          label="출발역"
+        <RoutePointPicker
+          label="출발"
           accent="sky"
+          station={originStation}
           query={originQuery}
+          allStations={allStations}
           onQueryChange={setOriginQuery}
-          stations={stations}
-          selectedStation={originStation}
           onSelect={(stationId) => {
             onSetRoutePoint("origin", stationId);
             setOriginQuery("");
           }}
           onClear={onClearOrigin}
         />
-        <RouteStationPicker
-          label="도착역"
+        <RoutePointPicker
+          label="도착"
           accent="amber"
+          station={destinationStation}
           query={destinationQuery}
+          allStations={allStations}
           onQueryChange={setDestinationQuery}
-          stations={stations}
-          selectedStation={destinationStation}
           onSelect={(stationId) => {
             onSetRoutePoint("destination", stationId);
             setDestinationQuery("");
@@ -2717,114 +2749,95 @@ function RouteDraftCard({
         />
       </div>
 
-      {results.length > 1 ? (
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
-          {results.map((candidate, index) => (
-            <button
-              key={`${candidate.stationIds.join("-")}:${index}`}
-              type="button"
-              className={cn(
-                "rounded border px-2 py-1.5 text-left text-[10px] font-semibold transition",
-                selectedResultIndex === index
-                  ? "border-slate-900 bg-white text-slate-950"
-                  : "border-slate-200 bg-white/80 text-slate-500 hover:bg-white",
-              )}
-              onClick={() => onSelectResult(index)}
-            >
-              <span className="block">{formatRouteCriteria(candidate.criteria)}</span>
-              <span className="mt-0.5 block text-slate-400">
-                {formatNumber(candidate.totalDurationMinutes)}분 · 환승 {formatNumber(candidate.transferCount)}회
-              </span>
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      {result ? (
-        <RouteResultSummary result={result} stationById={stationById} />
+      {results.length > 0 ? (
+        <RouteResultSummary
+          results={results}
+          activeResultIndex={activeResultIndex}
+          stationById={stationById}
+          onSelectResult={onSelectResult}
+        />
       ) : null}
 
       <button
         type="button"
-        className="mt-2 h-8 w-full rounded bg-slate-950 px-3 text-xs font-bold text-white transition duration-150 ease-out hover:bg-slate-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="mt-2 h-9 w-full rounded-full bg-slate-950 px-3 text-xs font-semibold text-white transition duration-150 ease-out hover:bg-slate-800 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-slate-300"
         disabled={!canSubmit}
         onClick={onSubmit}
       >
         경로 검색
       </button>
-      <p className="mt-1.5 text-[10px] leading-4 text-slate-400">
-        정차 패턴/열차 시간표가 있으면 시간표 구간을 함께 반영합니다.
-      </p>
     </section>
   );
 }
 
-
-function RouteStationPicker({
+function RoutePointPicker({
   label,
   accent,
+  station,
   query,
+  allStations,
   onQueryChange,
-  stations,
-  selectedStation,
   onSelect,
   onClear,
 }: {
   label: string;
   accent: "sky" | "amber";
+  station: RailMapStation | null;
   query: string;
-  onQueryChange: (query: string) => void;
-  stations: RailMapStation[];
-  selectedStation: RailMapStation | null;
+  allStations: RailMapStation[];
+  onQueryChange: (value: string) => void;
   onSelect: (stationId: string) => void;
   onClear: () => void;
 }) {
-  const normalized = normalizeSearchText(query);
   const labelClass = accent === "sky" ? "text-sky-600" : "text-amber-600";
-  const borderClass = accent === "sky" ? "focus:border-sky-300" : "focus:border-amber-300";
-  const matches = normalized.length >= 1
-    ? stations
-        .filter((station) => normalizeSearchText(`${station.nameKo} ${station.lineNameKo ?? ""}`).includes(normalized))
-        .slice(0, 6)
+  const ringClass = accent === "sky" ? "focus:border-sky-300 focus:ring-sky-100" : "focus:border-amber-300 focus:ring-amber-100";
+  const normalizedQuery = normalizeSearchText(query);
+  const results = normalizedQuery
+    ? allStations
+        .filter((candidate) => normalizeSearchText(candidate.nameKo).includes(normalizedQuery))
+        .slice(0, 8)
     : [];
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-2">
+    <div className="relative rounded-2xl border border-slate-200 bg-slate-50/70 p-2">
       <div className="flex items-center justify-between gap-2">
-        <span className={`text-[10px] font-semibold ${labelClass}`}>{label}</span>
-        {selectedStation ? (
+        <p className={`text-[10px] font-semibold ${labelClass}`}>{label}</p>
+        {station ? (
           <button
             type="button"
-            className="text-[10px] font-medium text-slate-400 hover:text-slate-700"
+            className="h-5 shrink-0 rounded-full px-1.5 text-[10px] font-medium text-slate-400 transition duration-150 ease-out hover:bg-white hover:text-slate-700 active:scale-[0.99]"
             onClick={onClear}
           >
             삭제
           </button>
         ) : null}
       </div>
+      <p className="mt-0.5 truncate text-xs font-semibold text-slate-900">
+        {station?.nameKo ?? "미지정"}
+      </p>
       <input
-        className={`mt-1 h-8 w-full rounded-lg border border-slate-200 bg-slate-50 px-2 text-xs font-medium text-slate-800 outline-none ${borderClass}`}
-        placeholder={selectedStation ? selectedStation.nameKo : `${label} 검색`}
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
+        placeholder={`${label}역 검색`}
+        className={`mt-1.5 h-8 w-full rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-900 outline-none transition focus:ring-4 ${ringClass}`}
       />
-      {selectedStation ? (
-        <p className="mt-1 truncate text-[11px] font-semibold text-slate-700">
-          {selectedStation.nameKo}
-          {selectedStation.lineNameKo ? <span className="font-medium text-slate-400"> · {selectedStation.lineNameKo}</span> : null}
-        </p>
-      ) : null}
-      {matches.length > 0 ? (
-        <div className="mt-1 grid max-h-40 gap-1 overflow-y-auto">
-          {matches.map((station) => (
+      {results.length > 0 ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white/98 shadow-2xl shadow-slate-950/15 backdrop-blur">
+          {results.map((candidate) => (
             <button
-              key={station.id}
+              key={candidate.id}
               type="button"
-              className="min-w-0 rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-slate-700 hover:bg-slate-50"
-              onClick={() => onSelect(station.id)}
+              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition hover:bg-slate-50"
+              onClick={() => onSelect(candidate.id)}
             >
-              <span className="block truncate font-semibold text-slate-900">{station.nameKo}</span>
-              <span className="block truncate text-[10px] text-slate-400">{station.lineNameKo ?? station.id}</span>
+              <span className="min-w-0 truncate text-xs font-semibold text-slate-900">
+                {candidate.nameKo}
+              </span>
+              {candidate.lineNameKo ? (
+                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                  {candidate.lineNameKo}
+                </span>
+              ) : null}
             </button>
           ))}
         </div>

@@ -389,3 +389,12 @@ Recommended scope:
 - 분할 실행 시 대표 노선 하나는 기존 stationId를 유지하고, 나머지 노선은 `::line:` scoped stationId로 새 stationOverride를 만든다.
 - 분할된 stationId를 branchRouteOverrides, geometryOverrides, lineBranchOverrides, servicePatterns, trainRuns에 함께 반영한다.
 - 같은 물리 역은 기존/신규 stationId를 환승 그룹으로 묶고, 환승 시간표는 보류 상태로 관리한다.
+
+## 13.57.0-route-search-result-ux-polish
+
+- public web 경로검색 결과 선택 시 해당 경로를 제외한 지도 노선/역을 반투명 처리한다.
+- 환승 연결은 지도 위 회색 점선으로 표시한다.
+- 경로 결과 카드의 시간/환승/거리/구간 정보를 더 읽기 쉬운 카드형 UI로 정리한다.
+- `수동 환승` 표현을 사용자용 `환승`으로 정리한다.
+- 출발/도착역 검색 dropdown을 absolute overlay로 표시해 레이아웃이 밀리지 않게 한다.
+- 최단 시간/최소 환승 결과를 비교해 서로 다를 때만 여러 후보를 표시한다.
