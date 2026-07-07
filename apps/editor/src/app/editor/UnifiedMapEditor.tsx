@@ -441,6 +441,10 @@ function buildTrainRunReviewIssues(
   return issues;
 }
 
+function isServicePatternDirection(value: unknown): value is "up" | "down" | "loop" | "unknown" {
+  return value === "up" || value === "down" || value === "loop" || value === "unknown";
+}
+
 function formatServicePatternDirection(direction: string | null | undefined) {
   switch (direction) {
     case "up":
@@ -9205,11 +9209,11 @@ function ServicePatternBuilderPanel({
 
   function startEditPattern(pattern: ManualServicePattern) {
     setEditingPatternId(pattern.id);
-    setLineId(pattern.lineId);
-    setBranchId(pattern.branchId);
+    setLineId(pattern.lineId ?? "");
+    setBranchId(pattern.branchId ?? "");
     setNameKo(pattern.nameKo);
     setServiceType(pattern.serviceType);
-    setDirection(pattern.direction);
+    setDirection(isServicePatternDirection(pattern.direction) ? pattern.direction : "unknown");
     setSelectedStationIds(pattern.stops
       .slice()
       .sort((a, b) => a.sequence - b.sequence)
