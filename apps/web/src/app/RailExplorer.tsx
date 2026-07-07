@@ -146,6 +146,7 @@ interface SelectedLinePanelProps {
   selectedBranch: CanonicalBranch | null;
   servicePatterns: ManualServicePattern[];
   trainRuns: ManualTrainRun[];
+  stationById: Map<string, RailMapStation>;
   onSelectBranch: (branchId: string) => void;
   onClearBranch: () => void;
 }
@@ -990,6 +991,7 @@ export default function RailExplorer({
                   selectedBranch={selectedBranch}
                   servicePatterns={servicePatterns}
                   trainRuns={trainRuns}
+                  stationById={stationById}
                   onSelectBranch={setSelectedBranchId}
                   onClearBranch={() => setSelectedBranchId(null)}
                 />
@@ -1105,6 +1107,7 @@ export default function RailExplorer({
                     selectedBranch={selectedBranch}
                     servicePatterns={servicePatterns}
                     trainRuns={trainRuns}
+                    stationById={stationById}
                     onSelectBranch={setSelectedBranchId}
                     onClearBranch={() => setSelectedBranchId(null)}
                     compact
@@ -2732,6 +2735,7 @@ function SelectedLinePanel({
   selectedBranch,
   servicePatterns,
   trainRuns,
+  stationById,
   onSelectBranch,
   onClearBranch,
   compact = false,
@@ -2793,6 +2797,7 @@ function SelectedLinePanel({
       <LineServicePatternSummary
         patterns={lineServicePatterns}
         trainRuns={lineTrainRuns}
+        stationById={stationById}
       />
 
       {selectedBranch ? (
@@ -3021,12 +3026,35 @@ function buildTimetableGraphSummary(
   };
 }
 
+function formatPatternStopNames(
+  stops: ManualServicePattern["stops"],
+  stationById: Map<string, RailMapStation>,
+) {
+  const sortedStops = stops.slice().sort((a, b) => a.sequence - b.sequence);
+  const names = sortedStops
+    .map((stop) => stationById.get(stop.stationId)?.nameKo ?? stop.stationId)
+    .filter(Boolean);
+  if (names.length <= 6) return names.join(" → ");
+  return `${names.slice(0, 3).join(" → ")} → ... → ${names.slice(-2).join(" → ")}`;
+}
+
+function formatTrainRunStopTimePreview(run: ManualTrainRun) {
+  const stops = run.stopTimes.slice().sort((a, b) => a.sequence - b.sequence);
+  const first = stops.find((stop) => stop.departureTime || stop.arrivalTime);
+  const last = stops.slice().reverse().find((stop) => stop.arrivalTime || stop.departureTime);
+  const firstTime = first?.departureTime ?? first?.arrivalTime ?? "--:--";
+  const lastTime = last?.arrivalTime ?? last?.departureTime ?? "--:--";
+  return `${firstTime} → ${lastTime}`;
+}
+
 function LineServicePatternSummary({
   patterns,
   trainRuns,
+  stationById,
 }: {
   patterns: ManualServicePattern[];
   trainRuns: ManualTrainRun[];
+  stationById: Map<string, RailMapStation>;
 }) {
   if (patterns.length === 0 && trainRuns.length === 0) return null;
 
@@ -3068,17 +3096,19 @@ function LineServicePatternSummary({
                   열차 {formatNumber(runs.length)}
                 </span>
               </div>
+              <p className="mt-1.5 break-words text-[11px] leading-4 text-slate-500">
+                {formatPatternStopNames(pattern.stops, stationById)}
+              </p>
               {runs.length > 0 ? (
-                <div className="mt-1.5 flex flex-wrap gap-1">
-                  {runs.slice(0, 3).map((run) => (
-                    <span key={run.id} className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
-                      {run.trainNumber || run.nameKo || "열차"} · {getTrainRunPrimaryTime(run)} · {formatOperatingDays(run.operatingDays)}
-                    </span>
+                <div className="mt-1.5 grid gap-1">
+                  {runs.slice(0, 4).map((run) => (
+                    <div key={run.id} className="flex items-center justify-between gap-2 rounded bg-white px-1.5 py-1 text-[10px] text-slate-600">
+                      <span className="truncate font-medium">{run.trainNumber || run.nameKo || "열차"}</span>
+                      <span className="shrink-0 text-slate-400">{formatTrainRunStopTimePreview(run)} · {formatOperatingDays(run.operatingDays)}</span>
+                    </div>
                   ))}
-                  {runs.length > 3 ? (
-                    <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
-                      +{runs.length - 3}
-                    </span>
+                  {runs.length > 4 ? (
+                    <p className="text-[10px] text-slate-400">외 {formatNumber(runs.length - 4)}개 열차</p>
                   ) : null}
                 </div>
               ) : null}
