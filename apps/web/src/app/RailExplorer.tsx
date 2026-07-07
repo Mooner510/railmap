@@ -2548,6 +2548,14 @@ function RouteResultSummary({
           </div>
         ) : null}
 
+        {results.length > 1 ? (
+          <RouteResultComparisonPanel
+            results={results}
+            activeResultIndex={activeResultIndex}
+            onSelectResult={onSelectResult}
+          />
+        ) : null}
+
         <div className="mt-3 grid grid-cols-3 gap-1.5">
           <RouteMetric label="역" value={`${formatNumber(result.stationIds.length)}개`} />
           <RouteMetric label="환승" value={`${formatNumber(result.transferCount)}회`} />
@@ -2617,6 +2625,54 @@ function RouteResultSummary({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function RouteResultComparisonPanel({
+  results,
+  activeResultIndex,
+  onSelectResult,
+}: {
+  results: RouteSearchResult[];
+  activeResultIndex: number;
+  onSelectResult: (index: number) => void;
+}) {
+  const fastestMinutes = Math.min(...results.map((result) => result.totalMinutes));
+  const fewestTransfers = Math.min(...results.map((result) => result.transferCount));
+
+  return (
+    <div className="mt-2 overflow-hidden rounded-2xl border border-white/80 bg-white/85 shadow-sm shadow-slate-950/5">
+      <div className="grid grid-cols-[1fr_58px_48px_52px] border-b border-slate-100 px-2 py-1.5 text-[10px] font-bold text-slate-400">
+        <span>후보</span>
+        <span className="text-right">시간</span>
+        <span className="text-right">환승</span>
+        <span className="text-right">근거</span>
+      </div>
+      {results.map((candidate, index) => {
+        const diagnostics = getRouteQualityDiagnostics(candidate);
+        const selected = index === activeResultIndex;
+        const isFastest = candidate.totalMinutes === fastestMinutes;
+        const isFewestTransfer = candidate.transferCount === fewestTransfers;
+
+        return (
+          <button
+            key={`${candidate.criterion}:comparison:${index}`}
+            type="button"
+            className={`grid w-full grid-cols-[1fr_58px_48px_52px] items-center gap-1 border-b border-slate-50 px-2 py-1.5 text-left text-[11px] last:border-b-0 ${selected ? "bg-emerald-50 text-emerald-800" : "bg-white text-slate-600 hover:bg-slate-50"}`}
+            onClick={() => onSelectResult(index)}
+          >
+            <span className="min-w-0 truncate font-semibold">
+              {candidate.label}
+              {isFastest ? " · 빠름" : ""}
+              {isFewestTransfer ? " · 적음" : ""}
+            </span>
+            <span className="text-right font-bold">{formatNumber(candidate.totalMinutes)}분</span>
+            <span className="text-right font-bold">{formatNumber(candidate.transferCount)}회</span>
+            <span className="text-right font-bold">{diagnostics.level}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
