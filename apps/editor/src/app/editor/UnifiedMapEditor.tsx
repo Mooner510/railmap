@@ -10287,6 +10287,8 @@ function ManualRailLinePanel({
   const [bulkEntryOpen, setBulkEntryOpen] = useState(false);
   const [bulkEntryText, setBulkEntryText] = useState("");
   const [bulkEntryResult, setBulkEntryResult] = useState<string | null>(null);
+  const [bulkEntrySummary, setBulkEntrySummary] = useState<{ added: number; missing: number; skipped: number } | null>(null);
+  const [bulkEntrySkippedNames, setBulkEntrySkippedNames] = useState<string[]>([]);
   const [bulkEntryMissingNames, setBulkEntryMissingNames] = useState<string[]>([]);
   const [bulkEntryResolveName, setBulkEntryResolveName] = useState("");
   const [bulkEntryResolveQuery, setBulkEntryResolveQuery] = useState("");
@@ -10402,16 +10404,28 @@ function ManualRailLinePanel({
     ) ?? null;
   }
 
+
+  function selectNextBulkMissingName(names: string[]) {
+    const nextName = names[0] ?? "";
+    setBulkEntryResolveName(nextName);
+    setBulkEntryResolveQuery(nextName);
+  }
+
   function applyBulkRouteStations() {
     if (!routeBuilderDraft) return;
     const names = parseBulkStationNames(bulkEntryText);
     const matched: ManualRouteStationDraft[] = [];
     const missing: string[] = [];
+    const skipped: string[] = [];
     const existingKeys = new Set(routeBuilderDraft.stations.map((station) => getManualStationNameKey(station.nameKo)).filter(Boolean));
 
     for (const name of names) {
       const key = getManualStationNameKey(name);
-      if (!key || existingKeys.has(key)) continue;
+      if (!key) continue;
+      if (existingKeys.has(key)) {
+        skipped.push(name);
+        continue;
+      }
       const station = findBulkStationMatch(name);
       if (!station || typeof station.lng !== "number" || typeof station.lat !== "number") {
         missing.push(name);
@@ -10428,10 +10442,12 @@ function ManualRailLinePanel({
     }
 
     setBulkEntryMissingNames(missing);
-    setBulkEntryResolveName(missing[0] ?? "");
+    setBulkEntrySkippedNames(skipped);
+    setBulkEntrySummary({ added: matched.length, missing: missing.length, skipped: skipped.length });
+    selectNextBulkMissingName(missing);
 
     if (matched.length === 0) {
-      setBulkEntryResult(missing.length > 0 ? `미매칭 ${missing.length.toLocaleString("ko-KR")}개 · 아래에서 보정하세요.` : "추가할 역이 없습니다.");
+      setBulkEntryResult(missing.length > 0 ? "보정이 필요한 역이 있습니다." : skipped.length > 0 ? "이미 목록에 있는 역만 제외했습니다." : "추가할 역이 없습니다.");
       return;
     }
 
@@ -10439,18 +10455,25 @@ function ManualRailLinePanel({
       ...routeBuilderDraft,
       stations: [...routeBuilderDraft.stations, ...matched],
     });
-    setBulkEntryResult(`${matched.length.toLocaleString("ko-KR")}개 역을 기존 역 위치로 추가했습니다${missing.length > 0 ? ` · 미매칭 ${missing.length.toLocaleString("ko-KR")}개` : ""}.`);
+    setBulkEntryResult(missing.length > 0 ? "추가된 역과 보정할 역을 나눠 표시했습니다." : "대량 입력을 반영했습니다.");
   }
 
   function useMissingNameOnMap(nameKo: string) {
     if (!routeBuilderDraft) return;
     onChangeRouteBuilder({ ...routeBuilderDraft, pendingStationName: nameKo });
+    setBulkEntryMissingNames((previous) => {
+      const next = previous.filter((name) => name !== nameKo);
+      selectNextBulkMissingName(next);
+      return next;
+    });
+    setBulkEntrySummary((previous) => previous ? { ...previous, missing: Math.max(0, previous.missing - 1) } : previous);
     setBulkEntryOpen(false);
   }
 
   function resolveMissingNameWithStation(station: EditorStation) {
     if (!routeBuilderDraft || typeof station.lng !== "number" || typeof station.lat !== "number") return;
-    const nameKo = bulkEntryResolveName.trim() || stripStationNameQualifier(station.nameKo);
+    const selectedName = bulkEntryResolveName;
+    const nameKo = selectedName.trim() || stripStationNameQualifier(station.nameKo);
     onChangeRouteBuilder({
       ...routeBuilderDraft,
       stations: [
@@ -10464,9 +10487,12 @@ function ManualRailLinePanel({
         },
       ],
     });
-    setBulkEntryMissingNames((previous) => previous.filter((name) => name !== bulkEntryResolveName));
-    setBulkEntryResolveName("");
-    setBulkEntryResolveQuery("");
+    setBulkEntryMissingNames((previous) => {
+      const next = previous.filter((name) => name !== selectedName);
+      selectNextBulkMissingName(next);
+      return next;
+    });
+    setBulkEntrySummary((previous) => previous ? { added: previous.added + 1, missing: Math.max(0, previous.missing - 1), skipped: previous.skipped } : previous);
     setBulkEntryResult(`${nameKo} 위치를 기존 역에서 복사했습니다.`);
   }
 
@@ -10537,6 +10563,8 @@ function ManualRailLinePanel({
               className="justify-start"
               onClick={() => {
                 setBulkEntryResult(null);
+                setBulkEntrySummary(null);
+                setBulkEntrySkippedNames([]);
                 setBulkEntryMissingNames([]);
                 setBulkEntryResolveName("");
                 setBulkEntryResolveQuery("");
@@ -10664,18 +10692,55 @@ function ManualRailLinePanel({
               onChange={(event) => {
                 setBulkEntryText(event.target.value);
                 setBulkEntryResult(null);
+                setBulkEntrySummary(null);
+                setBulkEntrySkippedNames([]);
                 setBulkEntryMissingNames([]);
               }}
               placeholder={"서울\n영등포\n수원\n천안\n대전"}
             />
+            {bulkEntrySummary ? (
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: "추가", value: bulkEntrySummary.added, className: "bg-emerald-50 text-emerald-700" },
+                  { label: "보정", value: bulkEntryMissingNames.length, className: "bg-amber-50 text-amber-700" },
+                  { label: "제외", value: bulkEntrySummary.skipped, className: "bg-slate-50 text-slate-500" },
+                ].map((item) => (
+                  <div key={item.label} className={cn("rounded-2xl px-3 py-2", item.className)}>
+                    <span className="block text-[10px] font-normal">{item.label}</span>
+                    <strong className="mt-0.5 block text-lg font-medium">{item.value.toLocaleString("ko-KR")}</strong>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {bulkEntryResult ? (
               <p className="rounded-2xl bg-slate-50 px-3 py-2 text-xs font-normal text-slate-600">{bulkEntryResult}</p>
+            ) : null}
+            {bulkEntrySkippedNames.length > 0 ? (
+              <div className="rounded-2xl bg-slate-50 px-3 py-2">
+                <span className="text-[11px] font-normal text-slate-500">이미 목록에 있어 제외됨</span>
+                <p className="mt-1 line-clamp-2 text-xs font-normal text-slate-600">{bulkEntrySkippedNames.join(", ")}</p>
+              </div>
             ) : null}
             {bulkEntryMissingNames.length > 0 ? (
               <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <strong className="text-xs font-medium text-amber-900">미매칭 역</strong>
-                  <span className="text-[11px] font-normal text-amber-700">{bulkEntryMissingNames.length}개</span>
+                  <strong className="text-xs font-medium text-amber-900">보정할 역</strong>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-normal text-amber-700">{bulkEntryMissingNames.length}개</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => {
+                        const currentIndex = bulkEntryMissingNames.findIndex((name) => name === bulkEntryResolveName);
+                        const nextName = bulkEntryMissingNames[(currentIndex + 1) % bulkEntryMissingNames.length] ?? bulkEntryMissingNames[0] ?? "";
+                        setBulkEntryResolveName(nextName);
+                        setBulkEntryResolveQuery(nextName);
+                      }}
+                    >
+                      다음
+                    </Button>
+                  </div>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {bulkEntryMissingNames.map((name) => (
@@ -10740,6 +10805,8 @@ function ManualRailLinePanel({
               onClick={() => {
                 setBulkEntryText("");
                 setBulkEntryResult(null);
+                setBulkEntrySummary(null);
+                setBulkEntrySkippedNames([]);
                 setBulkEntryMissingNames([]);
                 setBulkEntryResolveName("");
                 setBulkEntryResolveQuery("");
