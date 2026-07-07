@@ -451,3 +451,9 @@ Recommended scope:
 - Added a compact route quality review card to public route search results.
 - The result now highlights whether timetable edges, geometry/performance estimates, fallback durations, and transfer links were used.
 - This makes route-search quality issues easier to spot before deeper algorithm changes.
+
+## 13.66.0 route search visual review
+
+- Strengthened public route-search map highlighting.
+- Route result lines now use each route segment's actual line color instead of a single green color.
+- Route casing and transfer dotted lines were tuned so selected routes read more naturally against dimmed non-route map layers.
