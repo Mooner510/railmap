@@ -2295,11 +2295,14 @@ function findRoute(
       const transferCount = current.transferCount + (isTransfer ? 1 : 0);
       const totalMinutes = current.totalMinutes + durationMinutes + (isManualTransfer ? 0 : branchChangePenalty);
       const timetablePriority = edge.kind === "timetable" ? TIMETABLE_EDGE_PRIORITY_BONUS : 0;
+      const fallbackRidePenalty = edge.kind === "ride" && (!edge.distanceMeters || !edge.durationMinutes) ? 4 : 0;
+      const longTransferPenalty = edge.kind === "manual-transfer" && (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY) >= 20 ? 2 : 0;
+      const dataQualityPenalty = fallbackRidePenalty + longTransferPenalty;
       const nextScore = criterion === "fewest-transfers"
-        ? transferCount * FEWEST_TRANSFER_SCORE_WEIGHT + totalMinutes + current.stopCount * ROUTE_STOP_STEP_PENALTY
+        ? transferCount * FEWEST_TRANSFER_SCORE_WEIGHT + totalMinutes + dataQualityPenalty + current.stopCount * ROUTE_STOP_STEP_PENALTY
         : criterion === "timetable-priority"
-          ? totalMinutes - timetablePriority * 6 + transferCount * 3 + current.stopCount * ROUTE_STOP_STEP_PENALTY
-          : totalMinutes - timetablePriority + current.stopCount * ROUTE_STOP_STEP_PENALTY;
+          ? totalMinutes - timetablePriority * 6 + transferCount * 3 + dataQualityPenalty + current.stopCount * ROUTE_STOP_STEP_PENALTY
+          : totalMinutes - timetablePriority + dataQualityPenalty + current.stopCount * ROUTE_STOP_STEP_PENALTY;
       const nextPreviousBranchId = isManualTransfer ? null : edge.branchId;
       const nextPreviousLineNameKo = isManualTransfer ? null : edge.lineNameKo;
       const nextKey = makeRouteStateKey(edge.toStationId, nextPreviousBranchId);
@@ -2583,28 +2586,56 @@ function RouteQualityReviewPanel({ result }: { result: RouteSearchResult }) {
   ).length;
   const timetableCount = result.edges.filter((edge) => edge.kind === "timetable").length;
   const transferCount = result.edges.filter((edge) => edge.kind === "manual-transfer").length;
+  const geometryRideCount = result.edges.filter(
+    (edge) => edge.kind === "ride" && Boolean(edge.distanceMeters && edge.durationMinutes),
+  ).length;
+  const longTransferCount = result.edges.filter(
+    (edge) => edge.kind === "manual-transfer" && (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY) >= 20,
+  ).length;
+  const noDistanceRideCount = result.edges.filter(
+    (edge) => edge.kind === "ride" && !edge.distanceMeters,
+  ).length;
+  const qualityLevel = fallbackRideCount > 0 || noDistanceRideCount > 0
+    ? "확인 필요"
+    : longTransferCount > 0
+      ? "주의"
+      : "양호";
+  const qualityTone = qualityLevel === "양호"
+    ? "border-emerald-100 bg-emerald-50/70 text-emerald-800"
+    : qualityLevel === "주의"
+      ? "border-amber-100 bg-amber-50/70 text-amber-800"
+      : "border-rose-100 bg-rose-50/70 text-rose-800";
   const qualityItems = [
-    timetableCount > 0 ? `${formatNumber(timetableCount)}개 시간표 구간 사용` : "시간표 구간 없음",
-    fallbackRideCount > 0 ? `${formatNumber(fallbackRideCount)}개 구간 기본 시간 적용` : "선형 거리 계산 적용",
-    transferCount > 0 ? `${formatNumber(transferCount)}회 환승 연결` : "환승 연결 없음",
-  ];
+    timetableCount > 0 ? `${formatNumber(timetableCount)}개 시간표 구간` : null,
+    geometryRideCount > 0 ? `${formatNumber(geometryRideCount)}개 선형 거리 계산` : null,
+    fallbackRideCount > 0 ? `${formatNumber(fallbackRideCount)}개 기본 시간 보정` : null,
+    transferCount > 0 ? `${formatNumber(transferCount)}회 환승` : null,
+    longTransferCount > 0 ? `${formatNumber(longTransferCount)}개 긴 환승 시간` : null,
+  ].filter((item): item is string => Boolean(item));
 
   return (
-    <div className="mt-2 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+    <div className={`mt-2 rounded-2xl border px-3 py-2 ${qualityTone}`}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold text-emerald-800">품질 점검</p>
-        <p className="text-[10px] font-medium text-emerald-700/70">검색 근거</p>
+        <p className="text-[11px] font-semibold">품질 점검</p>
+        <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold shadow-sm shadow-slate-950/5">
+          {qualityLevel}
+        </span>
       </div>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {qualityItems.map((item) => (
           <span
             key={item}
-            className="rounded-full bg-white px-2 py-1 text-[10px] font-medium text-emerald-800 shadow-sm shadow-emerald-950/5"
+            className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-medium shadow-sm shadow-slate-950/5"
           >
             {item}
           </span>
         ))}
       </div>
+      {fallbackRideCount > 0 ? (
+        <p className="mt-1.5 text-[10px] font-medium opacity-75">
+          선형 거리나 성능값이 부족한 구간은 기본 시간으로 계산했습니다.
+        </p>
+      ) : null}
     </div>
   );
 }
