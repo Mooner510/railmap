@@ -2621,7 +2621,7 @@ function RouteResultSummary({
   );
 }
 
-function RouteQualityReviewPanel({ result }: { result: RouteSearchResult }) {
+function getRouteQualityDiagnostics(result: RouteSearchResult) {
   const fallbackRideCount = result.edges.filter(
     (edge) => edge.kind === "ride" && (!edge.distanceMeters || !edge.durationMinutes),
   ).length;
@@ -2636,31 +2636,62 @@ function RouteQualityReviewPanel({ result }: { result: RouteSearchResult }) {
   const noDistanceRideCount = result.edges.filter(
     (edge) => edge.kind === "ride" && !edge.distanceMeters,
   ).length;
-  const qualityLevel = fallbackRideCount > 0 || noDistanceRideCount > 0
+  const noDurationRideCount = result.edges.filter(
+    (edge) => edge.kind === "ride" && !edge.durationMinutes,
+  ).length;
+  const timetableShare = result.edges.length > 0
+    ? Math.round((timetableCount / result.edges.length) * 100)
+    : 0;
+  const fallbackShare = result.edges.length > 0
+    ? Math.round((fallbackRideCount / result.edges.length) * 100)
+    : 0;
+  const level = fallbackRideCount > 0 || noDistanceRideCount > 0 || noDurationRideCount > 0
     ? "확인 필요"
     : longTransferCount > 0
       ? "주의"
       : "양호";
-  const qualityTone = qualityLevel === "양호"
+
+  return {
+    level,
+    fallbackRideCount,
+    timetableCount,
+    transferCount,
+    geometryRideCount,
+    longTransferCount,
+    noDistanceRideCount,
+    noDurationRideCount,
+    timetableShare,
+    fallbackShare,
+  };
+}
+
+function RouteQualityReviewPanel({ result }: { result: RouteSearchResult }) {
+  const diagnostics = getRouteQualityDiagnostics(result);
+  const qualityTone = diagnostics.level === "양호"
     ? "border-emerald-100 bg-emerald-50/70 text-emerald-800"
-    : qualityLevel === "주의"
+    : diagnostics.level === "주의"
       ? "border-amber-100 bg-amber-50/70 text-amber-800"
       : "border-rose-100 bg-rose-50/70 text-rose-800";
   const qualityItems = [
-    timetableCount > 0 ? `${formatNumber(timetableCount)}개 시간표 구간` : null,
-    geometryRideCount > 0 ? `${formatNumber(geometryRideCount)}개 선형 거리 계산` : null,
-    fallbackRideCount > 0 ? `${formatNumber(fallbackRideCount)}개 기본 시간 보정` : null,
-    transferCount > 0 ? `${formatNumber(transferCount)}회 환승` : null,
-    longTransferCount > 0 ? `${formatNumber(longTransferCount)}개 긴 환승 시간` : null,
+    diagnostics.timetableCount > 0 ? `${formatNumber(diagnostics.timetableCount)}개 시간표 구간` : null,
+    diagnostics.geometryRideCount > 0 ? `${formatNumber(diagnostics.geometryRideCount)}개 선형 거리 계산` : null,
+    diagnostics.fallbackRideCount > 0 ? `${formatNumber(diagnostics.fallbackRideCount)}개 기본 시간 보정` : null,
+    diagnostics.transferCount > 0 ? `${formatNumber(diagnostics.transferCount)}회 환승` : null,
+    diagnostics.longTransferCount > 0 ? `${formatNumber(diagnostics.longTransferCount)}개 긴 환승 시간` : null,
   ].filter((item): item is string => Boolean(item));
 
   return (
     <div className={`mt-2 rounded-2xl border px-3 py-2 ${qualityTone}`}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-semibold">품질 점검</p>
+        <p className="text-[11px] font-semibold">품질 진단</p>
         <span className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold shadow-sm shadow-slate-950/5">
-          {qualityLevel}
+          {diagnostics.level}
         </span>
+      </div>
+      <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+        <RouteMetric label="시간표" value={`${formatNumber(diagnostics.timetableShare)}%`} />
+        <RouteMetric label="기본값" value={`${formatNumber(diagnostics.fallbackShare)}%`} />
+        <RouteMetric label="구간" value={`${formatNumber(result.edges.length)}개`} />
       </div>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {qualityItems.map((item) => (
@@ -2672,9 +2703,9 @@ function RouteQualityReviewPanel({ result }: { result: RouteSearchResult }) {
           </span>
         ))}
       </div>
-      {fallbackRideCount > 0 ? (
+      {diagnostics.fallbackRideCount > 0 ? (
         <p className="mt-1.5 text-[10px] font-medium opacity-75">
-          선형 거리나 성능값이 부족한 구간은 기본 시간으로 계산했습니다.
+          선형 거리 또는 성능값이 부족한 이동 구간은 기본 시간으로 계산했습니다.
         </p>
       ) : null}
     </div>
@@ -2713,6 +2744,7 @@ function RouteCalculationDebugPanel({
         : 0),
     0,
   );
+  const diagnostics = getRouteQualityDiagnostics(result);
   const debugRows = result.edges.map((edge, index) => {
     const fromName = stationById.get(result.stationIds[index] ?? "")?.nameKo ?? "출발";
     const toName = stationById.get(edge.toStationId)?.nameKo ?? "도착";
@@ -2753,6 +2785,7 @@ function RouteCalculationDebugPanel({
         <RouteMetric label="선형거리" value={formatDistance(rideDistanceMeters)} />
         <RouteMetric label="시간표" value={`${formatNumber(Math.ceil(timetableMinutes))}분`} />
         <RouteMetric label="환승" value={`${formatNumber(Math.ceil(transferMinutes))}분`} />
+        <RouteMetric label="기본값" value={`${formatNumber(diagnostics.fallbackRideCount)}구간`} />
       </div>
 
       <div className="mt-2 grid gap-1.5">
