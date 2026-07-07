@@ -116,52 +116,16 @@
       "note": "수기 노선 빌더에서 생성한 물리 노선 역"
     },
     {
-      "stationId": "manual.station.manual.line.경부선.신길",
-      "nameKo": "신길",
-      "stationNumber": "6",
-      "lineNameKo": "경부선",
-      "lineNumber": "manual.line.경부선",
-      "colorHex": "#2563eb",
-      "lat": 37.516764483585106,
-      "lng": 126.91840405408743,
+      "stationId": "candidate:kric:urban-rail-station:S1105:0518:row-180",
+      "nameKo": "까치산",
+      "stationNumber": "0518",
+      "lineNameKo": "5호선",
+      "lineNumber": "S1105",
+      "colorHex": "#996CAC",
+      "lat": 37.53211418435481,
+      "lng": 126.84651728438769,
       "enabled": true,
-      "note": "수기 노선 빌더에서 생성한 물리 노선 역"
-    },
-    {
-      "stationId": "manual.station.manual.line.경부선.영등포",
-      "nameKo": "영등포",
-      "stationNumber": "7",
-      "lineNameKo": "경부선",
-      "lineNumber": "manual.line.경부선",
-      "colorHex": "#2563eb",
-      "lat": 37.515340011488746,
-      "lng": 126.90694540628402,
-      "enabled": true,
-      "note": "수기 노선 빌더에서 생성한 물리 노선 역"
-    },
-    {
-      "stationId": "manual.station.manual.line.경부선.신도림역",
-      "nameKo": "신도림역",
-      "stationNumber": "8",
-      "lineNameKo": "경부선",
-      "lineNumber": "manual.line.경부선",
-      "colorHex": "#2563eb",
-      "lat": 37.50900855657662,
-      "lng": 126.89172138340422,
-      "enabled": true,
-      "note": "수기 노선 빌더에서 생성한 물리 노선 역"
-    },
-    {
-      "stationId": "manual.station.manual.line.경부선.구로역",
-      "nameKo": "구로역",
-      "stationNumber": "9",
-      "lineNameKo": "경부선",
-      "lineNumber": "manual.line.경부선",
-      "colorHex": "#2563eb",
-      "lat": 37.50344540578287,
-      "lng": 126.88250068284901,
-      "enabled": true,
-      "note": "수기 노선 빌더에서 생성한 물리 노선 역"
+      "note": null
     }
   ],
   "nonTransferStationIds": [

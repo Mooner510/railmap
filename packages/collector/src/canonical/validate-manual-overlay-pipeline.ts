@@ -70,6 +70,7 @@ type ManualOverlayBundle = {
     lineId?: string;
     category?: string;
     serviceTypes?: string[];
+    trainPerformance?: { accelerationMps2?: number | null; decelerationMps2?: number | null; maxSpeedKph?: number | null };
     enabled?: boolean;
   }>;
   manualLineDefinitions?: Array<{

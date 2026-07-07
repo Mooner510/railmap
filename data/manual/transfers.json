@@ -178,5 +178,8 @@
     }
   ],
   "manualTransferEdges": [],
+  "dismissedTransferGroupSuggestionKeys": [],
+  "dismissedTransferGroupSuggestionNotes": {},
+  "transferTimePendingGroupIds": [],
   "manualTransferReviewEvents": []
 }

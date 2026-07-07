@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Button } from "@repo/ui/button";
 import { cn } from "@repo/ui/utils";
 import { ChevronRight, Trash2 } from "lucide-react";
@@ -10,6 +11,7 @@ import {
   type ManualBranchRouteOverride,
   type ManualBranchStationExclusion,
   type ManualLineBranchOverride,
+  type ManualTrainPerformance,
   type RailLineCategory,
   type RailServiceType,
 } from "../editorModel";
@@ -175,7 +177,7 @@ export function BranchInspector({
   onUpdateRoute: (stationIds: string[], label: string, circular?: boolean) => void;
   onResetRoute: () => void;
   onSetCircular: (circular: boolean) => void;
-  onUpdateLineMetadata: (category: RailLineCategory, serviceTypes: RailServiceType[]) => void;
+  onUpdateLineMetadata: (category: RailLineCategory, serviceTypes: RailServiceType[], trainPerformance?: ManualTrainPerformance | null) => void;
 }) {
   const branchStations = getBranchStopStations(branch);
   const relatedLineBranches = lineBranchOverrides.filter(
@@ -199,6 +201,35 @@ export function BranchInspector({
   );
   const routeStationIds = branchStations.map((station) => station.id);
   const isCircular = branchRouteOverride?.circular === true || branch.isCircular === true;
+  const [accelerationMps2, setAccelerationMps2] = useState("");
+  const [decelerationMps2, setDecelerationMps2] = useState("");
+  const [maxSpeedKph, setMaxSpeedKph] = useState("");
+
+  useEffect(() => {
+    setAccelerationMps2(branch.trainPerformance?.accelerationMps2?.toString() ?? "");
+    setDecelerationMps2(branch.trainPerformance?.decelerationMps2?.toString() ?? "");
+    setMaxSpeedKph(branch.trainPerformance?.maxSpeedKph?.toString() ?? "");
+  }, [branch.id, branch.trainPerformance?.accelerationMps2, branch.trainPerformance?.decelerationMps2, branch.trainPerformance?.maxSpeedKph]);
+
+  function parsePositivePerformanceInput(value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }
+
+  function makePerformanceDraft(): ManualTrainPerformance | null {
+    const next = {
+      accelerationMps2: parsePositivePerformanceInput(accelerationMps2),
+      decelerationMps2: parsePositivePerformanceInput(decelerationMps2),
+      maxSpeedKph: parsePositivePerformanceInput(maxSpeedKph),
+    };
+    return next.accelerationMps2 || next.decelerationMps2 || next.maxSpeedKph ? next : null;
+  }
+
+  function saveLinePerformance() {
+    onUpdateLineMetadata(branch.category, branch.serviceTypes, makePerformanceDraft());
+  }
 
   function moveStation(index: number, direction: -1 | 1) {
     const targetIndex = index + direction;
@@ -279,7 +310,7 @@ export function BranchInspector({
                     ? "border-sky-300 bg-sky-50 text-sky-800"
                     : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50",
                 )}
-                onClick={() => onUpdateLineMetadata(category, branch.serviceTypes)}
+                onClick={() => onUpdateLineMetadata(category, branch.serviceTypes, branch.trainPerformance ?? null)}
               >
                 {formatRailLineCategory(category)}
               </button>
@@ -305,6 +336,7 @@ export function BranchInspector({
                     onUpdateLineMetadata(
                       branch.category,
                       nextServiceTypes.length > 0 ? nextServiceTypes : ["unknown"],
+                      branch.trainPerformance ?? null,
                     )
                   }
                 >
@@ -312,6 +344,35 @@ export function BranchInspector({
                 </button>
               );
             })}
+          </div>
+          <div className="mt-3 grid gap-2 rounded-2xl border border-slate-100 bg-slate-50 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <strong className="text-xs font-semibold text-slate-800">운행 성능</strong>
+              <Button variant="outline" onClick={saveLinePerformance}>저장</Button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <input
+                className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none focus:border-blue-300"
+                inputMode="decimal"
+                placeholder="가속 m/s²"
+                value={accelerationMps2}
+                onChange={(event) => setAccelerationMps2(event.target.value)}
+              />
+              <input
+                className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none focus:border-blue-300"
+                inputMode="decimal"
+                placeholder="감속 m/s²"
+                value={decelerationMps2}
+                onChange={(event) => setDecelerationMps2(event.target.value)}
+              />
+              <input
+                className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none focus:border-blue-300"
+                inputMode="decimal"
+                placeholder="최고속도 km/h"
+                value={maxSpeedKph}
+                onChange={(event) => setMaxSpeedKph(event.target.value)}
+              />
+            </div>
           </div>
         </div>
         <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">

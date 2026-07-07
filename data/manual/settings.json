@@ -21,6 +21,7 @@
       ],
       "status": "open",
       "coverageStatus": "draft",
+      "trainPerformance": null,
       "enabled": true,
       "source": "editor",
       "note": null

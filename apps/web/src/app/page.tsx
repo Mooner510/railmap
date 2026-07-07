@@ -153,6 +153,7 @@ interface ManualLineMetadataOverride {
   lineId: string;
   category?: RailLineCategory;
   serviceTypes?: RailServiceType[];
+  trainPerformance?: ManualTrainPerformance | null;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;
@@ -440,6 +441,7 @@ function applyLineMetadataOverrides(
       serviceTypes: override?.serviceTypes?.length
         ? override.serviceTypes
         : fallbackServiceTypes,
+      trainPerformance: override?.trainPerformance ?? line.trainPerformance ?? null,
     };
   });
 }
