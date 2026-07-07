@@ -53,9 +53,15 @@ type RoutePointRole = "origin" | "destination";
 const MIN_STATION_SEARCH_LENGTH = 1;
 const MAX_LINE_SEARCH_RESULTS = 8;
 const MAX_STATION_SEARCH_RESULTS = 12;
-const SAME_LINE_BRANCH_CHANGE_PENALTY = 4;
-const ROUTE_TRANSFER_PENALTY = 28;
-const MANUAL_TRANSFER_PENALTY = 18;
+const SAME_LINE_BRANCH_CHANGE_PENALTY = 2;
+const ROUTE_TRANSFER_PENALTY = 16;
+const MANUAL_TRANSFER_PENALTY = 7;
+const RIDE_EDGE_FALLBACK_MINUTES = 2;
+const TIMETABLE_EDGE_PRIORITY_BONUS = 0.75;
+const ROUTE_STOP_STEP_PENALTY = 0.03;
+const FEWEST_TRANSFER_SCORE_WEIGHT = 100_000;
+const ROUTE_EQUIVALENT_TIME_GAP_MINUTES = 3;
+const ROUTE_DOMINANT_TIME_GAP_MINUTES = 8;
 
 interface FilterControlsProps {
   areaCodes: string[];
@@ -2162,10 +2168,41 @@ function findRouteResults(
   if (first && second) {
     const minutesGap = Math.abs(first.totalMinutes - second.totalMinutes);
     const transferGap = Math.abs(first.transferCount - second.transferCount);
-    if (minutesGap <= 2 && transferGap === 0) return [first];
+    if (transferGap === 0 && minutesGap <= ROUTE_EQUIVALENT_TIME_GAP_MINUTES) {
+      return [first.totalMinutes <= second.totalMinutes ? first : second];
+    }
+    if (isClearlyDominantRoute(first, second)) return [first];
+    if (isClearlyDominantRoute(second, first)) return [second];
   }
 
-  return deduped.slice(0, 2);
+  return deduped.slice(0, 2).sort(
+    (a, b) =>
+      a.transferCount - b.transferCount ||
+      a.totalMinutes - b.totalMinutes ||
+      a.stationIds.length - b.stationIds.length,
+  );
+}
+
+function getRouteEdgeDurationMinutes(edge: RouteGraphEdge): number {
+  if (edge.kind === "manual-transfer") {
+    return Math.max(1, edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY);
+  }
+
+  if (typeof edge.durationMinutes === "number" && Number.isFinite(edge.durationMinutes) && edge.durationMinutes > 0) {
+    return Math.max(0.5, edge.durationMinutes);
+  }
+
+  if (edge.kind === "ride") return RIDE_EDGE_FALLBACK_MINUTES;
+  return 1;
+}
+
+function isClearlyDominantRoute(left: RouteSearchResult, right: RouteSearchResult): boolean {
+  return (
+    left.transferCount <= right.transferCount &&
+    left.totalMinutes <= right.totalMinutes &&
+    (left.transferCount < right.transferCount ||
+      right.totalMinutes - left.totalMinutes >= ROUTE_DOMINANT_TIME_GAP_MINUTES)
+  );
 }
 
 function findRoute(
@@ -2227,26 +2264,25 @@ function findRoute(
 
     for (const edge of graph.get(current.stationId) ?? []) {
       const isManualTransfer = edge.kind === "manual-transfer";
-      const isTransfer = Boolean(
-        isManualTransfer ||
-        (current.previousBranchId &&
-          current.previousBranchId !== edge.branchId),
+      const isBranchChange = Boolean(
+        current.previousBranchId && current.previousBranchId !== edge.branchId,
       );
-      const transferPenalty = isManualTransfer
-        ? MANUAL_TRANSFER_PENALTY
-        : !isTransfer
-          ? 0
-          : current.previousLineNameKo === edge.lineNameKo
-            ? SAME_LINE_BRANCH_CHANGE_PENALTY
-            : ROUTE_TRANSFER_PENALTY;
-      const durationMinutes = isManualTransfer
-        ? (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY)
-        : (edge.durationMinutes ?? 1);
+      const isLineChange = Boolean(
+        current.previousLineNameKo && current.previousLineNameKo !== edge.lineNameKo,
+      );
+      const isTransfer = isManualTransfer || (isBranchChange && isLineChange);
+      const branchChangePenalty = !isBranchChange
+        ? 0
+        : isLineChange
+          ? ROUTE_TRANSFER_PENALTY
+          : SAME_LINE_BRANCH_CHANGE_PENALTY;
+      const durationMinutes = getRouteEdgeDurationMinutes(edge);
       const transferCount = current.transferCount + (isTransfer ? 1 : 0);
-      const totalMinutes = current.totalMinutes + Math.max(0.2, durationMinutes);
+      const totalMinutes = current.totalMinutes + durationMinutes + (isManualTransfer ? 0 : branchChangePenalty);
+      const timetablePriority = edge.kind === "timetable" ? TIMETABLE_EDGE_PRIORITY_BONUS : 0;
       const nextScore = criterion === "fewest-transfers"
-        ? transferCount * 10000 + totalMinutes + current.stopCount
-        : totalMinutes + transferPenalty;
+        ? transferCount * FEWEST_TRANSFER_SCORE_WEIGHT + totalMinutes + current.stopCount * ROUTE_STOP_STEP_PENALTY
+        : totalMinutes - timetablePriority + current.stopCount * ROUTE_STOP_STEP_PENALTY;
       const nextPreviousBranchId = isManualTransfer ? null : edge.branchId;
       const nextPreviousLineNameKo = isManualTransfer ? null : edge.lineNameKo;
       const nextKey = makeRouteStateKey(edge.toStationId, nextPreviousBranchId);
@@ -2292,21 +2328,31 @@ function findRoute(
   let totalMinutes = 0;
   let totalDistanceMeters = 0;
 
+  let previousLineNameKo: string | null = null;
+
   for (const edge of edges) {
-    totalMinutes += edge.kind === "manual-transfer"
-      ? (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY)
-      : (edge.durationMinutes ?? 1);
+    const isManualTransfer = edge.kind === "manual-transfer";
+    const isBranchChange = Boolean(previousBranchId && edge.branchId !== previousBranchId);
+    const isLineChange = Boolean(previousLineNameKo && edge.lineNameKo !== previousLineNameKo);
+    const branchChangePenalty = !isBranchChange
+      ? 0
+      : isLineChange
+        ? ROUTE_TRANSFER_PENALTY
+        : SAME_LINE_BRANCH_CHANGE_PENALTY;
+
+    totalMinutes += getRouteEdgeDurationMinutes(edge) + (isManualTransfer ? 0 : branchChangePenalty);
     totalDistanceMeters += edge.distanceMeters ?? 0;
 
-    if (edge.kind === "manual-transfer") {
+    if (isManualTransfer) {
       transferCount += 1;
       previousBranchId = null;
+      previousLineNameKo = null;
       continue;
     }
 
-    if (previousBranchId && edge.branchId !== previousBranchId)
-      transferCount += 1;
+    if (isBranchChange && isLineChange) transferCount += 1;
     previousBranchId = edge.branchId;
+    previousLineNameKo = edge.lineNameKo;
   }
 
   return {
