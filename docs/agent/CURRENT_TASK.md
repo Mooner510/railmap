@@ -373,3 +373,19 @@ Recommended scope:
 - 선형이 없을 때만 역 좌표 직선거리로 fallback한다.
 - 이동 시간은 가속/감속/최고속도 기반의 삼각/사다리꼴 속도 프로파일로 계산하고 분 단위 올림 처리한다.
 - 열차 시간표가 있는 edge는 기존처럼 실제 입력된 시간표 duration을 우선 사용한다.
+
+## 13.53.0-line-performance-settings
+
+- 기존 canonical 노선에도 가속도/감속도/영업 최고속도를 설정할 수 있는 편집 UI를 추가했다.
+- lineMetadataOverrides에 trainPerformance를 저장하고 editor/web에 전달한다.
+
+
+## 13.56.0-station-line-split-tool
+
+- 기존 canonical 노선 타입에 `trainPerformance` optional 필드를 추가해 기존 노선 성능 설정 타입 오류를 수정했다.
+- 한 stationId가 여러 노선에 직접 연결된 역을 검증 탭에서 감지하도록 했다.
+- 현재 데이터 기준으로 `까치산` stationId가 2호선/5호선에 동시에 연결된 문제를 확인했다.
+- 역 상세 패널에 `노선별 stationId 분할` 버튼을 추가했다.
+- 분할 실행 시 대표 노선 하나는 기존 stationId를 유지하고, 나머지 노선은 `::line:` scoped stationId로 새 stationOverride를 만든다.
+- 분할된 stationId를 branchRouteOverrides, geometryOverrides, lineBranchOverrides, servicePatterns, trainRuns에 함께 반영한다.
+- 같은 물리 역은 기존/신규 stationId를 환승 그룹으로 묶고, 환승 시간표는 보류 상태로 관리한다.

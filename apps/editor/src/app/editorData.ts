@@ -12,6 +12,7 @@ import {
   type ManualBranchRouteOverride,
   type ManualGeometryOverride,
   type ManualOverlayBundle,
+  type ManualTrainPerformance,
   type ManualStationOverride,
 } from "./editorModel";
 
@@ -43,6 +44,7 @@ export type CanonicalLine = {
   colorHex?: string | null;
   category?: RailLineCategory | null;
   serviceTypes?: RailServiceType[] | null;
+  trainPerformance?: ManualTrainPerformance | null;
   sourceLineNumbers?: string[] | null;
   branches?: CanonicalBranch[];
 };
@@ -54,6 +56,7 @@ export type EditorMapBranch = {
   colorHex: string;
   category: RailLineCategory;
   serviceTypes: RailServiceType[];
+  trainPerformance?: ManualTrainPerformance | null;
   role: string;
   sourceLineNumber: string;
   sourceLineName: string;
@@ -419,6 +422,7 @@ function applyLineMetadataOverrides(
       serviceTypes: override?.serviceTypes?.length
         ? override.serviceTypes
         : fallbackServiceTypes,
+      trainPerformance: override?.trainPerformance ?? line.trainPerformance ?? null,
     };
   });
 }
@@ -527,6 +531,7 @@ function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geome
         colorHex: line.colorHex ?? "#0284c7",
         category: line.category ?? inferRailLineCategory(line),
         serviceTypes: line.serviceTypes?.length ? line.serviceTypes : inferRailServiceTypes(line),
+        trainPerformance: line.trainPerformance ?? null,
         role: branch.role,
         sourceLineNumber: branch.sourceLineNumber,
         sourceLineName: branch.sourceLineName,
