@@ -147,13 +147,16 @@ interface TimetableRouteGraph {
   edgesByStationId: Map<string, TimetableRouteGraphEdge[]>;
 }
 
+type RouteSearchCriterion = "fastest" | "fewest-transfers" | "timetable-priority";
+type RouteSearchPreference = "balanced" | RouteSearchCriterion;
+
 interface RouteSearchResult {
   stationIds: string[];
   edges: RouteGraphEdge[];
   transferCount: number;
   totalMinutes: number;
   totalDistanceMeters: number;
-  criterion: "fastest" | "fewest-transfers";
+  criterion: RouteSearchCriterion;
   label: string;
 }
 
@@ -228,6 +231,8 @@ export default function RailExplorer({
   const [routeSearchResults, setRouteSearchResults] =
     useState<RouteSearchResult[]>([]);
   const [selectedRouteResultIndex, setSelectedRouteResultIndex] = useState(0);
+  const [routeSearchPreference, setRouteSearchPreference] =
+    useState<RouteSearchPreference>("balanced");
   const [isHydratedFromUrl, setIsHydratedFromUrl] = useState(false);
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
   const [mapFocusVersion, setMapFocusVersion] = useState(0);
@@ -717,6 +722,13 @@ export default function RailExplorer({
     setMobilePanelMode("selected");
   };
 
+  const changeRouteSearchPreference = (preference: RouteSearchPreference) => {
+    setRouteSearchPreference(preference);
+    setRouteSearchResults([]);
+    setSelectedRouteResultIndex(0);
+    setRouteSearchMessage(null);
+  };
+
   const submitRouteSearch = () => {
     if (!routeOriginStationId || !routeDestinationStationId) {
       setRouteSearchResults([]);
@@ -742,6 +754,7 @@ export default function RailExplorer({
       routeGraph,
       routeOriginStationId,
       routeDestinationStationId,
+      routeSearchPreference,
     );
 
     if (results.length === 0) {
@@ -985,6 +998,8 @@ export default function RailExplorer({
                   stationById={stationById}
                   allStations={mapStations}
                   onSelectResult={setSelectedRouteResultIndex}
+                  routeSearchPreference={routeSearchPreference}
+                  onRouteSearchPreferenceChange={changeRouteSearchPreference}
                   onSetRoutePoint={setRoutePoint}
                   onClearOrigin={() => clearRoutePoint("origin")}
                   onClearDestination={() => clearRoutePoint("destination")}
@@ -1103,6 +1118,8 @@ export default function RailExplorer({
                       stationById={stationById}
                       allStations={mapStations}
                       onSelectResult={setSelectedRouteResultIndex}
+                      routeSearchPreference={routeSearchPreference}
+                      onRouteSearchPreferenceChange={changeRouteSearchPreference}
                       onSetRoutePoint={setRoutePoint}
                       onClearOrigin={() => clearRoutePoint("origin")}
                       onClearDestination={() => clearRoutePoint("destination")}
@@ -2141,17 +2158,15 @@ function findRouteResults(
   graph: Map<string, RouteGraphEdge[]>,
   originStationId: string,
   destinationStationId: string,
+  preference: RouteSearchPreference = "balanced",
 ): RouteSearchResult[] {
-  const fastest = findRoute(graph, originStationId, destinationStationId, "fastest");
-  const fewestTransfers = findRoute(
-    graph,
-    originStationId,
-    destinationStationId,
-    "fewest-transfers",
-  );
-  const results = [fastest, fewestTransfers].filter(
-    (result): result is RouteSearchResult => result !== null,
-  );
+  const criteria: RouteSearchCriterion[] =
+    preference === "balanced"
+      ? ["fastest", "fewest-transfers"]
+      : [preference];
+  const results = criteria
+    .map((criterion) => findRoute(graph, originStationId, destinationStationId, criterion))
+    .filter((result): result is RouteSearchResult => result !== null);
   const deduped: RouteSearchResult[] = [];
   const signatures = new Set<string>();
 
@@ -2209,7 +2224,7 @@ function findRoute(
   graph: Map<string, RouteGraphEdge[]>,
   originStationId: string,
   destinationStationId: string,
-  criterion: "fastest" | "fewest-transfers",
+  criterion: RouteSearchCriterion,
 ): RouteSearchResult | null {
   const originKey = makeRouteStateKey(originStationId, null);
   const open: Array<{
@@ -2282,7 +2297,9 @@ function findRoute(
       const timetablePriority = edge.kind === "timetable" ? TIMETABLE_EDGE_PRIORITY_BONUS : 0;
       const nextScore = criterion === "fewest-transfers"
         ? transferCount * FEWEST_TRANSFER_SCORE_WEIGHT + totalMinutes + current.stopCount * ROUTE_STOP_STEP_PENALTY
-        : totalMinutes - timetablePriority + current.stopCount * ROUTE_STOP_STEP_PENALTY;
+        : criterion === "timetable-priority"
+          ? totalMinutes - timetablePriority * 6 + transferCount * 3 + current.stopCount * ROUTE_STOP_STEP_PENALTY
+          : totalMinutes - timetablePriority + current.stopCount * ROUTE_STOP_STEP_PENALTY;
       const nextPreviousBranchId = isManualTransfer ? null : edge.branchId;
       const nextPreviousLineNameKo = isManualTransfer ? null : edge.lineNameKo;
       const nextKey = makeRouteStateKey(edge.toStationId, nextPreviousBranchId);
@@ -2362,7 +2379,7 @@ function findRoute(
     totalMinutes: Math.ceil(totalMinutes),
     totalDistanceMeters,
     criterion,
-    label: criterion === "fewest-transfers" ? "최소 환승" : "최단 시간",
+    label: criterion === "fewest-transfers" ? "환승 적게" : criterion === "timetable-priority" ? "시간표 우선" : "빠른 경로",
   };
 }
 
@@ -2803,6 +2820,8 @@ function RouteDraftCard({
   stationById,
   allStations,
   onSelectResult,
+  routeSearchPreference,
+  onRouteSearchPreferenceChange,
   onSetRoutePoint,
   onClearOrigin,
   onClearDestination,
@@ -2818,6 +2837,8 @@ function RouteDraftCard({
   stationById: Map<string, RailMapStation>;
   allStations: RailMapStation[];
   onSelectResult: (index: number) => void;
+  routeSearchPreference: RouteSearchPreference;
+  onRouteSearchPreferenceChange: (preference: RouteSearchPreference) => void;
   onSetRoutePoint: (role: RoutePointRole, stationId: string) => void;
   onClearOrigin: () => void;
   onClearDestination: () => void;
@@ -2894,6 +2915,11 @@ function RouteDraftCard({
         />
       </div>
 
+      <RouteSearchPreferenceControl
+        value={routeSearchPreference}
+        onChange={onRouteSearchPreferenceChange}
+      />
+
       {results.length > 0 ? (
         <RouteResultSummary
           results={results}
@@ -2912,6 +2938,43 @@ function RouteDraftCard({
         경로 검색
       </button>
     </section>
+  );
+}
+
+function RouteSearchPreferenceControl({
+  value,
+  onChange,
+}: {
+  value: RouteSearchPreference;
+  onChange: (value: RouteSearchPreference) => void;
+}) {
+  const options: Array<{ value: RouteSearchPreference; label: string; hint: string }> = [
+    { value: "balanced", label: "균형", hint: "최단 시간과 환승 적게를 함께 비교" },
+    { value: "fastest", label: "빠른 경로", hint: "예상 시간이 가장 짧은 경로" },
+    { value: "fewest-transfers", label: "환승 적게", hint: "환승 수를 우선 줄인 경로" },
+    { value: "timetable-priority", label: "시간표 우선", hint: "실제 시간표가 있는 구간을 조금 더 우선" },
+  ];
+
+  return (
+    <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-1.5">
+      <div className="grid grid-cols-2 gap-1">
+        {options.map((option) => {
+          const selected = value === option.value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              className={`rounded-xl px-2 py-1.5 text-left transition duration-150 ease-out ${selected ? "bg-white text-slate-950 shadow-sm shadow-slate-950/5" : "text-slate-500 hover:bg-white/70 hover:text-slate-800"}`}
+              onClick={() => onChange(option.value)}
+              title={option.hint}
+            >
+              <span className="block text-[11px] font-semibold">{option.label}</span>
+              <span className="mt-0.5 block truncate text-[9px] font-medium opacity-70">{option.hint}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
