@@ -239,6 +239,21 @@ type ServicePatternBuilderInput = {
   note: string;
 };
 
+type TrainRunBuilderInput = {
+  patternId: string;
+  trainNumber: string;
+  nameKo: string;
+  operatingDays: string[];
+  stopTimes: Array<{
+    stationId: string;
+    sequence: number;
+    arrivalTime: string;
+    departureTime: string;
+    stopType?: string | null;
+  }>;
+  note: string;
+};
+
 type ShortcutItem = {
   label: string;
   keys: string;
@@ -310,6 +325,24 @@ function makeManualServicePatternId(nameKo: string, lineId: string, existingIds:
   let suffix = 2;
   while (existingIds.has(`${base}-${suffix}`)) suffix += 1;
   return `${base}-${suffix}`;
+}
+
+function makeManualTrainRunId(trainNumber: string, patternId: string, existingIds: Set<string>) {
+  const normalized = normalizeSearchText(`${patternId}:${trainNumber || "train-run"}`)
+    .replace(/[^0-9A-Za-z가-힣._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  const base = `manual.train-run.${normalized || "train-run"}`;
+  if (!existingIds.has(base)) return base;
+
+  let suffix = 2;
+  while (existingIds.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+function formatOperatingDays(days: string[] | null | undefined) {
+  const cleaned = (days ?? []).map((day) => day.trim()).filter(Boolean);
+  return cleaned.length > 0 ? cleaned.join(", ") : "운행일 미정";
 }
 
 function formatServicePatternDirection(direction: string | null | undefined) {
@@ -7222,6 +7255,79 @@ export default function UnifiedMapEditor({
     );
   }
 
+  async function saveManualTrainRun(input: TrainRunBuilderInput) {
+    const pattern = overlays.manualServicePatterns.find((candidate) => candidate.id === input.patternId);
+    if (!pattern) {
+      showToast("정차 패턴을 선택하세요", "error");
+      return;
+    }
+
+    const trainNumber = input.trainNumber.trim();
+    const nameKo = input.nameKo.trim() || [formatRailServiceType(pattern.serviceType), trainNumber].filter(Boolean).join(" ") || "열차 시간표";
+    const stopTimes = input.stopTimes
+      .filter((stop) => stop.stationId)
+      .map((stop, index) => ({
+        stationId: stop.stationId,
+        sequence: index + 1,
+        arrivalTime: stop.arrivalTime.trim() || null,
+        departureTime: stop.departureTime.trim() || null,
+        stopType: stop.stopType || undefined,
+        note: undefined,
+      }));
+
+    if (stopTimes.length < 2) {
+      showToast("열차 시간표는 최소 2개 역이 필요합니다", "error");
+      return;
+    }
+
+    const hasAnyTime = stopTimes.some((stop) => stop.arrivalTime || stop.departureTime);
+    if (!hasAnyTime) {
+      showToast("도착 또는 출발 시각을 하나 이상 입력하세요", "error");
+      return;
+    }
+
+    const existingIds = new Set((overlays.manualTrainRuns ?? []).map((run) => run.id));
+    const runId = makeManualTrainRunId(trainNumber || nameKo, input.patternId, existingIds);
+    const nextRun: ManualTrainRun = {
+      id: runId,
+      patternId: input.patternId,
+      trainNumber: trainNumber || null,
+      nameKo,
+      serviceType: pattern.serviceType,
+      operatingDays: input.operatingDays.map((day) => day.trim()).filter(Boolean),
+      stopTimes,
+      enabled: true,
+      source: "editor",
+      note: input.note.trim() || null,
+    };
+
+    const next: ManualOverlayBundle = {
+      ...overlays,
+      manualTrainRuns: [...(overlays.manualTrainRuns ?? []), nextRun],
+    };
+
+    await executeOverlayCommand(
+      "열차 시간표 생성",
+      next,
+      `${nameKo} 시간표를 저장했습니다`,
+    );
+  }
+
+  async function deleteManualTrainRun(runId: string) {
+    const run = overlays.manualTrainRuns.find((candidate) => candidate.id === runId);
+    if (!run) return;
+    if (!window.confirm(`${run.nameKo || run.trainNumber || "열차 시간표"}를 삭제할까요?`)) return;
+    const next: ManualOverlayBundle = {
+      ...overlays,
+      manualTrainRuns: overlays.manualTrainRuns.filter((candidate) => candidate.id !== runId),
+    };
+    await executeOverlayCommand(
+      "열차 시간표 삭제",
+      next,
+      `${run.nameKo || run.trainNumber || "열차 시간표"}를 삭제했습니다`,
+    );
+  }
+
   async function updateLineMetadata(
     lineId: string,
     category: RailLineCategory,
@@ -8121,8 +8227,11 @@ export default function UnifiedMapEditor({
                 branches={data.branches}
                 stationById={displayStationById}
                 servicePatterns={overlays.manualServicePatterns ?? []}
+                trainRuns={overlays.manualTrainRuns ?? []}
                 onSave={(input) => void saveManualServicePattern(input)}
                 onDelete={(patternId) => void deleteManualServicePattern(patternId)}
+                onSaveTrainRun={(input) => void saveManualTrainRun(input)}
+                onDeleteTrainRun={(runId) => void deleteManualTrainRun(runId)}
               />
             ) : null}
 
@@ -8781,15 +8890,21 @@ function ServicePatternBuilderPanel({
   branches,
   stationById,
   servicePatterns,
+  trainRuns,
   onSave,
   onDelete,
+  onSaveTrainRun,
+  onDeleteTrainRun,
 }: {
   lines: EditorMapLine[];
   branches: EditorMapBranch[];
   stationById: Map<string, EditorStation>;
   servicePatterns: ManualServicePattern[];
+  trainRuns: ManualTrainRun[];
   onSave: (input: ServicePatternBuilderInput) => void;
   onDelete: (patternId: string) => void;
+  onSaveTrainRun: (input: TrainRunBuilderInput) => void;
+  onDeleteTrainRun: (runId: string) => void;
 }) {
   const availableLines = lines.slice().sort((a, b) => a.nameKo.localeCompare(b.nameKo, "ko-KR"));
   const [lineId, setLineId] = useState(availableLines[0]?.id ?? "");
@@ -8808,6 +8923,13 @@ function ServicePatternBuilderPanel({
   const [direction, setDirection] = useState<"up" | "down" | "loop" | "unknown">("unknown");
   const [selectedStationIds, setSelectedStationIds] = useState<string[]>([]);
   const [note, setNote] = useState("");
+  const [trainPatternId, setTrainPatternId] = useState(servicePatterns[0]?.id ?? "");
+  const activeTrainPattern = servicePatterns.find((pattern) => pattern.id === trainPatternId) ?? servicePatterns[0] ?? null;
+  const [trainNumber, setTrainNumber] = useState("");
+  const [trainNameKo, setTrainNameKo] = useState("");
+  const [operatingDaysText, setOperatingDaysText] = useState("");
+  const [trainNote, setTrainNote] = useState("");
+  const [trainStopTimes, setTrainStopTimes] = useState<Record<string, { arrivalTime: string; departureTime: string }>>({});
 
   useEffect(() => {
     if (!availableLines.some((line) => line.id === lineId)) {
@@ -8850,6 +8972,50 @@ function ServicePatternBuilderPanel({
       direction,
       stopStationIds: orderedStationIds,
       note,
+    });
+  }
+
+  useEffect(() => {
+    if (!servicePatterns.some((pattern) => pattern.id === trainPatternId)) {
+      setTrainPatternId(servicePatterns[0]?.id ?? "");
+    }
+  }, [servicePatterns, trainPatternId]);
+
+  useEffect(() => {
+    setTrainStopTimes({});
+    setTrainNameKo(activeTrainPattern ? `${formatRailServiceType(activeTrainPattern.serviceType)} ${activeTrainPattern.nameKo}` : "");
+  }, [activeTrainPattern?.id]);
+
+  function updateTrainStopTime(stationId: string, sequence: number, field: "arrivalTime" | "departureTime", value: string) {
+    const key = `${stationId}:${sequence}`;
+    setTrainStopTimes((current) => ({
+      ...current,
+      [key]: {
+        arrivalTime: current[key]?.arrivalTime ?? "",
+        departureTime: current[key]?.departureTime ?? "",
+        [field]: value,
+      },
+    }));
+  }
+
+  function submitTrainRun() {
+    if (!activeTrainPattern) return;
+    onSaveTrainRun({
+      patternId: activeTrainPattern.id,
+      trainNumber,
+      nameKo: trainNameKo,
+      operatingDays: operatingDaysText.split(/[\n,]+/).map((day) => day.trim()).filter(Boolean),
+      stopTimes: activeTrainPattern.stops.map((stop, index) => {
+        const key = `${stop.stationId}:${stop.sequence}`;
+        return {
+          stationId: stop.stationId,
+          sequence: index + 1,
+          arrivalTime: trainStopTimes[key]?.arrivalTime ?? "",
+          departureTime: trainStopTimes[key]?.departureTime ?? "",
+          stopType: stop.stopType ?? null,
+        };
+      }),
+      note: trainNote,
     });
   }
 
@@ -8988,6 +9154,110 @@ function ServicePatternBuilderPanel({
           {servicePatterns.length === 0 ? (
             <Placeholder title="정차 패턴 없음" description="노선과 지선을 선택한 뒤 실제 정차역만 남겨 저장하세요." />
           ) : null}
+        </div>
+      </div>
+
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <strong className="block truncate text-sm font-medium text-slate-900">열차 시간표 입력</strong>
+            <p className="mt-1 text-xs font-normal text-slate-500">정차 패턴을 고른 뒤 열차번호와 역별 시각을 입력합니다.</p>
+          </div>
+          <Badge className="bg-slate-100 text-slate-600">{trainRuns.length.toLocaleString("ko-KR")}개</Badge>
+        </div>
+
+        {activeTrainPattern ? (
+          <div className="mt-4 grid gap-3">
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              value={trainPatternId}
+              onChange={(event) => setTrainPatternId(event.target.value)}
+            >
+              {servicePatterns.map((pattern) => (
+                <option key={pattern.id} value={pattern.id}>{pattern.nameKo}</option>
+              ))}
+            </select>
+            <div className="grid grid-cols-2 gap-2">
+              <Input value={trainNumber} onChange={(event) => setTrainNumber(event.target.value)} placeholder="열차번호" />
+              <Input value={trainNameKo} onChange={(event) => setTrainNameKo(event.target.value)} placeholder="표시 이름" />
+            </div>
+            <Input value={operatingDaysText} onChange={(event) => setOperatingDaysText(event.target.value)} placeholder="운행일: 매일, 평일, 주말 또는 월,화,수" />
+
+            <div className="overflow-hidden rounded-2xl border border-slate-100">
+              <div className="grid grid-cols-[52px_minmax(0,1fr)_96px_96px] border-b border-slate-100 bg-slate-50 px-3 py-2 text-[11px] font-medium text-slate-500">
+                <span>순서</span>
+                <span>역</span>
+                <span>도착</span>
+                <span>출발</span>
+              </div>
+              <div className="max-h-[340px] overflow-y-auto">
+                {activeTrainPattern.stops.map((stop, index) => {
+                  const key = `${stop.stationId}:${stop.sequence}`;
+                  const station = stationById.get(stop.stationId);
+                  return (
+                    <div key={key} className="grid grid-cols-[52px_minmax(0,1fr)_96px_96px] items-center gap-0 border-b border-slate-50 px-3 py-2 last:border-b-0">
+                      <span className="text-[11px] font-medium text-slate-400">{index + 1}</span>
+                      <span className="min-w-0 truncate text-sm font-medium text-slate-800">{station?.nameKo ?? stop.stationId}</span>
+                      <Input
+                        className="h-8 rounded-lg text-xs"
+                        value={trainStopTimes[key]?.arrivalTime ?? ""}
+                        onChange={(event) => updateTrainStopTime(stop.stationId, stop.sequence, "arrivalTime", event.target.value)}
+                        placeholder="HH:mm"
+                      />
+                      <Input
+                        className="ml-1 h-8 rounded-lg text-xs"
+                        value={trainStopTimes[key]?.departureTime ?? ""}
+                        onChange={(event) => updateTrainStopTime(stop.stationId, stop.sequence, "departureTime", event.target.value)}
+                        placeholder="HH:mm"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <Textarea value={trainNote} onChange={(event) => setTrainNote(event.target.value)} className="min-h-16" placeholder="메모" />
+            <Button type="button" className="w-full" onClick={submitTrainRun}>
+              <Save className="mr-1 size-4" />
+              열차 시간표 저장
+            </Button>
+          </div>
+        ) : (
+          <Placeholder title="정차 패턴 필요" description="먼저 정차 패턴을 만든 뒤 열차 시간표를 입력하세요." />
+        )}
+
+        <div className="mt-4 grid gap-2">
+          {trainRuns.map((run) => {
+            const pattern = servicePatterns.find((candidate) => candidate.id === run.patternId);
+            return (
+              <div key={run.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <strong className="block truncate text-sm font-medium text-slate-900">{run.nameKo || run.trainNumber || "열차 시간표"}</strong>
+                    <p className="mt-1 truncate text-xs font-normal text-slate-500">
+                      {pattern?.nameKo ?? run.patternId ?? "패턴 미지정"} · {formatRailServiceType(run.serviceType)} · {formatOperatingDays(run.operatingDays)}
+                    </p>
+                  </div>
+                  <Button type="button" size="icon" variant="ghost" onClick={() => onDeleteTrainRun(run.id)} title="시간표 삭제">
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {run.stopTimes.slice(0, 6).map((stop) => (
+                    <span key={`${run.id}:${stop.stationId}:${stop.sequence}`} className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                      {stationById.get(stop.stationId)?.nameKo ?? stop.stationId}
+                      {(stop.arrivalTime || stop.departureTime) ? ` ${stop.arrivalTime ?? ""}${stop.departureTime ? `/${stop.departureTime}` : ""}` : ""}
+                    </span>
+                  ))}
+                  {run.stopTimes.length > 6 ? (
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-400">+{run.stopTimes.length - 6}</span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+          {trainRuns.length === 0 ? null : null}
         </div>
       </div>
     </div>
