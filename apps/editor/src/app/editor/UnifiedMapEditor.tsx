@@ -483,6 +483,25 @@ function normalizeStationNameForSuggestion(nameKo: string) {
   return normalizeSearchText(stripStationNameQualifier(nameKo).replace(/역$/g, ""));
 }
 
+
+function normalizeTrainCsvTime(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const match = trimmed.match(/^(\d{1,2})[:：](\d{2})$/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute) || hour < 0 || hour > 47 || minute < 0 || minute > 59) return null;
+  return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
+}
+
+function splitTrainCsvLine(line: string) {
+  return line
+    .split(/[\t,]/)
+    .map((column) => column.trim())
+    .filter(Boolean);
+}
+
 function getTransferSuggestionNameKey(nameKo: string) {
   return normalizeStationNameForSuggestion(nameKo);
 }
@@ -9571,31 +9590,44 @@ function ServicePatternBuilderPanel({
 
     let applied = 0;
     const missed: string[] = [];
+    const invalidTimes: string[] = [];
+    const duplicateStops: string[] = [];
     const nextTimes: Record<string, { arrivalTime: string; departureTime: string }> = {};
+    const seenStopKeys = new Set<string>();
 
     for (const rawLine of trainCsvText.split(/\r?\n/)) {
       const line = rawLine.trim();
-      if (!line) continue;
-      const columns = line.split(/[\t,]/).map((column) => column.trim()).filter(Boolean);
+      if (!line || /^역명[	,]/.test(line)) continue;
+      const columns = splitTrainCsvLine(line);
       const stationName = columns[0] ?? "";
       if (!stationName) continue;
-      const arrivalTime = columns[1] ?? "";
-      const departureTime = columns[2] ?? columns[1] ?? "";
+      const arrivalTime = normalizeTrainCsvTime(columns[1] ?? "");
+      const departureTime = normalizeTrainCsvTime(columns[2] ?? columns[1] ?? "");
+      if (arrivalTime === null || departureTime === null) {
+        invalidTimes.push(stationName);
+        continue;
+      }
       const stop = stopsByName.get(normalizeStationNameForSuggestion(stationName));
       if (!stop) {
         missed.push(stationName);
         continue;
       }
-      nextTimes[`${stop.stationId}:${stop.sequence}`] = { arrivalTime, departureTime };
+      const key = `${stop.stationId}:${stop.sequence}`;
+      if (seenStopKeys.has(key)) {
+        duplicateStops.push(stationName);
+        continue;
+      }
+      seenStopKeys.add(key);
+      nextTimes[key] = { arrivalTime: arrivalTime || "", departureTime: departureTime || arrivalTime || "" };
       applied += 1;
     }
 
     setTrainStopTimes((current) => ({ ...current, ...nextTimes }));
-    setTrainCsvMessage(
-      missed.length > 0
-        ? `${applied.toLocaleString("ko-KR")}개 반영 · 미매칭 ${missed.slice(0, 5).join(", ")}`
-        : `${applied.toLocaleString("ko-KR")}개 시각을 반영했습니다.`,
-    );
+    const parts = [`${applied.toLocaleString("ko-KR")}개 반영`];
+    if (missed.length > 0) parts.push(`미매칭 ${missed.slice(0, 5).join(", ")}`);
+    if (invalidTimes.length > 0) parts.push(`시각 오류 ${invalidTimes.slice(0, 5).join(", ")}`);
+    if (duplicateStops.length > 0) parts.push(`중복 제외 ${duplicateStops.slice(0, 5).join(", ")}`);
+    setTrainCsvMessage(parts.join(" · "));
   }
 
   const draftTrainRunInput = useMemo<TrainRunBuilderInput | null>(() => {

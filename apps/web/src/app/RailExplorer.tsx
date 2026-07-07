@@ -3342,7 +3342,7 @@ function SelectedStationPanel({
         </button>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
+      <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
         <MetricMini label="노선" value={uniqueLineCount} />
         <MetricMini label="구간" value={servingBranches.length} />
       </div>
@@ -3432,6 +3432,11 @@ function SelectedLinePanel({
   const lineTrainRuns = trainRuns.filter(
     (run) => run.enabled !== false && run.patternId && linePatternIds.has(run.patternId),
   );
+  const patternStationCount = lineServicePatterns.reduce(
+    (sum, pattern) => sum + pattern.stops.length,
+    0,
+  );
+  const firstTrainRun = lineTrainRuns[0] ?? null;
 
   return (
     <section className="border border-slate-200 bg-white p-2.5">
@@ -3460,6 +3465,8 @@ function SelectedLinePanel({
       <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs">
         <MetricMini label="구간" value={selectedLine.branches.length} />
         <MetricMini label="정차역" value={countRouteStops(selectedLine)} />
+        <MetricMini label="패턴 정차" value={patternStationCount} />
+        <MetricMini label="열차" value={lineTrainRuns.length} />
       </div>
 
       <LineRoutePreview
@@ -3743,7 +3750,7 @@ function LineServicePatternSummary({
   return (
     <section className="mt-2 border border-slate-200 bg-white px-2 py-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold text-slate-900">정차 패턴 · 시간표</h3>
+        <h3 className="text-xs font-semibold text-slate-900">운행 패턴과 시간표</h3>
         <span className="text-[11px] text-slate-400">
           패턴 {formatNumber(patterns.length)} · 열차 {formatNumber(trainRuns.length)}
         </span>
