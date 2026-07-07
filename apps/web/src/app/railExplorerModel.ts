@@ -332,6 +332,7 @@ export interface ManualLineMetadataOverride {
   lineId: string;
   category?: RailLineCategory;
   serviceTypes?: RailServiceType[];
+  trainPerformance?: ManualTrainPerformance | null;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;

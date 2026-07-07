@@ -355,6 +355,7 @@ function normalizeLineMetadataOverride(
     lineId,
     category,
     serviceTypes: serviceTypes && serviceTypes.length > 0 ? serviceTypes : undefined,
+    trainPerformance: normalizeManualTrainPerformance(override.trainPerformance),
     enabled: override.enabled !== false,
     source: asString(override.source) ?? "editor",
     note: asNullableString(override.note),
