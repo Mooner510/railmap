@@ -64,6 +64,7 @@ interface CanonicalLine {
   colorSource: string;
   category: RailLineCategory;
   serviceTypes: RailServiceType[];
+  trainPerformance?: ManualTrainPerformance | null;
   branches: CanonicalBranch[];
   sourceLineNumbers: string[];
 }
@@ -157,6 +158,12 @@ interface ManualLineMetadataOverride {
   note?: string | null;
 }
 
+interface ManualTrainPerformance {
+  accelerationMps2?: number | null;
+  decelerationMps2?: number | null;
+  maxSpeedKph?: number | null;
+}
+
 interface ManualLineDefinition {
   id: string;
   nameKo: string;
@@ -165,6 +172,7 @@ interface ManualLineDefinition {
   serviceTypes: RailServiceType[];
   status: ManualRailStatus;
   coverageStatus: ManualLineCoverageStatus;
+  trainPerformance?: ManualTrainPerformance | null;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;
@@ -347,6 +355,23 @@ function normalizeManualRailStatus(value: unknown) {
   return isManualRailStatus(value) ? value : "open";
 }
 
+function normalizePositiveDecimal(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : null;
+}
+
+function normalizeManualTrainPerformance(value: unknown): ManualLineDefinition["trainPerformance"] {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const accelerationMps2 = normalizePositiveDecimal(record.accelerationMps2);
+  const decelerationMps2 = normalizePositiveDecimal(record.decelerationMps2);
+  const maxSpeedKph = normalizePositiveDecimal(record.maxSpeedKph);
+  return accelerationMps2 || decelerationMps2 || maxSpeedKph
+    ? { accelerationMps2, decelerationMps2, maxSpeedKph }
+    : null;
+}
+
 function normalizeManualLineDefinition(value: unknown): ManualLineDefinition | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
@@ -364,6 +389,7 @@ function normalizeManualLineDefinition(value: unknown): ManualLineDefinition | n
     serviceTypes: serviceTypes.length > 0 ? serviceTypes : ["unknown"],
     status: normalizeManualRailStatus(record.status),
     coverageStatus: normalizeManualLineCoverageStatus(record.coverageStatus),
+    trainPerformance: normalizeManualTrainPerformance(record.trainPerformance),
     enabled: record.enabled !== false,
     source: typeof record.source === "string" ? record.source : "editor",
     note: typeof record.note === "string" ? record.note : null,
@@ -851,6 +877,7 @@ function applyManualLineDefinitions(
       colorSource: "manual-line-definition",
       category: manualRailTypeToLineCategory(line.railType),
       serviceTypes: line.serviceTypes,
+      trainPerformance: line.trainPerformance ?? null,
       branches,
       sourceLineNumbers: [line.id],
     });

@@ -170,6 +170,7 @@ export interface CanonicalLine {
   colorSource: string;
   category: RailLineCategory;
   serviceTypes: RailServiceType[];
+  trainPerformance?: ManualTrainPerformance | null;
   branches: CanonicalBranch[];
   sourceLineNumbers: string[];
 }
@@ -336,6 +337,12 @@ export interface ManualLineMetadataOverride {
   note?: string | null;
 }
 
+export interface ManualTrainPerformance {
+  accelerationMps2?: number | null;
+  decelerationMps2?: number | null;
+  maxSpeedKph?: number | null;
+}
+
 export interface ManualLineDefinition {
   id: string;
   nameKo: string;
@@ -344,6 +351,7 @@ export interface ManualLineDefinition {
   serviceTypes: RailServiceType[];
   status: ManualRailStatus;
   coverageStatus?: ManualLineCoverageStatus;
+  trainPerformance?: ManualTrainPerformance | null;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;
