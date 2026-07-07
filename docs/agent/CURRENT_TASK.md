@@ -325,3 +325,10 @@ Recommended scope:
 - 대표 열차는 각 정차 패턴 카드 안에 최대 3개까지 표시한다.
 - 13.44.0에서 발생한 정차 패턴 수정 타입 오류를 함께 수정했다.
 - 정차 패턴 수정 시 lineId/branchId/direction이 비어 있어도 안전한 기본값으로 처리한다.
+
+## 13.46.0 - timetable graph foundation
+
+- web에서 `manualServicePatterns`, `manualTrainRuns`가 누락되어도 빈 배열로 안전하게 처리한다.
+- public 노선 상세의 정차 패턴 카드에 경로검색용 timetable graph 준비 지표를 추가한다.
+- graph 지표는 역 노드 수, 정차 패턴 기반 구간 수, 시간표 기반 시간 간선 수를 계산한다.
+- 실제 경로검색 알고리즘 연결은 후속 단계로 분리한다.

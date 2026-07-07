@@ -276,8 +276,8 @@ interface ManualOverlays {
   lineMetadataOverrides: ManualLineMetadataOverride[];
   manualLineDefinitions: ManualLineDefinition[];
   manualBranchDefinitions: ManualBranchDefinition[];
-  manualServicePatterns?: ManualServicePattern[];
-  manualTrainRuns?: ManualTrainRun[];
+  manualServicePatterns: ManualServicePattern[];
+  manualTrainRuns: ManualTrainRun[];
 }
 
 function makeTransferPairKey(stationIdA: string, stationIdB: string) {
@@ -1062,8 +1062,8 @@ export default function Home() {
         transferGroups={toMapTransferGroups(
           manualOverlays.manualTransferGroups,
         )}
-        servicePatterns={manualOverlays.manualServicePatterns.filter((pattern) => pattern.enabled !== false)}
-        trainRuns={manualOverlays.manualTrainRuns.filter((run) => run.enabled !== false)}
+        servicePatterns={(manualOverlays.manualServicePatterns ?? []).filter((pattern) => pattern.enabled !== false)}
+        trainRuns={(manualOverlays.manualTrainRuns ?? []).filter((run) => run.enabled !== false)}
       />
     </main>
   );

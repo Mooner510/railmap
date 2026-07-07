@@ -2871,6 +2871,69 @@ function getTrainRunPrimaryTime(run: ManualTrainRun) {
   return first?.departureTime ?? first?.arrivalTime ?? "시각 미정";
 }
 
+interface TimetableGraphSummary {
+  nodeCount: number;
+  patternSegmentCount: number;
+  timedEdgeCount: number;
+  runCount: number;
+}
+
+function buildTimetableGraphSummary(
+  patterns: ManualServicePattern[],
+  trainRuns: ManualTrainRun[],
+): TimetableGraphSummary {
+  const stationIds = new Set<string>();
+  const patternSegments = new Set<string>();
+  const timedEdges = new Set<string>();
+
+  for (const pattern of patterns) {
+    const stops = pattern.stops
+      .filter((stop) => stop.stationId)
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence);
+
+    for (const stop of stops) {
+      stationIds.add(stop.stationId);
+    }
+
+    for (let index = 0; index < stops.length - 1; index += 1) {
+      const from = stops[index]?.stationId;
+      const to = stops[index + 1]?.stationId;
+      if (!from || !to || from === to) continue;
+      patternSegments.add(`${pattern.id}:${from}->${to}`);
+    }
+  }
+
+  for (const run of trainRuns) {
+    const stops = run.stopTimes
+      .filter((stop) => stop.stationId)
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence);
+
+    for (const stop of stops) {
+      stationIds.add(stop.stationId);
+    }
+
+    for (let index = 0; index < stops.length - 1; index += 1) {
+      const from = stops[index];
+      const to = stops[index + 1];
+      if (!from?.stationId || !to?.stationId || from.stationId === to.stationId) continue;
+      const hasAnyTime = Boolean(
+        from.departureTime || from.arrivalTime || to.arrivalTime || to.departureTime,
+      );
+      if (!hasAnyTime) continue;
+      timedEdges.add(`${run.id}:${from.stationId}->${to.stationId}`);
+    }
+  }
+
+  return {
+    nodeCount: stationIds.size,
+    patternSegmentCount: patternSegments.size,
+    timedEdgeCount: timedEdges.size,
+    runCount: trainRuns.length,
+  };
+}
+
 function LineServicePatternSummary({
   patterns,
   trainRuns,
@@ -2880,6 +2943,7 @@ function LineServicePatternSummary({
 }) {
   if (patterns.length === 0 && trainRuns.length === 0) return null;
 
+  const graphSummary = buildTimetableGraphSummary(patterns, trainRuns);
   const runsByPatternId = new Map<string, ManualTrainRun[]>();
   for (const run of trainRuns) {
     if (!run.patternId) continue;
@@ -2895,6 +2959,9 @@ function LineServicePatternSummary({
         <span className="text-[11px] text-slate-400">
           패턴 {formatNumber(patterns.length)} · 열차 {formatNumber(trainRuns.length)}
         </span>
+      </div>
+      <div className="mt-1.5 rounded bg-slate-50 px-2 py-1 text-[11px] text-slate-500">
+        그래프 준비: 역 {formatNumber(graphSummary.nodeCount)} · 패턴 구간 {formatNumber(graphSummary.patternSegmentCount)} · 시간 간선 {formatNumber(graphSummary.timedEdgeCount)}
       </div>
       <div className="mt-1.5 grid gap-1.5">
         {patterns.slice(0, 4).map((pattern) => {
