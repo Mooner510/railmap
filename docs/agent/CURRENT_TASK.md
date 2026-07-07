@@ -285,3 +285,11 @@ Recommended scope:
 - `manualTrainRuns`를 추가해 열차번호별 실제 도착/출발 시각을 정차 패턴과 별도로 저장할 수 있는 기반을 만들었다.
 - collector validation에서 service pattern과 train run의 line/branch/station/pattern 참조를 검증한다.
 - 아직 시간표 입력 UI는 만들지 않았으며, 다음 단계에서 service pattern 생성/편집 UX를 추가한다.
+
+## 13.41.0-service-pattern-builder-ui
+
+- `정차 패턴` 탭을 추가했다.
+- 노선/지선을 선택한 뒤 KTX, SRT, 무궁화, ITX 같은 서비스 타입별 정차 패턴을 만들 수 있게 했다.
+- 물리 노선의 전체 역 목록에서 실제 정차역만 선택해 저장한다.
+- 저장된 정차 패턴은 목록에서 확인하고 삭제할 수 있다.
+- 정차 패턴은 아직 열차번호별 시간표가 아니며, 다음 단계의 train run / timetable 입력 UI에서 사용한다.

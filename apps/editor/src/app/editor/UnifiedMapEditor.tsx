@@ -94,7 +94,7 @@ import {
   makeTransferPairKey,
   normalizeSearchText,
 } from "../editorModel";
-import type { EditorMapBranch, UnifiedEditorData } from "../editorData";
+import type { EditorMapBranch, EditorMapLine, UnifiedEditorData } from "../editorData";
 import { getLineBranchConnectionBlockReason, isBranchCircular } from "./branchRules";
 import { AddStationInsertionDialog, type PendingAddStationInsertion } from "./stationInsertion";
 import { BranchInspector } from "./branchInspector";
@@ -121,7 +121,7 @@ type Selection =
   | { type: "transferGroup"; id: string }
   | { type: "multiStation"; ids: string[] };
 
-type SidebarTab = "search" | "layers" | "manualLines" | "transfers" | "transferReview" | "validation" | "history";
+type SidebarTab = "search" | "layers" | "manualLines" | "transfers" | "transferReview" | "patterns" | "validation" | "history";
 type ToolMode = "select" | "box" | "geometry";
 type IconComponent = ComponentType<{ className?: string }>;
 type LngLatTuple = [number, number];
@@ -229,6 +229,16 @@ type TransferGroupSuggestion = {
 
 type TransferGroupReviewFilter = "pending" | "dismissed" | "approved" | "all";
 
+type ServicePatternBuilderInput = {
+  nameKo: string;
+  lineId: string;
+  branchId: string;
+  serviceType: RailServiceType;
+  direction: "up" | "down" | "loop" | "unknown";
+  stopStationIds: string[];
+  note: string;
+};
+
 type ShortcutItem = {
   label: string;
   keys: string;
@@ -287,6 +297,32 @@ function makeManualRailStationId(lineId: string, stationNameKo: string, existing
 
 function makeManualRouteStationClientId() {
   return `manual-route-station:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function makeManualServicePatternId(nameKo: string, lineId: string, existingIds: Set<string>) {
+  const normalized = normalizeSearchText(`${lineId}:${nameKo || "service-pattern"}`)
+    .replace(/[^0-9A-Za-z가-힣._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+  const base = `manual.service-pattern.${normalized || "service-pattern"}`;
+  if (!existingIds.has(base)) return base;
+
+  let suffix = 2;
+  while (existingIds.has(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+function formatServicePatternDirection(direction: string | null | undefined) {
+  switch (direction) {
+    case "up":
+      return "상행";
+    case "down":
+      return "하행";
+    case "loop":
+      return "순환";
+    default:
+      return "미정";
+  }
 }
 
 function stripStationNameQualifier(name: string) {
@@ -7120,6 +7156,72 @@ export default function UnifiedMapEditor({
     setSidebarTab("manualLines");
   }
 
+  async function saveManualServicePattern(input: ServicePatternBuilderInput) {
+    const line = data.lines.find((candidate) => candidate.id === input.lineId);
+    const branch = data.branches.find((candidate) => candidate.id === input.branchId);
+    const nameKo = input.nameKo.trim() || `${line?.nameKo ?? "정차 패턴"} ${formatRailServiceType(input.serviceType)}`;
+    const stopStationIds = [...new Set(input.stopStationIds.filter(Boolean))];
+
+    if (!line) {
+      showToast("노선을 선택하세요", "error");
+      return;
+    }
+    if (!branch) {
+      showToast("지선을 선택하세요", "error");
+      return;
+    }
+    if (stopStationIds.length < 2) {
+      showToast("정차 패턴은 최소 2개 역이 필요합니다", "error");
+      return;
+    }
+
+    const existingIds = new Set((overlays.manualServicePatterns ?? []).map((pattern) => pattern.id));
+    const patternId = makeManualServicePatternId(nameKo, input.lineId, existingIds);
+    const nextPattern: ManualServicePattern = {
+      id: patternId,
+      nameKo,
+      lineId: input.lineId,
+      branchId: input.branchId,
+      serviceType: input.serviceType,
+      direction: input.direction,
+      stops: stopStationIds.map((stationId, index) => ({
+        stationId,
+        sequence: index + 1,
+        stopType: index === 0 ? "origin" : index === stopStationIds.length - 1 ? "terminal" : "stop",
+        note: null,
+      })),
+      enabled: true,
+      source: "editor",
+      note: input.note.trim() || null,
+    };
+    const next: ManualOverlayBundle = {
+      ...overlays,
+      manualServicePatterns: [...(overlays.manualServicePatterns ?? []), nextPattern],
+    };
+
+    await executeOverlayCommand(
+      "정차 패턴 생성",
+      next,
+      `${nameKo} 정차 패턴을 저장했습니다`,
+    );
+  }
+
+  async function deleteManualServicePattern(patternId: string) {
+    const pattern = overlays.manualServicePatterns.find((candidate) => candidate.id === patternId);
+    if (!pattern) return;
+    if (!window.confirm(`${pattern.nameKo} 정차 패턴을 삭제할까요?`)) return;
+    const next: ManualOverlayBundle = {
+      ...overlays,
+      manualServicePatterns: overlays.manualServicePatterns.filter((candidate) => candidate.id !== patternId),
+      manualTrainRuns: overlays.manualTrainRuns.filter((run) => run.patternId !== patternId),
+    };
+    await executeOverlayCommand(
+      "정차 패턴 삭제",
+      next,
+      `${pattern.nameKo} 정차 패턴을 삭제했습니다`,
+    );
+  }
+
   async function updateLineMetadata(
     lineId: string,
     category: RailLineCategory,
@@ -7698,6 +7800,12 @@ export default function UnifiedMapEditor({
       badge: transferGroupSuggestions.length,
     },
     {
+      value: "patterns",
+      label: "정차 패턴",
+      Icon: ListChecks,
+      badge: overlays.manualServicePatterns.length,
+    },
+    {
       value: "validation",
       label: "검증",
       Icon: ListChecks,
@@ -8004,6 +8112,17 @@ export default function UnifiedMapEditor({
                 onOpenSuggestion={openTransferGroupSuggestion}
                 onSelectSuggestion={(suggestion) => setActiveTransferSuggestionKey(suggestion.key)}
                 onDismissSuggestion={(suggestion, reason) => void dismissTransferGroupSuggestion(suggestion, reason)}
+              />
+            ) : null}
+
+            {!isGeometryMode && sidebarTab === "patterns" ? (
+              <ServicePatternBuilderPanel
+                lines={data.lines}
+                branches={data.branches}
+                stationById={displayStationById}
+                servicePatterns={overlays.manualServicePatterns ?? []}
+                onSave={(input) => void saveManualServicePattern(input)}
+                onDelete={(patternId) => void deleteManualServicePattern(patternId)}
               />
             ) : null}
 
@@ -8652,6 +8771,224 @@ function CommandHistoryPanel({
         <p className="mt-3 text-xs font-normal leading-5 text-slate-500">
           노선은 물리 선로, 정차 패턴은 열차/운행계통, 시간표는 열차번호별 시각으로 분리됩니다.
         </p>
+      </div>
+    </div>
+  );
+}
+
+function ServicePatternBuilderPanel({
+  lines,
+  branches,
+  stationById,
+  servicePatterns,
+  onSave,
+  onDelete,
+}: {
+  lines: EditorMapLine[];
+  branches: EditorMapBranch[];
+  stationById: Map<string, EditorStation>;
+  servicePatterns: ManualServicePattern[];
+  onSave: (input: ServicePatternBuilderInput) => void;
+  onDelete: (patternId: string) => void;
+}) {
+  const availableLines = lines.slice().sort((a, b) => a.nameKo.localeCompare(b.nameKo, "ko-KR"));
+  const [lineId, setLineId] = useState(availableLines[0]?.id ?? "");
+  const branchesForLine = branches
+    .filter((branch) => branch.canonicalLineId === lineId)
+    .sort((a, b) => (a.role || a.id).localeCompare(b.role || b.id, "ko-KR"));
+  const [branchId, setBranchId] = useState(branchesForLine[0]?.id ?? "");
+  const activeLine = availableLines.find((line) => line.id === lineId) ?? null;
+  const activeBranch = branches.find((branch) => branch.id === branchId) ?? branchesForLine[0] ?? null;
+  const branchStops = activeBranch?.routeStops
+    .map((stop) => stop.station)
+    .filter((station): station is EditorStation => Boolean(station?.id)) ?? [];
+  const defaultServiceType = activeLine?.serviceTypes.find((serviceType) => serviceType !== "unknown") ?? activeLine?.serviceTypes[0] ?? "unknown";
+  const [nameKo, setNameKo] = useState("");
+  const [serviceType, setServiceType] = useState<RailServiceType>(defaultServiceType);
+  const [direction, setDirection] = useState<"up" | "down" | "loop" | "unknown">("unknown");
+  const [selectedStationIds, setSelectedStationIds] = useState<string[]>([]);
+  const [note, setNote] = useState("");
+
+  useEffect(() => {
+    if (!availableLines.some((line) => line.id === lineId)) {
+      setLineId(availableLines[0]?.id ?? "");
+    }
+  }, [availableLines, lineId]);
+
+  useEffect(() => {
+    const nextBranches = branches.filter((branch) => branch.canonicalLineId === lineId);
+    if (!nextBranches.some((branch) => branch.id === branchId)) {
+      setBranchId(nextBranches[0]?.id ?? "");
+    }
+  }, [branches, branchId, lineId]);
+
+  useEffect(() => {
+    setSelectedStationIds(branchStops.map((station) => station.id));
+    setServiceType(defaultServiceType);
+    setNameKo(activeLine ? `${activeLine.nameKo} ${formatRailServiceType(defaultServiceType)} 정차 패턴` : "");
+  }, [activeBranch?.id, activeLine?.id, defaultServiceType]);
+
+  function toggleStation(stationId: string) {
+    setSelectedStationIds((current) =>
+      current.includes(stationId)
+        ? current.filter((id) => id !== stationId)
+        : [...current, stationId],
+    );
+  }
+
+  function submit() {
+    if (!activeLine || !activeBranch) return;
+    const order = new Map(branchStops.map((station, index) => [station.id, index]));
+    const orderedStationIds = selectedStationIds
+      .slice()
+      .sort((a, b) => (order.get(a) ?? 999999) - (order.get(b) ?? 999999));
+    onSave({
+      nameKo,
+      lineId: activeLine.id,
+      branchId: activeBranch.id,
+      serviceType,
+      direction,
+      stopStationIds: orderedStationIds,
+      note,
+    });
+  }
+
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-3xl border border-slate-200 bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <strong className="block truncate text-sm font-medium text-slate-900">정차 패턴 만들기</strong>
+            <p className="mt-1 text-xs font-normal text-slate-500">물리 노선 위에서 실제로 정차하는 역만 선택합니다.</p>
+          </div>
+          <Badge className="bg-slate-100 text-slate-600">
+            {selectedStationIds.length.toLocaleString("ko-KR")}개 정차
+          </Badge>
+        </div>
+
+        <div className="mt-4 grid gap-2">
+          <Input value={nameKo} onChange={(event) => setNameKo(event.target.value)} placeholder="예: 무궁화 경부선 계통" />
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              value={lineId}
+              onChange={(event) => setLineId(event.target.value)}
+            >
+              {availableLines.map((line) => (
+                <option key={line.id} value={line.id}>{line.nameKo}</option>
+              ))}
+            </select>
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              value={branchId}
+              onChange={(event) => setBranchId(event.target.value)}
+            >
+              {branchesForLine.map((branch) => (
+                <option key={branch.id} value={branch.id}>{branch.role || branch.sourceLineName || branch.id}</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              value={serviceType}
+              onChange={(event) => setServiceType(event.target.value as RailServiceType)}
+            >
+              {RAIL_SERVICE_TYPES.map((type) => (
+                <option key={type} value={type}>{formatRailServiceType(type)}</option>
+              ))}
+            </select>
+            <select
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
+              value={direction}
+              onChange={(event) => setDirection(event.target.value as "up" | "down" | "loop" | "unknown")}
+            >
+              {(["unknown", "up", "down", "loop"] as const).map((value) => (
+                <option key={value} value={value}>{formatServicePatternDirection(value)}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-slate-500">정차역 선택</span>
+          <div className="flex gap-1">
+            <Button type="button" size="sm" variant="outline" onClick={() => setSelectedStationIds(branchStops.map((station) => station.id))}>전체</Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => setSelectedStationIds([])}>비우기</Button>
+          </div>
+        </div>
+
+        <div className="mt-2 max-h-[320px] overflow-y-auto rounded-2xl border border-slate-100 bg-slate-50 p-2">
+          <div className="grid gap-1.5">
+            {branchStops.map((station, index) => {
+              const checked = selectedStationIds.includes(station.id);
+              return (
+                <button
+                  key={`${station.id}:${index}`}
+                  type="button"
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl border px-2 py-1.5 text-left transition",
+                    checked ? "border-blue-200 bg-white text-slate-950 shadow-sm" : "border-transparent bg-transparent text-slate-500 hover:bg-white",
+                  )}
+                  onClick={() => toggleStation(station.id)}
+                >
+                  <span className={cn("grid size-6 shrink-0 place-items-center rounded-full text-[10px] font-semibold", checked ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-500")}>{index + 1}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{station.nameKo}</span>
+                  <span className="shrink-0 text-[10px] font-medium text-slate-400">{station.lineNameKo ?? activeLine?.nameKo ?? ""}</span>
+                </button>
+              );
+            })}
+            {branchStops.length === 0 ? (
+              <Placeholder title="선택 가능한 역 없음" description="먼저 수기 노선 빌더에서 역 목록을 저장하세요." />
+            ) : null}
+          </div>
+        </div>
+
+        <Textarea value={note} onChange={(event) => setNote(event.target.value)} className="mt-3 min-h-20" placeholder="메모" />
+        <Button type="button" className="mt-3 w-full" onClick={submit} disabled={!activeLine || !activeBranch || selectedStationIds.length < 2}>
+          <Save className="mr-1 size-4" />
+          정차 패턴 저장
+        </Button>
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <strong className="text-sm font-medium text-slate-900">저장된 정차 패턴</strong>
+          <Badge className="bg-slate-100 text-slate-600">{servicePatterns.length.toLocaleString("ko-KR")}개</Badge>
+        </div>
+        <div className="mt-3 grid gap-2">
+          {servicePatterns.map((pattern) => {
+            const line = lines.find((candidate) => candidate.id === pattern.lineId);
+            return (
+              <div key={pattern.id} className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <strong className="block truncate text-sm font-medium text-slate-900">{pattern.nameKo}</strong>
+                    <p className="mt-1 truncate text-xs font-normal text-slate-500">
+                      {line?.nameKo ?? pattern.lineId ?? "노선 미지정"} · {formatRailServiceType(pattern.serviceType)} · {formatServicePatternDirection(pattern.direction)}
+                    </p>
+                  </div>
+                  <Button type="button" size="icon" variant="ghost" onClick={() => onDelete(pattern.id)} title="정차 패턴 삭제">
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {pattern.stops.slice(0, 8).map((stop) => (
+                    <span key={`${pattern.id}:${stop.stationId}:${stop.sequence}`} className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                      {stationById.get(stop.stationId)?.nameKo ?? stop.stationId}
+                    </span>
+                  ))}
+                  {pattern.stops.length > 8 ? (
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-400">+{pattern.stops.length - 8}</span>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+          {servicePatterns.length === 0 ? (
+            <Placeholder title="정차 패턴 없음" description="노선과 지선을 선택한 뒤 실제 정차역만 남겨 저장하세요." />
+          ) : null}
+        </div>
       </div>
     </div>
   );
