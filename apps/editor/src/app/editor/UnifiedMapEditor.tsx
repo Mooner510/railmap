@@ -9487,6 +9487,23 @@ function ServicePatternBuilderPanel({
     invalidTimes: string[];
     duplicateStops: string[];
   } | null>(null);
+  const normalizedOperatingDays = useMemo(
+    () => operatingDaysText
+      .split(/\r?\n|,/)
+      .map((day) => day.trim())
+      .filter(Boolean),
+    [operatingDaysText],
+  );
+  const duplicateTrainNumberRuns = trainNumber.trim()
+    ? trainRuns.filter((run) => run.trainNumber?.trim() === trainNumber.trim())
+    : [];
+  const duplicateOperatingDayRuns = activeTrainPattern
+    ? trainRuns.filter((run) =>
+        run.patternId === activeTrainPattern.id &&
+        normalizedOperatingDays.length > 0 &&
+        (run.operatingDays ?? []).some((day) => normalizedOperatingDays.includes(day)),
+      )
+    : [];
 
   useEffect(() => {
     if (editingPatternId) return;
@@ -9691,7 +9708,7 @@ function ServicePatternBuilderPanel({
       }),
       note: trainNote,
     };
-  }, [activeTrainPattern, operatingDaysText, trainNameKo, trainNumber, trainNote, trainStopTimes]);
+  }, [activeTrainPattern, normalizedOperatingDays, trainNameKo, trainNumber, trainNote, trainStopTimes]);
 
   const draftTrainRunReviewIssues = useMemo(
     () => draftTrainRunInput ? buildTrainRunReviewIssues(draftTrainRunInput, activeTrainPattern, stationById) : [],
@@ -9886,6 +9903,16 @@ function ServicePatternBuilderPanel({
               <Input value={trainNameKo} onChange={(event) => setTrainNameKo(event.target.value)} placeholder="표시 이름" />
             </div>
             <Input value={operatingDaysText} onChange={(event) => setOperatingDaysText(event.target.value)} placeholder="운행일: 매일, 평일, 주말 또는 월,화,수" />
+            {(duplicateTrainNumberRuns.length > 0 || duplicateOperatingDayRuns.length > 0) ? (
+              <div className="rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800">
+                {duplicateTrainNumberRuns.length > 0 ? (
+                  <p>같은 열차번호 {duplicateTrainNumberRuns.length.toLocaleString("ko-KR")}개가 이미 있습니다.</p>
+                ) : null}
+                {duplicateOperatingDayRuns.length > 0 ? (
+                  <p className="mt-0.5">같은 정차 패턴에서 겹치는 운행일이 있습니다.</p>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
               <div className="flex items-center justify-between gap-2">
@@ -9909,6 +9936,7 @@ function ServicePatternBuilderPanel({
                       <Badge className="bg-blue-100 text-blue-700">대기 {trainCsvReview.pending.length.toLocaleString("ko-KR")}</Badge>
                       {trainCsvReview.missed.length > 0 ? <Badge className="bg-amber-100 text-amber-700">미매칭 {trainCsvReview.missed.length.toLocaleString("ko-KR")}</Badge> : null}
                       {trainCsvReview.invalidTimes.length > 0 ? <Badge className="bg-red-100 text-red-700">시각 오류 {trainCsvReview.invalidTimes.length.toLocaleString("ko-KR")}</Badge> : null}
+                      {trainCsvReview.duplicateStops.length > 0 ? <Badge className="bg-slate-100 text-slate-600">중복 {trainCsvReview.duplicateStops.length.toLocaleString("ko-KR")}</Badge> : null}
                     </div>
                   </div>
                   {trainCsvReview.pending.length > 0 ? (
@@ -9931,6 +9959,7 @@ function ServicePatternBuilderPanel({
                   {trainCsvReview.missed.length > 0 || trainCsvReview.invalidTimes.length > 0 || trainCsvReview.duplicateStops.length > 0 ? (
                     <div className="mt-2 grid gap-1 text-[11px] text-slate-500">
                       {trainCsvReview.missed.length > 0 ? <span>미매칭: {trainCsvReview.missed.slice(0, 8).join(", ")}</span> : null}
+                      {trainCsvReview.missed.length > 0 ? <span>패턴 역명: {activeTrainPattern.stops.slice(0, 10).map((stop) => stationById.get(stop.stationId)?.nameKo ?? stop.stationId).join(", ")}</span> : null}
                       {trainCsvReview.invalidTimes.length > 0 ? <span>시각 오류: {trainCsvReview.invalidTimes.slice(0, 8).join(", ")}</span> : null}
                       {trainCsvReview.duplicateStops.length > 0 ? <span>중복 제외: {trainCsvReview.duplicateStops.slice(0, 8).join(", ")}</span> : null}
                     </div>
