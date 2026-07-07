@@ -2514,6 +2514,7 @@ function RouteResultSummary({
           <RouteMetric label="시간표" value={`${formatNumber(timedEdgeCount)}구간`} />
           <RouteMetric label="환승" value={`${formatNumber(transferEdgeCount)}회`} />
         </div>
+        <RouteQualityReviewPanel result={result} />
       </div>
 
       <div className="border-b border-slate-100 px-3 py-2">
@@ -2571,6 +2572,38 @@ function RouteResultSummary({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function RouteQualityReviewPanel({ result }: { result: RouteSearchResult }) {
+  const fallbackRideCount = result.edges.filter(
+    (edge) => edge.kind === "ride" && (!edge.distanceMeters || !edge.durationMinutes),
+  ).length;
+  const timetableCount = result.edges.filter((edge) => edge.kind === "timetable").length;
+  const transferCount = result.edges.filter((edge) => edge.kind === "manual-transfer").length;
+  const qualityItems = [
+    timetableCount > 0 ? `${formatNumber(timetableCount)}개 시간표 구간 사용` : "시간표 구간 없음",
+    fallbackRideCount > 0 ? `${formatNumber(fallbackRideCount)}개 구간 기본 시간 적용` : "선형 거리 계산 적용",
+    transferCount > 0 ? `${formatNumber(transferCount)}회 환승 연결` : "환승 연결 없음",
+  ];
+
+  return (
+    <div className="mt-2 rounded-2xl border border-emerald-100 bg-emerald-50/60 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold text-emerald-800">품질 점검</p>
+        <p className="text-[10px] font-medium text-emerald-700/70">검색 근거</p>
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {qualityItems.map((item) => (
+          <span
+            key={item}
+            className="rounded-full bg-white px-2 py-1 text-[10px] font-medium text-emerald-800 shadow-sm shadow-emerald-950/5"
+          >
+            {item}
+          </span>
+        ))}
       </div>
     </div>
   );
