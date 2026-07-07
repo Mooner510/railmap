@@ -445,3 +445,9 @@ Recommended scope:
 - Added deploy/cache/version policy documentation for public data artifacts.
 - Clarified that `data/manual` remains source-of-truth and `apps/web/public/data` is export output.
 - Added release checklist for editor/web/collector type checks and public data parity.
+
+## 13.65.0 route search quality review
+
+- Added a compact route quality review card to public route search results.
+- The result now highlights whether timetable edges, geometry/performance estimates, fallback durations, and transfer links were used.
+- This makes route-search quality issues easier to spot before deeper algorithm changes.
