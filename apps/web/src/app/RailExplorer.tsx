@@ -36,8 +36,19 @@ import {
   type RailServiceType,
 } from "./railExplorerModel";
 
+interface PublicDataVersionManifest {
+  schemaVersion: number;
+  generatedAt: string;
+  acquiredDate?: string;
+  versions?: {
+    bundle?: { generatedAt?: string | null; acquiredDate?: string | null; bytes?: number | null };
+    manualOverlay?: { bytes?: number | null; mtimeMs?: number | null };
+  };
+}
+
 interface RailExplorerProps {
   bundle: CanonicalBundle;
+  dataVersionManifest: PublicDataVersionManifest | null;
   mapStations: RailMapStation[];
   mapBranches: RailMapBranch[];
   lineBranchOverrides: ManualLineBranchOverride[];
@@ -196,6 +207,7 @@ interface SelectedTransferGroupPanelProps {
 
 export default function RailExplorer({
   bundle,
+  dataVersionManifest,
   mapStations,
   mapBranches,
   lineBranchOverrides,
@@ -887,6 +899,7 @@ export default function RailExplorer({
             visibleBranchCount={visibleMapBranches.length}
             visibleStationCount={visibleMapStations.length}
           />
+          <DataVersionBadge manifest={dataVersionManifest} />
           <DesktopPanelTabs
             activeMode={desktopPanelMode}
             resultCount={stationSearchResults.length + lineSearchResults.length}
@@ -1060,6 +1073,7 @@ export default function RailExplorer({
                 visibleStationCount={visibleMapStations.length}
                 compact
               />
+              <DataVersionBadge manifest={dataVersionManifest} compact />
               <MobilePanelTabs
                 activeMode={mobilePanelMode}
                 hasSelection={hasSelection}
@@ -1386,6 +1400,33 @@ function MobilePanelTabs({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+function DataVersionBadge({
+  manifest,
+  compact = false,
+}: {
+  manifest: PublicDataVersionManifest | null;
+  compact?: boolean;
+}) {
+  const bundleGeneratedAt = manifest?.versions?.bundle?.generatedAt ?? manifest?.generatedAt ?? null;
+  const label = manifest
+    ? `데이터 ${manifest.acquiredDate ?? manifest.versions?.bundle?.acquiredDate ?? "버전 확인"}`
+    : "데이터 버전 없음";
+  const title = bundleGeneratedAt
+    ? `bundle generatedAt: ${bundleGeneratedAt}`
+    : "data-version.json을 찾지 못했습니다.";
+
+  return (
+    <div className={compact ? "mt-1" : "mt-2"}>
+      <span
+        className="inline-flex max-w-full items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500"
+        title={title}
+      >
+        {label}
+      </span>
     </div>
   );
 }

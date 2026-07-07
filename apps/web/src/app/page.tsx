@@ -250,6 +250,16 @@ interface ManualTrainRun {
   note?: string | null;
 }
 
+interface PublicDataVersionManifest {
+  schemaVersion: number;
+  generatedAt: string;
+  acquiredDate?: string;
+  versions?: {
+    bundle?: { generatedAt?: string | null; acquiredDate?: string | null; bytes?: number | null };
+    manualOverlay?: { bytes?: number | null; mtimeMs?: number | null };
+  };
+}
+
 interface CanonicalBundle {
   bundleId: string;
   acquiredDate: string;
@@ -900,6 +910,12 @@ function applyManualLineDefinitions(
   };
 }
 
+function readPublicDataVersionManifest(): PublicDataVersionManifest | null {
+  const manifestPath = path.join(process.cwd(), "public/data/data-version.json");
+  if (!fs.existsSync(manifestPath)) return null;
+  return JSON.parse(fs.readFileSync(manifestPath, "utf8")) as PublicDataVersionManifest;
+}
+
 function readBundle(): CanonicalBundle {
   const bundlePath = path.join(
     process.cwd(),
@@ -1070,6 +1086,7 @@ function toMapTransferGroups(
 export default function Home() {
   const bundle = readBundle();
   const manualOverlays = readManualOverlays();
+  const dataVersionManifest = readPublicDataVersionManifest();
   const mapStations = toMapStations(bundle.stations);
   const mapStationById = buildMapStationIndex(mapStations);
 
@@ -1077,6 +1094,7 @@ export default function Home() {
     <main className="h-[100dvh] overflow-hidden bg-slate-950 text-slate-950">
       <RailExplorer
         bundle={bundle}
+        dataVersionManifest={dataVersionManifest}
         mapStations={mapStations}
         mapBranches={toMapBranches(
           bundle,
