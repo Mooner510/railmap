@@ -254,6 +254,12 @@ type TrainRunBuilderInput = {
   note: string;
 };
 
+type TimetableReviewIssue = {
+  level: "error" | "warning";
+  title: string;
+  message: string;
+};
+
 type ShortcutItem = {
   label: string;
   keys: string;
@@ -343,6 +349,95 @@ function makeManualTrainRunId(trainNumber: string, patternId: string, existingId
 function formatOperatingDays(days: string[] | null | undefined) {
   const cleaned = (days ?? []).map((day) => day.trim()).filter(Boolean);
   return cleaned.length > 0 ? cleaned.join(", ") : "운행일 미정";
+}
+
+function normalizeTimetableTimeText(value: string | null | undefined) {
+  return String(value ?? "").trim();
+}
+
+function getManualTimetableTimeMinutes(value: string | null | undefined) {
+  const text = normalizeTimetableTimeText(value);
+  const match = /^(\d{1,2}):(\d{2})$/.exec(text);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null;
+  if (hour < 0 || hour > 47 || minute < 0 || minute > 59) return null;
+  return hour * 60 + minute;
+}
+
+function isValidManualTimetableTime(value: string | null | undefined) {
+  const text = normalizeTimetableTimeText(value);
+  return text.length === 0 || getManualTimetableTimeMinutes(text) !== null;
+}
+
+function getManualTimetablePrimaryTime(stop: { arrivalTime?: string | null; departureTime?: string | null }) {
+  const arrival = normalizeTimetableTimeText(stop.arrivalTime);
+  const departure = normalizeTimetableTimeText(stop.departureTime);
+  return arrival || departure;
+}
+
+function buildTrainRunReviewIssues(
+  input: TrainRunBuilderInput,
+  pattern: ManualServicePattern | null | undefined,
+  stationById: Map<string, EditorStation>,
+): TimetableReviewIssue[] {
+  const issues: TimetableReviewIssue[] = [];
+  if (!pattern) {
+    issues.push({ level: "error", title: "정차 패턴 없음", message: "시간표를 연결할 정차 패턴을 선택하세요." });
+    return issues;
+  }
+
+  const trainLabel = input.nameKo.trim() || input.trainNumber.trim() || "열차 시간표";
+  if (!input.trainNumber.trim()) {
+    issues.push({ level: "warning", title: "열차번호 없음", message: `${trainLabel}: 열차번호가 비어 있습니다.` });
+  }
+  if ((input.operatingDays ?? []).length === 0) {
+    issues.push({ level: "warning", title: "운행일 미입력", message: `${trainLabel}: 운행일이 비어 있습니다.` });
+  }
+  if (input.stopTimes.length < 2) {
+    issues.push({ level: "error", title: "정차역 부족", message: `${trainLabel}: 시간표에는 최소 2개 역이 필요합니다.` });
+  }
+
+  const patternStationKeys = new Set(pattern.stops.map((stop) => `${stop.stationId}:${stop.sequence}`));
+  let previousMinutes: number | null = null;
+  for (const stop of input.stopTimes) {
+    const station = stationById.get(stop.stationId);
+    const stationLabel = station?.nameKo ?? stop.stationId;
+    if (!station) {
+      issues.push({ level: "error", title: "역 참조 오류", message: `${stationLabel}: 현재 데이터에서 역을 찾을 수 없습니다.` });
+    }
+    if (!patternStationKeys.has(`${stop.stationId}:${stop.sequence}`)) {
+      issues.push({ level: "warning", title: "정차 패턴과 순서 불일치", message: `${stationLabel}: 정차 패턴의 역 순서와 시간표 순서가 다를 수 있습니다.` });
+    }
+
+    const arrival = normalizeTimetableTimeText(stop.arrivalTime);
+    const departure = normalizeTimetableTimeText(stop.departureTime);
+    if (!arrival && !departure) {
+      issues.push({ level: "warning", title: "시각 누락", message: `${stationLabel}: 도착/출발 시각이 모두 비어 있습니다.` });
+      continue;
+    }
+    if (!isValidManualTimetableTime(arrival) || !isValidManualTimetableTime(departure)) {
+      issues.push({ level: "error", title: "시각 형식 오류", message: `${stationLabel}: 시각은 HH:mm 형식으로 입력하세요. 예: 09:05` });
+      continue;
+    }
+
+    const arrivalMinutes = getManualTimetableTimeMinutes(arrival);
+    const departureMinutes = getManualTimetableTimeMinutes(departure);
+    if (arrivalMinutes !== null && departureMinutes !== null && departureMinutes < arrivalMinutes) {
+      issues.push({ level: "warning", title: "출발이 도착보다 빠름", message: `${stationLabel}: 출발 시각이 도착 시각보다 빠릅니다.` });
+    }
+
+    const primaryMinutes = arrivalMinutes ?? departureMinutes;
+    if (primaryMinutes !== null) {
+      if (previousMinutes !== null && primaryMinutes < previousMinutes) {
+        issues.push({ level: "warning", title: "시간 순서 확인", message: `${stationLabel}: 이전 역보다 이른 시각입니다. 자정 이후 운행이면 의도한 값인지 확인하세요.` });
+      }
+      previousMinutes = primaryMinutes;
+    }
+  }
+
+  return issues;
 }
 
 function formatServicePatternDirection(direction: string | null | undefined) {
@@ -1737,6 +1832,95 @@ function validateManualRailLineReview(
         severity: "warning",
         cause: "같은 노선 안에서 같은 이름이 반복되면 실제 동명이역인지, 잘못 추가한 중복인지 확인이 필요합니다.",
         solution: "동일 물리 역 중복이면 하나를 삭제하고, 실제 다른 역이면 메모나 표시명으로 구분하세요.",
+      }));
+    }
+  }
+
+  return issues;
+}
+
+function validateManualTimetableReview(
+  overlays: ManualOverlayBundle,
+  stationById: Map<string, EditorStation>,
+): LineBranchValidationIssue[] {
+  const issues: LineBranchValidationIssue[] = [];
+  const patternById = new Map((overlays.manualServicePatterns ?? []).map((pattern) => [pattern.id, pattern]));
+
+  for (const pattern of overlays.manualServicePatterns ?? []) {
+    if (pattern.enabled === false) continue;
+    const patternLabel = pattern.nameKo || pattern.id;
+    const stops = [...(pattern.stops ?? [])].filter((stop) => Boolean(stop.stationId));
+    if (stops.length < 2) {
+      issues.push(makeValidationIssue({
+        id: `${pattern.id}:service-pattern-too-few-stops`,
+        title: "정차 패턴 역이 2개 미만",
+        message: `${patternLabel}: 정차 패턴에는 최소 2개 역이 필요합니다.`,
+        category: "manual-line-review",
+        severity: "error",
+        cause: "정차 패턴이 실제 경로/시간표 계산에 사용할 수 없는 상태입니다.",
+        solution: "정차 패턴 탭에서 실제 정차역을 2개 이상 선택해 다시 저장하세요.",
+      }));
+    }
+
+    const seen = new Set<string>();
+    for (const stop of stops) {
+      if (!stationById.has(stop.stationId)) {
+        issues.push(makeValidationIssue({
+          id: `${pattern.id}:${stop.stationId}:service-pattern-missing-station`,
+          title: "정차 패턴 역을 찾을 수 없음",
+          message: `${patternLabel}: ${stop.stationId} 역을 현재 데이터에서 찾지 못했습니다.`,
+          category: "manual-line-review",
+          severity: "error",
+          cause: "정차 패턴이 삭제되었거나 생성되지 않은 stationId를 참조합니다.",
+          solution: "정차 패턴을 다시 열어 현재 노선의 역 목록 기준으로 저장하세요.",
+        }));
+      }
+      if (seen.has(stop.stationId)) {
+        issues.push(makeValidationIssue({
+          id: `${pattern.id}:${stop.stationId}:service-pattern-duplicate-station`,
+          title: "정차 패턴에 같은 역 반복",
+          message: `${patternLabel}: 같은 stationId가 정차 패턴 안에 반복됩니다.`,
+          category: "manual-line-review",
+          severity: "warning",
+          cause: "정차 패턴 편집 중 같은 역이 중복으로 들어갔을 수 있습니다.",
+          solution: "정차 패턴 탭에서 중복 역을 제거하고 다시 저장하세요.",
+        }));
+      }
+      seen.add(stop.stationId);
+    }
+  }
+
+  for (const run of overlays.manualTrainRuns ?? []) {
+    if (run.enabled === false) continue;
+    const pattern = run.patternId ? patternById.get(run.patternId) : null;
+    const reviewIssues = buildTrainRunReviewIssues(
+      {
+        patternId: run.patternId ?? "",
+        trainNumber: run.trainNumber ?? "",
+        nameKo: run.nameKo ?? "",
+        operatingDays: run.operatingDays ?? [],
+        stopTimes: (run.stopTimes ?? []).map((stop) => ({
+          stationId: stop.stationId,
+          sequence: stop.sequence,
+          arrivalTime: stop.arrivalTime ?? "",
+          departureTime: stop.departureTime ?? "",
+          stopType: stop.stopType,
+        })),
+        note: run.note ?? "",
+      },
+      pattern,
+      stationById,
+    );
+
+    for (const issue of reviewIssues) {
+      issues.push(makeValidationIssue({
+        id: `${run.id}:${issue.title}:${issue.message}`,
+        title: `시간표 점검: ${issue.title}`,
+        message: issue.message,
+        category: "manual-line-review",
+        severity: issue.level,
+        cause: "열차 시간표 입력값이 정차 패턴 또는 시간 형식과 맞지 않습니다.",
+        solution: "정차 패턴 탭에서 해당 시간표를 확인하고 시각/역 순서/운행일을 보정하세요.",
       }));
     }
   }
@@ -3903,6 +4087,7 @@ export default function UnifiedMapEditor({
       ...validateBranchStationExclusions(overlays, data.branches, stationById),
       ...validateStationLineIdentity(overlays, data.branches, stationById),
       ...validateManualRailLineReview(overlays, displayStationById),
+      ...validateManualTimetableReview(overlays, displayStationById),
       ...validateMissingBranchGeometry(data.branches, overlays),
       ...validateGeometryConsistency(
         displayBranches,
@@ -8885,6 +9070,44 @@ function CommandHistoryPanel({
   );
 }
 
+function TimetableDraftReviewCard({ issues }: { issues: TimetableReviewIssue[] }) {
+  const errors = issues.filter((issue) => issue.level === "error");
+  const warnings = issues.filter((issue) => issue.level === "warning");
+  if (issues.length === 0) {
+    return (
+      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+        <strong className="font-medium">저장 전 점검 통과</strong>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <strong className="text-xs font-medium text-slate-800">저장 전 점검</strong>
+        <div className="flex gap-1">
+          {errors.length > 0 ? <Badge className="bg-red-100 text-red-700">오류 {errors.length}</Badge> : null}
+          {warnings.length > 0 ? <Badge className="bg-amber-100 text-amber-700">주의 {warnings.length}</Badge> : null}
+        </div>
+      </div>
+      <div className="mt-2 grid gap-1.5">
+        {issues.slice(0, 5).map((issue, index) => (
+          <div key={`${issue.title}:${issue.message}:${index}`} className={cn(
+            "rounded-xl border px-2 py-1.5 text-xs",
+            issue.level === "error" ? "border-red-100 bg-white text-red-800" : "border-amber-100 bg-white text-amber-800",
+          )}>
+            <span className="font-medium">{issue.title}</span>
+            <span className="ml-1 font-normal opacity-80">{issue.message}</span>
+          </div>
+        ))}
+        {issues.length > 5 ? (
+          <span className="text-[11px] font-medium text-slate-500">외 {issues.length - 5}개</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 function ServicePatternBuilderPanel({
   lines,
   branches,
@@ -8998,9 +9221,9 @@ function ServicePatternBuilderPanel({
     }));
   }
 
-  function submitTrainRun() {
-    if (!activeTrainPattern) return;
-    onSaveTrainRun({
+  const draftTrainRunInput = useMemo<TrainRunBuilderInput | null>(() => {
+    if (!activeTrainPattern) return null;
+    return {
       patternId: activeTrainPattern.id,
       trainNumber,
       nameKo: trainNameKo,
@@ -9012,11 +9235,22 @@ function ServicePatternBuilderPanel({
           sequence: index + 1,
           arrivalTime: trainStopTimes[key]?.arrivalTime ?? "",
           departureTime: trainStopTimes[key]?.departureTime ?? "",
-          stopType: stop.stopType ?? null,
+          stopType: stop.stopType || undefined,
         };
       }),
       note: trainNote,
-    });
+    };
+  }, [activeTrainPattern, operatingDaysText, trainNameKo, trainNumber, trainNote, trainStopTimes]);
+
+  const draftTrainRunReviewIssues = useMemo(
+    () => draftTrainRunInput ? buildTrainRunReviewIssues(draftTrainRunInput, activeTrainPattern, stationById) : [],
+    [activeTrainPattern, draftTrainRunInput, stationById],
+  );
+  const hasDraftTrainRunErrors = draftTrainRunReviewIssues.some((issue) => issue.level === "error");
+
+  function submitTrainRun() {
+    if (!draftTrainRunInput || hasDraftTrainRunErrors) return;
+    onSaveTrainRun(draftTrainRunInput);
   }
 
   return (
@@ -9217,8 +9451,9 @@ function ServicePatternBuilderPanel({
               </div>
             </div>
 
+            <TimetableDraftReviewCard issues={draftTrainRunReviewIssues} />
             <Textarea value={trainNote} onChange={(event) => setTrainNote(event.target.value)} className="min-h-16" placeholder="메모" />
-            <Button type="button" className="w-full" onClick={submitTrainRun}>
+            <Button type="button" className="w-full" onClick={submitTrainRun} disabled={hasDraftTrainRunErrors}>
               <Save className="mr-1 size-4" />
               열차 시간표 저장
             </Button>
