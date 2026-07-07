@@ -230,6 +230,7 @@ type TransferGroupSuggestion = {
 type TransferGroupReviewFilter = "pending" | "dismissed" | "approved" | "all";
 
 type ServicePatternBuilderInput = {
+  id?: string;
   nameKo: string;
   lineId: string;
   branchId: string;
@@ -7393,8 +7394,13 @@ export default function UnifiedMapEditor({
       return;
     }
 
-    const existingIds = new Set((overlays.manualServicePatterns ?? []).map((pattern) => pattern.id));
-    const patternId = makeManualServicePatternId(nameKo, input.lineId, existingIds);
+    const existingPattern = input.id
+      ? (overlays.manualServicePatterns ?? []).find((pattern) => pattern.id === input.id) ?? null
+      : null;
+    const existingIds = new Set((overlays.manualServicePatterns ?? [])
+      .map((pattern) => pattern.id)
+      .filter((id) => id !== input.id));
+    const patternId = existingPattern?.id ?? makeManualServicePatternId(nameKo, input.lineId, existingIds);
     const nextPattern: ManualServicePattern = {
       id: patternId,
       nameKo,
@@ -7414,13 +7420,16 @@ export default function UnifiedMapEditor({
     };
     const next: ManualOverlayBundle = {
       ...overlays,
-      manualServicePatterns: [...(overlays.manualServicePatterns ?? []), nextPattern],
+      manualServicePatterns: [
+        ...(overlays.manualServicePatterns ?? []).filter((pattern) => pattern.id !== patternId),
+        nextPattern,
+      ],
     };
 
     await executeOverlayCommand(
-      "정차 패턴 생성",
+      existingPattern ? "정차 패턴 수정" : "정차 패턴 생성",
       next,
-      `${nameKo} 정차 패턴을 저장했습니다`,
+      `${nameKo} 정차 패턴을 ${existingPattern ? "수정" : "저장"}했습니다`,
     );
   }
 
@@ -9146,6 +9155,7 @@ function ServicePatternBuilderPanel({
   const [direction, setDirection] = useState<"up" | "down" | "loop" | "unknown">("unknown");
   const [selectedStationIds, setSelectedStationIds] = useState<string[]>([]);
   const [note, setNote] = useState("");
+  const [editingPatternId, setEditingPatternId] = useState<string | null>(null);
   const [trainPatternId, setTrainPatternId] = useState(servicePatterns[0]?.id ?? "");
   const activeTrainPattern = servicePatterns.find((pattern) => pattern.id === trainPatternId) ?? servicePatterns[0] ?? null;
   const [trainNumber, setTrainNumber] = useState("");
@@ -9155,23 +9165,26 @@ function ServicePatternBuilderPanel({
   const [trainStopTimes, setTrainStopTimes] = useState<Record<string, { arrivalTime: string; departureTime: string }>>({});
 
   useEffect(() => {
+    if (editingPatternId) return;
     if (!availableLines.some((line) => line.id === lineId)) {
       setLineId(availableLines[0]?.id ?? "");
     }
-  }, [availableLines, lineId]);
+  }, [availableLines, editingPatternId, lineId]);
 
   useEffect(() => {
+    if (editingPatternId) return;
     const nextBranches = branches.filter((branch) => branch.canonicalLineId === lineId);
     if (!nextBranches.some((branch) => branch.id === branchId)) {
       setBranchId(nextBranches[0]?.id ?? "");
     }
-  }, [branches, branchId, lineId]);
+  }, [branches, branchId, editingPatternId, lineId]);
 
   useEffect(() => {
+    if (editingPatternId) return;
     setSelectedStationIds(branchStops.map((station) => station.id));
     setServiceType(defaultServiceType);
     setNameKo(activeLine ? `${activeLine.nameKo} ${formatRailServiceType(defaultServiceType)} 정차 패턴` : "");
-  }, [activeBranch?.id, activeLine?.id, defaultServiceType]);
+  }, [activeBranch?.id, activeLine?.id, defaultServiceType, editingPatternId]);
 
   function toggleStation(stationId: string) {
     setSelectedStationIds((current) =>
@@ -9181,6 +9194,29 @@ function ServicePatternBuilderPanel({
     );
   }
 
+  function resetPatternDraft() {
+    setEditingPatternId(null);
+    setNameKo(activeLine ? `${activeLine.nameKo} ${formatRailServiceType(defaultServiceType)} 정차 패턴` : "");
+    setServiceType(defaultServiceType);
+    setDirection("unknown");
+    setSelectedStationIds(branchStops.map((station) => station.id));
+    setNote("");
+  }
+
+  function startEditPattern(pattern: ManualServicePattern) {
+    setEditingPatternId(pattern.id);
+    setLineId(pattern.lineId);
+    setBranchId(pattern.branchId);
+    setNameKo(pattern.nameKo);
+    setServiceType(pattern.serviceType);
+    setDirection(pattern.direction);
+    setSelectedStationIds(pattern.stops
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((stop) => stop.stationId));
+    setNote(pattern.note ?? "");
+  }
+
   function submit() {
     if (!activeLine || !activeBranch) return;
     const order = new Map(branchStops.map((station, index) => [station.id, index]));
@@ -9188,6 +9224,7 @@ function ServicePatternBuilderPanel({
       .slice()
       .sort((a, b) => (order.get(a) ?? 999999) - (order.get(b) ?? 999999));
     onSave({
+      id: editingPatternId ?? undefined,
       nameKo,
       lineId: activeLine.id,
       branchId: activeBranch.id,
@@ -9196,6 +9233,7 @@ function ServicePatternBuilderPanel({
       stopStationIds: orderedStationIds,
       note,
     });
+    setEditingPatternId(null);
   }
 
   useEffect(() => {
@@ -9258,7 +9296,7 @@ function ServicePatternBuilderPanel({
       <div className="rounded-3xl border border-slate-200 bg-white p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <strong className="block truncate text-sm font-medium text-slate-900">정차 패턴 만들기</strong>
+            <strong className="block truncate text-sm font-medium text-slate-900">{editingPatternId ? "정차 패턴 수정" : "정차 패턴 만들기"}</strong>
             <p className="mt-1 text-xs font-normal text-slate-500">물리 노선 위에서 실제로 정차하는 역만 선택합니다.</p>
           </div>
           <Badge className="bg-slate-100 text-slate-600">
@@ -9345,10 +9383,23 @@ function ServicePatternBuilderPanel({
         </div>
 
         <Textarea value={note} onChange={(event) => setNote(event.target.value)} className="mt-3 min-h-20" placeholder="메모" />
-        <Button type="button" className="mt-3 w-full" onClick={submit} disabled={!activeLine || !activeBranch || selectedStationIds.length < 2}>
-          <Save className="mr-1 size-4" />
-          정차 패턴 저장
-        </Button>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {editingPatternId ? (
+            <Button type="button" variant="outline" onClick={resetPatternDraft}>
+              <X className="mr-1 size-4" />
+              수정 취소
+            </Button>
+          ) : null}
+          <Button
+            type="button"
+            className={cn("w-full", editingPatternId ? "" : "sm:col-span-2")}
+            onClick={submit}
+            disabled={!activeLine || !activeBranch || selectedStationIds.length < 2}
+          >
+            <Save className="mr-1 size-4" />
+            {editingPatternId ? "정차 패턴 수정" : "정차 패턴 저장"}
+          </Button>
+        </div>
       </div>
 
       <div className="rounded-3xl border border-slate-200 bg-white p-4">
@@ -9368,9 +9419,14 @@ function ServicePatternBuilderPanel({
                       {line?.nameKo ?? pattern.lineId ?? "노선 미지정"} · {formatRailServiceType(pattern.serviceType)} · {formatServicePatternDirection(pattern.direction)}
                     </p>
                   </div>
-                  <Button type="button" size="icon" variant="ghost" onClick={() => onDelete(pattern.id)} title="정차 패턴 삭제">
-                    <Trash2 className="size-4" />
-                  </Button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button type="button" size="icon" variant="ghost" onClick={() => startEditPattern(pattern)} title="정차 패턴 수정">
+                      <Pencil className="size-4" />
+                    </Button>
+                    <Button type="button" size="icon" variant="ghost" onClick={() => onDelete(pattern.id)} title="정차 패턴 삭제">
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1">
                   {pattern.stops.slice(0, 8).map((stop) => (
