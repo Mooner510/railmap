@@ -114,6 +114,26 @@ interface RouteGraphEdge {
   transferMinutes?: number | null;
 }
 
+interface TimetableRouteGraphEdge {
+  id: string;
+  fromStationId: string;
+  toStationId: string;
+  patternId: string;
+  trainRunId?: string | null;
+  serviceType: string;
+  trainNumber?: string | null;
+  departureMinutes?: number | null;
+  arrivalMinutes?: number | null;
+  durationMinutes?: number | null;
+}
+
+interface TimetableRouteGraph {
+  nodes: Set<string>;
+  patternEdges: TimetableRouteGraphEdge[];
+  timedEdges: TimetableRouteGraphEdge[];
+  edgesByStationId: Map<string, TimetableRouteGraphEdge[]>;
+}
+
 interface RouteSearchResult {
   stationIds: string[];
   edges: RouteGraphEdge[];
@@ -2878,58 +2898,125 @@ interface TimetableGraphSummary {
   runCount: number;
 }
 
-function buildTimetableGraphSummary(
+function parseTimetableMinutes(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return null;
+  if (hours < 0 || hours > 47 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+function getTrainStopDepartureMinutes(stop: ManualTrainRun["stopTimes"][number]): number | null {
+  return parseTimetableMinutes(stop.departureTime) ?? parseTimetableMinutes(stop.arrivalTime);
+}
+
+function getTrainStopArrivalMinutes(stop: ManualTrainRun["stopTimes"][number]): number | null {
+  return parseTimetableMinutes(stop.arrivalTime) ?? parseTimetableMinutes(stop.departureTime);
+}
+
+function buildTimetableRouteGraph(
   patterns: ManualServicePattern[],
   trainRuns: ManualTrainRun[],
-): TimetableGraphSummary {
-  const stationIds = new Set<string>();
-  const patternSegments = new Set<string>();
-  const timedEdges = new Set<string>();
+): TimetableRouteGraph {
+  const nodes = new Set<string>();
+  const patternEdges: TimetableRouteGraphEdge[] = [];
+  const timedEdges: TimetableRouteGraphEdge[] = [];
+  const edgesByStationId = new Map<string, TimetableRouteGraphEdge[]>();
+
+  const addEdge = (edge: TimetableRouteGraphEdge, timed: boolean) => {
+    nodes.add(edge.fromStationId);
+    nodes.add(edge.toStationId);
+    if (timed) timedEdges.push(edge);
+    else patternEdges.push(edge);
+    const list = edgesByStationId.get(edge.fromStationId) ?? [];
+    list.push(edge);
+    edgesByStationId.set(edge.fromStationId, list);
+  };
 
   for (const pattern of patterns) {
+    if (pattern.enabled === false) continue;
     const stops = pattern.stops
       .filter((stop) => stop.stationId)
       .slice()
       .sort((a, b) => a.sequence - b.sequence);
 
-    for (const stop of stops) {
-      stationIds.add(stop.stationId);
-    }
+    for (const stop of stops) nodes.add(stop.stationId);
 
     for (let index = 0; index < stops.length - 1; index += 1) {
       const from = stops[index]?.stationId;
       const to = stops[index + 1]?.stationId;
       if (!from || !to || from === to) continue;
-      patternSegments.add(`${pattern.id}:${from}->${to}`);
+      addEdge(
+        {
+          id: `pattern:${pattern.id}:${index}`,
+          fromStationId: from,
+          toStationId: to,
+          patternId: pattern.id,
+          trainRunId: null,
+          serviceType: pattern.serviceType,
+          trainNumber: null,
+          departureMinutes: null,
+          arrivalMinutes: null,
+          durationMinutes: null,
+        },
+        false,
+      );
     }
   }
 
   for (const run of trainRuns) {
+    if (run.enabled === false || !run.patternId) continue;
     const stops = run.stopTimes
       .filter((stop) => stop.stationId)
       .slice()
       .sort((a, b) => a.sequence - b.sequence);
 
-    for (const stop of stops) {
-      stationIds.add(stop.stationId);
-    }
+    for (const stop of stops) nodes.add(stop.stationId);
 
     for (let index = 0; index < stops.length - 1; index += 1) {
       const from = stops[index];
       const to = stops[index + 1];
       if (!from?.stationId || !to?.stationId || from.stationId === to.stationId) continue;
-      const hasAnyTime = Boolean(
-        from.departureTime || from.arrivalTime || to.arrivalTime || to.departureTime,
+      const departureMinutes = getTrainStopDepartureMinutes(from);
+      const arrivalMinutes = getTrainStopArrivalMinutes(to);
+      const durationMinutes =
+        departureMinutes !== null && arrivalMinutes !== null && arrivalMinutes >= departureMinutes
+          ? arrivalMinutes - departureMinutes
+          : null;
+      addEdge(
+        {
+          id: `run:${run.id}:${index}`,
+          fromStationId: from.stationId,
+          toStationId: to.stationId,
+          patternId: run.patternId,
+          trainRunId: run.id,
+          serviceType: run.serviceType,
+          trainNumber: run.trainNumber ?? run.nameKo ?? null,
+          departureMinutes,
+          arrivalMinutes,
+          durationMinutes,
+        },
+        true,
       );
-      if (!hasAnyTime) continue;
-      timedEdges.add(`${run.id}:${from.stationId}->${to.stationId}`);
     }
   }
 
+  return { nodes, patternEdges, timedEdges, edgesByStationId };
+}
+
+function buildTimetableGraphSummary(
+  patterns: ManualServicePattern[],
+  trainRuns: ManualTrainRun[],
+): TimetableGraphSummary {
+  const graph = buildTimetableRouteGraph(patterns, trainRuns);
+
   return {
-    nodeCount: stationIds.size,
-    patternSegmentCount: patternSegments.size,
-    timedEdgeCount: timedEdges.size,
+    nodeCount: graph.nodes.size,
+    patternSegmentCount: graph.patternEdges.length,
+    timedEdgeCount: graph.timedEdges.length,
     runCount: trainRuns.length,
   };
 }
