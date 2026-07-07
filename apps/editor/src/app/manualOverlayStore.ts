@@ -17,6 +17,11 @@ import {
   type ManualLineMetadataOverride,
   type ManualLineDefinition,
   type ManualBranchDefinition,
+  type ManualServicePattern,
+  type ManualServicePatternStop,
+  type ManualTrainRun,
+  type ManualTrainStopTime,
+  type ManualTransferReviewEvent,
   type ManualStationOverride,
   isManualLineCoverageStatus,
   isManualRailStatus,
@@ -407,6 +412,117 @@ function normalizeManualBranchDefinition(value: unknown): ManualBranchDefinition
   };
 }
 
+function normalizeTransferReviewEvent(value: unknown, index: number): ManualTransferReviewEvent | null {
+  if (!value || typeof value !== "object") return null;
+
+  const event = value as Record<string, unknown>;
+  const type = asString(event.type);
+  const nameKo = asString(event.nameKo);
+  if (!type || !nameKo) return null;
+
+  const stationIds = Array.isArray(event.stationIds)
+    ? [...new Set(event.stationIds.map(asString).filter((id): id is string => id !== null))]
+    : [];
+
+  return {
+    id: asString(event.id) ?? `manual-transfer-review-event:${Date.now()}:${index}`,
+    type: type as ManualTransferReviewEvent["type"],
+    transferGroupId: asNullableString(event.transferGroupId),
+    suggestionKey: asNullableString(event.suggestionKey),
+    nameKo,
+    stationIds,
+    decidedAt: asString(event.decidedAt) ?? new Date(0).toISOString(),
+    reason: asNullableString(event.reason),
+    note: asNullableString(event.note),
+  };
+}
+
+function normalizeServicePatternStop(value: unknown, index: number): ManualServicePatternStop | null {
+  if (!value || typeof value !== "object") return null;
+  const stop = value as Record<string, unknown>;
+  const stationId = asString(stop.stationId);
+  if (!stationId) return null;
+  const sequenceValue = Number(stop.sequence);
+  return {
+    stationId,
+    sequence: Number.isFinite(sequenceValue) ? sequenceValue : index,
+    stopType: asString(stop.stopType) ?? "stop",
+    note: asNullableString(stop.note),
+  };
+}
+
+function normalizeManualServicePattern(value: unknown): ManualServicePattern | null {
+  if (!value || typeof value !== "object") return null;
+  const pattern = value as Record<string, unknown>;
+  const id = asString(pattern.id);
+  const nameKo = asString(pattern.nameKo);
+  if (!id || !nameKo) return null;
+  const stops = Array.isArray(pattern.stops)
+    ? pattern.stops
+        .map((stop, index) => normalizeServicePatternStop(stop, index))
+        .filter((stop): stop is ManualServicePatternStop => stop !== null)
+        .sort((a, b) => a.sequence - b.sequence)
+    : [];
+
+  return {
+    id,
+    nameKo,
+    lineId: asNullableString(pattern.lineId),
+    branchId: asNullableString(pattern.branchId),
+    serviceType: isRailServiceType(pattern.serviceType) ? pattern.serviceType : "unknown",
+    direction: asString(pattern.direction) ?? "unknown",
+    stops,
+    enabled: pattern.enabled !== false,
+    source: asString(pattern.source) ?? "editor",
+    note: asNullableString(pattern.note),
+  };
+}
+
+function normalizeTrainStopTime(value: unknown, index: number): ManualTrainStopTime | null {
+  if (!value || typeof value !== "object") return null;
+  const stop = value as Record<string, unknown>;
+  const stationId = asString(stop.stationId);
+  if (!stationId) return null;
+  const sequenceValue = Number(stop.sequence);
+  return {
+    stationId,
+    sequence: Number.isFinite(sequenceValue) ? sequenceValue : index,
+    arrivalTime: asNullableString(stop.arrivalTime),
+    departureTime: asNullableString(stop.departureTime),
+    stopType: asString(stop.stopType) ?? "stop",
+    note: asNullableString(stop.note),
+  };
+}
+
+function normalizeManualTrainRun(value: unknown): ManualTrainRun | null {
+  if (!value || typeof value !== "object") return null;
+  const run = value as Record<string, unknown>;
+  const id = asString(run.id);
+  if (!id) return null;
+  const stopTimes = Array.isArray(run.stopTimes)
+    ? run.stopTimes
+        .map((stop, index) => normalizeTrainStopTime(stop, index))
+        .filter((stop): stop is ManualTrainStopTime => stop !== null)
+        .sort((a, b) => a.sequence - b.sequence)
+    : [];
+  const operatingDays = Array.isArray(run.operatingDays)
+    ? [...new Set(run.operatingDays.map(asString).filter((day): day is string => day !== null))]
+    : [];
+
+  return {
+    id,
+    patternId: asNullableString(run.patternId),
+    trainNumber: asNullableString(run.trainNumber),
+    nameKo: asNullableString(run.nameKo),
+    serviceType: isRailServiceType(run.serviceType) ? run.serviceType : "unknown",
+    operatingDays,
+    stopTimes,
+    enabled: run.enabled !== false,
+    source: asString(run.source) ?? "editor",
+    note: asNullableString(run.note),
+  };
+}
+
 function normalizeGeometryOverride(
   value: unknown,
 ): ManualGeometryOverride | null {
@@ -526,6 +642,14 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
       ]
     : [];
 
+  const manualTransferReviewEvents = Array.isArray(
+    (data as { manualTransferReviewEvents?: unknown }).manualTransferReviewEvents,
+  )
+    ? (data as { manualTransferReviewEvents: unknown[] }).manualTransferReviewEvents
+        .map(normalizeTransferReviewEvent)
+        .filter((event): event is ManualTransferReviewEvent => event !== null)
+    : [];
+
   return {
     schemaVersion: 1,
     manualTransferGroups,
@@ -537,6 +661,7 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
     dismissedTransferGroupSuggestionKeys,
     dismissedTransferGroupSuggestionNotes,
     transferTimePendingGroupIds,
+    manualTransferReviewEvents,
     stationOverrides: Array.isArray(data.stationOverrides)
       ? data.stationOverrides
           .map(normalizeStationOverride)
@@ -608,6 +733,20 @@ export function normalizeManualOverlays(value: unknown): ManualOverlayBundle {
           .map(normalizeManualBranchDefinition)
           .filter((branch): branch is ManualBranchDefinition => branch !== null)
       : [],
+    manualServicePatterns: Array.isArray(
+      (data as { manualServicePatterns?: unknown }).manualServicePatterns,
+    )
+      ? (data as { manualServicePatterns: unknown[] }).manualServicePatterns
+          .map(normalizeManualServicePattern)
+          .filter((pattern): pattern is ManualServicePattern => pattern !== null)
+      : [],
+    manualTrainRuns: Array.isArray(
+      (data as { manualTrainRuns?: unknown }).manualTrainRuns,
+    )
+      ? (data as { manualTrainRuns: unknown[] }).manualTrainRuns
+          .map(normalizeManualTrainRun)
+          .filter((run): run is ManualTrainRun => run !== null)
+      : [],
   };
 }
 
@@ -650,6 +789,7 @@ async function writeManualOverlaySplitFiles(overlays: ManualOverlayBundle) {
       dismissedTransferGroupSuggestionKeys: overlays.dismissedTransferGroupSuggestionKeys,
       dismissedTransferGroupSuggestionNotes: overlays.dismissedTransferGroupSuggestionNotes,
       transferTimePendingGroupIds: overlays.transferTimePendingGroupIds,
+      manualTransferReviewEvents: overlays.manualTransferReviewEvents,
     }),
     writeJson(paths.geometry, {
       schemaVersion: overlays.schemaVersion,
@@ -665,6 +805,8 @@ async function writeManualOverlaySplitFiles(overlays: ManualOverlayBundle) {
       lineMetadataOverrides: overlays.lineMetadataOverrides,
       manualLineDefinitions: overlays.manualLineDefinitions,
       manualBranchDefinitions: overlays.manualBranchDefinitions,
+      manualServicePatterns: overlays.manualServicePatterns,
+      manualTrainRuns: overlays.manualTrainRuns,
     }),
   ]);
 }

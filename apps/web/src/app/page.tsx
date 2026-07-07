@@ -203,6 +203,44 @@ interface ManualTransferEdge {
   note?: string | null;
 }
 
+interface ManualTransferReviewEvent {
+  id: string;
+  type: string;
+  transferGroupId?: string | null;
+  suggestionKey?: string | null;
+  nameKo: string;
+  stationIds: string[];
+  decidedAt: string;
+  reason?: string | null;
+  note?: string | null;
+}
+
+interface ManualServicePattern {
+  id: string;
+  nameKo: string;
+  lineId?: string | null;
+  branchId?: string | null;
+  serviceType: RailServiceType;
+  direction?: string;
+  stops: Array<{ stationId: string; sequence: number; stopType?: string; note?: string | null }>;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
+interface ManualTrainRun {
+  id: string;
+  patternId?: string | null;
+  trainNumber?: string | null;
+  nameKo?: string | null;
+  serviceType: RailServiceType;
+  operatingDays?: string[];
+  stopTimes: Array<{ stationId: string; sequence: number; arrivalTime?: string | null; departureTime?: string | null; stopType?: string; note?: string | null }>;
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 interface CanonicalBundle {
   bundleId: string;
   acquiredDate: string;
@@ -229,6 +267,7 @@ interface ManualOverlays {
   manualTransferGroups: ManualTransferGroup[];
   manualTransferEdges: ManualTransferEdge[];
   nonTransferStationIds?: string[];
+  manualTransferReviewEvents?: ManualTransferReviewEvent[];
   stationOverrides: ManualStationOverride[];
   branchStationExclusions: ManualBranchStationExclusion[];
   branchRouteOverrides: ManualBranchRouteOverride[];
@@ -237,6 +276,8 @@ interface ManualOverlays {
   lineMetadataOverrides: ManualLineMetadataOverride[];
   manualLineDefinitions: ManualLineDefinition[];
   manualBranchDefinitions: ManualBranchDefinition[];
+  manualServicePatterns?: ManualServicePattern[];
+  manualTrainRuns?: ManualTrainRun[];
 }
 
 function makeTransferPairKey(stationIdA: string, stationIdB: string) {
@@ -409,6 +450,9 @@ function readManualOverlays(): ManualOverlays {
       nonTransferStationIds: Array.isArray(parsed.nonTransferStationIds)
         ? parsed.nonTransferStationIds
         : [],
+      manualTransferReviewEvents: Array.isArray((parsed as { manualTransferReviewEvents?: unknown }).manualTransferReviewEvents)
+        ? (parsed as { manualTransferReviewEvents: ManualTransferReviewEvent[] }).manualTransferReviewEvents
+        : [],
       stationOverrides: Array.isArray(parsed.stationOverrides)
         ? parsed.stationOverrides
         : [],
@@ -439,6 +483,12 @@ function readManualOverlays(): ManualOverlays {
             .map(normalizeManualBranchDefinition)
             .filter((branch): branch is ManualBranchDefinition => branch !== null)
         : [],
+      manualServicePatterns: Array.isArray((parsed as { manualServicePatterns?: unknown }).manualServicePatterns)
+        ? (parsed as { manualServicePatterns: ManualServicePattern[] }).manualServicePatterns
+        : [],
+      manualTrainRuns: Array.isArray((parsed as { manualTrainRuns?: unknown }).manualTrainRuns)
+        ? (parsed as { manualTrainRuns: ManualTrainRun[] }).manualTrainRuns
+        : [],
     };
   }
 
@@ -447,6 +497,7 @@ function readManualOverlays(): ManualOverlays {
     manualTransferGroups: [],
     manualTransferEdges: [],
     nonTransferStationIds: [],
+    manualTransferReviewEvents: [],
     stationOverrides: [],
     branchStationExclusions: [],
     branchRouteOverrides: [],
@@ -455,6 +506,8 @@ function readManualOverlays(): ManualOverlays {
     lineMetadataOverrides: [],
     manualLineDefinitions: [],
     manualBranchDefinitions: [],
+    manualServicePatterns: [],
+    manualTrainRuns: [],
   };
 }
 

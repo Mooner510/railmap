@@ -219,6 +219,69 @@ export interface ManualTransferEdge {
   note?: string | null;
 }
 
+export type ManualTransferReviewEventType =
+  | "suggestion-approved"
+  | "suggestion-dismissed"
+  | "group-created"
+  | "group-updated"
+  | "group-deleted"
+  | "transfer-time-pending"
+  | "transfer-time-completed";
+
+export interface ManualTransferReviewEvent {
+  id: string;
+  type: ManualTransferReviewEventType;
+  transferGroupId?: string | null;
+  suggestionKey?: string | null;
+  nameKo: string;
+  stationIds: string[];
+  decidedAt: string;
+  reason?: string | null;
+  note?: string | null;
+}
+
+export interface ManualServicePatternStop {
+  stationId: string;
+  sequence: number;
+  stopType?: "stop" | "pass" | "origin" | "terminal" | string;
+  note?: string | null;
+}
+
+export interface ManualServicePattern {
+  id: string;
+  nameKo: string;
+  lineId?: string | null;
+  branchId?: string | null;
+  serviceType: RailServiceType;
+  direction?: "up" | "down" | "loop" | "unknown" | string;
+  stops: ManualServicePatternStop[];
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
+export interface ManualTrainStopTime {
+  stationId: string;
+  sequence: number;
+  arrivalTime?: string | null;
+  departureTime?: string | null;
+  stopType?: "stop" | "pass" | "origin" | "terminal" | string;
+  note?: string | null;
+}
+
+export interface ManualTrainRun {
+  id: string;
+  patternId?: string | null;
+  trainNumber?: string | null;
+  nameKo?: string | null;
+  serviceType: RailServiceType;
+  operatingDays?: string[];
+  stopTimes: ManualTrainStopTime[];
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 export interface ManualStationOverride {
   stationId: string;
   nameKo?: string;
@@ -305,6 +368,7 @@ export interface ManualOverlayBundle {
   dismissedTransferGroupSuggestionKeys: string[];
   dismissedTransferGroupSuggestionNotes: Record<string, string>;
   transferTimePendingGroupIds: string[];
+  manualTransferReviewEvents: ManualTransferReviewEvent[];
   stationOverrides: ManualStationOverride[];
   branchOverrides: ManualBranchOverride[];
   branchStationExclusions: ManualBranchStationExclusion[];
@@ -314,6 +378,8 @@ export interface ManualOverlayBundle {
   lineMetadataOverrides: ManualLineMetadataOverride[];
   manualLineDefinitions: ManualLineDefinition[];
   manualBranchDefinitions: ManualBranchDefinition[];
+  manualServicePatterns: ManualServicePattern[];
+  manualTrainRuns: ManualTrainRun[];
 }
 
 export interface CanonicalBundle {
@@ -328,6 +394,7 @@ export const EMPTY_MANUAL_OVERLAY_BUNDLE: ManualOverlayBundle = {
   dismissedTransferGroupSuggestionKeys: [],
   dismissedTransferGroupSuggestionNotes: {},
   transferTimePendingGroupIds: [],
+  manualTransferReviewEvents: [],
   stationOverrides: [],
   branchOverrides: [],
   branchStationExclusions: [],
@@ -337,6 +404,8 @@ export const EMPTY_MANUAL_OVERLAY_BUNDLE: ManualOverlayBundle = {
   lineMetadataOverrides: [],
   manualLineDefinitions: [],
   manualBranchDefinitions: [],
+  manualServicePatterns: [],
+  manualTrainRuns: [],
 };
 
 export function normalizeSearchText(value: string): string {

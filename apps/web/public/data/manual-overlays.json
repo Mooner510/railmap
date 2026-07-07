@@ -1705,5 +1705,8 @@
   ],
   "dismissedTransferGroupSuggestionKeys": [],
   "transferTimePendingGroupIds": [],
-  "dismissedTransferGroupSuggestionNotes": {}
+  "dismissedTransferGroupSuggestionNotes": {},
+  "manualTransferReviewEvents": [],
+  "manualServicePatterns": [],
+  "manualTrainRuns": []
 }

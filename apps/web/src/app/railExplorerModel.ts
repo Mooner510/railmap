@@ -196,6 +196,60 @@ export interface ManualTransferEdge {
   note?: string | null;
 }
 
+export interface ManualTransferReviewEvent {
+  id: string;
+  type: string;
+  transferGroupId?: string | null;
+  suggestionKey?: string | null;
+  nameKo: string;
+  stationIds: string[];
+  decidedAt: string;
+  reason?: string | null;
+  note?: string | null;
+}
+
+export interface ManualServicePatternStop {
+  stationId: string;
+  sequence: number;
+  stopType?: string;
+  note?: string | null;
+}
+
+export interface ManualServicePattern {
+  id: string;
+  nameKo: string;
+  lineId?: string | null;
+  branchId?: string | null;
+  serviceType: RailServiceType;
+  direction?: string;
+  stops: ManualServicePatternStop[];
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
+export interface ManualTrainStopTime {
+  stationId: string;
+  sequence: number;
+  arrivalTime?: string | null;
+  departureTime?: string | null;
+  stopType?: string;
+  note?: string | null;
+}
+
+export interface ManualTrainRun {
+  id: string;
+  patternId?: string | null;
+  trainNumber?: string | null;
+  nameKo?: string | null;
+  serviceType: RailServiceType;
+  operatingDays?: string[];
+  stopTimes: ManualTrainStopTime[];
+  enabled: boolean;
+  source?: "manual" | "editor" | string;
+  note?: string | null;
+}
+
 export interface ManualStationOverride {
   stationId: string;
   nameKo?: string;
@@ -311,6 +365,7 @@ export interface ManualOverlayBundle {
   manualTransferGroups: ManualTransferGroup[];
   manualTransferEdges: ManualTransferEdge[];
   nonTransferStationIds: string[];
+  manualTransferReviewEvents: ManualTransferReviewEvent[];
   stationOverrides: ManualStationOverride[];
   branchOverrides: ManualBranchOverride[];
   branchStationExclusions: ManualBranchStationExclusion[];
@@ -320,6 +375,8 @@ export interface ManualOverlayBundle {
   lineMetadataOverrides: ManualLineMetadataOverride[];
   manualLineDefinitions: ManualLineDefinition[];
   manualBranchDefinitions: ManualBranchDefinition[];
+  manualServicePatterns: ManualServicePattern[];
+  manualTrainRuns: ManualTrainRun[];
 }
 
 export interface ManualOverlayValidationIssue {
@@ -338,6 +395,7 @@ export const EMPTY_MANUAL_OVERLAY_BUNDLE: ManualOverlayBundle = {
   manualTransferGroups: [],
   manualTransferEdges: [],
   nonTransferStationIds: [],
+  manualTransferReviewEvents: [],
   stationOverrides: [],
   branchOverrides: [],
   branchStationExclusions: [],
@@ -347,6 +405,8 @@ export const EMPTY_MANUAL_OVERLAY_BUNDLE: ManualOverlayBundle = {
   lineMetadataOverrides: [],
   manualLineDefinitions: [],
   manualBranchDefinitions: [],
+  manualServicePatterns: [],
+  manualTrainRuns: [],
 };
 
 export interface CanonicalBundle {
