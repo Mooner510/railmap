@@ -30,8 +30,10 @@ import {
   type ManualLineBranchOverride,
   type ManualServicePattern,
   type ManualTrainRun,
+  type ManualTrainPerformance,
   type ManualTransferEdge,
   type RailLineCategory,
+  type RailServiceType,
 } from "./railExplorerModel";
 
 interface RailExplorerProps {
@@ -110,8 +112,13 @@ interface RouteGraphEdge {
   lineNameKo: string;
   sourceLineName: string;
   colorHex: string;
-  kind: "ride" | "manual-transfer";
+  kind: "ride" | "manual-transfer" | "timetable";
   transferMinutes?: number | null;
+  departureMinutes?: number | null;
+  arrivalMinutes?: number | null;
+  durationMinutes?: number | null;
+  distanceMeters?: number | null;
+  trainNumber?: string | null;
 }
 
 interface TimetableRouteGraphEdge {
@@ -460,8 +467,11 @@ export default function RailExplorer({
         bundle.lines,
         bundle.manualTransferEdges ?? [],
         lineBranchOverrides,
+        servicePatterns,
+        trainRuns,
+        mapBranches,
       ),
-    [bundle.lines, bundle.manualTransferEdges, lineBranchOverrides],
+    [bundle.lines, bundle.manualTransferEdges, lineBranchOverrides, servicePatterns, trainRuns, mapBranches],
   );
   const routeResultStationIds = useMemo(
     () => routeSearchResult?.stationIds ?? [],
@@ -1827,16 +1837,127 @@ function LineCard({
   );
 }
 
+interface TrainPerformanceProfile {
+  accelerationMps2: number;
+  decelerationMps2: number;
+  maxSpeedKph: number;
+}
+
+const DEFAULT_TRAIN_PERFORMANCE_BY_SERVICE: Partial<Record<RailServiceType, TrainPerformanceProfile>> = {
+  subway: { accelerationMps2: 0.8, decelerationMps2: 0.9, maxSpeedKph: 80 },
+  gtx: { accelerationMps2: 0.9, decelerationMps2: 1.0, maxSpeedKph: 180 },
+  airport_rail: { accelerationMps2: 0.65, decelerationMps2: 0.75, maxSpeedKph: 110 },
+  ktx: { accelerationMps2: 0.45, decelerationMps2: 0.55, maxSpeedKph: 300 },
+  srt: { accelerationMps2: 0.45, decelerationMps2: 0.55, maxSpeedKph: 300 },
+  itx: { accelerationMps2: 0.55, decelerationMps2: 0.65, maxSpeedKph: 180 },
+  saemaeul: { accelerationMps2: 0.5, decelerationMps2: 0.6, maxSpeedKph: 150 },
+  mugunghwa: { accelerationMps2: 0.45, decelerationMps2: 0.55, maxSpeedKph: 120 },
+  nuriro: { accelerationMps2: 0.55, decelerationMps2: 0.65, maxSpeedKph: 120 },
+};
+
+function getFallbackTrainPerformanceProfile(line: CanonicalLine): TrainPerformanceProfile {
+  for (const serviceType of line.serviceTypes ?? []) {
+    const profile = DEFAULT_TRAIN_PERFORMANCE_BY_SERVICE[serviceType];
+    if (profile) return profile;
+  }
+
+  if (line.category === "high_speed_rail") return { accelerationMps2: 0.45, decelerationMps2: 0.55, maxSpeedKph: 300 };
+  if (line.category === "gtx") return { accelerationMps2: 0.9, decelerationMps2: 1.0, maxSpeedKph: 180 };
+  if (line.category === "conventional_rail") return { accelerationMps2: 0.45, decelerationMps2: 0.55, maxSpeedKph: 120 };
+  return { accelerationMps2: 0.8, decelerationMps2: 0.9, maxSpeedKph: 80 };
+}
+
+function getTrainPerformanceProfile(line: CanonicalLine): TrainPerformanceProfile {
+  const fallback = getFallbackTrainPerformanceProfile(line);
+  const override = line.trainPerformance;
+  return {
+    accelerationMps2: typeof override?.accelerationMps2 === "number" && override.accelerationMps2 > 0 ? override.accelerationMps2 : fallback.accelerationMps2,
+    decelerationMps2: typeof override?.decelerationMps2 === "number" && override.decelerationMps2 > 0 ? override.decelerationMps2 : fallback.decelerationMps2,
+    maxSpeedKph: typeof override?.maxSpeedKph === "number" && override.maxSpeedKph > 0 ? override.maxSpeedKph : fallback.maxSpeedKph,
+  };
+}
+
+function calculateRideDurationMinutes(distanceMeters: number | null, profile: TrainPerformanceProfile): number | null {
+  if (!distanceMeters || distanceMeters <= 0) return null;
+  const acceleration = Math.max(0.05, profile.accelerationMps2);
+  const deceleration = Math.max(0.05, profile.decelerationMps2);
+  const maxSpeedMps = Math.max(1, profile.maxSpeedKph / 3.6);
+  const accelDistance = (maxSpeedMps * maxSpeedMps) / (2 * acceleration);
+  const decelDistance = (maxSpeedMps * maxSpeedMps) / (2 * deceleration);
+
+  let seconds: number;
+  if (distanceMeters >= accelDistance + decelDistance) {
+    seconds = maxSpeedMps / acceleration + maxSpeedMps / deceleration + (distanceMeters - accelDistance - decelDistance) / maxSpeedMps;
+  } else {
+    const peakSpeed = Math.sqrt((2 * distanceMeters * acceleration * deceleration) / (acceleration + deceleration));
+    seconds = peakSpeed / acceleration + peakSpeed / deceleration;
+  }
+
+  return Math.max(1, Math.ceil(seconds / 60));
+}
+
+function distanceLngLatMeters(left: [number, number], right: [number, number]) {
+  const lat = ((left[1] + right[1]) / 2) * Math.PI / 180;
+  const dx = (right[0] - left[0]) * 111_320 * Math.cos(lat);
+  const dy = (right[1] - left[1]) * 110_540;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function nearestCoordinateIndex(coordinates: Array<[number, number]>, target: [number, number]) {
+  let bestIndex = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < coordinates.length; index += 1) {
+    const distance = distanceLngLatMeters(coordinates[index] ?? target, target);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  return bestIndex;
+}
+
+function estimateBranchSegmentDistanceMeters(branch: RailMapBranch | undefined, fromStationId: string, toStationId: string): number | null {
+  const fromStop = branch?.routeStops.find((stop) => stop.station?.id === fromStationId);
+  const toStop = branch?.routeStops.find((stop) => stop.station?.id === toStationId);
+  const fromStation = fromStop?.station;
+  const toStation = toStop?.station;
+  if (typeof fromStation?.lng !== "number" || typeof fromStation.lat !== "number" || typeof toStation?.lng !== "number" || typeof toStation.lat !== "number") return null;
+
+  const fallbackDistance = distanceLngLatMeters([fromStation.lng, fromStation.lat], [toStation.lng, toStation.lat]);
+  const coordinates = branch?.geometryOverrideCoordinates;
+  if (!coordinates || coordinates.length < 2) return fallbackDistance;
+
+  const fromIndex = nearestCoordinateIndex(coordinates, [fromStation.lng, fromStation.lat]);
+  const toIndex = nearestCoordinateIndex(coordinates, [toStation.lng, toStation.lat]);
+  if (fromIndex === toIndex) return fallbackDistance;
+
+  const start = Math.min(fromIndex, toIndex);
+  const end = Math.max(fromIndex, toIndex);
+  let total = 0;
+  for (let index = start; index < end; index += 1) {
+    const current = coordinates[index];
+    const next = coordinates[index + 1];
+    if (!current || !next) continue;
+    total += distanceLngLatMeters(current, next);
+  }
+
+  return total > 0 ? total : fallbackDistance;
+}
+
 function buildRouteGraph(
   lines: CanonicalLine[],
   manualTransferEdges: ManualTransferEdge[] = [],
   lineBranchOverrides: ManualLineBranchOverride[] = [],
+  servicePatterns: ManualServicePattern[] = [],
+  trainRuns: ManualTrainRun[] = [],
+  mapBranches: RailMapBranch[] = [],
 ): Map<string, RouteGraphEdge[]> {
   const graph = new Map<string, RouteGraphEdge[]>();
   const branchContextById = new Map<
     string,
     { branch: CanonicalBranch; line: CanonicalLine }
   >();
+  const mapBranchById = new Map(mapBranches.map((branch) => [branch.id, branch]));
 
   const addEdge = (fromStationId: string, edge: RouteGraphEdge) => {
     const edges = graph.get(fromStationId) ?? [];
@@ -1859,12 +1980,23 @@ function buildRouteGraph(
         )
           continue;
 
+        const distanceMeters = estimateBranchSegmentDistanceMeters(
+          mapBranchById.get(branch.id),
+          current.stationId,
+          next.stationId,
+        );
+        const durationMinutes = calculateRideDurationMinutes(
+          distanceMeters,
+          getTrainPerformanceProfile(line),
+        );
         const edge: Omit<RouteGraphEdge, "toStationId"> = {
           branchId: branch.id,
           lineNameKo: line.nameKo,
           sourceLineName: branch.sourceLineName,
           colorHex: line.colorHex,
           kind: "ride",
+          durationMinutes,
+          distanceMeters,
         };
 
         addEdge(current.stationId, { ...edge, toStationId: next.stationId });
@@ -1954,6 +2086,26 @@ function buildRouteGraph(
     }
   }
 
+  const patternById = new Map(servicePatterns.map((pattern) => [pattern.id, pattern]));
+  for (const timedEdge of buildTimetableRouteGraph(servicePatterns, trainRuns).timedEdges) {
+    const pattern = patternById.get(timedEdge.patternId);
+    const line = pattern?.lineId
+      ? lines.find((candidate) => candidate.id === pattern.lineId || candidate.canonicalKey === pattern.lineId)
+      : null;
+    addEdge(timedEdge.fromStationId, {
+      toStationId: timedEdge.toStationId,
+      branchId: `timetable:${timedEdge.trainRunId ?? timedEdge.patternId}`,
+      lineNameKo: line?.nameKo ?? formatRailServiceType(timedEdge.serviceType as RailServiceType),
+      sourceLineName: timedEdge.trainNumber ? `열차 ${timedEdge.trainNumber}` : "시간표",
+      colorHex: line?.colorHex ?? "#2563eb",
+      kind: "timetable",
+      departureMinutes: timedEdge.departureMinutes ?? null,
+      arrivalMinutes: timedEdge.arrivalMinutes ?? null,
+      durationMinutes: timedEdge.durationMinutes ?? null,
+      trainNumber: timedEdge.trainNumber ?? null,
+    });
+  }
+
   return graph;
 }
 
@@ -2012,6 +2164,7 @@ function findRoute(
 
     for (const edge of graph.get(current.stationId) ?? []) {
       const isManualTransfer = edge.kind === "manual-transfer";
+      const isTimetable = edge.kind === "timetable";
       const isTransfer = Boolean(
         isManualTransfer ||
         (current.previousBranchId &&
@@ -2024,8 +2177,12 @@ function findRoute(
           : current.previousLineNameKo === edge.lineNameKo
             ? SAME_LINE_BRANCH_CHANGE_PENALTY
             : ROUTE_TRANSFER_PENALTY;
-      const nextScore =
-        current.score + (isManualTransfer ? 0.2 : 1) + transferPenalty;
+      const rideCost = isManualTransfer
+        ? 0.2
+        : edge.durationMinutes
+          ? Math.max(0.25, edge.durationMinutes / 8)
+          : 1;
+      const nextScore = current.score + rideCost + transferPenalty;
       const nextPreviousBranchId = isManualTransfer ? null : edge.branchId;
       const nextPreviousLineNameKo = isManualTransfer ? null : edge.lineNameKo;
       const nextKey = makeRouteStateKey(edge.toStationId, nextPreviousBranchId);
@@ -2099,6 +2256,9 @@ function RouteResultSummary({
   const destinationName =
     stationById.get(result.stationIds[result.stationIds.length - 1] ?? "")
       ?.nameKo ?? "도착";
+  const timedEdgeCount = result.edges.filter((edge) => edge.kind === "timetable").length;
+  const rideEdgeCount = result.edges.filter((edge) => edge.kind === "ride").length;
+  const transferEdgeCount = result.edges.filter((edge) => edge.kind === "manual-transfer").length;
 
   const segments: Array<{
     branchId: string;
@@ -2110,6 +2270,7 @@ function RouteResultSummary({
     edgeCount: number;
     kind: RouteGraphEdge["kind"];
     transferMinutes?: number | null;
+    durationMinutes?: number | null;
   }> = [];
 
   for (let index = 0; index < result.edges.length; index += 1) {
@@ -2125,6 +2286,7 @@ function RouteResultSummary({
     if (last && last.branchId === edge.branchId && edge.kind === "ride") {
       last.toStationId = toStationId;
       last.edgeCount += 1;
+      last.durationMinutes = (last.durationMinutes ?? 0) + (edge.durationMinutes ?? 0);
     } else {
       segments.push({
         branchId: edge.branchId,
@@ -2136,6 +2298,7 @@ function RouteResultSummary({
         edgeCount: 1,
         kind: edge.kind,
         transferMinutes: edge.transferMinutes ?? null,
+        durationMinutes: edge.durationMinutes ?? null,
       });
     }
   }
@@ -2148,13 +2311,21 @@ function RouteResultSummary({
             경로 결과
           </p>
           <p className="shrink-0 text-[10px] font-semibold text-emerald-700">
-            {formatNumber(result.stationIds.length)}역 · 환승{" "}
-            {formatNumber(result.transferCount)}회
+            {formatNumber(result.stationIds.length)}역 · 환승 {formatNumber(result.transferCount)}회
           </p>
         </div>
         <p className="mt-1 break-words text-xs font-bold leading-4 text-slate-950">
           {originName} → {destinationName}
         </p>
+        <div className="mt-1.5 flex flex-wrap gap-1">
+          <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">노선 {formatNumber(rideEdgeCount)}</span>
+          {timedEdgeCount > 0 ? (
+            <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-blue-700">시간표 {formatNumber(timedEdgeCount)}</span>
+          ) : null}
+          {transferEdgeCount > 0 ? (
+            <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-600">수동 환승 {formatNumber(transferEdgeCount)}</span>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid min-w-0 gap-2 px-2.5 py-2">
@@ -2176,6 +2347,20 @@ function RouteResultSummary({
             );
           }
 
+          if (segment.kind === "timetable") {
+            return (
+              <RouteTimedSegment
+                key={`${segment.branchId}:${index}:${segment.fromStationId}:${segment.toStationId}`}
+                colorHex={segment.colorHex}
+                lineName={segment.lineNameKo}
+                sourceLineName={segment.sourceLineName}
+                fromStationName={fromName}
+                toStationName={toName}
+                durationMinutes={segment.durationMinutes}
+              />
+            );
+          }
+
           return (
             <div
               key={`${segment.branchId}:${index}:${segment.fromStationId}:${segment.toStationId}`}
@@ -2189,11 +2374,43 @@ function RouteResultSummary({
                 fromStationName={fromName}
                 toStationName={toName}
                 stationCount={segment.edgeCount + 1}
+                durationMinutes={segment.durationMinutes}
               />
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function RouteTimedSegment({
+  colorHex,
+  lineName,
+  sourceLineName,
+  fromStationName,
+  toStationName,
+  durationMinutes,
+}: {
+  colorHex: string;
+  lineName: string;
+  sourceLineName: string;
+  fromStationName: string;
+  toStationName: string;
+  durationMinutes?: number | null;
+}) {
+  return (
+    <div className="min-w-0 rounded border border-blue-100 bg-blue-50 px-2 py-1.5">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colorHex }} />
+        <p className="min-w-0 break-words text-[11px] font-semibold leading-4 text-slate-800">
+          {lineName} · {sourceLineName}
+        </p>
+      </div>
+      <p className="mt-1 text-[10px] text-slate-500">
+        {fromStationName} → {toStationName}
+        {typeof durationMinutes === "number" ? ` · ${formatNumber(durationMinutes)}분` : ""}
+      </p>
     </div>
   );
 }
@@ -2248,6 +2465,7 @@ function RouteRoadmapSegment({
   fromStationName,
   toStationName,
   stationCount,
+  durationMinutes,
 }: {
   colorHex: string;
   lineName: string;
@@ -2255,6 +2473,7 @@ function RouteRoadmapSegment({
   fromStationName: string;
   toStationName: string;
   stationCount: number;
+  durationMinutes?: number | null;
 }) {
   const lineLabel =
     sourceLineName && sourceLineName !== lineName
@@ -2285,7 +2504,8 @@ function RouteRoadmapSegment({
         />
         <div className="flex min-w-0 items-center py-1">
           <p className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
-            {formatNumber(Math.max(1, stationCount - 1))}개 구간 이동
+            {formatNumber(Math.max(1, stationCount - 1))}개 구간
+            {typeof durationMinutes === "number" && durationMinutes > 0 ? ` · 약 ${formatNumber(Math.ceil(durationMinutes))}분` : ""}
           </p>
         </div>
 
@@ -2395,6 +2615,9 @@ function RouteDraftCard({
       >
         경로 검색
       </button>
+      <p className="mt-1.5 text-[10px] leading-4 text-slate-400">
+        정차 패턴/열차 시간표가 있으면 시간표 구간을 함께 반영합니다.
+      </p>
     </section>
   );
 }

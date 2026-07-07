@@ -176,6 +176,9 @@ type ManualLineDraft = {
   serviceTypes: RailServiceType[];
   status: ManualRailStatus;
   coverageStatus: ManualLineCoverageStatus;
+  accelerationMps2: string;
+  decelerationMps2: string;
+  maxSpeedKph: string;
   note: string;
 };
 
@@ -186,8 +189,18 @@ const DEFAULT_MANUAL_LINE_DRAFT: ManualLineDraft = {
   serviceTypes: ["unknown"],
   status: "open",
   coverageStatus: "draft",
+  accelerationMps2: "",
+  decelerationMps2: "",
+  maxSpeedKph: "",
   note: "",
 };
+
+function parseOptionalPositiveNumberInput(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
 
 type ManualRouteStationDraft = {
   clientId: string;
@@ -465,8 +478,12 @@ function stripStationNameQualifier(name: string) {
     .trim();
 }
 
-function getTransferSuggestionNameKey(nameKo: string) {
+function normalizeStationNameForSuggestion(nameKo: string) {
   return normalizeSearchText(stripStationNameQualifier(nameKo).replace(/역$/g, ""));
+}
+
+function getTransferSuggestionNameKey(nameKo: string) {
+  return normalizeStationNameForSuggestion(nameKo);
 }
 
 function getTransferSuggestionName(nameKo: string) {
@@ -6986,6 +7003,12 @@ export default function UnifiedMapEditor({
     ]);
     const id = makeManualRailLineId(nameKo, existingLineIds);
     const serviceTypes = draft.serviceTypes.length > 0 ? draft.serviceTypes : (["unknown"] as RailServiceType[]);
+    const accelerationMps2 = parseOptionalPositiveNumberInput(draft.accelerationMps2);
+    const decelerationMps2 = parseOptionalPositiveNumberInput(draft.decelerationMps2);
+    const maxSpeedKph = parseOptionalPositiveNumberInput(draft.maxSpeedKph);
+    const trainPerformance = accelerationMps2 || decelerationMps2 || maxSpeedKph
+      ? { accelerationMps2, decelerationMps2, maxSpeedKph }
+      : null;
     const nextLine = {
       id,
       nameKo,
@@ -6994,6 +7017,7 @@ export default function UnifiedMapEditor({
       serviceTypes,
       status: draft.status,
       coverageStatus: draft.coverageStatus,
+      trainPerformance,
       enabled: true,
       source: "editor",
       note: draft.note.trim() || null,
@@ -9167,6 +9191,8 @@ function ServicePatternBuilderPanel({
   const [operatingDaysText, setOperatingDaysText] = useState("");
   const [trainNote, setTrainNote] = useState("");
   const [trainStopTimes, setTrainStopTimes] = useState<Record<string, { arrivalTime: string; departureTime: string }>>({});
+  const [trainCsvText, setTrainCsvText] = useState("");
+  const [trainCsvMessage, setTrainCsvMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (editingPatternId) return;
@@ -9261,6 +9287,46 @@ function ServicePatternBuilderPanel({
         [field]: value,
       },
     }));
+  }
+
+  function applyTrainCsvText() {
+    if (!activeTrainPattern) return;
+    const stopsByName = new Map<string, ManualServicePattern["stops"][number]>();
+    for (const stop of activeTrainPattern.stops) {
+      const station = stationById.get(stop.stationId);
+      const names = [station?.nameKo, stop.stationId]
+        .filter((value): value is string => Boolean(value && value.trim()))
+        .map((value) => normalizeStationNameForSuggestion(value));
+      for (const name of names) stopsByName.set(name, stop);
+    }
+
+    let applied = 0;
+    const missed: string[] = [];
+    const nextTimes: Record<string, { arrivalTime: string; departureTime: string }> = {};
+
+    for (const rawLine of trainCsvText.split(/\r?\n/)) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      const columns = line.split(/[\t,]/).map((column) => column.trim()).filter(Boolean);
+      const stationName = columns[0] ?? "";
+      if (!stationName) continue;
+      const arrivalTime = columns[1] ?? "";
+      const departureTime = columns[2] ?? columns[1] ?? "";
+      const stop = stopsByName.get(normalizeStationNameForSuggestion(stationName));
+      if (!stop) {
+        missed.push(stationName);
+        continue;
+      }
+      nextTimes[`${stop.stationId}:${stop.sequence}`] = { arrivalTime, departureTime };
+      applied += 1;
+    }
+
+    setTrainStopTimes((current) => ({ ...current, ...nextTimes }));
+    setTrainCsvMessage(
+      missed.length > 0
+        ? `${applied.toLocaleString("ko-KR")}개 반영 · 미매칭 ${missed.slice(0, 5).join(", ")}`
+        : `${applied.toLocaleString("ko-KR")}개 시각을 반영했습니다.`,
+    );
   }
 
   const draftTrainRunInput = useMemo<TrainRunBuilderInput | null>(() => {
@@ -9477,6 +9543,22 @@ function ServicePatternBuilderPanel({
               <Input value={trainNameKo} onChange={(event) => setTrainNameKo(event.target.value)} placeholder="표시 이름" />
             </div>
             <Input value={operatingDaysText} onChange={(event) => setOperatingDaysText(event.target.value)} placeholder="운행일: 매일, 평일, 주말 또는 월,화,수" />
+
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <strong className="text-xs font-medium text-slate-700">시간표 붙여넣기</strong>
+                <Button type="button" size="sm" variant="outline" onClick={applyTrainCsvText} disabled={!trainCsvText.trim()}>
+                  반영
+                </Button>
+              </div>
+              <Textarea
+                value={trainCsvText}
+                onChange={(event) => setTrainCsvText(event.target.value)}
+                className="mt-2 min-h-24 bg-white text-xs"
+                placeholder={"역명,도착,출발\n서울,09:00,09:05\n영등포,09:14,09:15"}
+              />
+              {trainCsvMessage ? <p className="mt-2 text-[11px] text-slate-500">{trainCsvMessage}</p> : null}
+            </div>
 
             <div className="overflow-hidden rounded-2xl border border-slate-100">
               <div className="grid grid-cols-[52px_minmax(0,1fr)_96px_96px] border-b border-slate-100 bg-slate-50 px-3 py-2 text-[11px] font-medium text-slate-500">
@@ -12164,6 +12246,30 @@ function ManualRailLineDialog({
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="grid gap-2">
+            <label className="text-xs font-bold text-slate-500">운행 성능</label>
+            <div className="grid grid-cols-3 gap-2">
+              <Input
+                inputMode="decimal"
+                placeholder="가속 m/s²"
+                value={draft.accelerationMps2}
+                onChange={(event) => onChange({ ...draft, accelerationMps2: event.target.value })}
+              />
+              <Input
+                inputMode="decimal"
+                placeholder="감속 m/s²"
+                value={draft.decelerationMps2}
+                onChange={(event) => onChange({ ...draft, decelerationMps2: event.target.value })}
+              />
+              <Input
+                inputMode="decimal"
+                placeholder="최고속도 km/h"
+                value={draft.maxSpeedKph}
+                onChange={(event) => onChange({ ...draft, maxSpeedKph: event.target.value })}
+              />
             </div>
           </div>
 

@@ -361,6 +361,23 @@ function normalizeLineMetadataOverride(
   };
 }
 
+function normalizePositiveDecimal(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) && numberValue > 0 ? numberValue : null;
+}
+
+function normalizeManualTrainPerformance(value: unknown): ManualLineDefinition["trainPerformance"] {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const accelerationMps2 = normalizePositiveDecimal(record.accelerationMps2);
+  const decelerationMps2 = normalizePositiveDecimal(record.decelerationMps2);
+  const maxSpeedKph = normalizePositiveDecimal(record.maxSpeedKph);
+  return accelerationMps2 || decelerationMps2 || maxSpeedKph
+    ? { accelerationMps2, decelerationMps2, maxSpeedKph }
+    : null;
+}
+
 function normalizeManualLineDefinition(value: unknown): ManualLineDefinition | null {
   if (!value || typeof value !== "object") return null;
 
@@ -382,6 +399,7 @@ function normalizeManualLineDefinition(value: unknown): ManualLineDefinition | n
     serviceTypes: serviceTypes.length > 0 ? serviceTypes : ["unknown"],
     status: isManualRailStatus(line.status) ? line.status : "open",
     coverageStatus: isManualLineCoverageStatus(line.coverageStatus) ? line.coverageStatus : "draft",
+    trainPerformance: normalizeManualTrainPerformance(line.trainPerformance),
     enabled: line.enabled !== false,
     source: asString(line.source) ?? "editor",
     note: asNullableString(line.note),
