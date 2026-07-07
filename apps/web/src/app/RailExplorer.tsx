@@ -2431,8 +2431,12 @@ function RouteResultSummary({
         <div className="mt-1.5 grid grid-cols-3 gap-1.5">
           <RouteMetric label="이동" value={`${formatNumber(rideEdgeCount)}구간`} />
           <RouteMetric label="시간표" value={`${formatNumber(timedEdgeCount)}구간`} />
-          <RouteMetric label="환승 연결" value={`${formatNumber(transferEdgeCount)}회`} />
+          <RouteMetric label="환승" value={`${formatNumber(transferEdgeCount)}회`} />
         </div>
+      </div>
+
+      <div className="border-b border-slate-100 px-3 py-2">
+        <RouteCalculationDebugPanel result={result} stationById={stationById} />
       </div>
 
       <div className="grid min-w-0 gap-2.5 px-3 py-3">
@@ -2497,6 +2501,101 @@ function RouteMetric({ label, value }: { label: string; value: string }) {
       <p className="text-[10px] font-medium text-slate-400">{label}</p>
       <p className="mt-0.5 text-xs font-semibold text-slate-900">{value}</p>
     </div>
+  );
+}
+
+function RouteCalculationDebugPanel({
+  result,
+  stationById,
+}: {
+  result: RouteSearchResult;
+  stationById: Map<string, RailMapStation>;
+}) {
+  const rideDistanceMeters = result.edges.reduce(
+    (sum, edge) => sum + (edge.kind === "ride" ? (edge.distanceMeters ?? 0) : 0),
+    0,
+  );
+  const timetableMinutes = result.edges.reduce(
+    (sum, edge) => sum + (edge.kind === "timetable" ? (edge.durationMinutes ?? 0) : 0),
+    0,
+  );
+  const transferMinutes = result.edges.reduce(
+    (sum, edge) =>
+      sum +
+      (edge.kind === "manual-transfer"
+        ? (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY)
+        : 0),
+    0,
+  );
+  const debugRows = result.edges.map((edge, index) => {
+    const fromName = stationById.get(result.stationIds[index] ?? "")?.nameKo ?? "출발";
+    const toName = stationById.get(edge.toStationId)?.nameKo ?? "도착";
+    const duration = edge.kind === "manual-transfer"
+      ? (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY)
+      : (edge.durationMinutes ?? 1);
+
+    return {
+      key: `${edge.kind}:${edge.branchId}:${edge.toStationId}:${index}`,
+      title: edge.kind === "timetable"
+        ? `${edge.lineNameKo} · ${edge.trainNumber ? `열차 ${edge.trainNumber}` : "시간표"}`
+        : edge.kind === "manual-transfer"
+          ? "환승"
+          : edge.lineNameKo,
+      fromName,
+      toName,
+      duration,
+      distanceMeters: edge.distanceMeters ?? null,
+      source: edge.kind === "timetable"
+        ? "시간표"
+        : edge.kind === "manual-transfer"
+          ? "환승 시간"
+          : edge.distanceMeters
+            ? "선형 거리 + 성능값"
+            : "기본 이동 시간",
+    };
+  });
+
+  return (
+    <details className="group rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[11px] font-semibold text-slate-700">
+        <span>계산 근거</span>
+        <span className="text-[10px] font-medium text-slate-400 group-open:hidden">열기</span>
+        <span className="hidden text-[10px] font-medium text-slate-400 group-open:inline">닫기</span>
+      </summary>
+
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
+        <RouteMetric label="선형거리" value={formatDistance(rideDistanceMeters)} />
+        <RouteMetric label="시간표" value={`${formatNumber(Math.ceil(timetableMinutes))}분`} />
+        <RouteMetric label="환승" value={`${formatNumber(Math.ceil(transferMinutes))}분`} />
+      </div>
+
+      <div className="mt-2 grid gap-1.5">
+        {debugRows.slice(0, 8).map((row) => (
+          <div
+            key={row.key}
+            className="rounded-xl border border-white bg-white px-2 py-1.5 shadow-sm shadow-slate-950/5"
+          >
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-[11px] font-semibold text-slate-800">
+                {row.title}
+              </p>
+              <p className="shrink-0 text-[10px] font-semibold text-slate-500">
+                약 {formatNumber(Math.ceil(row.duration))}분
+              </p>
+            </div>
+            <p className="mt-0.5 truncate text-[10px] font-medium text-slate-400">
+              {row.fromName} → {row.toName} · {row.source}
+              {row.distanceMeters ? ` · ${formatDistance(row.distanceMeters)}` : ""}
+            </p>
+          </div>
+        ))}
+        {debugRows.length > 8 ? (
+          <p className="text-center text-[10px] font-medium text-slate-400">
+            외 {formatNumber(debugRows.length - 8)}개 구간
+          </p>
+        ) : null}
+      </div>
+    </details>
   );
 }
 
