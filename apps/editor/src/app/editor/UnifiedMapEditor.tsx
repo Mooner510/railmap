@@ -69,6 +69,7 @@ import type {
   ManualOverlayBundle,
   ManualServicePattern,
   ManualTrainRun,
+  ManualTrainPerformance,
   ManualTransferReviewEvent,
   RailLineCategory,
   RailServiceType,
@@ -1693,6 +1694,41 @@ function makeStationLineIdentityIssue(
 }
 
 
+function validateMultiLineStationReuse(
+  branches: EditorMapBranch[],
+  stationById: Map<string, EditorStation>,
+): LineBranchValidationIssue[] {
+  const branchIdsByStationId = new Map<string, EditorMapBranch[]>();
+
+  for (const branch of branches) {
+    for (const station of getBranchStopStations(branch)) {
+      const list = branchIdsByStationId.get(station.id) ?? [];
+      list.push(branch);
+      branchIdsByStationId.set(station.id, list);
+    }
+  }
+
+  const issues: LineBranchValidationIssue[] = [];
+  for (const [stationId, stationBranches] of branchIdsByStationId) {
+    const distinctBranches = getDistinctLineBranches(stationBranches);
+    if (distinctBranches.length < 2) continue;
+    const station = stationById.get(stationId);
+    issues.push(makeValidationIssue({
+      id: `${stationId}:multi-line-station-reuse`,
+      title: "한 역 ID가 여러 노선에 연결됨",
+      message: `${formatStationDisplayName(station)}: ${distinctBranches.map(formatBranchDisplayName).join(" / ")}에 같은 stationId가 직접 연결되어 있습니다.`,
+      category: "station-line-identity",
+      severity: "error",
+      cause: "같은 물리 역이라도 노선/선로 체계가 다르면 별도 stationId로 관리하고, 환승 그룹으로 묶어야 합니다.",
+      solution: "해당 역을 클릭한 뒤 '노선별 역 분할'을 실행하세요. 대표 노선 하나만 기존 stationId를 유지하고 나머지 노선은 새 stationId로 분리됩니다.",
+      includeInBulkFix: false,
+    }));
+  }
+
+  return issues;
+}
+
+
 function isStationAlreadyInTransferGroup(
   stationId: string,
   overlays: ManualOverlayBundle,
@@ -2675,6 +2711,63 @@ function selectionLabel(selection: Selection) {
   if (selection.type === "station") return "역";
   if (selection.type === "branch") return "노선/분기";
   return "환승 그룹";
+}
+
+function getBranchLineIdentity(branch: EditorMapBranch) {
+  return normalizeIdentityKey(
+    branch.canonicalLineId || branch.canonicalLineNameKo || branch.sourceLineNumber || branch.sourceLineName || branch.id,
+  );
+}
+
+function getDistinctLineBranches(branches: EditorMapBranch[]) {
+  const seen = new Set<string>();
+  const result: EditorMapBranch[] = [];
+  for (const branch of branches) {
+    const key = getBranchLineIdentity(branch);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(branch);
+  }
+  return result;
+}
+
+function isMultiLineStationReuseCandidate(branches: EditorMapBranch[]) {
+  return getDistinctLineBranches(branches).length > 1;
+}
+
+function makeLineScopedStationId(baseStationId: string, branch: EditorMapBranch, existingIds: Set<string>) {
+  const branchKey = normalizeSearchText(
+    branch.canonicalLineId || branch.canonicalLineNameKo || branch.sourceLineNumber || branch.sourceLineName || branch.id,
+  ) || "line";
+  const safeBranchKey = branchKey.replace(/[^a-z0-9가-힣_.:-]+/gi, "_");
+  const base = `${baseStationId}::line:${safeBranchKey}`;
+  if (!existingIds.has(base)) return base;
+  let index = 2;
+  while (existingIds.has(`${base}:${index}`)) index += 1;
+  return `${base}:${index}`;
+}
+
+function makeSplitStationOverride(
+  station: EditorStation,
+  branch: EditorMapBranch,
+  newStationId: string,
+): ManualStationOverride {
+  return {
+    stationId: newStationId,
+    nameKo: station.nameKo,
+    stationNumber: station.stationNumber || "SPLIT",
+    lineNameKo: branch.canonicalLineNameKo || branch.sourceLineName,
+    lineNumber: branch.sourceLineNumber || branch.canonicalLineId,
+    colorHex: branch.colorHex ?? station.colorHex ?? null,
+    lat: station.lat,
+    lng: station.lng,
+    enabled: true,
+    note: `${formatStationDisplayName(station)} 노선별 stationId 분할 · ${formatBranchDisplayName(branch)}`,
+  };
+}
+
+function replaceStationIdInRoute(stationIds: string[], fromStationId: string, toStationId: string) {
+  return stationIds.map((stationId) => (stationId === fromStationId ? toStationId : stationId));
 }
 
 
@@ -4108,6 +4201,7 @@ export default function UnifiedMapEditor({
       ...validateLineBranchOverrides(overlays, data.branches, stationById),
       ...validateBranchStationExclusions(overlays, data.branches, stationById),
       ...validateStationLineIdentity(overlays, data.branches, stationById),
+      ...validateMultiLineStationReuse(data.branches, stationById),
       ...validateManualRailLineReview(overlays, displayStationById),
       ...validateManualTimetableReview(overlays, displayStationById),
       ...validateMissingBranchGeometry(data.branches, overlays),
@@ -7554,11 +7648,13 @@ export default function UnifiedMapEditor({
     lineId: string,
     category: RailLineCategory,
     serviceTypes: RailServiceType[],
+    trainPerformance?: ManualTrainPerformance | null,
   ) {
     const nextOverride = {
       lineId,
       category,
       serviceTypes: serviceTypes.length > 0 ? serviceTypes : (["unknown"] as RailServiceType[]),
+      trainPerformance: trainPerformance ?? null,
       enabled: true,
       source: "editor",
       note: null,
@@ -7581,12 +7677,12 @@ export default function UnifiedMapEditor({
       ...current,
       branches: current.branches.map((branch) =>
         branch.canonicalLineId === lineId
-          ? { ...branch, category, serviceTypes: nextOverride.serviceTypes }
+          ? { ...branch, category, serviceTypes: nextOverride.serviceTypes, trainPerformance: nextOverride.trainPerformance }
           : branch,
       ),
       lines: current.lines.map((line) =>
         line.id === lineId
-          ? { ...line, category, serviceTypes: nextOverride.serviceTypes }
+          ? { ...line, category, serviceTypes: nextOverride.serviceTypes, trainPerformance: nextOverride.trainPerformance }
           : line,
       ),
     }));
@@ -7946,6 +8042,173 @@ export default function UnifiedMapEditor({
     await saveStationLocationAndAddToBranch(nextDraft, insertion);
   }
 
+  async function splitSelectedStationByLine() {
+    if (!selectedStation) {
+      showToast("분할할 역을 먼저 선택하세요", "error");
+      return;
+    }
+
+    const targetBranches = getDistinctLineBranches(getBranchesServingStation(data.branches, selectedStation.id));
+    if (targetBranches.length < 2) {
+      showToast("이 역은 여러 노선에 직접 연결되어 있지 않습니다", "info");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `${formatStationDisplayName(selectedStation)} 역을 ${targetBranches.length.toLocaleString("ko-KR")}개 노선별 stationId로 분할할까요?\n\n대표 노선 하나는 기존 stationId를 유지하고, 나머지 노선은 새 stationId로 만들어 환승 그룹으로 묶습니다.`,
+    );
+    if (!confirmed) return;
+
+    const keepBranch = targetBranches[0];
+    const splitBranches = targetBranches.slice(1);
+    const existingStationIds = new Set([
+      ...data.stations.map((station) => station.id),
+      ...overlays.stationOverrides.map((override) => override.stationId),
+    ]);
+    const replacementByBranchId = new Map<string, string>();
+    const createdStationIds: string[] = [];
+    const createdOverrides: ManualStationOverride[] = [];
+
+    for (const branch of splitBranches) {
+      const newStationId = makeLineScopedStationId(selectedStation.id, branch, existingStationIds);
+      existingStationIds.add(newStationId);
+      replacementByBranchId.set(branch.id, newStationId);
+      createdStationIds.push(newStationId);
+      createdOverrides.push(makeSplitStationOverride(selectedStation, branch, newStationId));
+    }
+
+    const nextBranchRouteOverrides = [...overlays.branchRouteOverrides];
+    for (const branch of splitBranches) {
+      const replacementStationId = replacementByBranchId.get(branch.id);
+      if (!replacementStationId) continue;
+      const currentStationIds = getBranchStopStations(branch).map((station) => station.id);
+      const nextStationIds = replaceStationIdInRoute(currentStationIds, selectedStation.id, replacementStationId);
+      const existingIndex = nextBranchRouteOverrides.findIndex((override) => override.branchId === branch.id);
+      const previous = existingIndex >= 0 ? nextBranchRouteOverrides[existingIndex] : null;
+      const nextOverride: ManualBranchRouteOverride = {
+        id: previous?.id ?? makeBranchRouteOverrideId(branch.id),
+        branchId: branch.id,
+        stationIds: nextStationIds,
+        circular: previous?.circular ?? branch.isCircular === true,
+        enabled: true,
+        source: "editor",
+        note: `${formatStationDisplayName(selectedStation)} 노선별 stationId 분할`,
+      };
+      if (existingIndex >= 0) nextBranchRouteOverrides[existingIndex] = nextOverride;
+      else nextBranchRouteOverrides.push(nextOverride);
+    }
+
+    const nextGeometryOverrides = overlays.geometryOverrides.map((override) => {
+      const replacementStationId = replacementByBranchId.get(override.branchId);
+      if (!replacementStationId) return override;
+      return {
+        ...override,
+        points: override.points.map((point) =>
+          point.kind === "station" && point.stationId === selectedStation.id
+            ? { ...point, stationId: replacementStationId }
+            : point,
+        ),
+      };
+    });
+
+    const nextLineBranchOverrides = (overlays.lineBranchOverrides ?? []).map((override) => {
+      const parentReplacement = replacementByBranchId.get(override.parentBranchId);
+      const connectedReplacement = override.connectedBranchId
+        ? replacementByBranchId.get(override.connectedBranchId)
+        : undefined;
+      const replacementForGeometry = parentReplacement ?? connectedReplacement;
+      return {
+        ...override,
+        anchorStationId: parentReplacement && override.anchorStationId === selectedStation.id ? parentReplacement : override.anchorStationId,
+        branchStationId: parentReplacement && override.branchStationId === selectedStation.id ? parentReplacement : override.branchStationId,
+        connectedEndpointStationId: connectedReplacement && override.connectedEndpointStationId === selectedStation.id ? connectedReplacement : override.connectedEndpointStationId,
+        geometry: (override.geometry ?? []).map((point) =>
+          replacementForGeometry && point.kind === "station" && point.stationId === selectedStation.id
+            ? { ...point, stationId: replacementForGeometry }
+            : point,
+        ),
+      };
+    });
+
+    const replacementByPatternId = new Map<string, string>();
+    const nextManualServicePatterns = overlays.manualServicePatterns.map((pattern) => {
+      const replacementStationId = pattern.branchId ? replacementByBranchId.get(pattern.branchId) : undefined;
+      if (!replacementStationId) return pattern;
+      replacementByPatternId.set(pattern.id, replacementStationId);
+      return {
+        ...pattern,
+        stops: pattern.stops.map((stop) =>
+          stop.stationId === selectedStation.id ? { ...stop, stationId: replacementStationId } : stop,
+        ),
+      };
+    });
+
+    const nextManualTrainRuns = overlays.manualTrainRuns.map((run) => {
+      const replacementStationId = run.patternId ? replacementByPatternId.get(run.patternId) : undefined;
+      if (!replacementStationId) return run;
+      return {
+        ...run,
+        stopTimes: run.stopTimes.map((stop) =>
+          stop.stationId === selectedStation.id ? { ...stop, stationId: replacementStationId } : stop,
+        ),
+      };
+    });
+
+    const transferStationIds = [selectedStation.id, ...createdStationIds];
+    const existingGroupIndex = overlays.manualTransferGroups.findIndex(
+      (group) => group.enabled !== false && group.stationIds.includes(selectedStation.id),
+    );
+    const nextManualTransferGroups = [...overlays.manualTransferGroups];
+    if (existingGroupIndex >= 0) {
+      const group = nextManualTransferGroups[existingGroupIndex]!;
+      const stationIds = [...new Set([...group.stationIds, ...createdStationIds])];
+      nextManualTransferGroups[existingGroupIndex] = {
+        ...group,
+        stationIds,
+        transferMinutesByPair: normalizeTransferGroupDraftPairs(stationIds, group.transferMinutesByPair),
+      };
+    } else {
+      const nameKo = stripStationNameQualifier(selectedStation.nameKo) || selectedStation.nameKo;
+      nextManualTransferGroups.push({
+        id: makeTransferGroupId(nameKo, transferStationIds),
+        nameKo,
+        stationIds: transferStationIds,
+        transferMinutesByPair: normalizeTransferGroupDraftPairs(transferStationIds, {}),
+        enabled: true,
+        source: "editor",
+        note: "노선별 stationId 분할로 생성된 환승 그룹",
+      });
+    }
+
+    const next: ManualOverlayBundle = {
+      ...overlays,
+      stationOverrides: [
+        ...overlays.stationOverrides.filter((override) => !createdStationIds.includes(override.stationId)),
+        ...createdOverrides,
+      ],
+      branchRouteOverrides: nextBranchRouteOverrides,
+      geometryOverrides: nextGeometryOverrides,
+      lineBranchOverrides: nextLineBranchOverrides,
+      manualServicePatterns: nextManualServicePatterns,
+      manualTrainRuns: nextManualTrainRuns,
+      manualTransferGroups: nextManualTransferGroups,
+      transferTimePendingGroupIds: [
+        ...new Set([...(overlays.transferTimePendingGroupIds ?? []), existingGroupIndex >= 0 ? nextManualTransferGroups[existingGroupIndex]!.id : nextManualTransferGroups.at(-1)!.id]),
+      ],
+    };
+
+    const saved = await executeOverlayCommand(
+      "노선별 stationId 분할",
+      next,
+      `${formatStationDisplayName(selectedStation)} 역을 노선별 stationId로 분할했습니다`,
+    );
+    if (!saved) return;
+    await reloadEditorData();
+    setSelection({ type: "station", id: selectedStation.id });
+    setSidebarTab("validation");
+  }
+
+
   const selectedStation =
     selection.type === "station"
       ? (stationById.get(selection.id) ?? null)
@@ -7968,6 +8231,8 @@ export default function UnifiedMapEditor({
   const selectedStationBranches = selectedStation
     ? getBranchesServingStation(data.branches, selectedStation.id)
     : [];
+  const selectedStationSplitCandidates = getDistinctLineBranches(selectedStationBranches);
+  const selectedStationNeedsLineSplit = selectedStationSplitCandidates.length > 1;
   const selectedStationTransferGroup = selectedStation
     ? (stationTransferGroupIndex.get(selectedStation.id) ?? null)
     : null;
@@ -8679,6 +8944,9 @@ export default function UnifiedMapEditor({
                 branchRemovalOptions={selectedStationBranches}
                 branchAddOptions={data.branches}
                 lineBranchOverrides={overlays.lineBranchOverrides}
+                lineSplitBranches={selectedStationSplitCandidates}
+                canSplitByLine={selectedStationNeedsLineSplit}
+                onSplitByLine={() => void splitSelectedStationByLine()}
                 onExcludeFromBranch={(branchId) =>
                   void createBranchStationExclusion(
                     branchId,
@@ -8740,11 +9008,12 @@ export default function UnifiedMapEditor({
                 onSetCircular={(circular) =>
                   void setBranchCircular(activeGeometryBranch.id, circular)
                 }
-                onUpdateLineMetadata={(category, serviceTypes) =>
+                onUpdateLineMetadata={(category, serviceTypes, trainPerformance) =>
                   void updateLineMetadata(
                     activeGeometryBranch.canonicalLineId,
                     category,
                     serviceTypes,
+                    trainPerformance,
                   )
                 }
               />
@@ -10123,6 +10392,9 @@ function StationInspector({
   pendingAddStationInsertion,
   branchAddOptions,
   lineBranchOverrides,
+  lineSplitBranches,
+  canSplitByLine,
+  onSplitByLine,
   onExcludeFromBranch,
   onCreateAddStationBranch,
   onCreateConnectLineBranch,
@@ -10150,6 +10422,9 @@ function StationInspector({
   branchRemovalOptions: EditorMapBranch[];
   branchAddOptions: EditorMapBranch[];
   lineBranchOverrides: ManualLineBranchOverride[];
+  lineSplitBranches: EditorMapBranch[];
+  canSplitByLine: boolean;
+  onSplitByLine: () => void;
   onExcludeFromBranch: (branchId: string) => void;
   onCreateAddStationBranch: (branchId: string, anchorStationId: string) => void;
   onCreateConnectLineBranch: (
@@ -10320,6 +10595,35 @@ function StationInspector({
           {station.id}
         </p>
       </div>
+      {canSplitByLine ? (
+        <div className="grid gap-2 rounded-2xl border border-rose-100 bg-rose-50 p-3 text-xs text-rose-900">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <strong className="font-semibold">노선별 역 분할 필요</strong>
+              <p className="mt-1 leading-5 text-rose-800">
+                이 stationId가 여러 노선에 직접 연결되어 있습니다. 노선별 stationId로 나누고 환승 그룹으로 묶어야 합니다.
+              </p>
+            </div>
+            <Badge className="bg-white text-rose-700">
+              {lineSplitBranches.length}개 노선
+            </Badge>
+          </div>
+          <div className="grid gap-1">
+            {lineSplitBranches.map((branch) => (
+              <div key={branch.id} className="flex items-center gap-2 rounded-xl bg-white/80 px-2 py-1.5">
+                <span className="size-2 rounded-full" style={{ backgroundColor: branch.colorHex }} />
+                <span className="min-w-0 flex-1 truncate font-medium">
+                  {formatBranchDisplayName(branch)}
+                </span>
+              </div>
+            ))}
+          </div>
+          <Button variant="outline" onClick={onSplitByLine}>
+            <Route className="mr-1 size-4" />
+            노선별 stationId 분할
+          </Button>
+        </div>
+      ) : null}
       <Field label="표시명 보정">
         <Input
           value={draft.nameKo ?? ""}
