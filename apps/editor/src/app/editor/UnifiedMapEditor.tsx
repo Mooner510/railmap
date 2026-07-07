@@ -10288,6 +10288,7 @@ function ManualRailLinePanel({
   const [bulkEntryText, setBulkEntryText] = useState("");
   const [bulkEntryResult, setBulkEntryResult] = useState<string | null>(null);
   const [bulkEntrySummary, setBulkEntrySummary] = useState<{ added: number; missing: number; skipped: number } | null>(null);
+  const [bulkEntryPendingStations, setBulkEntryPendingStations] = useState<ManualRouteStationDraft[]>([]);
   const [bulkEntrySkippedNames, setBulkEntrySkippedNames] = useState<string[]>([]);
   const [bulkEntryMissingNames, setBulkEntryMissingNames] = useState<string[]>([]);
   const [bulkEntryResolveName, setBulkEntryResolveName] = useState("");
@@ -10441,21 +10442,29 @@ function ManualRailLinePanel({
       });
     }
 
+    setBulkEntryPendingStations(matched);
     setBulkEntryMissingNames(missing);
     setBulkEntrySkippedNames(skipped);
     setBulkEntrySummary({ added: matched.length, missing: missing.length, skipped: skipped.length });
     selectNextBulkMissingName(missing);
 
     if (matched.length === 0) {
-      setBulkEntryResult(missing.length > 0 ? "보정이 필요한 역이 있습니다." : skipped.length > 0 ? "이미 목록에 있는 역만 제외했습니다." : "추가할 역이 없습니다.");
+      setBulkEntryResult(missing.length > 0 ? "보정할 역을 확인하세요." : skipped.length > 0 ? "이미 있는 역만 제외했습니다." : "추가할 역이 없습니다.");
       return;
     }
 
+    setBulkEntryResult(missing.length > 0 ? "추가 후보와 보정할 역을 확인한 뒤 반영하세요." : "추가 후보를 확인한 뒤 반영하세요.");
+  }
+
+  function commitBulkPendingStations() {
+    if (!routeBuilderDraft || bulkEntryPendingStations.length === 0) return;
     onChangeRouteBuilder({
       ...routeBuilderDraft,
-      stations: [...routeBuilderDraft.stations, ...matched],
+      stations: [...routeBuilderDraft.stations, ...bulkEntryPendingStations],
     });
-    setBulkEntryResult(missing.length > 0 ? "추가된 역과 보정할 역을 나눠 표시했습니다." : "대량 입력을 반영했습니다.");
+    setBulkEntryResult(`${bulkEntryPendingStations.length.toLocaleString("ko-KR")}개 역을 목록에 반영했습니다.`);
+    setBulkEntryPendingStations([]);
+    setBulkEntrySummary((previous) => previous ? { ...previous, added: 0 } : previous);
   }
 
   function useMissingNameOnMap(nameKo: string) {
@@ -10564,6 +10573,7 @@ function ManualRailLinePanel({
               onClick={() => {
                 setBulkEntryResult(null);
                 setBulkEntrySummary(null);
+                setBulkEntryPendingStations([]);
                 setBulkEntrySkippedNames([]);
                 setBulkEntryMissingNames([]);
                 setBulkEntryResolveName("");
@@ -10693,6 +10703,7 @@ function ManualRailLinePanel({
                 setBulkEntryText(event.target.value);
                 setBulkEntryResult(null);
                 setBulkEntrySummary(null);
+                setBulkEntryPendingStations([]);
                 setBulkEntrySkippedNames([]);
                 setBulkEntryMissingNames([]);
               }}
@@ -10714,6 +10725,25 @@ function ManualRailLinePanel({
             ) : null}
             {bulkEntryResult ? (
               <p className="rounded-2xl bg-slate-50 px-3 py-2 text-xs font-normal text-slate-600">{bulkEntryResult}</p>
+            ) : null}
+            {bulkEntryPendingStations.length > 0 ? (
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <strong className="text-xs font-medium text-emerald-900">반영 대기</strong>
+                  <span className="text-[11px] font-normal text-emerald-700">{bulkEntryPendingStations.length.toLocaleString("ko-KR")}개</span>
+                </div>
+                <div className="mt-2 grid max-h-44 gap-1 overflow-y-auto pr-1">
+                  {bulkEntryPendingStations.map((station, index) => (
+                    <div key={station.clientId} className="grid grid-cols-[auto_1fr] gap-2 rounded-xl bg-white px-2 py-1.5">
+                      <span className="text-[11px] font-medium text-emerald-700">{index + 1}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-medium text-slate-800">{station.nameKo}</span>
+                        <span className="block truncate text-[10px] font-normal text-slate-400">{station.sourceStationId ? `기존 역 복사 · ${stationById.get(station.sourceStationId)?.nameKo ?? station.sourceStationId}` : "새 수기 역"}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : null}
             {bulkEntrySkippedNames.length > 0 ? (
               <div className="rounded-2xl bg-slate-50 px-3 py-2">
@@ -10798,7 +10828,7 @@ function ManualRailLinePanel({
               </div>
             ) : null}
           </div>
-          <div className="grid grid-cols-3 gap-2 border-t border-slate-200 px-4 py-3">
+          <div className="grid grid-cols-4 gap-2 border-t border-slate-200 px-4 py-3">
             <Button variant="outline" onClick={() => setBulkEntryOpen(false)}>닫기</Button>
             <Button
               variant="outline"
@@ -10806,6 +10836,7 @@ function ManualRailLinePanel({
                 setBulkEntryText("");
                 setBulkEntryResult(null);
                 setBulkEntrySummary(null);
+                setBulkEntryPendingStations([]);
                 setBulkEntrySkippedNames([]);
                 setBulkEntryMissingNames([]);
                 setBulkEntryResolveName("");
@@ -10814,7 +10845,8 @@ function ManualRailLinePanel({
             >
               비우기
             </Button>
-            <Button onClick={applyBulkRouteStations}>추가</Button>
+            <Button variant="outline" onClick={applyBulkRouteStations}>분석</Button>
+            <Button onClick={commitBulkPendingStations} disabled={bulkEntryPendingStations.length === 0}>반영</Button>
           </div>
         </Dialog>
       </div>
