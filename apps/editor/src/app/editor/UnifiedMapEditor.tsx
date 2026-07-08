@@ -597,6 +597,24 @@ function buildTransferGroupSuggestions(
   });
 }
 
+function getTransferSuggestionNearestDistanceMeters(
+  sourceStationIds: string[],
+  suggestion: TransferGroupSuggestion,
+  stationById: Map<string, EditorStation>,
+) {
+  let nearest = Number.POSITIVE_INFINITY;
+  for (const sourceStationId of sourceStationIds) {
+    const sourceStation = stationById.get(sourceStationId);
+    if (!sourceStation || !isValidStation(sourceStation)) continue;
+    for (const targetStationId of suggestion.stationIds) {
+      const targetStation = stationById.get(targetStationId);
+      if (!targetStation || !isValidStation(targetStation)) continue;
+      nearest = Math.min(nearest, getApproxDistanceMeters(sourceStation, targetStation));
+    }
+  }
+  return nearest;
+}
+
 type OverlayCommandRecord = {
   id: string;
   label: string;
@@ -4389,6 +4407,39 @@ export default function UnifiedMapEditor({
     transferGroupSuggestions,
     transferReviewFilter,
   ]);
+  const findNearestPendingTransferSuggestion = useCallback((
+    sourceStationIds: string[],
+    excludeKey: string | null,
+  ) => {
+    const dismissed = new Set(overlays.dismissedTransferGroupSuggestionKeys ?? []);
+    return transferGroupSuggestions
+      .filter((suggestion) => {
+        if (suggestion.key === excludeKey) return false;
+        if (approvedTransferSuggestionKeys.has(suggestion.key)) return false;
+        if (dismissed.has(suggestion.key)) return false;
+        return true;
+      })
+      .map((suggestion) => ({
+        suggestion,
+        distance: getTransferSuggestionNearestDistanceMeters(
+          sourceStationIds,
+          suggestion,
+          stationById,
+        ),
+      }))
+      .sort((left, right) => {
+        if (left.distance !== right.distance) return left.distance - right.distance;
+        if (left.suggestion.confidence !== right.suggestion.confidence) {
+          return left.suggestion.confidence === "strong" ? -1 : 1;
+        }
+        return left.suggestion.maxDistanceMeters - right.suggestion.maxDistanceMeters;
+      })[0]?.suggestion ?? null;
+  }, [
+    approvedTransferSuggestionKeys,
+    overlays.dismissedTransferGroupSuggestionKeys,
+    stationById,
+    transferGroupSuggestions,
+  ]);
   const unassignedStations = useMemo(
     () => getUnassignedStations(data.stations, data.branches),
     [data.branches, data.stations],
@@ -6687,35 +6738,49 @@ export default function UnifiedMapEditor({
       transferDraft,
       stationById,
     );
+    const suggestionKey = activeTransferSuggestionKey;
+    const isSuggestionApproval = Boolean(suggestionKey);
+    let saveAsPending = missingPairs.length > 0 && allowPending;
+
     if (missingPairs.length > 0 && !allowPending) {
-      showToast(
-        `환승 시간표 ${missingPairs.length.toLocaleString("ko-KR")}개를 모두 입력하거나 보류 저장하세요`,
-        "error",
+      if (!isSuggestionApproval) {
+        showToast(
+          `환승 시간표 ${missingPairs.length.toLocaleString("ko-KR")}개를 모두 입력하거나 보류 저장하세요`,
+          "error",
+        );
+        return;
+      }
+
+      const confirmed = window.confirm(
+        `역간 환승 시간표 ${missingPairs.length.toLocaleString("ko-KR")}개가 아직 비어 있습니다.\n\n시간표가 완성되지 않았는데도 저장하고 가장 가까운 다음 환승 추천으로 넘어갈까요?`,
       );
-      return;
+      if (!confirmed) return;
+      saveAsPending = true;
     }
 
     const pendingIds = new Set(overlays.transferTimePendingGroupIds ?? []);
-    if (missingPairs.length > 0 && allowPending) pendingIds.add(group.id);
+    if (saveAsPending) pendingIds.add(group.id);
     else pendingIds.delete(group.id);
 
     const suggestionKeys = new Set(overlays.dismissedTransferGroupSuggestionKeys ?? []);
-    if (activeTransferSuggestionKey) suggestionKeys.add(activeTransferSuggestionKey);
+    if (suggestionKey) suggestionKeys.add(suggestionKey);
 
     const transferReviewEvent = makeManualTransferReviewEvent({
-      type: missingPairs.length > 0 && allowPending
+      type: saveAsPending
         ? "transfer-time-pending"
-        : activeTransferSuggestionKey
+        : suggestionKey
           ? "suggestion-approved"
           : transferDraft.id
             ? "group-updated"
             : "group-created",
       transferGroupId: group.id,
-      suggestionKey: activeTransferSuggestionKey,
+      suggestionKey,
       nameKo: group.nameKo,
       stationIds: group.stationIds,
-      note: missingPairs.length > 0 && allowPending
-        ? "환승 시간표 입력을 나중으로 보류"
+      note: saveAsPending
+        ? isSuggestionApproval
+          ? "환승 추천 승인 후 시간표 입력을 나중으로 보류"
+          : "환승 시간표 입력을 나중으로 보류"
         : null,
     });
 
@@ -6735,11 +6800,30 @@ export default function UnifiedMapEditor({
     const saved = await executeOverlayCommand(
       transferDraft.id ? "환승 그룹 수정" : "환승 그룹 생성",
       next,
-      missingPairs.length > 0 && allowPending
+      saveAsPending
         ? "환승 그룹을 저장하고 시간표 입력은 보류했습니다"
         : "환승 그룹 저장 완료",
     );
     if (!saved) return;
+
+    const nextSuggestion = isSuggestionApproval
+      ? findNearestPendingTransferSuggestion(group.stationIds, suggestionKey)
+      : null;
+
+    if (nextSuggestion) {
+      setActiveTransferSuggestionKey(nextSuggestion.key);
+      setTransferDraft({
+        ...makeTransferDraftFromStations(nextSuggestion.stationIds, stationById),
+        nameKo: nextSuggestion.nameKo,
+        note: `환승 그룹 추천에서 생성: ${nextSuggestion.reasonLabels.join(", ")}`,
+      });
+      applyMultiStationSelection(nextSuggestion.stationIds);
+      focusStationCluster(nextSuggestion.stationIds);
+      setSidebarTab("transferReview");
+      await reloadEditorData();
+      return;
+    }
+
     setSelection({ type: "transferGroup", id: group.id });
     setTransferDraft(makeTransferDraftFromGroup(group));
     setActiveTransferSuggestionKey(null);
