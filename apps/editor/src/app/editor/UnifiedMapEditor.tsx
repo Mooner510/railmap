@@ -275,6 +275,22 @@ type TimetableReviewIssue = {
   message: string;
 };
 
+type TrainCsvPendingReviewItem = {
+  stationId: string;
+  sequence: number;
+  stationName: string;
+  sourceName: string;
+  arrivalTime: string;
+  departureTime: string;
+};
+
+type TrainCsvMissedReviewItem = {
+  sourceName: string;
+  arrivalTime: string;
+  departureTime: string;
+  candidateStationIds: string[];
+};
+
 type ShortcutItem = {
   label: string;
   keys: string;
@@ -9476,6 +9492,35 @@ function ManualDataAuditDashboard({
   const trainRunsWithSparseTimes = enabledTrainRuns.filter((run) =>
     run.stopTimes.filter((stop) => stop.arrivalTime || stop.departureTime).length < 2,
   );
+  const trainRunsWithTimeOrderWarnings = enabledTrainRuns.filter((run) => {
+    let previous: number | null = null;
+    for (const stop of run.stopTimes.slice().sort((a, b) => a.sequence - b.sequence)) {
+      const current = getManualTimetableTimeMinutes(getManualTimetablePrimaryTime(stop));
+      if (current === null) continue;
+      if (previous !== null && current < previous) return true;
+      previous = current;
+    }
+    return false;
+  });
+  const manualLinesWithoutPerformance = enabledManualLines.filter((line) => {
+    const performance = line.trainPerformance;
+    return !performance ||
+      typeof performance.accelerationMps2 !== "number" ||
+      typeof performance.decelerationMps2 !== "number" ||
+      typeof performance.maxSpeedKph !== "number";
+  });
+  const routeReadyPatternCount = enabledPatterns.filter((pattern) => patternIdsWithTrainRuns.has(pattern.id)).length;
+  const routeDiagnostics = [
+    { label: "시간표 우선 계산", value: enabledTrainRuns.length, detail: `${routeReadyPatternCount.toLocaleString("ko-KR")}개 패턴 연결`, tone: enabledTrainRuns.length > 0 ? "emerald" : "amber" },
+    { label: "성능 fallback", value: manualLinesWithoutPerformance.length, detail: "성능값 누락 노선", tone: manualLinesWithoutPerformance.length === 0 ? "emerald" : "amber" },
+    { label: "환승 edge", value: transferGroupsWithoutTime.length, detail: "환승 시간 미완성", tone: transferGroupsWithoutTime.length === 0 ? "emerald" : "amber" },
+    { label: "시간 순서", value: trainRunsWithTimeOrderWarnings.length, detail: "이전 역보다 빠른 시각", tone: trainRunsWithTimeOrderWarnings.length === 0 ? "emerald" : "amber" },
+  ];
+  const comparisonReadinessItems = [
+    { label: "최단 시간", ready: enabledTrainRuns.length > 0 || manualLinesWithoutPerformance.length < enabledManualLines.length, detail: "시간표 또는 성능 fallback 필요" },
+    { label: "최소 환승", ready: enabledTransferGroups.length > 0, detail: "환승 그룹/시간표 기준" },
+    { label: "시간표 우선", ready: routeReadyPatternCount > 0, detail: "정차 패턴+열차 시간표 연결" },
+  ];
   const auditItems = [
     { label: "수기 노선", value: enabledManualLines.length, detail: `${overlays.manualBranchDefinitions.length.toLocaleString("ko-KR")}개 지선` },
     { label: "환승 그룹", value: enabledTransferGroups.length, detail: `${transferGroupsWithoutTime.length.toLocaleString("ko-KR")}개 시간 확인` },
@@ -9487,6 +9532,8 @@ function ManualDataAuditDashboard({
     transferGroupsWithoutTime.length > 0 ? `환승 시간 미입력 ${transferGroupsWithoutTime.length.toLocaleString("ko-KR")}개` : null,
     patternsWithoutTrainRuns.length > 0 ? `시간표 없는 정차 패턴 ${patternsWithoutTrainRuns.length.toLocaleString("ko-KR")}개` : null,
     trainRunsWithSparseTimes.length > 0 ? `시각 부족 시간표 ${trainRunsWithSparseTimes.length.toLocaleString("ko-KR")}개` : null,
+    trainRunsWithTimeOrderWarnings.length > 0 ? `시간 순서 확인 ${trainRunsWithTimeOrderWarnings.length.toLocaleString("ko-KR")}개` : null,
+    manualLinesWithoutPerformance.length > 0 ? `성능값 누락 노선 ${manualLinesWithoutPerformance.length.toLocaleString("ko-KR")}개` : null,
     missingStationReferences.length > 0 ? `없는 역 참조 ${missingStationReferences.length.toLocaleString("ko-KR")}개` : null,
     validationIssues.length > 0 ? `검증 패널 이슈 ${validationIssues.length.toLocaleString("ko-KR")}개` : null,
   ].filter((item): item is string => Boolean(item));
@@ -9509,6 +9556,38 @@ function ManualDataAuditDashboard({
               <p className="text-[10px] font-semibold text-slate-400">{item.label}</p>
               <strong className="mt-1 block text-lg font-semibold text-slate-900">{item.value.toLocaleString("ko-KR")}</strong>
               <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <strong className="block text-sm font-semibold text-slate-900">경로검색 품질 진단</strong>
+            <p className="mt-1 text-xs font-medium text-slate-500">후보 점수에 영향을 주는 시간표·환승·fallback 상태입니다.</p>
+          </div>
+          <Badge className={routeDiagnostics.some((item) => item.tone === "amber") ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}>
+            {routeDiagnostics.some((item) => item.tone === "amber") ? "보정 필요" : "준비됨"}
+          </Badge>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {routeDiagnostics.map((item) => (
+            <div key={item.label} className={cn("rounded-2xl border px-3 py-2", item.tone === "emerald" ? "border-emerald-100 bg-emerald-50" : "border-amber-100 bg-amber-50")}>
+              <p className={cn("text-[10px] font-semibold", item.tone === "emerald" ? "text-emerald-700" : "text-amber-700")}>{item.label}</p>
+              <strong className="mt-1 block text-lg font-semibold text-slate-900">{item.value.toLocaleString("ko-KR")}</strong>
+              <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-1.5">
+          <strong className="text-[11px] font-semibold text-slate-500">경로 후보 비교 준비도</strong>
+          {comparisonReadinessItems.map((item) => (
+            <div key={item.label} className="flex items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2">
+              <span className="text-xs font-medium text-slate-700">{item.label}</span>
+              <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold", item.ready ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                {item.ready ? "비교 가능" : "데이터 부족"}
+              </span>
             </div>
           ))}
         </div>
@@ -9688,8 +9767,8 @@ function ServicePatternBuilderPanel({
   const [trainCsvText, setTrainCsvText] = useState("");
   const [trainCsvMessage, setTrainCsvMessage] = useState<string | null>(null);
   const [trainCsvReview, setTrainCsvReview] = useState<{
-    pending: Array<{ stationId: string; sequence: number; stationName: string; sourceName: string; arrivalTime: string; departureTime: string }>;
-    missed: string[];
+    pending: TrainCsvPendingReviewItem[];
+    missed: TrainCsvMissedReviewItem[];
     invalidTimes: string[];
     duplicateStops: string[];
   } | null>(null);
@@ -9710,6 +9789,29 @@ function ServicePatternBuilderPanel({
         (run.operatingDays ?? []).some((day) => normalizedOperatingDays.includes(day)),
       )
     : [];
+
+  function getTrainCsvMatchCandidates(sourceName: string, limit = 4) {
+    if (!activeTrainPattern) return [];
+    const sourceKey = normalizeStationNameForSuggestion(sourceName);
+    if (!sourceKey) return [];
+    return activeTrainPattern.stops
+      .map((stop) => {
+        const station = stationById.get(stop.stationId);
+        const stationKey = normalizeStationNameForSuggestion(station?.nameKo ?? stop.stationId);
+        const score = stationKey === sourceKey
+          ? 0
+          : stationKey.includes(sourceKey) || sourceKey.includes(stationKey)
+            ? 1
+            : stationKey[0] === sourceKey[0]
+              ? 2
+              : 3;
+        return { stop, score, stationKey };
+      })
+      .filter((item) => item.score < 3)
+      .sort((a, b) => a.score - b.score || a.stop.sequence - b.stop.sequence)
+      .slice(0, limit)
+      .map((item) => item.stop.stationId);
+  }
 
   useEffect(() => {
     if (editingPatternId) return;
@@ -9819,8 +9921,8 @@ function ServicePatternBuilderPanel({
       for (const name of names) stopsByName.set(name, stop);
     }
 
-    const pending: Array<{ stationId: string; sequence: number; stationName: string; sourceName: string; arrivalTime: string; departureTime: string }> = [];
-    const missed: string[] = [];
+    const pending: TrainCsvPendingReviewItem[] = [];
+    const missed: TrainCsvMissedReviewItem[] = [];
     const invalidTimes: string[] = [];
     const duplicateStops: string[] = [];
     const seenStopKeys = new Set<string>();
@@ -9839,7 +9941,12 @@ function ServicePatternBuilderPanel({
       }
       const stop = stopsByName.get(normalizeStationNameForSuggestion(stationName));
       if (!stop) {
-        missed.push(stationName);
+        missed.push({
+          sourceName: stationName,
+          arrivalTime: arrivalTime || "",
+          departureTime: departureTime || arrivalTime || "",
+          candidateStationIds: getTrainCsvMatchCandidates(stationName),
+        });
         continue;
       }
       const key = `${stop.stationId}:${stop.sequence}`;
@@ -9880,6 +9987,40 @@ function ServicePatternBuilderPanel({
     setTrainCsvReview((current) => {
       if (!current) return current;
       return { ...current, pending: current.pending.filter((_, itemIndex) => itemIndex !== index) };
+    });
+  }
+
+  function resolveTrainCsvMissedItem(index: number, stationId: string) {
+    if (!activeTrainPattern) return;
+    const stop = activeTrainPattern.stops.find((candidate) => candidate.stationId === stationId);
+    if (!stop) return;
+    setTrainCsvReview((current) => {
+      if (!current) return current;
+      const missed = current.missed[index];
+      if (!missed) return current;
+      const key = `${stop.stationId}:${stop.sequence}`;
+      if (current.pending.some((item) => `${item.stationId}:${item.sequence}` === key)) {
+        return {
+          ...current,
+          missed: current.missed.filter((_, itemIndex) => itemIndex !== index),
+          duplicateStops: [...current.duplicateStops, missed.sourceName],
+        };
+      }
+      return {
+        ...current,
+        pending: [
+          ...current.pending,
+          {
+            stationId: stop.stationId,
+            sequence: stop.sequence,
+            stationName: stationById.get(stop.stationId)?.nameKo ?? stop.stationId,
+            sourceName: missed.sourceName,
+            arrivalTime: missed.arrivalTime,
+            departureTime: missed.departureTime,
+          },
+        ].sort((a, b) => a.sequence - b.sequence),
+        missed: current.missed.filter((_, itemIndex) => itemIndex !== index),
+      };
     });
   }
 
@@ -10111,11 +10252,15 @@ function ServicePatternBuilderPanel({
             <Input value={operatingDaysText} onChange={(event) => setOperatingDaysText(event.target.value)} placeholder="운행일: 매일, 평일, 주말 또는 월,화,수" />
             {(duplicateTrainNumberRuns.length > 0 || duplicateOperatingDayRuns.length > 0) ? (
               <div className="rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800">
+                <div className="flex items-center justify-between gap-2">
+                  <strong className="font-semibold">중복 가능성 확인</strong>
+                  <Badge className="bg-white/80 text-amber-700">저장 가능</Badge>
+                </div>
                 {duplicateTrainNumberRuns.length > 0 ? (
-                  <p>같은 열차번호 {duplicateTrainNumberRuns.length.toLocaleString("ko-KR")}개가 이미 있습니다.</p>
+                  <p className="mt-1">같은 열차번호 {duplicateTrainNumberRuns.length.toLocaleString("ko-KR")}개: {duplicateTrainNumberRuns.slice(0, 3).map((run) => run.nameKo || run.trainNumber).join(", ")}</p>
                 ) : null}
                 {duplicateOperatingDayRuns.length > 0 ? (
-                  <p className="mt-0.5">같은 정차 패턴에서 겹치는 운행일이 있습니다.</p>
+                  <p className="mt-0.5">같은 정차 패턴에서 운행일이 겹칩니다: {duplicateOperatingDayRuns.slice(0, 3).map((run) => run.nameKo || run.trainNumber || "시간표").join(", ")}</p>
                 ) : null}
               </div>
             ) : null}
@@ -10162,9 +10307,35 @@ function ServicePatternBuilderPanel({
                       ))}
                     </div>
                   ) : null}
+                  {trainCsvReview.missed.length > 0 ? (
+                    <div className="mt-2 grid gap-2 rounded-xl border border-amber-100 bg-amber-50 p-2">
+                      <strong className="text-[11px] font-semibold text-amber-800">미매칭 역 보정</strong>
+                      {trainCsvReview.missed.slice(0, 6).map((item, index) => (
+                        <div key={`${item.sourceName}:${index}`} className="rounded-xl bg-white/80 px-2 py-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-[11px] font-medium text-slate-700">입력: {item.sourceName}</span>
+                            <span className="shrink-0 text-[10px] font-medium text-slate-400">{item.arrivalTime || "--:--"}/{item.departureTime || "--:--"}</span>
+                          </div>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {item.candidateStationIds.map((stationId) => (
+                              <Button key={stationId} type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={() => resolveTrainCsvMissedItem(index, stationId)}>
+                                {stationById.get(stationId)?.nameKo ?? stationId}
+                              </Button>
+                            ))}
+                            {item.candidateStationIds.length === 0 ? (
+                              <span className="text-[10px] font-medium text-amber-700">추천 후보 없음 · 역명을 직접 맞춰 다시 분석하세요.</span>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                      {trainCsvReview.missed.length > 6 ? (
+                        <span className="text-[10px] font-medium text-amber-700">외 {trainCsvReview.missed.length - 6}개는 입력 역명 보정 후 다시 분석하세요.</span>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {trainCsvReview.missed.length > 0 || trainCsvReview.invalidTimes.length > 0 || trainCsvReview.duplicateStops.length > 0 ? (
                     <div className="mt-2 grid gap-1 text-[11px] text-slate-500">
-                      {trainCsvReview.missed.length > 0 ? <span>미매칭: {trainCsvReview.missed.slice(0, 8).join(", ")}</span> : null}
+                      {trainCsvReview.missed.length > 0 ? <span>미매칭: {trainCsvReview.missed.slice(0, 8).map((item) => item.sourceName).join(", ")}</span> : null}
                       {trainCsvReview.missed.length > 0 ? <span>패턴 역명: {activeTrainPattern.stops.slice(0, 10).map((stop) => stationById.get(stop.stationId)?.nameKo ?? stop.stationId).join(", ")}</span> : null}
                       {trainCsvReview.invalidTimes.length > 0 ? <span>시각 오류: {trainCsvReview.invalidTimes.slice(0, 8).join(", ")}</span> : null}
                       {trainCsvReview.duplicateStops.length > 0 ? <span>중복 제외: {trainCsvReview.duplicateStops.slice(0, 8).join(", ")}</span> : null}
