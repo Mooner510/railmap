@@ -56,6 +56,18 @@
       "note": null
     },
     {
+      "stationId": "candidate:kric:urban-rail-station:S1105:0518:row-180",
+      "nameKo": "까치산",
+      "stationNumber": "0518",
+      "lineNameKo": "5호선",
+      "lineNumber": "S1105",
+      "colorHex": "#996CAC",
+      "lat": 37.53211418435481,
+      "lng": 126.84651728438769,
+      "enabled": true,
+      "note": null
+    },
+    {
       "stationId": "manual.station.manual.line.경부선.서울역",
       "nameKo": "서울역",
       "stationNumber": "1",
@@ -114,18 +126,6 @@
       "lng": 126.92656491514936,
       "enabled": true,
       "note": "수기 노선 빌더에서 생성한 물리 노선 역"
-    },
-    {
-      "stationId": "candidate:kric:urban-rail-station:S1105:0518:row-180",
-      "nameKo": "까치산",
-      "stationNumber": "0518",
-      "lineNameKo": "5호선",
-      "lineNumber": "S1105",
-      "colorHex": "#996CAC",
-      "lat": 37.53211418435481,
-      "lng": 126.84651728438769,
-      "enabled": true,
-      "note": null
     }
   ],
   "nonTransferStationIds": [
