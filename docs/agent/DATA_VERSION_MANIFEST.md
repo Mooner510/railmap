@@ -1,10 +1,21 @@
-# Public data version manifest
+# Public Data Version Manifest
 
-`apps/web/public/data/data-version.json`은 public viewer가 현재 배포된 데이터 묶음을 식별하기 위한 manifest다.
+## 현재 스키마
 
-- `versions.bundle`: `kric-canonical-app-bundle.json`의 생성 시각, 수집일, 파일 크기
-- `versions.manualOverlay`: `manual-overlays.json`의 파일 크기와 수정 시각
-- `cachePolicy.manifest`: manifest는 최신 여부 판단용이므로 CDN에서 짧게 또는 no-store로 다룬다.
-- `cachePolicy.dataArtifacts`: bundle과 manual overlay는 version manifest 기준으로 변경 여부를 판단한다.
+`apps/web/public/data/data-version.json`의 `schemaVersion`은 2다.
 
-collector 실행 후 `writePublicDataVersionManifest()`가 manifest를 갱신한다.
+## 버전 판정
+
+파일 크기와 수정 시각만으로 변경 여부를 판단하지 않는다.
+
+- canonical bundle SHA-256
+- manual overlay SHA-256
+- 두 해시로 만든 16자리 `releaseId`
+
+웹 데이터 배지는 release ID와 각 파일 해시 앞 12자리를 tooltip으로 제공한다.
+
+## 캐시 정책
+
+- manifest: `no-store`
+- 데이터 artifact: 콘텐츠 해시 기준 버전 판정
+- bundle과 manual overlay 중 하나라도 바뀌면 release ID가 바뀐다.

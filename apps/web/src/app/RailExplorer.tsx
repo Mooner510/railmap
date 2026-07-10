@@ -40,9 +40,10 @@ interface PublicDataVersionManifest {
   schemaVersion: number;
   generatedAt: string;
   acquiredDate?: string;
+  releaseId?: string;
   versions?: {
-    bundle?: { generatedAt?: string | null; acquiredDate?: string | null; bytes?: number | null };
-    manualOverlay?: { bytes?: number | null; mtimeMs?: number | null };
+    bundle?: { generatedAt?: string | null; acquiredDate?: string | null; bytes?: number | null; sha256?: string | null };
+    manualOverlay?: { bytes?: number | null; mtimeMs?: number | null; sha256?: string | null };
   };
 }
 
@@ -1415,8 +1416,15 @@ function DataVersionBadge({
   const label = manifest
     ? `데이터 ${manifest.acquiredDate ?? manifest.versions?.bundle?.acquiredDate ?? "버전 확인"}`
     : "데이터 버전 없음";
-  const title = bundleGeneratedAt
-    ? `bundle generatedAt: ${bundleGeneratedAt}`
+  const bundleHash = manifest?.versions?.bundle?.sha256?.slice(0, 12) ?? null;
+  const overlayHash = manifest?.versions?.manualOverlay?.sha256?.slice(0, 12) ?? null;
+  const title = manifest
+    ? [
+        manifest.releaseId ? `release: ${manifest.releaseId}` : null,
+        bundleGeneratedAt ? `bundle generatedAt: ${bundleGeneratedAt}` : null,
+        bundleHash ? `bundle sha256: ${bundleHash}` : null,
+        overlayHash ? `manual overlay sha256: ${overlayHash}` : null,
+      ].filter(Boolean).join("\n")
     : "data-version.json을 찾지 못했습니다.";
 
   return (
@@ -2567,6 +2575,7 @@ function RouteResultSummary({
           <RouteMetric label="환승" value={`${formatNumber(transferEdgeCount)}회`} />
         </div>
         <RouteQualityReviewPanel result={result} />
+        <RouteRegressionCasePanel result={result} stationById={stationById} />
       </div>
 
       <div className="border-b border-slate-100 px-3 py-2">
@@ -2763,6 +2772,123 @@ function RouteQualityReviewPanel({ result }: { result: RouteSearchResult }) {
         <p className="mt-1.5 text-[10px] font-medium opacity-75">
           선형 거리 또는 성능값이 부족한 이동 구간은 기본 시간으로 계산했습니다.
         </p>
+      ) : null}
+    </div>
+  );
+}
+
+interface StoredRouteRegressionCase {
+  id: string;
+  originStationId: string;
+  destinationStationId: string;
+  originName: string;
+  destinationName: string;
+  expectedMinutes: number;
+  expectedTransfers: number;
+  expectedStationIds: string[];
+  createdAt: string;
+}
+
+const ROUTE_REGRESSION_STORAGE_KEY = "railmap.route-regression-cases.v1";
+
+function readStoredRouteRegressionCases(): StoredRouteRegressionCase[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(ROUTE_REGRESSION_STORAGE_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function RouteRegressionCasePanel({
+  result,
+  stationById,
+}: {
+  result: RouteSearchResult;
+  stationById: Map<string, RailMapStation>;
+}) {
+  const [cases, setCases] = useState<StoredRouteRegressionCase[]>([]);
+  const originStationId = result.stationIds[0] ?? "";
+  const destinationStationId = result.stationIds[result.stationIds.length - 1] ?? "";
+
+  useEffect(() => {
+    setCases(readStoredRouteRegressionCases());
+  }, []);
+
+  const persist = (nextCases: StoredRouteRegressionCase[]) => {
+    setCases(nextCases);
+    window.localStorage.setItem(ROUTE_REGRESSION_STORAGE_KEY, JSON.stringify(nextCases));
+  };
+
+  const matchingCase = cases.find(
+    (item) => item.originStationId === originStationId && item.destinationStationId === destinationStationId,
+  );
+  const minutesDelta = matchingCase ? Math.ceil(result.totalMinutes) - matchingCase.expectedMinutes : 0;
+  const transferDelta = matchingCase ? result.transferCount - matchingCase.expectedTransfers : 0;
+  const routeChanged = matchingCase
+    ? matchingCase.expectedStationIds.join(">") !== result.stationIds.join(">")
+    : false;
+  const regressionDetected = Boolean(matchingCase && (minutesDelta > 3 || transferDelta > 0 || routeChanged));
+
+  const saveCurrent = () => {
+    if (!originStationId || !destinationStationId) return;
+    const nextCase: StoredRouteRegressionCase = {
+      id: `${originStationId}:${destinationStationId}`,
+      originStationId,
+      destinationStationId,
+      originName: stationById.get(originStationId)?.nameKo ?? originStationId,
+      destinationName: stationById.get(destinationStationId)?.nameKo ?? destinationStationId,
+      expectedMinutes: Math.ceil(result.totalMinutes),
+      expectedTransfers: result.transferCount,
+      expectedStationIds: result.stationIds,
+      createdAt: new Date().toISOString(),
+    };
+    persist([nextCase, ...cases.filter((item) => item.id !== nextCase.id)].slice(0, 50));
+  };
+
+  const removeCurrent = () => {
+    if (!matchingCase) return;
+    persist(cases.filter((item) => item.id !== matchingCase.id));
+  };
+
+  return (
+    <div className="mt-2 rounded-2xl border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-indigo-900">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold">회귀 검증 기준</p>
+          <p className="mt-0.5 text-[10px] font-medium text-indigo-700/70">
+            현재 경로를 브라우저에 저장하고 다음 검색 결과와 비교합니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-indigo-700 shadow-sm"
+          onClick={saveCurrent}
+        >
+          {matchingCase ? "기준 갱신" : "기준 저장"}
+        </button>
+      </div>
+      {matchingCase ? (
+        <div className={`mt-2 rounded-xl border px-2.5 py-2 ${regressionDetected ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+          <div className="flex items-center justify-between gap-2">
+            <strong className="text-[10px]">{regressionDetected ? "변경 확인 필요" : "기준 통과"}</strong>
+            <button type="button" className="text-[10px] font-semibold opacity-70 hover:opacity-100" onClick={removeCurrent}>삭제</button>
+          </div>
+          <p className="mt-1 text-[10px] font-medium">
+            기준 {matchingCase.expectedMinutes}분 · {matchingCase.expectedTransfers}회 / 현재 {Math.ceil(result.totalMinutes)}분 · {result.transferCount}회
+          </p>
+          {regressionDetected ? (
+            <p className="mt-1 text-[10px] font-medium">
+              {minutesDelta > 3 ? `시간 +${minutesDelta}분 ` : ""}
+              {transferDelta > 0 ? `환승 +${transferDelta}회 ` : ""}
+              {routeChanged ? "경유 경로 변경" : ""}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {cases.length > 0 ? (
+        <p className="mt-1.5 text-[10px] font-medium text-indigo-700/70">저장된 검증 기준 {cases.length.toLocaleString("ko-KR")}개</p>
       ) : null}
     </div>
   );

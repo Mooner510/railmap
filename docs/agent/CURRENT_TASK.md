@@ -1,74 +1,34 @@
-# CURRENT_TASK
+# Current Task
 
-Status: active implementation
-Updated: 2026-07-10
-Current applied baseline: `13.70.0-route-search-diagnostics-import-comparison`
-Next patch target: `13.71.0-editor-maintenance-workflow`
+## 적용 기준
 
-## Current phase
+- 기준 current: `railmap13.70.0-current.zip`
+- 선행 반영: `13.71.0-editor-maintenance-workflow`
+- 현재 묶음: `13.72.0-13.74.0`
 
-The editor, public web viewer, collector/export pipeline, manual rail builder, transfer review, timetable input, route search, data version manifest, and audit foundation are implemented.
+## 이번 묶음
 
-Current focus is no longer foundation work. The next phase is operational hardening:
+### 13.72.0 경로검색 회귀 기준
 
-1. make destructive maintenance actions previewable and reversible through normal overlay history;
-2. turn audit summaries into direct entry points for correction;
-3. keep implementation documents synchronized with current code;
-4. add repeatable route-quality regression cases before expanding fare/search policies.
+- 공개 웹 결과를 브라우저 회귀 기준으로 저장
+- 같은 출발·도착 검색 시 시간, 환승, 경유 순서 비교
+- 변경 확인 필요/기준 통과 표시
 
-## Completed through 13.70.0
+### 13.73.0 데이터 콘텐츠 해시
 
-- Transfer recommendation approval flow and nearest-next recommendation selection.
-- Manual route/station building and transfer-group review.
-- Service-pattern and train-run timetable authoring/import review.
-- Public route search with multiple candidate comparison.
-- Route quality diagnostics and comparison readiness.
-- Station-line identity detection and stationId split execution.
-- Manual data audit summary.
-- Public data version manifest generation and web loading.
+- bundle 및 manual overlay SHA-256 생성
+- release ID 생성
+- manifest schema 2 적용
 
-## 13.71.0 scope
+### 13.74.0 운영 정리
 
-- Replace stationId split `window.confirm` with a central preview dialog.
-- Let the operator choose which line keeps the existing stationId.
-- Show affected service-pattern and train-run counts before execution.
-- Keep generated stations in a transfer group and mark transfer times pending.
-- Make audit risk rows navigate to the relevant correction tab.
-- Correct stale documents that no longer match the current code.
+- 웹 데이터 버전 tooltip에 release/hash 표시
+- 오래된 `.bak` 파일 제거 대상으로 정리
+- 관련 운영 문서 최신화
 
-## Recommended next work after 13.71.0
+## 다음 후보
 
-### 13.72.0 route-search regression cases
-
-- Save origin/destination verification cases.
-- Define expected via stations or expected route characteristics.
-- Run all cases and filter failures.
-- Classify failures by timetable, performance, geometry, transfer time, and detour.
-
-### 13.73.0 timetable import operations
-
-- Bulk-resolve unmatched stations.
-- Remember mapping choices and connect them to station aliases.
-- Improve midnight rollover and duplicate-run conflict handling.
-- Provide before/after review and per-row exclusion.
-
-### 13.74.0 cache and release hardening
-
-- Replace mtime/size versioning with content hashes.
-- Add release ID and schema compatibility checks.
-- Detect stale web data and define Cloudflare cache headers.
-
-### 13.75.0 fare model foundation
-
-- Add operator/line/service fare policies.
-- Add editor input and validation.
-- Prepare route result estimated fare and cost-first search.
-
-## Non-negotiable rules
-
-- No dummy or sample production transit data.
-- A stationId must not represent real stations on multiple lines.
-- Same physical station connections use transfer groups.
-- KTX/SRT are service types, not physical Line names.
-- `data/manual` remains the manual source of truth.
-- Do not perform risky geometry or identity repair silently.
+- 시간표 CSV 대량 미매칭 일괄 보정
+- 회귀 검증 케이스 가져오기/내보내기 및 일괄 실행
+- 배포 캐시 헤더와 release 불일치 경고
+- 운임 모델 기반

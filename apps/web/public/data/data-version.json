@@ -1,11 +1,12 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-07-07T00:00:00.000Z",
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-10T07:44:12.514063Z",
   "acquiredDate": "2026-06-19",
+  "releaseId": "2b74c8c1babd866d",
   "cachePolicy": {
     "manifest": "no-store",
-    "dataArtifacts": "immutable-after-version",
-    "note": "배포 시 manifest를 먼저 확인하고 bundle/manual overlay 변경 여부를 판단한다."
+    "dataArtifacts": "content-hash-versioned",
+    "note": "manifest releaseId와 각 artifact sha256으로 데이터 변경 여부를 판단한다."
   },
   "versions": {
     "bundle": {
@@ -14,13 +15,15 @@
       "acquiredDate": "2026-06-19",
       "file": "kric-canonical-app-bundle.json",
       "bytes": 1981745,
-      "mtimeMs": 1783406283000
+      "mtimeMs": 1783659620000,
+      "sha256": "ed750f70ea3b281b7fb8229d9904667259d3f77336cfa1949b46d16dd63838c6"
     },
     "manualOverlay": {
       "id": "manual-overlays",
       "file": "manual-overlays.json",
-      "bytes": 58116,
-      "mtimeMs": 1783406283000
+      "bytes": 127797,
+      "mtimeMs": 1783659620000,
+      "sha256": "a6f0053b057fb50eb1f7f6fb25e29b72e169efcdee3af041d60f9e8f04262e35"
     }
   }
 }

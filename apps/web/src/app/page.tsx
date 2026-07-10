@@ -254,9 +254,10 @@ interface PublicDataVersionManifest {
   schemaVersion: number;
   generatedAt: string;
   acquiredDate?: string;
+  releaseId?: string;
   versions?: {
-    bundle?: { generatedAt?: string | null; acquiredDate?: string | null; bytes?: number | null };
-    manualOverlay?: { bytes?: number | null; mtimeMs?: number | null };
+    bundle?: { generatedAt?: string | null; acquiredDate?: string | null; bytes?: number | null; sha256?: string | null };
+    manualOverlay?: { bytes?: number | null; mtimeMs?: number | null; sha256?: string | null };
   };
 }
 
