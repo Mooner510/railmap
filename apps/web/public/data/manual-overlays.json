@@ -486,6 +486,1048 @@
       "enabled": true,
       "source": "editor",
       "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 103m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:별내:candidate:kric:urban-rail-station:I41K2:1313:row-439:candidate:kric:urban-rail-station:S4108:804:row-438",
+      "nameKo": "별내",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I41K2:1313:row-439",
+        "candidate:kric:urban-rail-station:S4108:804:row-438"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I41K2:1313:row-439<->candidate:kric:urban-rail-station:S4108:804:row-438": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 34m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:신내:candidate:kric:urban-rail-station:I41K2:1311:row-659:candidate:kric:urban-rail-station:S1106:0648:row-658",
+      "nameKo": "신내",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I41K2:1311:row-659",
+        "candidate:kric:urban-rail-station:S1106:0648:row-658"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I41K2:1311:row-659<->candidate:kric:urban-rail-station:S1106:0648:row-658": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 98m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:상봉:candidate:kric:urban-rail-station:I4108:1202:row-521:candidate:kric:urban-rail-station:S1107:0720:row-522",
+      "nameKo": "상봉",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4108:1202:row-521",
+        "candidate:kric:urban-rail-station:S1107:0720:row-522"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4108:1202:row-521<->candidate:kric:urban-rail-station:S1107:0720:row-522": 9
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 121m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:태릉입구:candidate:kric:urban-rail-station:S1106:0645:row-1021:candidate:kric:urban-rail-station:S1107:0717:row-1022",
+      "nameKo": "태릉입구",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1106:0645:row-1021",
+        "candidate:kric:urban-rail-station:S1107:0717:row-1022"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1106:0645:row-1021<->candidate:kric:urban-rail-station:S1107:0717:row-1022": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 144m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:석계:candidate:kric:urban-rail-station:I4102:1018:row-563:candidate:kric:urban-rail-station:S1106:0644:row-564",
+      "nameKo": "석계",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4102:1018:row-563",
+        "candidate:kric:urban-rail-station:S1106:0644:row-564"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4102:1018:row-563<->candidate:kric:urban-rail-station:S1106:0644:row-564": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 42m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:청량리:candidate:kric:urban-rail-station:I4101:0124:row-993:candidate:kric:urban-rail-station:I4102:1014:row-991",
+      "nameKo": "청량리",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:0124:row-993",
+        "candidate:kric:urban-rail-station:I4102:1014:row-991"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4101:0124:row-993<->candidate:kric:urban-rail-station:I4102:1014:row-991": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 270m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:신설동:candidate:kric:urban-rail-station:I4101:0126:row-678:candidate:kric:urban-rail-station:L11UI:S122:row-680:candidate:kric:urban-rail-station:S1121:2114:row-679",
+      "nameKo": "신설동",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:0126:row-678",
+        "candidate:kric:urban-rail-station:L11UI:S122:row-680",
+        "candidate:kric:urban-rail-station:S1121:2114:row-679"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4101:0126:row-678<->candidate:kric:urban-rail-station:L11UI:S122:row-680": 4,
+        "candidate:kric:urban-rail-station:I4101:0126:row-678<->candidate:kric:urban-rail-station:S1121:2114:row-679": 4,
+        "candidate:kric:urban-rail-station:L11UI:S122:row-680<->candidate:kric:urban-rail-station:S1121:2114:row-679": 6
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 274m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:동묘앞:candidate:kric:urban-rail-station:I4101:0127:row-313:candidate:kric:urban-rail-station:S1106:0636:row-314",
+      "nameKo": "동묘앞",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:0127:row-313",
+        "candidate:kric:urban-rail-station:S1106:0636:row-314"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4101:0127:row-313<->candidate:kric:urban-rail-station:S1106:0636:row-314": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 130m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:동대문:candidate:kric:urban-rail-station:I1104:0421:row-300:candidate:kric:urban-rail-station:I4101:0128:row-299",
+      "nameKo": "동대문",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1104:0421:row-300",
+        "candidate:kric:urban-rail-station:I4101:0128:row-299"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1104:0421:row-300<->candidate:kric:urban-rail-station:I4101:0128:row-299": 4
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 147m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:동대문역사문화공원:candidate:kric:urban-rail-station:I1104:0422:row-302:candidate:kric:urban-rail-station:S1102:0205:row-301:candidate:kric:urban-rail-station:S1105:0536:row-303",
+      "nameKo": "동대문역사문화공원",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1104:0422:row-302",
+        "candidate:kric:urban-rail-station:S1102:0205:row-301",
+        "candidate:kric:urban-rail-station:S1105:0536:row-303"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1104:0422:row-302<->candidate:kric:urban-rail-station:S1102:0205:row-301": 2,
+        "candidate:kric:urban-rail-station:I1104:0422:row-302<->candidate:kric:urban-rail-station:S1105:0536:row-303": 4,
+        "candidate:kric:urban-rail-station:S1102:0205:row-301<->candidate:kric:urban-rail-station:S1105:0536:row-303": 7
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 347m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:신당:candidate:kric:urban-rail-station:S1102:0206:row-663:candidate:kric:urban-rail-station:S1106:0635:row-664",
+      "nameKo": "신당",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0206:row-663",
+        "candidate:kric:urban-rail-station:S1106:0635:row-664"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1102:0206:row-663<->candidate:kric:urban-rail-station:S1106:0635:row-664": 7
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 294m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:약수:candidate:kric:urban-rail-station:I1103:0333:row-728:candidate:kric:urban-rail-station:S1106:0633:row-729",
+      "nameKo": "약수",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0333:row-728",
+        "candidate:kric:urban-rail-station:S1106:0633:row-729"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1103:0333:row-728<->candidate:kric:urban-rail-station:S1106:0633:row-729": 4
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 76m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:충무로:candidate:kric:urban-rail-station:I1103:0331:row-1009:candidate:kric:urban-rail-station:I1104:0423:row-1010",
+      "nameKo": "충무로",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0331:row-1009",
+        "candidate:kric:urban-rail-station:I1104:0423:row-1010"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1103:0331:row-1009<->candidate:kric:urban-rail-station:I1104:0423:row-1010": 1
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 36m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:을지로3가:candidate:kric:urban-rail-station:I1103:0330:row-851:candidate:kric:urban-rail-station:S1102:0203:row-850",
+      "nameKo": "을지로3가",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0330:row-851",
+        "candidate:kric:urban-rail-station:S1102:0203:row-850"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1103:0330:row-851<->candidate:kric:urban-rail-station:S1102:0203:row-850": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 154m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:을지로4가:candidate:kric:urban-rail-station:S1102:0204:row-852:candidate:kric:urban-rail-station:S1105:0535:row-853",
+      "nameKo": "을지로4가",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0204:row-852",
+        "candidate:kric:urban-rail-station:S1105:0535:row-853"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1102:0204:row-852<->candidate:kric:urban-rail-station:S1105:0535:row-853": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 87m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:종로3가:candidate:kric:urban-rail-station:I1103:0329:row-928:candidate:kric:urban-rail-station:I4101:0130:row-927:candidate:kric:urban-rail-station:S1105:0534:row-929",
+      "nameKo": "종로3가",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0329:row-928",
+        "candidate:kric:urban-rail-station:I4101:0130:row-927",
+        "candidate:kric:urban-rail-station:S1105:0534:row-929"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1103:0329:row-928<->candidate:kric:urban-rail-station:I4101:0130:row-927": 3,
+        "candidate:kric:urban-rail-station:I1103:0329:row-928<->candidate:kric:urban-rail-station:S1105:0534:row-929": 5,
+        "candidate:kric:urban-rail-station:I4101:0130:row-927<->candidate:kric:urban-rail-station:S1105:0534:row-929": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 276m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:시청:candidate:kric:urban-rail-station:I4101:0132:row-644:candidate:kric:urban-rail-station:S1102:0201:row-646",
+      "nameKo": "시청",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:0132:row-644",
+        "candidate:kric:urban-rail-station:S1102:0201:row-646"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4101:0132:row-644<->candidate:kric:urban-rail-station:S1102:0201:row-646": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 253m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:공덕:candidate:kric:urban-rail-station:I28A1:A02:row-94:candidate:kric:urban-rail-station:I4108:1262:row-95:candidate:kric:urban-rail-station:S1105:0529:row-92:candidate:kric:urban-rail-station:S1106:0626:row-93",
+      "nameKo": "공덕",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A02:row-94",
+        "candidate:kric:urban-rail-station:I4108:1262:row-95",
+        "candidate:kric:urban-rail-station:S1105:0529:row-92",
+        "candidate:kric:urban-rail-station:S1106:0626:row-93"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I28A1:A02:row-94<->candidate:kric:urban-rail-station:I4108:1262:row-95": 8,
+        "candidate:kric:urban-rail-station:I28A1:A02:row-94<->candidate:kric:urban-rail-station:S1105:0529:row-92": 8,
+        "candidate:kric:urban-rail-station:I28A1:A02:row-94<->candidate:kric:urban-rail-station:S1106:0626:row-93": 1,
+        "candidate:kric:urban-rail-station:I4108:1262:row-95<->candidate:kric:urban-rail-station:S1105:0529:row-92": 6,
+        "candidate:kric:urban-rail-station:I4108:1262:row-95<->candidate:kric:urban-rail-station:S1106:0626:row-93": 4,
+        "candidate:kric:urban-rail-station:S1105:0529:row-92<->candidate:kric:urban-rail-station:S1106:0626:row-93": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 172m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:석촌:candidate:kric:urban-rail-station:S1108:0815:row-571:candidate:kric:urban-rail-station:S1109:4133:row-572",
+      "nameKo": "석촌",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1108:0815:row-571",
+        "candidate:kric:urban-rail-station:S1109:4133:row-572"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1108:0815:row-571<->candidate:kric:urban-rail-station:S1109:4133:row-572": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 36m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:가락시장:candidate:kric:urban-rail-station:I1103:0350:row-4:candidate:kric:urban-rail-station:S1108:0817:row-5",
+      "nameKo": "가락시장",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0350:row-4",
+        "candidate:kric:urban-rail-station:S1108:0817:row-5"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1103:0350:row-4<->candidate:kric:urban-rail-station:S1108:0817:row-5": 1
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 92m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:오금:candidate:kric:urban-rail-station:I1103:0352:row-777:candidate:kric:urban-rail-station:S1105:P552:row-778",
+      "nameKo": "오금",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0352:row-777",
+        "candidate:kric:urban-rail-station:S1105:P552:row-778"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1103:0352:row-777<->candidate:kric:urban-rail-station:S1105:P552:row-778": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 58m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:올림픽공원:candidate:kric:urban-rail-station:S1105:P550:row-797:candidate:kric:urban-rail-station:S1109:4136:row-798",
+      "nameKo": "올림픽공원",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1105:P550:row-797",
+        "candidate:kric:urban-rail-station:S1109:4136:row-798"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1105:P550:row-797<->candidate:kric:urban-rail-station:S1109:4136:row-798": 4
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 57m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:천호:candidate:kric:urban-rail-station:S1105:0547:row-981:candidate:kric:urban-rail-station:S1108:0811:row-982",
+      "nameKo": "천호",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1105:0547:row-981",
+        "candidate:kric:urban-rail-station:S1108:0811:row-982"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1105:0547:row-981<->candidate:kric:urban-rail-station:S1108:0811:row-982": 1
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 79m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:건대입구:candidate:kric:urban-rail-station:S1102:0212:row-51:candidate:kric:urban-rail-station:S1107:0727:row-52",
+      "nameKo": "건대입구",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0212:row-51",
+        "candidate:kric:urban-rail-station:S1107:0727:row-52"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1102:0212:row-51<->candidate:kric:urban-rail-station:S1107:0727:row-52": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 174m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:종합운동장:candidate:kric:urban-rail-station:S1102:0218:row-931:candidate:kric:urban-rail-station:S1109:4130:row-933",
+      "nameKo": "종합운동장",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0218:row-931",
+        "candidate:kric:urban-rail-station:S1109:4130:row-933"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1102:0218:row-931<->candidate:kric:urban-rail-station:S1109:4130:row-933": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 272m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:선릉:candidate:kric:urban-rail-station:I4105:1023:row-575:candidate:kric:urban-rail-station:S1102:0220:row-574",
+      "nameKo": "선릉",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1023:row-575",
+        "candidate:kric:urban-rail-station:S1102:0220:row-574"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4105:1023:row-575<->candidate:kric:urban-rail-station:S1102:0220:row-574": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 73m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:선정릉:candidate:kric:urban-rail-station:I4105:1850:row-580:candidate:kric:urban-rail-station:S1109:4127:row-579",
+      "nameKo": "선정릉",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1850:row-580",
+        "candidate:kric:urban-rail-station:S1109:4127:row-579"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4105:1850:row-580<->candidate:kric:urban-rail-station:S1109:4127:row-579": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 55m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:강남구청:candidate:kric:urban-rail-station:I4105:1849:row-30:candidate:kric:urban-rail-station:S1107:0730:row-29",
+      "nameKo": "강남구청",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1849:row-30",
+        "candidate:kric:urban-rail-station:S1107:0730:row-29"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4105:1849:row-30<->candidate:kric:urban-rail-station:S1107:0730:row-29": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 75m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:도곡:candidate:kric:urban-rail-station:I1103:0344:row-278:candidate:kric:urban-rail-station:I4105:1025:row-279",
+      "nameKo": "도곡",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0344:row-278",
+        "candidate:kric:urban-rail-station:I4105:1025:row-279"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1103:0344:row-278<->candidate:kric:urban-rail-station:I4105:1025:row-279": 1
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 36m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:수서:candidate:kric:urban-rail-station:I1103:0349:row-621:candidate:kric:urban-rail-station:I4105:1030:row-622",
+      "nameKo": "수서",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0349:row-621",
+        "candidate:kric:urban-rail-station:I4105:1030:row-622"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1103:0349:row-621<->candidate:kric:urban-rail-station:I4105:1030:row-622": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 73m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:복정:candidate:kric:urban-rail-station:I4105:1031:row-452:candidate:kric:urban-rail-station:S1108:0820:row-451",
+      "nameKo": "복정",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1031:row-452",
+        "candidate:kric:urban-rail-station:S1108:0820:row-451"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4105:1031:row-452<->candidate:kric:urban-rail-station:S1108:0820:row-451": 1
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 141m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:모란:candidate:kric:urban-rail-station:I4105:1853:row-382:candidate:kric:urban-rail-station:S1108:0827:row-381",
+      "nameKo": "모란",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1853:row-382",
+        "candidate:kric:urban-rail-station:S1108:0827:row-381"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4105:1853:row-382<->candidate:kric:urban-rail-station:S1108:0827:row-381": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 220m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:이매:candidate:kric:urban-rail-station:I4105:1860:row-864:candidate:kric:urban-rail-station:I41K5:1502:row-863",
+      "nameKo": "이매",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1860:row-864",
+        "candidate:kric:urban-rail-station:I41K5:1502:row-863"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4105:1860:row-864<->candidate:kric:urban-rail-station:I41K5:1502:row-863": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 164m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:정자:candidate:kric:urban-rail-station:I11D1:D012:row-921:candidate:kric:urban-rail-station:I4105:1857:row-922",
+      "nameKo": "정자",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I11D1:D012:row-921",
+        "candidate:kric:urban-rail-station:I4105:1857:row-922"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I11D1:D012:row-921<->candidate:kric:urban-rail-station:I4105:1857:row-922": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 166m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:미금:candidate:kric:urban-rail-station:I11D1:D013:row-396:candidate:kric:urban-rail-station:I4105:1858:row-397",
+      "nameKo": "미금",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I11D1:D013:row-396",
+        "candidate:kric:urban-rail-station:I4105:1858:row-397"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I11D1:D013:row-396<->candidate:kric:urban-rail-station:I4105:1858:row-397": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 58m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:기흥:candidate:kric:urban-rail-station:I4105:1865:row-167:candidate:kric:urban-rail-station:L41E1:Y110:row-166",
+      "nameKo": "기흥",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1865:row-167",
+        "candidate:kric:urban-rail-station:L41E1:Y110:row-166"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4105:1865:row-167<->candidate:kric:urban-rail-station:L41E1:Y110:row-166": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 101m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:초지:candidate:kric:urban-rail-station:I4103:1758:row-1001:candidate:kric:urban-rail-station:I41WS:4813:row-1003",
+      "nameKo": "초지",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4103:1758:row-1001",
+        "candidate:kric:urban-rail-station:I41WS:4813:row-1003"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4103:1758:row-1001<->candidate:kric:urban-rail-station:I41WS:4813:row-1003": 8
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 178m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:원인재:candidate:kric:urban-rail-station:I28K1:1884:row-833:candidate:kric:urban-rail-station:S2801:3130:row-832",
+      "nameKo": "원인재",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28K1:1884:row-833",
+        "candidate:kric:urban-rail-station:S2801:3130:row-832"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I28K1:1884:row-833<->candidate:kric:urban-rail-station:S2801:3130:row-832": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 104m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:인천시청:candidate:kric:urban-rail-station:S2801:3124:row-881:candidate:kric:urban-rail-station:S2802:3221:row-882",
+      "nameKo": "인천시청",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S2801:3124:row-881",
+        "candidate:kric:urban-rail-station:S2802:3221:row-882"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S2801:3124:row-881<->candidate:kric:urban-rail-station:S2802:3221:row-882": 4
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 100m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:주안:candidate:kric:urban-rail-station:I1101:1809:row-937:candidate:kric:urban-rail-station:S2802:3218:row-938",
+      "nameKo": "주안",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1101:1809:row-937",
+        "candidate:kric:urban-rail-station:S2802:3218:row-938"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1101:1809:row-937<->candidate:kric:urban-rail-station:S2802:3218:row-938": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 149m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:석남:candidate:kric:urban-rail-station:S1107:3763:row-565:candidate:kric:urban-rail-station:S2802:3213:row-566",
+      "nameKo": "석남",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1107:3763:row-565",
+        "candidate:kric:urban-rail-station:S2802:3213:row-566"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1107:3763:row-565<->candidate:kric:urban-rail-station:S2802:3213:row-566": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 112m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:부평구청:candidate:kric:urban-rail-station:S1107:3761:row-475:candidate:kric:urban-rail-station:S2801:3118:row-476",
+      "nameKo": "부평구청",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1107:3761:row-475",
+        "candidate:kric:urban-rail-station:S2801:3118:row-476"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1107:3761:row-475<->candidate:kric:urban-rail-station:S2801:3118:row-476": 1
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 156m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:부평:candidate:kric:urban-rail-station:I1101:1806:row-473:candidate:kric:urban-rail-station:S2801:3120:row-474",
+      "nameKo": "부평",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1101:1806:row-473",
+        "candidate:kric:urban-rail-station:S2801:3120:row-474"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1101:1806:row-473<->candidate:kric:urban-rail-station:S2801:3120:row-474": 4
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 157m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:소사:candidate:kric:urban-rail-station:I1101:4804:row-599:candidate:kric:urban-rail-station:I41WS:4804:row-598",
+      "nameKo": "소사",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1101:4804:row-599",
+        "candidate:kric:urban-rail-station:I41WS:4804:row-598"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1101:4804:row-599<->candidate:kric:urban-rail-station:I41WS:4804:row-598": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 52m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:부천종합운동장:candidate:kric:urban-rail-station:I41WS:1982:row-472:candidate:kric:urban-rail-station:S1107:3754:row-471",
+      "nameKo": "부천종합운동장",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I41WS:1982:row-472",
+        "candidate:kric:urban-rail-station:S1107:3754:row-471"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I41WS:1982:row-472<->candidate:kric:urban-rail-station:S1107:3754:row-471": 4
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 54m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:김포공항:candidate:kric:urban-rail-station:I28A1:A05:row-175:candidate:kric:urban-rail-station:I41WS:1980:row-177:candidate:kric:urban-rail-station:L41G1:G109:row-176:candidate:kric:urban-rail-station:S1105:0512:row-173:candidate:kric:urban-rail-station:S1109:4102:row-174",
+      "nameKo": "김포공항",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A05:row-175",
+        "candidate:kric:urban-rail-station:I41WS:1980:row-177",
+        "candidate:kric:urban-rail-station:L41G1:G109:row-176",
+        "candidate:kric:urban-rail-station:S1105:0512:row-173",
+        "candidate:kric:urban-rail-station:S1109:4102:row-174"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I28A1:A05:row-175<->candidate:kric:urban-rail-station:I41WS:1980:row-177": 7,
+        "candidate:kric:urban-rail-station:I28A1:A05:row-175<->candidate:kric:urban-rail-station:L41G1:G109:row-176": 3,
+        "candidate:kric:urban-rail-station:I28A1:A05:row-175<->candidate:kric:urban-rail-station:S1105:0512:row-173": 2,
+        "candidate:kric:urban-rail-station:I28A1:A05:row-175<->candidate:kric:urban-rail-station:S1109:4102:row-174": 1,
+        "candidate:kric:urban-rail-station:I41WS:1980:row-177<->candidate:kric:urban-rail-station:L41G1:G109:row-176": 7,
+        "candidate:kric:urban-rail-station:I41WS:1980:row-177<->candidate:kric:urban-rail-station:S1105:0512:row-173": 6,
+        "candidate:kric:urban-rail-station:I41WS:1980:row-177<->candidate:kric:urban-rail-station:S1109:4102:row-174": 8,
+        "candidate:kric:urban-rail-station:L41G1:G109:row-176<->candidate:kric:urban-rail-station:S1105:0512:row-173": 4,
+        "candidate:kric:urban-rail-station:L41G1:G109:row-176<->candidate:kric:urban-rail-station:S1109:4102:row-174": 3,
+        "candidate:kric:urban-rail-station:S1105:0512:row-173<->candidate:kric:urban-rail-station:S1109:4102:row-174": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 246m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:마곡나루:candidate:kric:urban-rail-station:I28A1:A042:row-343:candidate:kric:urban-rail-station:S1109:4105:row-342",
+      "nameKo": "마곡나루",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A042:row-343",
+        "candidate:kric:urban-rail-station:S1109:4105:row-342"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I28A1:A042:row-343<->candidate:kric:urban-rail-station:S1109:4105:row-342": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 100m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:디지털미디어시티:candidate:kric:urban-rail-station:I28A1:A04:row-338:candidate:kric:urban-rail-station:I4108:1266:row-339:candidate:kric:urban-rail-station:S1106:0618:row-337",
+      "nameKo": "디지털미디어시티",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A04:row-338",
+        "candidate:kric:urban-rail-station:I4108:1266:row-339",
+        "candidate:kric:urban-rail-station:S1106:0618:row-337"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I28A1:A04:row-338<->candidate:kric:urban-rail-station:I4108:1266:row-339": 11,
+        "candidate:kric:urban-rail-station:I28A1:A04:row-338<->candidate:kric:urban-rail-station:S1106:0618:row-337": 7,
+        "candidate:kric:urban-rail-station:I4108:1266:row-339<->candidate:kric:urban-rail-station:S1106:0618:row-337": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 325m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:홍대입구:candidate:kric:urban-rail-station:I28A1:A03:row-1079:candidate:kric:urban-rail-station:I4108:1264:row-1080:candidate:kric:urban-rail-station:S1102:0239:row-1078",
+      "nameKo": "홍대입구",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A03:row-1079",
+        "candidate:kric:urban-rail-station:I4108:1264:row-1080",
+        "candidate:kric:urban-rail-station:S1102:0239:row-1078"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I28A1:A03:row-1079<->candidate:kric:urban-rail-station:I4108:1264:row-1080": 4,
+        "candidate:kric:urban-rail-station:I28A1:A03:row-1079<->candidate:kric:urban-rail-station:S1102:0239:row-1078": 5,
+        "candidate:kric:urban-rail-station:I4108:1264:row-1080<->candidate:kric:urban-rail-station:S1102:0239:row-1078": 6
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 297m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:합정:candidate:kric:urban-rail-station:S1102:0238:row-1067:candidate:kric:urban-rail-station:S1106:0622:row-1068",
+      "nameKo": "합정",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0238:row-1067",
+        "candidate:kric:urban-rail-station:S1106:0622:row-1068"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1102:0238:row-1067<->candidate:kric:urban-rail-station:S1106:0622:row-1068": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 142m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:당산:candidate:kric:urban-rail-station:S1102:0237:row-237:candidate:kric:urban-rail-station:S1109:4113:row-238",
+      "nameKo": "당산",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0237:row-237",
+        "candidate:kric:urban-rail-station:S1109:4113:row-238"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1102:0237:row-237<->candidate:kric:urban-rail-station:S1109:4113:row-238": 6
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 112m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:보라매:candidate:kric:urban-rail-station:L11SL:S404:row-443:candidate:kric:urban-rail-station:S1107:0742:row-442",
+      "nameKo": "보라매",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L11SL:S404:row-443",
+        "candidate:kric:urban-rail-station:S1107:0742:row-442"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:L11SL:S404:row-443<->candidate:kric:urban-rail-station:S1107:0742:row-442": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 55m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:신림:candidate:kric:urban-rail-station:L11SL:S408:row-671:candidate:kric:urban-rail-station:S1102:0230:row-670",
+      "nameKo": "신림",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L11SL:S408:row-671",
+        "candidate:kric:urban-rail-station:S1102:0230:row-670"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:L11SL:S408:row-671<->candidate:kric:urban-rail-station:S1102:0230:row-670": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 75m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:대림:candidate:kric:urban-rail-station:S1102:0233:row-250:candidate:kric:urban-rail-station:S1107:0744:row-251",
+      "nameKo": "대림",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0233:row-250",
+        "candidate:kric:urban-rail-station:S1107:0744:row-251"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1102:0233:row-250<->candidate:kric:urban-rail-station:S1107:0744:row-251": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 182m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:가산디지털단지:candidate:kric:urban-rail-station:I4101:1702:row-6:candidate:kric:urban-rail-station:S1107:0746:row-7",
+      "nameKo": "가산디지털단지",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:1702:row-6",
+        "candidate:kric:urban-rail-station:S1107:0746:row-7"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I4101:1702:row-6<->candidate:kric:urban-rail-station:S1107:0746:row-7": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 132m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:불광:candidate:kric:urban-rail-station:I1103:0322:row-484:candidate:kric:urban-rail-station:S1106:0612:row-485",
+      "nameKo": "불광",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0322:row-484",
+        "candidate:kric:urban-rail-station:S1106:0612:row-485"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1103:0322:row-484<->candidate:kric:urban-rail-station:S1106:0612:row-485": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 104m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:연신내:candidate:kric:urban-rail-station:I1103:0321:row-761:candidate:kric:urban-rail-station:S1106:0614:row-762",
+      "nameKo": "연신내",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0321:row-761",
+        "candidate:kric:urban-rail-station:S1106:0614:row-762"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1103:0321:row-761<->candidate:kric:urban-rail-station:S1106:0614:row-762": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 103m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:성신여대입구:candidate:kric:urban-rail-station:I1104:0418:row-589:candidate:kric:urban-rail-station:L11UI:S120:row-588",
+      "nameKo": "성신여대입구",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1104:0418:row-589",
+        "candidate:kric:urban-rail-station:L11UI:S120:row-588"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1104:0418:row-589<->candidate:kric:urban-rail-station:L11UI:S120:row-588": 5
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 55m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:왕십리:candidate:kric:urban-rail-station:S1102:0208:row-801:candidate:kric:urban-rail-station:S1105:0540:row-802",
+      "nameKo": "왕십리",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0208:row-801",
+        "candidate:kric:urban-rail-station:S1105:0540:row-802"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S1102:0208:row-801<->candidate:kric:urban-rail-station:S1105:0540:row-802": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 78m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:창동:candidate:kric:urban-rail-station:I1104:0412:row-975:candidate:kric:urban-rail-station:I4102:1022:row-976",
+      "nameKo": "창동",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1104:0412:row-975",
+        "candidate:kric:urban-rail-station:I4102:1022:row-976"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1104:0412:row-975<->candidate:kric:urban-rail-station:I4102:1022:row-976": 2
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 59m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:노원:candidate:kric:urban-rail-station:I1104:0411:row-209:candidate:kric:urban-rail-station:S1107:0713:row-210",
+      "nameKo": "노원",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1104:0411:row-209",
+        "candidate:kric:urban-rail-station:S1107:0713:row-210"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1104:0411:row-209<->candidate:kric:urban-rail-station:S1107:0713:row-210": 9
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 306m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:검암:candidate:kric:urban-rail-station:I28A1:A07:row-59:candidate:kric:urban-rail-station:S2802:3207:row-60",
+      "nameKo": "검암",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A07:row-59",
+        "candidate:kric:urban-rail-station:S2802:3207:row-60"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I28A1:A07:row-59<->candidate:kric:urban-rail-station:S2802:3207:row-60": 8
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 199m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:인천:candidate:kric:urban-rail-station:I1101:1812:row-872:candidate:kric:urban-rail-station:I28K1:1891:row-873",
+      "nameKo": "인천",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1101:1812:row-872",
+        "candidate:kric:urban-rail-station:I28K1:1891:row-873"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:I1101:1812:row-872<->candidate:kric:urban-rail-station:I28K1:1891:row-873": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 44m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:청라언덕:candidate:kric:urban-rail-station:S2702:0229:row-989:candidate:kric:urban-rail-station:S2703:0329:row-990",
+      "nameKo": "청라언덕",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S2702:0229:row-989",
+        "candidate:kric:urban-rail-station:S2703:0329:row-990"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S2702:0229:row-989<->candidate:kric:urban-rail-station:S2703:0329:row-990": 4
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 90m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:반월당:candidate:kric:urban-rail-station:S2701:0130:row-411:candidate:kric:urban-rail-station:S2702:0230:row-412",
+      "nameKo": "반월당",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S2701:0130:row-411",
+        "candidate:kric:urban-rail-station:S2702:0230:row-412"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S2701:0130:row-411<->candidate:kric:urban-rail-station:S2702:0230:row-412": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 189m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:명덕:candidate:kric:urban-rail-station:S2701:0129:row-371:candidate:kric:urban-rail-station:S2703:0331:row-372",
+      "nameKo": "명덕",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S2701:0129:row-371",
+        "candidate:kric:urban-rail-station:S2703:0331:row-372"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S2701:0129:row-371<->candidate:kric:urban-rail-station:S2703:0331:row-372": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 90m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:대저:candidate:kric:urban-rail-station:L48B1:0007:row-263:candidate:kric:urban-rail-station:S2603:0317:row-262",
+      "nameKo": "대저",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L48B1:0007:row-263",
+        "candidate:kric:urban-rail-station:S2603:0317:row-262"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:L48B1:0007:row-263<->candidate:kric:urban-rail-station:S2603:0317:row-262": 3
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 44m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:사상:candidate:kric:urban-rail-station:L48B1:0001:row-495:candidate:kric:urban-rail-station:S2602:0227:row-494",
+      "nameKo": "사상",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L48B1:0001:row-495",
+        "candidate:kric:urban-rail-station:S2602:0227:row-494"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:L48B1:0001:row-495<->candidate:kric:urban-rail-station:S2602:0227:row-494": 6
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 117m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:서면:candidate:kric:urban-rail-station:S2601:0119:row-543:candidate:kric:urban-rail-station:S2602:0219:row-544",
+      "nameKo": "서면",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S2601:0119:row-543",
+        "candidate:kric:urban-rail-station:S2602:0219:row-544"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S2601:0119:row-543<->candidate:kric:urban-rail-station:S2602:0219:row-544": 1
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 61m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:수영:candidate:kric:urban-rail-station:S2602:0208:row-629:candidate:kric:urban-rail-station:S2603:0301:row-630",
+      "nameKo": "수영",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S2602:0208:row-629",
+        "candidate:kric:urban-rail-station:S2603:0301:row-630"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:S2602:0208:row-629<->candidate:kric:urban-rail-station:S2603:0301:row-630": 1
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 220m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:동래:candidate:kric:urban-rail-station:L2604:0402:row-309:candidate:kric:urban-rail-station:S2601:0125:row-308",
+      "nameKo": "동래",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L2604:0402:row-309",
+        "candidate:kric:urban-rail-station:S2601:0125:row-308"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:L2604:0402:row-309<->candidate:kric:urban-rail-station:S2601:0125:row-308": 6
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 138m 안에 있음, 아직 환승 그룹에 포함되지 않음"
+    },
+    {
+      "id": "manual-transfer-group:미남:candidate:kric:urban-rail-station:L2604:0401:row-399:candidate:kric:urban-rail-station:S2603:0309:row-398",
+      "nameKo": "미남",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L2604:0401:row-399",
+        "candidate:kric:urban-rail-station:S2603:0309:row-398"
+      ],
+      "transferMinutesByPair": {
+        "candidate:kric:urban-rail-station:L2604:0401:row-399<->candidate:kric:urban-rail-station:S2603:0309:row-398": 1
+      },
+      "enabled": true,
+      "source": "editor",
+      "note": "환승 그룹 추천에서 생성: 정규화한 역명이 같음, 반경 118m 안에 있음, 아직 환승 그룹에 포함되지 않음"
     }
   ],
   "manualTransferEdges": [],
@@ -514,7 +1556,79 @@
     "candidate:kric:urban-rail-station:I1103:0339:row-79|candidate:kric:urban-rail-station:S1107:0734:row-80|candidate:kric:urban-rail-station:S1109:4123:row-81",
     "candidate:kric:urban-rail-station:I1104:0431:row-323|candidate:kric:urban-rail-station:S1109:4120:row-324",
     "candidate:kric:urban-rail-station:I1104:0428:row-505|candidate:kric:urban-rail-station:S1106:0628:row-506",
-    "candidate:kric:urban-rail-station:I4108:1261:row-1098|candidate:kric:urban-rail-station:S1106:0627:row-1097"
+    "candidate:kric:urban-rail-station:I4108:1261:row-1098|candidate:kric:urban-rail-station:S1106:0627:row-1097",
+    "candidate:kric:urban-rail-station:I41K2:1313:row-439|candidate:kric:urban-rail-station:S4108:804:row-438",
+    "candidate:kric:urban-rail-station:I41K2:1311:row-659|candidate:kric:urban-rail-station:S1106:0648:row-658",
+    "candidate:kric:urban-rail-station:I4108:1202:row-521|candidate:kric:urban-rail-station:S1107:0720:row-522",
+    "candidate:kric:urban-rail-station:S1106:0645:row-1021|candidate:kric:urban-rail-station:S1107:0717:row-1022",
+    "candidate:kric:urban-rail-station:I4102:1018:row-563|candidate:kric:urban-rail-station:S1106:0644:row-564",
+    "candidate:kric:urban-rail-station:I4101:0124:row-993|candidate:kric:urban-rail-station:I4102:1014:row-991",
+    "candidate:kric:urban-rail-station:I4101:0126:row-678|candidate:kric:urban-rail-station:L11UI:S122:row-680|candidate:kric:urban-rail-station:S1121:2114:row-679",
+    "candidate:kric:urban-rail-station:I4101:0127:row-313|candidate:kric:urban-rail-station:S1106:0636:row-314",
+    "candidate:kric:urban-rail-station:I1104:0421:row-300|candidate:kric:urban-rail-station:I4101:0128:row-299",
+    "candidate:kric:urban-rail-station:I1104:0422:row-302|candidate:kric:urban-rail-station:S1102:0205:row-301|candidate:kric:urban-rail-station:S1105:0536:row-303",
+    "candidate:kric:urban-rail-station:S1102:0206:row-663|candidate:kric:urban-rail-station:S1106:0635:row-664",
+    "candidate:kric:urban-rail-station:I1103:0333:row-728|candidate:kric:urban-rail-station:S1106:0633:row-729",
+    "candidate:kric:urban-rail-station:I1103:0331:row-1009|candidate:kric:urban-rail-station:I1104:0423:row-1010",
+    "candidate:kric:urban-rail-station:I1103:0330:row-851|candidate:kric:urban-rail-station:S1102:0203:row-850",
+    "candidate:kric:urban-rail-station:S1102:0204:row-852|candidate:kric:urban-rail-station:S1105:0535:row-853",
+    "candidate:kric:urban-rail-station:I1103:0329:row-928|candidate:kric:urban-rail-station:I4101:0130:row-927|candidate:kric:urban-rail-station:S1105:0534:row-929",
+    "candidate:kric:urban-rail-station:I4101:0132:row-644|candidate:kric:urban-rail-station:S1102:0201:row-646",
+    "candidate:kric:urban-rail-station:I28A1:A02:row-94|candidate:kric:urban-rail-station:I4108:1262:row-95|candidate:kric:urban-rail-station:S1105:0529:row-92|candidate:kric:urban-rail-station:S1106:0626:row-93",
+    "candidate:kric:urban-rail-station:S1108:0815:row-571|candidate:kric:urban-rail-station:S1109:4133:row-572",
+    "candidate:kric:urban-rail-station:I1103:0350:row-4|candidate:kric:urban-rail-station:S1108:0817:row-5",
+    "candidate:kric:urban-rail-station:I1103:0352:row-777|candidate:kric:urban-rail-station:S1105:P552:row-778",
+    "candidate:kric:urban-rail-station:S1105:P550:row-797|candidate:kric:urban-rail-station:S1109:4136:row-798",
+    "candidate:kric:urban-rail-station:S1105:0547:row-981|candidate:kric:urban-rail-station:S1108:0811:row-982",
+    "candidate:kric:urban-rail-station:S1102:0212:row-51|candidate:kric:urban-rail-station:S1107:0727:row-52",
+    "candidate:kric:urban-rail-station:S1102:0218:row-931|candidate:kric:urban-rail-station:S1109:4130:row-933",
+    "candidate:kric:urban-rail-station:I4105:1023:row-575|candidate:kric:urban-rail-station:S1102:0220:row-574",
+    "candidate:kric:urban-rail-station:I4105:1850:row-580|candidate:kric:urban-rail-station:S1109:4127:row-579",
+    "candidate:kric:urban-rail-station:I4105:1849:row-30|candidate:kric:urban-rail-station:S1107:0730:row-29",
+    "candidate:kric:urban-rail-station:I1103:0344:row-278|candidate:kric:urban-rail-station:I4105:1025:row-279",
+    "candidate:kric:urban-rail-station:I1103:0349:row-621|candidate:kric:urban-rail-station:I4105:1030:row-622",
+    "candidate:kric:urban-rail-station:I4105:1031:row-452|candidate:kric:urban-rail-station:S1108:0820:row-451",
+    "candidate:kric:urban-rail-station:I4105:1853:row-382|candidate:kric:urban-rail-station:S1108:0827:row-381",
+    "candidate:kric:urban-rail-station:I4105:1860:row-864|candidate:kric:urban-rail-station:I41K5:1502:row-863",
+    "candidate:kric:urban-rail-station:I11D1:D012:row-921|candidate:kric:urban-rail-station:I4105:1857:row-922",
+    "candidate:kric:urban-rail-station:I11D1:D013:row-396|candidate:kric:urban-rail-station:I4105:1858:row-397",
+    "candidate:kric:urban-rail-station:I4105:1865:row-167|candidate:kric:urban-rail-station:L41E1:Y110:row-166",
+    "candidate:kric:urban-rail-station:I4103:1758:row-1001|candidate:kric:urban-rail-station:I41WS:4813:row-1003",
+    "candidate:kric:urban-rail-station:I28K1:1884:row-833|candidate:kric:urban-rail-station:S2801:3130:row-832",
+    "candidate:kric:urban-rail-station:S2801:3124:row-881|candidate:kric:urban-rail-station:S2802:3221:row-882",
+    "candidate:kric:urban-rail-station:I1101:1809:row-937|candidate:kric:urban-rail-station:S2802:3218:row-938",
+    "candidate:kric:urban-rail-station:S1107:3763:row-565|candidate:kric:urban-rail-station:S2802:3213:row-566",
+    "candidate:kric:urban-rail-station:S1107:3761:row-475|candidate:kric:urban-rail-station:S2801:3118:row-476",
+    "candidate:kric:urban-rail-station:I1101:1806:row-473|candidate:kric:urban-rail-station:S2801:3120:row-474",
+    "candidate:kric:urban-rail-station:I1101:4804:row-599|candidate:kric:urban-rail-station:I41WS:4804:row-598",
+    "candidate:kric:urban-rail-station:I41WS:1982:row-472|candidate:kric:urban-rail-station:S1107:3754:row-471",
+    "candidate:kric:urban-rail-station:I28A1:A05:row-175|candidate:kric:urban-rail-station:I41WS:1980:row-177|candidate:kric:urban-rail-station:L41G1:G109:row-176|candidate:kric:urban-rail-station:S1105:0512:row-173|candidate:kric:urban-rail-station:S1109:4102:row-174",
+    "candidate:kric:urban-rail-station:I28A1:A042:row-343|candidate:kric:urban-rail-station:S1109:4105:row-342",
+    "candidate:kric:urban-rail-station:I28A1:A04:row-338|candidate:kric:urban-rail-station:I4108:1266:row-339|candidate:kric:urban-rail-station:S1106:0618:row-337",
+    "candidate:kric:urban-rail-station:I28A1:A03:row-1079|candidate:kric:urban-rail-station:I4108:1264:row-1080|candidate:kric:urban-rail-station:S1102:0239:row-1078",
+    "candidate:kric:urban-rail-station:S1102:0238:row-1067|candidate:kric:urban-rail-station:S1106:0622:row-1068",
+    "candidate:kric:urban-rail-station:S1102:0237:row-237|candidate:kric:urban-rail-station:S1109:4113:row-238",
+    "candidate:kric:urban-rail-station:L11SL:S404:row-443|candidate:kric:urban-rail-station:S1107:0742:row-442",
+    "candidate:kric:urban-rail-station:L11SL:S408:row-671|candidate:kric:urban-rail-station:S1102:0230:row-670",
+    "candidate:kric:urban-rail-station:S1102:0233:row-250|candidate:kric:urban-rail-station:S1107:0744:row-251",
+    "candidate:kric:urban-rail-station:I4101:1702:row-6|candidate:kric:urban-rail-station:S1107:0746:row-7",
+    "candidate:kric:urban-rail-station:I1103:0322:row-484|candidate:kric:urban-rail-station:S1106:0612:row-485",
+    "candidate:kric:urban-rail-station:I1103:0321:row-761|candidate:kric:urban-rail-station:S1106:0614:row-762",
+    "candidate:kric:urban-rail-station:I1104:0418:row-589|candidate:kric:urban-rail-station:L11UI:S120:row-588",
+    "candidate:kric:urban-rail-station:S1102:0208:row-801|candidate:kric:urban-rail-station:S1105:0540:row-802",
+    "candidate:kric:urban-rail-station:I1104:0412:row-975|candidate:kric:urban-rail-station:I4102:1022:row-976",
+    "candidate:kric:urban-rail-station:I1104:0411:row-209|candidate:kric:urban-rail-station:S1107:0713:row-210",
+    "candidate:kric:urban-rail-station:I28A1:A07:row-59|candidate:kric:urban-rail-station:S2802:3207:row-60",
+    "candidate:kric:urban-rail-station:I1101:1812:row-872|candidate:kric:urban-rail-station:I28K1:1891:row-873",
+    "candidate:kric:urban-rail-station:S2702:0229:row-989|candidate:kric:urban-rail-station:S2703:0329:row-990",
+    "candidate:kric:urban-rail-station:S2701:0130:row-411|candidate:kric:urban-rail-station:S2702:0230:row-412",
+    "candidate:kric:urban-rail-station:S2701:0129:row-371|candidate:kric:urban-rail-station:S2703:0331:row-372",
+    "candidate:kric:urban-rail-station:L48B1:0007:row-263|candidate:kric:urban-rail-station:S2603:0317:row-262",
+    "candidate:kric:urban-rail-station:L48B1:0001:row-495|candidate:kric:urban-rail-station:S2602:0227:row-494",
+    "candidate:kric:urban-rail-station:S2601:0119:row-543|candidate:kric:urban-rail-station:S2602:0219:row-544",
+    "candidate:kric:urban-rail-station:S2602:0208:row-629|candidate:kric:urban-rail-station:S2603:0301:row-630",
+    "candidate:kric:urban-rail-station:L2604:0402:row-309|candidate:kric:urban-rail-station:S2601:0125:row-308",
+    "candidate:kric:urban-rail-station:L2604:0401:row-399|candidate:kric:urban-rail-station:S2603:0309:row-398"
   ],
   "dismissedTransferGroupSuggestionNotes": {},
   "transferTimePendingGroupIds": [],
@@ -827,6 +1941,1024 @@
       "decidedAt": "2026-07-08T11:41:08.212Z",
       "reason": null,
       "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T03:30:25.904Z:suggestion-approved:candidate:kric:urban-rail-station:I41K2:1313:row-439|candidate:kric:urban-rail-station:S4108:804:row-438",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:별내:candidate:kric:urban-rail-station:I41K2:1313:row-439:candidate:kric:urban-rail-station:S4108:804:row-438",
+      "suggestionKey": "candidate:kric:urban-rail-station:I41K2:1313:row-439|candidate:kric:urban-rail-station:S4108:804:row-438",
+      "nameKo": "별내",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I41K2:1313:row-439",
+        "candidate:kric:urban-rail-station:S4108:804:row-438"
+      ],
+      "decidedAt": "2026-07-09T03:30:25.904Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T03:30:39.214Z:suggestion-approved:candidate:kric:urban-rail-station:I41K2:1311:row-659|candidate:kric:urban-rail-station:S1106:0648:row-658",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:신내:candidate:kric:urban-rail-station:I41K2:1311:row-659:candidate:kric:urban-rail-station:S1106:0648:row-658",
+      "suggestionKey": "candidate:kric:urban-rail-station:I41K2:1311:row-659|candidate:kric:urban-rail-station:S1106:0648:row-658",
+      "nameKo": "신내",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I41K2:1311:row-659",
+        "candidate:kric:urban-rail-station:S1106:0648:row-658"
+      ],
+      "decidedAt": "2026-07-09T03:30:39.214Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T03:33:01.411Z:suggestion-approved:candidate:kric:urban-rail-station:I4108:1202:row-521|candidate:kric:urban-rail-station:S1107:0720:row-522",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:상봉:candidate:kric:urban-rail-station:I4108:1202:row-521:candidate:kric:urban-rail-station:S1107:0720:row-522",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4108:1202:row-521|candidate:kric:urban-rail-station:S1107:0720:row-522",
+      "nameKo": "상봉",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4108:1202:row-521",
+        "candidate:kric:urban-rail-station:S1107:0720:row-522"
+      ],
+      "decidedAt": "2026-07-09T03:33:01.411Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T03:33:14.656Z:suggestion-approved:candidate:kric:urban-rail-station:S1106:0645:row-1021|candidate:kric:urban-rail-station:S1107:0717:row-1022",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:태릉입구:candidate:kric:urban-rail-station:S1106:0645:row-1021:candidate:kric:urban-rail-station:S1107:0717:row-1022",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1106:0645:row-1021|candidate:kric:urban-rail-station:S1107:0717:row-1022",
+      "nameKo": "태릉입구",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1106:0645:row-1021",
+        "candidate:kric:urban-rail-station:S1107:0717:row-1022"
+      ],
+      "decidedAt": "2026-07-09T03:33:14.656Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T03:33:28.703Z:suggestion-approved:candidate:kric:urban-rail-station:I4102:1018:row-563|candidate:kric:urban-rail-station:S1106:0644:row-564",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:석계:candidate:kric:urban-rail-station:I4102:1018:row-563:candidate:kric:urban-rail-station:S1106:0644:row-564",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4102:1018:row-563|candidate:kric:urban-rail-station:S1106:0644:row-564",
+      "nameKo": "석계",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4102:1018:row-563",
+        "candidate:kric:urban-rail-station:S1106:0644:row-564"
+      ],
+      "decidedAt": "2026-07-09T03:33:28.703Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T03:33:58.252Z:suggestion-approved:candidate:kric:urban-rail-station:I4101:0124:row-993|candidate:kric:urban-rail-station:I4102:1014:row-991",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:청량리:candidate:kric:urban-rail-station:I4101:0124:row-993:candidate:kric:urban-rail-station:I4102:1014:row-991",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4101:0124:row-993|candidate:kric:urban-rail-station:I4102:1014:row-991",
+      "nameKo": "청량리",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:0124:row-993",
+        "candidate:kric:urban-rail-station:I4102:1014:row-991"
+      ],
+      "decidedAt": "2026-07-09T03:33:58.252Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T03:35:55.498Z:suggestion-approved:candidate:kric:urban-rail-station:I4101:0126:row-678|candidate:kric:urban-rail-station:L11UI:S122:row-680|candidate:kric:urban-rail-station:S1121:2114:row-679",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:신설동:candidate:kric:urban-rail-station:I4101:0126:row-678:candidate:kric:urban-rail-station:L11UI:S122:row-680:candidate:kric:urban-rail-station:S1121:2114:row-679",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4101:0126:row-678|candidate:kric:urban-rail-station:L11UI:S122:row-680|candidate:kric:urban-rail-station:S1121:2114:row-679",
+      "nameKo": "신설동",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:0126:row-678",
+        "candidate:kric:urban-rail-station:L11UI:S122:row-680",
+        "candidate:kric:urban-rail-station:S1121:2114:row-679"
+      ],
+      "decidedAt": "2026-07-09T03:35:55.498Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T03:36:28.759Z:suggestion-approved:candidate:kric:urban-rail-station:I4101:0127:row-313|candidate:kric:urban-rail-station:S1106:0636:row-314",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:동묘앞:candidate:kric:urban-rail-station:I4101:0127:row-313:candidate:kric:urban-rail-station:S1106:0636:row-314",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4101:0127:row-313|candidate:kric:urban-rail-station:S1106:0636:row-314",
+      "nameKo": "동묘앞",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:0127:row-313",
+        "candidate:kric:urban-rail-station:S1106:0636:row-314"
+      ],
+      "decidedAt": "2026-07-09T03:36:28.759Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T03:37:16.352Z:suggestion-approved:candidate:kric:urban-rail-station:I1104:0421:row-300|candidate:kric:urban-rail-station:I4101:0128:row-299",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:동대문:candidate:kric:urban-rail-station:I1104:0421:row-300:candidate:kric:urban-rail-station:I4101:0128:row-299",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1104:0421:row-300|candidate:kric:urban-rail-station:I4101:0128:row-299",
+      "nameKo": "동대문",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1104:0421:row-300",
+        "candidate:kric:urban-rail-station:I4101:0128:row-299"
+      ],
+      "decidedAt": "2026-07-09T03:37:16.352Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T10:00:30.309Z:suggestion-approved:candidate:kric:urban-rail-station:I1104:0422:row-302|candidate:kric:urban-rail-station:S1102:0205:row-301|candidate:kric:urban-rail-station:S1105:0536:row-303",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:동대문역사문화공원:candidate:kric:urban-rail-station:I1104:0422:row-302:candidate:kric:urban-rail-station:S1102:0205:row-301:candidate:kric:urban-rail-station:S1105:0536:row-303",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1104:0422:row-302|candidate:kric:urban-rail-station:S1102:0205:row-301|candidate:kric:urban-rail-station:S1105:0536:row-303",
+      "nameKo": "동대문역사문화공원",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1104:0422:row-302",
+        "candidate:kric:urban-rail-station:S1102:0205:row-301",
+        "candidate:kric:urban-rail-station:S1105:0536:row-303"
+      ],
+      "decidedAt": "2026-07-09T10:00:30.309Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T10:00:49.052Z:suggestion-approved:candidate:kric:urban-rail-station:S1102:0206:row-663|candidate:kric:urban-rail-station:S1106:0635:row-664",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:신당:candidate:kric:urban-rail-station:S1102:0206:row-663:candidate:kric:urban-rail-station:S1106:0635:row-664",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1102:0206:row-663|candidate:kric:urban-rail-station:S1106:0635:row-664",
+      "nameKo": "신당",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0206:row-663",
+        "candidate:kric:urban-rail-station:S1106:0635:row-664"
+      ],
+      "decidedAt": "2026-07-09T10:00:49.052Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T10:01:02.972Z:suggestion-approved:candidate:kric:urban-rail-station:I1103:0333:row-728|candidate:kric:urban-rail-station:S1106:0633:row-729",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:약수:candidate:kric:urban-rail-station:I1103:0333:row-728:candidate:kric:urban-rail-station:S1106:0633:row-729",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1103:0333:row-728|candidate:kric:urban-rail-station:S1106:0633:row-729",
+      "nameKo": "약수",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0333:row-728",
+        "candidate:kric:urban-rail-station:S1106:0633:row-729"
+      ],
+      "decidedAt": "2026-07-09T10:01:02.972Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T10:01:20.213Z:suggestion-approved:candidate:kric:urban-rail-station:I1103:0331:row-1009|candidate:kric:urban-rail-station:I1104:0423:row-1010",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:충무로:candidate:kric:urban-rail-station:I1103:0331:row-1009:candidate:kric:urban-rail-station:I1104:0423:row-1010",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1103:0331:row-1009|candidate:kric:urban-rail-station:I1104:0423:row-1010",
+      "nameKo": "충무로",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0331:row-1009",
+        "candidate:kric:urban-rail-station:I1104:0423:row-1010"
+      ],
+      "decidedAt": "2026-07-09T10:01:20.213Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T10:01:38.028Z:suggestion-approved:candidate:kric:urban-rail-station:I1103:0330:row-851|candidate:kric:urban-rail-station:S1102:0203:row-850",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:을지로3가:candidate:kric:urban-rail-station:I1103:0330:row-851:candidate:kric:urban-rail-station:S1102:0203:row-850",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1103:0330:row-851|candidate:kric:urban-rail-station:S1102:0203:row-850",
+      "nameKo": "을지로3가",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0330:row-851",
+        "candidate:kric:urban-rail-station:S1102:0203:row-850"
+      ],
+      "decidedAt": "2026-07-09T10:01:38.028Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T10:01:53.211Z:suggestion-approved:candidate:kric:urban-rail-station:S1102:0204:row-852|candidate:kric:urban-rail-station:S1105:0535:row-853",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:을지로4가:candidate:kric:urban-rail-station:S1102:0204:row-852:candidate:kric:urban-rail-station:S1105:0535:row-853",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1102:0204:row-852|candidate:kric:urban-rail-station:S1105:0535:row-853",
+      "nameKo": "을지로4가",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0204:row-852",
+        "candidate:kric:urban-rail-station:S1105:0535:row-853"
+      ],
+      "decidedAt": "2026-07-09T10:01:53.211Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T10:04:43.036Z:suggestion-approved:candidate:kric:urban-rail-station:I1103:0329:row-928|candidate:kric:urban-rail-station:I4101:0130:row-927|candidate:kric:urban-rail-station:S1105:0534:row-929",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:종로3가:candidate:kric:urban-rail-station:I1103:0329:row-928:candidate:kric:urban-rail-station:I4101:0130:row-927:candidate:kric:urban-rail-station:S1105:0534:row-929",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1103:0329:row-928|candidate:kric:urban-rail-station:I4101:0130:row-927|candidate:kric:urban-rail-station:S1105:0534:row-929",
+      "nameKo": "종로3가",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0329:row-928",
+        "candidate:kric:urban-rail-station:I4101:0130:row-927",
+        "candidate:kric:urban-rail-station:S1105:0534:row-929"
+      ],
+      "decidedAt": "2026-07-09T10:04:43.036Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T10:05:02.593Z:suggestion-approved:candidate:kric:urban-rail-station:I4101:0132:row-644|candidate:kric:urban-rail-station:S1102:0201:row-646",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:시청:candidate:kric:urban-rail-station:I4101:0132:row-644:candidate:kric:urban-rail-station:S1102:0201:row-646",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4101:0132:row-644|candidate:kric:urban-rail-station:S1102:0201:row-646",
+      "nameKo": "시청",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:0132:row-644",
+        "candidate:kric:urban-rail-station:S1102:0201:row-646"
+      ],
+      "decidedAt": "2026-07-09T10:05:02.593Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-09T10:10:54.087Z:suggestion-approved:candidate:kric:urban-rail-station:I28A1:A02:row-94|candidate:kric:urban-rail-station:I4108:1262:row-95|candidate:kric:urban-rail-station:S1105:0529:row-92|candidate:kric:urban-rail-station:S1106:0626:row-93",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:공덕:candidate:kric:urban-rail-station:I28A1:A02:row-94:candidate:kric:urban-rail-station:I4108:1262:row-95:candidate:kric:urban-rail-station:S1105:0529:row-92:candidate:kric:urban-rail-station:S1106:0626:row-93",
+      "suggestionKey": "candidate:kric:urban-rail-station:I28A1:A02:row-94|candidate:kric:urban-rail-station:I4108:1262:row-95|candidate:kric:urban-rail-station:S1105:0529:row-92|candidate:kric:urban-rail-station:S1106:0626:row-93",
+      "nameKo": "공덕",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A02:row-94",
+        "candidate:kric:urban-rail-station:I4108:1262:row-95",
+        "candidate:kric:urban-rail-station:S1105:0529:row-92",
+        "candidate:kric:urban-rail-station:S1106:0626:row-93"
+      ],
+      "decidedAt": "2026-07-09T10:10:54.087Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:08:20.140Z:suggestion-approved:candidate:kric:urban-rail-station:S1108:0815:row-571|candidate:kric:urban-rail-station:S1109:4133:row-572",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:석촌:candidate:kric:urban-rail-station:S1108:0815:row-571:candidate:kric:urban-rail-station:S1109:4133:row-572",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1108:0815:row-571|candidate:kric:urban-rail-station:S1109:4133:row-572",
+      "nameKo": "석촌",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1108:0815:row-571",
+        "candidate:kric:urban-rail-station:S1109:4133:row-572"
+      ],
+      "decidedAt": "2026-07-10T09:08:20.140Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:08:37.319Z:suggestion-approved:candidate:kric:urban-rail-station:I1103:0350:row-4|candidate:kric:urban-rail-station:S1108:0817:row-5",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:가락시장:candidate:kric:urban-rail-station:I1103:0350:row-4:candidate:kric:urban-rail-station:S1108:0817:row-5",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1103:0350:row-4|candidate:kric:urban-rail-station:S1108:0817:row-5",
+      "nameKo": "가락시장",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0350:row-4",
+        "candidate:kric:urban-rail-station:S1108:0817:row-5"
+      ],
+      "decidedAt": "2026-07-10T09:08:37.319Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:08:46.989Z:suggestion-approved:candidate:kric:urban-rail-station:I1103:0352:row-777|candidate:kric:urban-rail-station:S1105:P552:row-778",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:오금:candidate:kric:urban-rail-station:I1103:0352:row-777:candidate:kric:urban-rail-station:S1105:P552:row-778",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1103:0352:row-777|candidate:kric:urban-rail-station:S1105:P552:row-778",
+      "nameKo": "오금",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0352:row-777",
+        "candidate:kric:urban-rail-station:S1105:P552:row-778"
+      ],
+      "decidedAt": "2026-07-10T09:08:46.989Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:08:55.907Z:suggestion-approved:candidate:kric:urban-rail-station:S1105:P550:row-797|candidate:kric:urban-rail-station:S1109:4136:row-798",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:올림픽공원:candidate:kric:urban-rail-station:S1105:P550:row-797:candidate:kric:urban-rail-station:S1109:4136:row-798",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1105:P550:row-797|candidate:kric:urban-rail-station:S1109:4136:row-798",
+      "nameKo": "올림픽공원",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1105:P550:row-797",
+        "candidate:kric:urban-rail-station:S1109:4136:row-798"
+      ],
+      "decidedAt": "2026-07-10T09:08:55.907Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:09:15.894Z:suggestion-approved:candidate:kric:urban-rail-station:S1105:0547:row-981|candidate:kric:urban-rail-station:S1108:0811:row-982",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:천호:candidate:kric:urban-rail-station:S1105:0547:row-981:candidate:kric:urban-rail-station:S1108:0811:row-982",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1105:0547:row-981|candidate:kric:urban-rail-station:S1108:0811:row-982",
+      "nameKo": "천호",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1105:0547:row-981",
+        "candidate:kric:urban-rail-station:S1108:0811:row-982"
+      ],
+      "decidedAt": "2026-07-10T09:09:15.894Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:09:25.122Z:suggestion-approved:candidate:kric:urban-rail-station:S1102:0212:row-51|candidate:kric:urban-rail-station:S1107:0727:row-52",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:건대입구:candidate:kric:urban-rail-station:S1102:0212:row-51:candidate:kric:urban-rail-station:S1107:0727:row-52",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1102:0212:row-51|candidate:kric:urban-rail-station:S1107:0727:row-52",
+      "nameKo": "건대입구",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0212:row-51",
+        "candidate:kric:urban-rail-station:S1107:0727:row-52"
+      ],
+      "decidedAt": "2026-07-10T09:09:25.122Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:09:38.407Z:suggestion-approved:candidate:kric:urban-rail-station:S1102:0218:row-931|candidate:kric:urban-rail-station:S1109:4130:row-933",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:종합운동장:candidate:kric:urban-rail-station:S1102:0218:row-931:candidate:kric:urban-rail-station:S1109:4130:row-933",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1102:0218:row-931|candidate:kric:urban-rail-station:S1109:4130:row-933",
+      "nameKo": "종합운동장",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0218:row-931",
+        "candidate:kric:urban-rail-station:S1109:4130:row-933"
+      ],
+      "decidedAt": "2026-07-10T09:09:38.407Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:10:05.239Z:suggestion-approved:candidate:kric:urban-rail-station:I4105:1023:row-575|candidate:kric:urban-rail-station:S1102:0220:row-574",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:선릉:candidate:kric:urban-rail-station:I4105:1023:row-575:candidate:kric:urban-rail-station:S1102:0220:row-574",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4105:1023:row-575|candidate:kric:urban-rail-station:S1102:0220:row-574",
+      "nameKo": "선릉",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1023:row-575",
+        "candidate:kric:urban-rail-station:S1102:0220:row-574"
+      ],
+      "decidedAt": "2026-07-10T09:10:05.239Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:10:08.757Z:suggestion-approved:candidate:kric:urban-rail-station:I4105:1850:row-580|candidate:kric:urban-rail-station:S1109:4127:row-579",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:선정릉:candidate:kric:urban-rail-station:I4105:1850:row-580:candidate:kric:urban-rail-station:S1109:4127:row-579",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4105:1850:row-580|candidate:kric:urban-rail-station:S1109:4127:row-579",
+      "nameKo": "선정릉",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1850:row-580",
+        "candidate:kric:urban-rail-station:S1109:4127:row-579"
+      ],
+      "decidedAt": "2026-07-10T09:10:08.757Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:10:17.539Z:suggestion-approved:candidate:kric:urban-rail-station:I4105:1849:row-30|candidate:kric:urban-rail-station:S1107:0730:row-29",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:강남구청:candidate:kric:urban-rail-station:I4105:1849:row-30:candidate:kric:urban-rail-station:S1107:0730:row-29",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4105:1849:row-30|candidate:kric:urban-rail-station:S1107:0730:row-29",
+      "nameKo": "강남구청",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1849:row-30",
+        "candidate:kric:urban-rail-station:S1107:0730:row-29"
+      ],
+      "decidedAt": "2026-07-10T09:10:17.539Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:10:28.400Z:suggestion-approved:candidate:kric:urban-rail-station:I1103:0344:row-278|candidate:kric:urban-rail-station:I4105:1025:row-279",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:도곡:candidate:kric:urban-rail-station:I1103:0344:row-278:candidate:kric:urban-rail-station:I4105:1025:row-279",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1103:0344:row-278|candidate:kric:urban-rail-station:I4105:1025:row-279",
+      "nameKo": "도곡",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0344:row-278",
+        "candidate:kric:urban-rail-station:I4105:1025:row-279"
+      ],
+      "decidedAt": "2026-07-10T09:10:28.400Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:10:47.847Z:suggestion-approved:candidate:kric:urban-rail-station:I1103:0349:row-621|candidate:kric:urban-rail-station:I4105:1030:row-622",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:수서:candidate:kric:urban-rail-station:I1103:0349:row-621:candidate:kric:urban-rail-station:I4105:1030:row-622",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1103:0349:row-621|candidate:kric:urban-rail-station:I4105:1030:row-622",
+      "nameKo": "수서",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0349:row-621",
+        "candidate:kric:urban-rail-station:I4105:1030:row-622"
+      ],
+      "decidedAt": "2026-07-10T09:10:47.847Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:10:59.711Z:suggestion-approved:candidate:kric:urban-rail-station:I4105:1031:row-452|candidate:kric:urban-rail-station:S1108:0820:row-451",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:복정:candidate:kric:urban-rail-station:I4105:1031:row-452:candidate:kric:urban-rail-station:S1108:0820:row-451",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4105:1031:row-452|candidate:kric:urban-rail-station:S1108:0820:row-451",
+      "nameKo": "복정",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1031:row-452",
+        "candidate:kric:urban-rail-station:S1108:0820:row-451"
+      ],
+      "decidedAt": "2026-07-10T09:10:59.711Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:11:14.456Z:suggestion-approved:candidate:kric:urban-rail-station:I4105:1853:row-382|candidate:kric:urban-rail-station:S1108:0827:row-381",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:모란:candidate:kric:urban-rail-station:I4105:1853:row-382:candidate:kric:urban-rail-station:S1108:0827:row-381",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4105:1853:row-382|candidate:kric:urban-rail-station:S1108:0827:row-381",
+      "nameKo": "모란",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1853:row-382",
+        "candidate:kric:urban-rail-station:S1108:0827:row-381"
+      ],
+      "decidedAt": "2026-07-10T09:11:14.456Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:11:29.050Z:suggestion-approved:candidate:kric:urban-rail-station:I4105:1860:row-864|candidate:kric:urban-rail-station:I41K5:1502:row-863",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:이매:candidate:kric:urban-rail-station:I4105:1860:row-864:candidate:kric:urban-rail-station:I41K5:1502:row-863",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4105:1860:row-864|candidate:kric:urban-rail-station:I41K5:1502:row-863",
+      "nameKo": "이매",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1860:row-864",
+        "candidate:kric:urban-rail-station:I41K5:1502:row-863"
+      ],
+      "decidedAt": "2026-07-10T09:11:29.050Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:11:45.237Z:suggestion-approved:candidate:kric:urban-rail-station:I11D1:D012:row-921|candidate:kric:urban-rail-station:I4105:1857:row-922",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:정자:candidate:kric:urban-rail-station:I11D1:D012:row-921:candidate:kric:urban-rail-station:I4105:1857:row-922",
+      "suggestionKey": "candidate:kric:urban-rail-station:I11D1:D012:row-921|candidate:kric:urban-rail-station:I4105:1857:row-922",
+      "nameKo": "정자",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I11D1:D012:row-921",
+        "candidate:kric:urban-rail-station:I4105:1857:row-922"
+      ],
+      "decidedAt": "2026-07-10T09:11:45.237Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:12:02.025Z:suggestion-approved:candidate:kric:urban-rail-station:I11D1:D013:row-396|candidate:kric:urban-rail-station:I4105:1858:row-397",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:미금:candidate:kric:urban-rail-station:I11D1:D013:row-396:candidate:kric:urban-rail-station:I4105:1858:row-397",
+      "suggestionKey": "candidate:kric:urban-rail-station:I11D1:D013:row-396|candidate:kric:urban-rail-station:I4105:1858:row-397",
+      "nameKo": "미금",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I11D1:D013:row-396",
+        "candidate:kric:urban-rail-station:I4105:1858:row-397"
+      ],
+      "decidedAt": "2026-07-10T09:12:02.025Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:12:16.924Z:suggestion-approved:candidate:kric:urban-rail-station:I4105:1865:row-167|candidate:kric:urban-rail-station:L41E1:Y110:row-166",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:기흥:candidate:kric:urban-rail-station:I4105:1865:row-167:candidate:kric:urban-rail-station:L41E1:Y110:row-166",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4105:1865:row-167|candidate:kric:urban-rail-station:L41E1:Y110:row-166",
+      "nameKo": "기흥",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4105:1865:row-167",
+        "candidate:kric:urban-rail-station:L41E1:Y110:row-166"
+      ],
+      "decidedAt": "2026-07-10T09:12:16.924Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:12:58.284Z:suggestion-approved:candidate:kric:urban-rail-station:I4103:1758:row-1001|candidate:kric:urban-rail-station:I41WS:4813:row-1003",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:초지:candidate:kric:urban-rail-station:I4103:1758:row-1001:candidate:kric:urban-rail-station:I41WS:4813:row-1003",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4103:1758:row-1001|candidate:kric:urban-rail-station:I41WS:4813:row-1003",
+      "nameKo": "초지",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4103:1758:row-1001",
+        "candidate:kric:urban-rail-station:I41WS:4813:row-1003"
+      ],
+      "decidedAt": "2026-07-10T09:12:58.284Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:13:14.017Z:suggestion-approved:candidate:kric:urban-rail-station:I28K1:1884:row-833|candidate:kric:urban-rail-station:S2801:3130:row-832",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:원인재:candidate:kric:urban-rail-station:I28K1:1884:row-833:candidate:kric:urban-rail-station:S2801:3130:row-832",
+      "suggestionKey": "candidate:kric:urban-rail-station:I28K1:1884:row-833|candidate:kric:urban-rail-station:S2801:3130:row-832",
+      "nameKo": "원인재",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28K1:1884:row-833",
+        "candidate:kric:urban-rail-station:S2801:3130:row-832"
+      ],
+      "decidedAt": "2026-07-10T09:13:14.017Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:13:22.046Z:suggestion-approved:candidate:kric:urban-rail-station:S2801:3124:row-881|candidate:kric:urban-rail-station:S2802:3221:row-882",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:인천시청:candidate:kric:urban-rail-station:S2801:3124:row-881:candidate:kric:urban-rail-station:S2802:3221:row-882",
+      "suggestionKey": "candidate:kric:urban-rail-station:S2801:3124:row-881|candidate:kric:urban-rail-station:S2802:3221:row-882",
+      "nameKo": "인천시청",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S2801:3124:row-881",
+        "candidate:kric:urban-rail-station:S2802:3221:row-882"
+      ],
+      "decidedAt": "2026-07-10T09:13:22.046Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:13:34.747Z:suggestion-approved:candidate:kric:urban-rail-station:I1101:1809:row-937|candidate:kric:urban-rail-station:S2802:3218:row-938",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:주안:candidate:kric:urban-rail-station:I1101:1809:row-937:candidate:kric:urban-rail-station:S2802:3218:row-938",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1101:1809:row-937|candidate:kric:urban-rail-station:S2802:3218:row-938",
+      "nameKo": "주안",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1101:1809:row-937",
+        "candidate:kric:urban-rail-station:S2802:3218:row-938"
+      ],
+      "decidedAt": "2026-07-10T09:13:34.747Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:13:45.713Z:suggestion-approved:candidate:kric:urban-rail-station:S1107:3763:row-565|candidate:kric:urban-rail-station:S2802:3213:row-566",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:석남:candidate:kric:urban-rail-station:S1107:3763:row-565:candidate:kric:urban-rail-station:S2802:3213:row-566",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1107:3763:row-565|candidate:kric:urban-rail-station:S2802:3213:row-566",
+      "nameKo": "석남",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1107:3763:row-565",
+        "candidate:kric:urban-rail-station:S2802:3213:row-566"
+      ],
+      "decidedAt": "2026-07-10T09:13:45.713Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:13:53.579Z:suggestion-approved:candidate:kric:urban-rail-station:S1107:3761:row-475|candidate:kric:urban-rail-station:S2801:3118:row-476",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:부평구청:candidate:kric:urban-rail-station:S1107:3761:row-475:candidate:kric:urban-rail-station:S2801:3118:row-476",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1107:3761:row-475|candidate:kric:urban-rail-station:S2801:3118:row-476",
+      "nameKo": "부평구청",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1107:3761:row-475",
+        "candidate:kric:urban-rail-station:S2801:3118:row-476"
+      ],
+      "decidedAt": "2026-07-10T09:13:53.579Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:14:02.229Z:suggestion-approved:candidate:kric:urban-rail-station:I1101:1806:row-473|candidate:kric:urban-rail-station:S2801:3120:row-474",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:부평:candidate:kric:urban-rail-station:I1101:1806:row-473:candidate:kric:urban-rail-station:S2801:3120:row-474",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1101:1806:row-473|candidate:kric:urban-rail-station:S2801:3120:row-474",
+      "nameKo": "부평",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1101:1806:row-473",
+        "candidate:kric:urban-rail-station:S2801:3120:row-474"
+      ],
+      "decidedAt": "2026-07-10T09:14:02.229Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:14:19.117Z:suggestion-approved:candidate:kric:urban-rail-station:I1101:4804:row-599|candidate:kric:urban-rail-station:I41WS:4804:row-598",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:소사:candidate:kric:urban-rail-station:I1101:4804:row-599:candidate:kric:urban-rail-station:I41WS:4804:row-598",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1101:4804:row-599|candidate:kric:urban-rail-station:I41WS:4804:row-598",
+      "nameKo": "소사",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1101:4804:row-599",
+        "candidate:kric:urban-rail-station:I41WS:4804:row-598"
+      ],
+      "decidedAt": "2026-07-10T09:14:19.117Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:14:41.884Z:suggestion-approved:candidate:kric:urban-rail-station:I41WS:1982:row-472|candidate:kric:urban-rail-station:S1107:3754:row-471",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:부천종합운동장:candidate:kric:urban-rail-station:I41WS:1982:row-472:candidate:kric:urban-rail-station:S1107:3754:row-471",
+      "suggestionKey": "candidate:kric:urban-rail-station:I41WS:1982:row-472|candidate:kric:urban-rail-station:S1107:3754:row-471",
+      "nameKo": "부천종합운동장",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I41WS:1982:row-472",
+        "candidate:kric:urban-rail-station:S1107:3754:row-471"
+      ],
+      "decidedAt": "2026-07-10T09:14:41.884Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:18:26.876Z:suggestion-approved:candidate:kric:urban-rail-station:I28A1:A05:row-175|candidate:kric:urban-rail-station:I41WS:1980:row-177|candidate:kric:urban-rail-station:L41G1:G109:row-176|candidate:kric:urban-rail-station:S1105:0512:row-173|candidate:kric:urban-rail-station:S1109:4102:row-174",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:김포공항:candidate:kric:urban-rail-station:I28A1:A05:row-175:candidate:kric:urban-rail-station:I41WS:1980:row-177:candidate:kric:urban-rail-station:L41G1:G109:row-176:candidate:kric:urban-rail-station:S1105:0512:row-173:candidate:kric:urban-rail-station:S1109:4102:row-174",
+      "suggestionKey": "candidate:kric:urban-rail-station:I28A1:A05:row-175|candidate:kric:urban-rail-station:I41WS:1980:row-177|candidate:kric:urban-rail-station:L41G1:G109:row-176|candidate:kric:urban-rail-station:S1105:0512:row-173|candidate:kric:urban-rail-station:S1109:4102:row-174",
+      "nameKo": "김포공항",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A05:row-175",
+        "candidate:kric:urban-rail-station:I41WS:1980:row-177",
+        "candidate:kric:urban-rail-station:L41G1:G109:row-176",
+        "candidate:kric:urban-rail-station:S1105:0512:row-173",
+        "candidate:kric:urban-rail-station:S1109:4102:row-174"
+      ],
+      "decidedAt": "2026-07-10T09:18:26.876Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:18:52.971Z:suggestion-approved:candidate:kric:urban-rail-station:I28A1:A042:row-343|candidate:kric:urban-rail-station:S1109:4105:row-342",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:마곡나루:candidate:kric:urban-rail-station:I28A1:A042:row-343:candidate:kric:urban-rail-station:S1109:4105:row-342",
+      "suggestionKey": "candidate:kric:urban-rail-station:I28A1:A042:row-343|candidate:kric:urban-rail-station:S1109:4105:row-342",
+      "nameKo": "마곡나루",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A042:row-343",
+        "candidate:kric:urban-rail-station:S1109:4105:row-342"
+      ],
+      "decidedAt": "2026-07-10T09:18:52.971Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:19:51.720Z:suggestion-approved:candidate:kric:urban-rail-station:I28A1:A04:row-338|candidate:kric:urban-rail-station:I4108:1266:row-339|candidate:kric:urban-rail-station:S1106:0618:row-337",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:디지털미디어시티:candidate:kric:urban-rail-station:I28A1:A04:row-338:candidate:kric:urban-rail-station:I4108:1266:row-339:candidate:kric:urban-rail-station:S1106:0618:row-337",
+      "suggestionKey": "candidate:kric:urban-rail-station:I28A1:A04:row-338|candidate:kric:urban-rail-station:I4108:1266:row-339|candidate:kric:urban-rail-station:S1106:0618:row-337",
+      "nameKo": "디지털미디어시티",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A04:row-338",
+        "candidate:kric:urban-rail-station:I4108:1266:row-339",
+        "candidate:kric:urban-rail-station:S1106:0618:row-337"
+      ],
+      "decidedAt": "2026-07-10T09:19:51.720Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:20:59.588Z:suggestion-approved:candidate:kric:urban-rail-station:I28A1:A03:row-1079|candidate:kric:urban-rail-station:I4108:1264:row-1080|candidate:kric:urban-rail-station:S1102:0239:row-1078",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:홍대입구:candidate:kric:urban-rail-station:I28A1:A03:row-1079:candidate:kric:urban-rail-station:I4108:1264:row-1080:candidate:kric:urban-rail-station:S1102:0239:row-1078",
+      "suggestionKey": "candidate:kric:urban-rail-station:I28A1:A03:row-1079|candidate:kric:urban-rail-station:I4108:1264:row-1080|candidate:kric:urban-rail-station:S1102:0239:row-1078",
+      "nameKo": "홍대입구",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A03:row-1079",
+        "candidate:kric:urban-rail-station:I4108:1264:row-1080",
+        "candidate:kric:urban-rail-station:S1102:0239:row-1078"
+      ],
+      "decidedAt": "2026-07-10T09:20:59.588Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:21:16.105Z:suggestion-approved:candidate:kric:urban-rail-station:S1102:0238:row-1067|candidate:kric:urban-rail-station:S1106:0622:row-1068",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:합정:candidate:kric:urban-rail-station:S1102:0238:row-1067:candidate:kric:urban-rail-station:S1106:0622:row-1068",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1102:0238:row-1067|candidate:kric:urban-rail-station:S1106:0622:row-1068",
+      "nameKo": "합정",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0238:row-1067",
+        "candidate:kric:urban-rail-station:S1106:0622:row-1068"
+      ],
+      "decidedAt": "2026-07-10T09:21:16.105Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:21:31.714Z:suggestion-approved:candidate:kric:urban-rail-station:S1102:0237:row-237|candidate:kric:urban-rail-station:S1109:4113:row-238",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:당산:candidate:kric:urban-rail-station:S1102:0237:row-237:candidate:kric:urban-rail-station:S1109:4113:row-238",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1102:0237:row-237|candidate:kric:urban-rail-station:S1109:4113:row-238",
+      "nameKo": "당산",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0237:row-237",
+        "candidate:kric:urban-rail-station:S1109:4113:row-238"
+      ],
+      "decidedAt": "2026-07-10T09:21:31.714Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:21:44.630Z:suggestion-approved:candidate:kric:urban-rail-station:L11SL:S404:row-443|candidate:kric:urban-rail-station:S1107:0742:row-442",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:보라매:candidate:kric:urban-rail-station:L11SL:S404:row-443:candidate:kric:urban-rail-station:S1107:0742:row-442",
+      "suggestionKey": "candidate:kric:urban-rail-station:L11SL:S404:row-443|candidate:kric:urban-rail-station:S1107:0742:row-442",
+      "nameKo": "보라매",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L11SL:S404:row-443",
+        "candidate:kric:urban-rail-station:S1107:0742:row-442"
+      ],
+      "decidedAt": "2026-07-10T09:21:44.630Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:22:58.181Z:suggestion-approved:candidate:kric:urban-rail-station:L11SL:S408:row-671|candidate:kric:urban-rail-station:S1102:0230:row-670",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:신림:candidate:kric:urban-rail-station:L11SL:S408:row-671:candidate:kric:urban-rail-station:S1102:0230:row-670",
+      "suggestionKey": "candidate:kric:urban-rail-station:L11SL:S408:row-671|candidate:kric:urban-rail-station:S1102:0230:row-670",
+      "nameKo": "신림",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L11SL:S408:row-671",
+        "candidate:kric:urban-rail-station:S1102:0230:row-670"
+      ],
+      "decidedAt": "2026-07-10T09:22:58.181Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:23:10.316Z:suggestion-approved:candidate:kric:urban-rail-station:S1102:0233:row-250|candidate:kric:urban-rail-station:S1107:0744:row-251",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:대림:candidate:kric:urban-rail-station:S1102:0233:row-250:candidate:kric:urban-rail-station:S1107:0744:row-251",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1102:0233:row-250|candidate:kric:urban-rail-station:S1107:0744:row-251",
+      "nameKo": "대림",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0233:row-250",
+        "candidate:kric:urban-rail-station:S1107:0744:row-251"
+      ],
+      "decidedAt": "2026-07-10T09:23:10.316Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:23:22.669Z:suggestion-approved:candidate:kric:urban-rail-station:I4101:1702:row-6|candidate:kric:urban-rail-station:S1107:0746:row-7",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:가산디지털단지:candidate:kric:urban-rail-station:I4101:1702:row-6:candidate:kric:urban-rail-station:S1107:0746:row-7",
+      "suggestionKey": "candidate:kric:urban-rail-station:I4101:1702:row-6|candidate:kric:urban-rail-station:S1107:0746:row-7",
+      "nameKo": "가산디지털단지",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I4101:1702:row-6",
+        "candidate:kric:urban-rail-station:S1107:0746:row-7"
+      ],
+      "decidedAt": "2026-07-10T09:23:22.669Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:24:05.515Z:suggestion-approved:candidate:kric:urban-rail-station:I1103:0322:row-484|candidate:kric:urban-rail-station:S1106:0612:row-485",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:불광:candidate:kric:urban-rail-station:I1103:0322:row-484:candidate:kric:urban-rail-station:S1106:0612:row-485",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1103:0322:row-484|candidate:kric:urban-rail-station:S1106:0612:row-485",
+      "nameKo": "불광",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0322:row-484",
+        "candidate:kric:urban-rail-station:S1106:0612:row-485"
+      ],
+      "decidedAt": "2026-07-10T09:24:05.515Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:26:48.417Z:suggestion-approved:candidate:kric:urban-rail-station:I1103:0321:row-761|candidate:kric:urban-rail-station:S1106:0614:row-762",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:연신내:candidate:kric:urban-rail-station:I1103:0321:row-761:candidate:kric:urban-rail-station:S1106:0614:row-762",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1103:0321:row-761|candidate:kric:urban-rail-station:S1106:0614:row-762",
+      "nameKo": "연신내",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1103:0321:row-761",
+        "candidate:kric:urban-rail-station:S1106:0614:row-762"
+      ],
+      "decidedAt": "2026-07-10T09:26:48.417Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:27:00.419Z:suggestion-approved:candidate:kric:urban-rail-station:I1104:0418:row-589|candidate:kric:urban-rail-station:L11UI:S120:row-588",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:성신여대입구:candidate:kric:urban-rail-station:I1104:0418:row-589:candidate:kric:urban-rail-station:L11UI:S120:row-588",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1104:0418:row-589|candidate:kric:urban-rail-station:L11UI:S120:row-588",
+      "nameKo": "성신여대입구",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1104:0418:row-589",
+        "candidate:kric:urban-rail-station:L11UI:S120:row-588"
+      ],
+      "decidedAt": "2026-07-10T09:27:00.419Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:28:19.181Z:suggestion-approved:candidate:kric:urban-rail-station:S1102:0208:row-801|candidate:kric:urban-rail-station:S1105:0540:row-802",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:왕십리:candidate:kric:urban-rail-station:S1102:0208:row-801:candidate:kric:urban-rail-station:S1105:0540:row-802",
+      "suggestionKey": "candidate:kric:urban-rail-station:S1102:0208:row-801|candidate:kric:urban-rail-station:S1105:0540:row-802",
+      "nameKo": "왕십리",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S1102:0208:row-801",
+        "candidate:kric:urban-rail-station:S1105:0540:row-802"
+      ],
+      "decidedAt": "2026-07-10T09:28:19.181Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:37:26.927Z:suggestion-approved:candidate:kric:urban-rail-station:I1104:0412:row-975|candidate:kric:urban-rail-station:I4102:1022:row-976",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:창동:candidate:kric:urban-rail-station:I1104:0412:row-975:candidate:kric:urban-rail-station:I4102:1022:row-976",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1104:0412:row-975|candidate:kric:urban-rail-station:I4102:1022:row-976",
+      "nameKo": "창동",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1104:0412:row-975",
+        "candidate:kric:urban-rail-station:I4102:1022:row-976"
+      ],
+      "decidedAt": "2026-07-10T09:37:26.927Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:37:51.518Z:suggestion-approved:candidate:kric:urban-rail-station:I1104:0411:row-209|candidate:kric:urban-rail-station:S1107:0713:row-210",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:노원:candidate:kric:urban-rail-station:I1104:0411:row-209:candidate:kric:urban-rail-station:S1107:0713:row-210",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1104:0411:row-209|candidate:kric:urban-rail-station:S1107:0713:row-210",
+      "nameKo": "노원",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1104:0411:row-209",
+        "candidate:kric:urban-rail-station:S1107:0713:row-210"
+      ],
+      "decidedAt": "2026-07-10T09:37:51.518Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:38:16.180Z:suggestion-approved:candidate:kric:urban-rail-station:I28A1:A07:row-59|candidate:kric:urban-rail-station:S2802:3207:row-60",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:검암:candidate:kric:urban-rail-station:I28A1:A07:row-59:candidate:kric:urban-rail-station:S2802:3207:row-60",
+      "suggestionKey": "candidate:kric:urban-rail-station:I28A1:A07:row-59|candidate:kric:urban-rail-station:S2802:3207:row-60",
+      "nameKo": "검암",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I28A1:A07:row-59",
+        "candidate:kric:urban-rail-station:S2802:3207:row-60"
+      ],
+      "decidedAt": "2026-07-10T09:38:16.180Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:42:14.669Z:suggestion-approved:candidate:kric:urban-rail-station:I1101:1812:row-872|candidate:kric:urban-rail-station:I28K1:1891:row-873",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:인천:candidate:kric:urban-rail-station:I1101:1812:row-872:candidate:kric:urban-rail-station:I28K1:1891:row-873",
+      "suggestionKey": "candidate:kric:urban-rail-station:I1101:1812:row-872|candidate:kric:urban-rail-station:I28K1:1891:row-873",
+      "nameKo": "인천",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:I1101:1812:row-872",
+        "candidate:kric:urban-rail-station:I28K1:1891:row-873"
+      ],
+      "decidedAt": "2026-07-10T09:42:14.669Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:42:42.430Z:suggestion-approved:candidate:kric:urban-rail-station:S2702:0229:row-989|candidate:kric:urban-rail-station:S2703:0329:row-990",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:청라언덕:candidate:kric:urban-rail-station:S2702:0229:row-989:candidate:kric:urban-rail-station:S2703:0329:row-990",
+      "suggestionKey": "candidate:kric:urban-rail-station:S2702:0229:row-989|candidate:kric:urban-rail-station:S2703:0329:row-990",
+      "nameKo": "청라언덕",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S2702:0229:row-989",
+        "candidate:kric:urban-rail-station:S2703:0329:row-990"
+      ],
+      "decidedAt": "2026-07-10T09:42:42.430Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:42:55.097Z:suggestion-approved:candidate:kric:urban-rail-station:S2701:0130:row-411|candidate:kric:urban-rail-station:S2702:0230:row-412",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:반월당:candidate:kric:urban-rail-station:S2701:0130:row-411:candidate:kric:urban-rail-station:S2702:0230:row-412",
+      "suggestionKey": "candidate:kric:urban-rail-station:S2701:0130:row-411|candidate:kric:urban-rail-station:S2702:0230:row-412",
+      "nameKo": "반월당",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S2701:0130:row-411",
+        "candidate:kric:urban-rail-station:S2702:0230:row-412"
+      ],
+      "decidedAt": "2026-07-10T09:42:55.097Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:43:19.158Z:suggestion-approved:candidate:kric:urban-rail-station:S2701:0129:row-371|candidate:kric:urban-rail-station:S2703:0331:row-372",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:명덕:candidate:kric:urban-rail-station:S2701:0129:row-371:candidate:kric:urban-rail-station:S2703:0331:row-372",
+      "suggestionKey": "candidate:kric:urban-rail-station:S2701:0129:row-371|candidate:kric:urban-rail-station:S2703:0331:row-372",
+      "nameKo": "명덕",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S2701:0129:row-371",
+        "candidate:kric:urban-rail-station:S2703:0331:row-372"
+      ],
+      "decidedAt": "2026-07-10T09:43:19.158Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:43:45.361Z:suggestion-approved:candidate:kric:urban-rail-station:L48B1:0007:row-263|candidate:kric:urban-rail-station:S2603:0317:row-262",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:대저:candidate:kric:urban-rail-station:L48B1:0007:row-263:candidate:kric:urban-rail-station:S2603:0317:row-262",
+      "suggestionKey": "candidate:kric:urban-rail-station:L48B1:0007:row-263|candidate:kric:urban-rail-station:S2603:0317:row-262",
+      "nameKo": "대저",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L48B1:0007:row-263",
+        "candidate:kric:urban-rail-station:S2603:0317:row-262"
+      ],
+      "decidedAt": "2026-07-10T09:43:45.361Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:44:28.697Z:suggestion-approved:candidate:kric:urban-rail-station:L48B1:0001:row-495|candidate:kric:urban-rail-station:S2602:0227:row-494",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:사상:candidate:kric:urban-rail-station:L48B1:0001:row-495:candidate:kric:urban-rail-station:S2602:0227:row-494",
+      "suggestionKey": "candidate:kric:urban-rail-station:L48B1:0001:row-495|candidate:kric:urban-rail-station:S2602:0227:row-494",
+      "nameKo": "사상",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L48B1:0001:row-495",
+        "candidate:kric:urban-rail-station:S2602:0227:row-494"
+      ],
+      "decidedAt": "2026-07-10T09:44:28.697Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:49:35.596Z:suggestion-approved:candidate:kric:urban-rail-station:S2601:0119:row-543|candidate:kric:urban-rail-station:S2602:0219:row-544",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:서면:candidate:kric:urban-rail-station:S2601:0119:row-543:candidate:kric:urban-rail-station:S2602:0219:row-544",
+      "suggestionKey": "candidate:kric:urban-rail-station:S2601:0119:row-543|candidate:kric:urban-rail-station:S2602:0219:row-544",
+      "nameKo": "서면",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S2601:0119:row-543",
+        "candidate:kric:urban-rail-station:S2602:0219:row-544"
+      ],
+      "decidedAt": "2026-07-10T09:49:35.596Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:49:50.693Z:suggestion-approved:candidate:kric:urban-rail-station:S2602:0208:row-629|candidate:kric:urban-rail-station:S2603:0301:row-630",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:수영:candidate:kric:urban-rail-station:S2602:0208:row-629:candidate:kric:urban-rail-station:S2603:0301:row-630",
+      "suggestionKey": "candidate:kric:urban-rail-station:S2602:0208:row-629|candidate:kric:urban-rail-station:S2603:0301:row-630",
+      "nameKo": "수영",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:S2602:0208:row-629",
+        "candidate:kric:urban-rail-station:S2603:0301:row-630"
+      ],
+      "decidedAt": "2026-07-10T09:49:50.693Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:50:30.496Z:suggestion-approved:candidate:kric:urban-rail-station:L2604:0402:row-309|candidate:kric:urban-rail-station:S2601:0125:row-308",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:동래:candidate:kric:urban-rail-station:L2604:0402:row-309:candidate:kric:urban-rail-station:S2601:0125:row-308",
+      "suggestionKey": "candidate:kric:urban-rail-station:L2604:0402:row-309|candidate:kric:urban-rail-station:S2601:0125:row-308",
+      "nameKo": "동래",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L2604:0402:row-309",
+        "candidate:kric:urban-rail-station:S2601:0125:row-308"
+      ],
+      "decidedAt": "2026-07-10T09:50:30.496Z",
+      "reason": null,
+      "note": null
+    },
+    {
+      "id": "manual-transfer-review-event:2026-07-10T09:50:47.571Z:suggestion-approved:candidate:kric:urban-rail-station:L2604:0401:row-399|candidate:kric:urban-rail-station:S2603:0309:row-398",
+      "type": "suggestion-approved",
+      "transferGroupId": "manual-transfer-group:미남:candidate:kric:urban-rail-station:L2604:0401:row-399:candidate:kric:urban-rail-station:S2603:0309:row-398",
+      "suggestionKey": "candidate:kric:urban-rail-station:L2604:0401:row-399|candidate:kric:urban-rail-station:S2603:0309:row-398",
+      "nameKo": "미남",
+      "stationIds": [
+        "candidate:kric:urban-rail-station:L2604:0401:row-399",
+        "candidate:kric:urban-rail-station:S2603:0309:row-398"
+      ],
+      "decidedAt": "2026-07-10T09:50:47.571Z",
+      "reason": null,
+      "note": null
     }
   ],
   "stationOverrides": [
@@ -881,6 +3013,18 @@
       "colorHex": null,
       "lat": 37.56865832606789,
       "lng": 126.9150549217253,
+      "enabled": true,
+      "note": null
+    },
+    {
+      "stationId": "candidate:kric:urban-rail-station:S1105:0518:row-180",
+      "nameKo": "까치산",
+      "stationNumber": "0518",
+      "lineNameKo": "5호선",
+      "lineNumber": "S1105",
+      "colorHex": "#996CAC",
+      "lat": 37.53211418435481,
+      "lng": 126.84651728438769,
       "enabled": true,
       "note": null
     },
@@ -943,18 +3087,6 @@
       "lng": 126.92656491514936,
       "enabled": true,
       "note": "수기 노선 빌더에서 생성한 물리 노선 역"
-    },
-    {
-      "stationId": "candidate:kric:urban-rail-station:S1105:0518:row-180",
-      "nameKo": "까치산",
-      "stationNumber": "0518",
-      "lineNameKo": "5호선",
-      "lineNumber": "S1105",
-      "colorHex": "#996CAC",
-      "lat": 37.53211418435481,
-      "lng": 126.84651728438769,
-      "enabled": true,
-      "note": null
     }
   ],
   "branchOverrides": [],
