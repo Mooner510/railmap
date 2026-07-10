@@ -9624,7 +9624,7 @@ function ManualDataAuditDashboard({
     manualLinesWithoutPerformance.length > 0 ? { label: `성능값 누락 노선 ${manualLinesWithoutPerformance.length.toLocaleString("ko-KR")}개`, tab: "manualLines" as const } : null,
     missingStationReferences.length > 0 ? { label: `없는 역 참조 ${missingStationReferences.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
     validationIssues.length > 0 ? { label: `검증 패널 이슈 ${validationIssues.length.toLocaleString("ko-KR")}개`, tab: "validation" as const } : null,
-  ].filter((item): item is { label: string; tab: SidebarTab } => Boolean(item));
+  ].filter((item): item is NonNullable<typeof item> => item !== null);
 
   return (
     <div className="grid gap-3">
