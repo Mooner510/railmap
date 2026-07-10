@@ -63,6 +63,7 @@ import type {
   EditorStation,
   ManualBranchStationExclusion,
   ManualBranchRouteOverride,
+  ManualBranchRouteDirection,
   ManualGeometryOverride,
   ManualGeometryOverridePoint,
   ManualLineBranchOverride,
@@ -6579,10 +6580,15 @@ export default function UnifiedMapEditor({
       nextOverride.stationId,
       ...currentRouteStationIds.slice(afterIndex),
     ];
+    const previousRouteOverride = baseOverlays.branchRouteOverrides.find(
+      (candidate) => candidate.branchId === insertion.parentBranchId,
+    );
     const routeOverride: ManualBranchRouteOverride = {
-      id: makeBranchRouteOverrideId(insertion.parentBranchId),
+      id: previousRouteOverride?.id ?? makeBranchRouteOverrideId(insertion.parentBranchId),
       branchId: insertion.parentBranchId,
       stationIds: nextRouteStationIds,
+      circular: previousRouteOverride?.circular ?? parentBranch.isCircular === true,
+      routeDirection: previousRouteOverride?.routeDirection ?? parentBranch.routeDirection ?? "bidirectional",
       enabled: true,
       source: "editor",
       note: `${formatStationDisplayName(beforeStation)} - ${formatStationDisplayName(branchStation)} - ${formatStationDisplayName(afterStation)}`,
@@ -8015,6 +8021,7 @@ export default function UnifiedMapEditor({
     commandLabel: string,
     message: string,
     circular = branchRouteOverrideById.get(branchId)?.circular === true,
+    routeDirection: ManualBranchRouteDirection = branchRouteOverrideById.get(branchId)?.routeDirection ?? "bidirectional",
   ) {
     const branch = branchById.get(branchId);
     if (!branch) {
@@ -8033,13 +8040,16 @@ export default function UnifiedMapEditor({
     const baseStationIds = getBranchStopStations(branch).map(
       (station) => station.id,
     );
-    const currentCircular = branchRouteOverrideById.get(branchId)?.circular === true;
+    const currentOverride = branchRouteOverrideById.get(branchId);
+    const currentCircular = currentOverride?.circular === true;
+    const currentRouteDirection = currentOverride?.routeDirection ?? "bidirectional";
     const isSameAsCurrent =
       baseStationIds.length === uniqueStationIds.length &&
       baseStationIds.every(
         (stationId, index) => stationId === uniqueStationIds[index],
       ) &&
-      currentCircular === circular;
+      currentCircular === circular &&
+      currentRouteDirection === routeDirection;
     if (isSameAsCurrent) {
       showToast("변경된 정차 순서가 없습니다", "info");
       return;
@@ -8050,6 +8060,7 @@ export default function UnifiedMapEditor({
       branchId,
       stationIds: uniqueStationIds,
       circular,
+      routeDirection,
       enabled: true,
       source: "editor",
       note: null,
@@ -8084,6 +8095,33 @@ export default function UnifiedMapEditor({
     );
     if (!saved) return;
     await reloadEditorData();
+  }
+
+  async function setBranchRouteDirection(
+    branchId: string,
+    routeDirection: ManualBranchRouteDirection,
+  ) {
+    const branch = branchById.get(branchId);
+    if (!branch) {
+      showToast("노선을 찾지 못했습니다", "error");
+      return;
+    }
+
+    const stationIds = getBranchStopStations(branch).map((station) => station.id);
+    const label =
+      routeDirection === "bidirectional"
+        ? "양방향"
+        : routeDirection === "forward"
+          ? "위 → 아래 단방향"
+          : "아래 → 위 단방향";
+    await saveBranchRouteOverride(
+      branchId,
+      stationIds,
+      "노선 운행 방향 설정",
+      `${label} 운행으로 저장했습니다`,
+      branchRouteOverrideById.get(branchId)?.circular === true,
+      routeDirection,
+    );
   }
 
   async function setBranchCircular(branchId: string, circular: boolean) {
@@ -8227,6 +8265,7 @@ export default function UnifiedMapEditor({
         branchId: branch.id,
         stationIds: nextStationIds,
         circular: previous?.circular ?? branch.isCircular === true,
+        routeDirection: previous?.routeDirection ?? branch.routeDirection ?? "bidirectional",
         enabled: true,
         source: "editor",
         note: `${formatStationDisplayName(selectedStation)} 노선별 stationId 분할`,
@@ -9179,6 +9218,9 @@ export default function UnifiedMapEditor({
                 }
                 onSetCircular={(circular) =>
                   void setBranchCircular(activeGeometryBranch.id, circular)
+                }
+                onSetRouteDirection={(routeDirection) =>
+                  void setBranchRouteDirection(activeGeometryBranch.id, routeDirection)
                 }
                 onUpdateLineMetadata={(category, serviceTypes, trainPerformance) =>
                   void updateLineMetadata(

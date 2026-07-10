@@ -2105,8 +2105,13 @@ function buildRouteGraph(
           distanceMeters,
         };
 
-        addEdge(current.stationId, { ...edge, toStationId: next.stationId });
-        addEdge(next.stationId, { ...edge, toStationId: current.stationId });
+        const routeDirection = branch.routeDirection ?? "bidirectional";
+        if (routeDirection !== "reverse") {
+          addEdge(current.stationId, { ...edge, toStationId: next.stationId });
+        }
+        if (routeDirection !== "forward") {
+          addEdge(next.stationId, { ...edge, toStationId: current.stationId });
+        }
       }
     }
   }
@@ -3882,9 +3887,16 @@ function SelectedLinePanel({
                 {selectedBranch.terminal ?? getLastStop(selectedBranch)}
               </p>
             </div>
-            <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
-              {formatNumber(selectedBranch.routeStops.length)}역
-            </span>
+            <div className="flex shrink-0 items-center gap-1">
+              {selectedBranch.routeDirection && selectedBranch.routeDirection !== "bidirectional" ? (
+                <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
+                  {selectedBranch.routeDirection === "forward" ? "위→아래 단방향" : "아래→위 단방향"}
+                </span>
+              ) : null}
+              <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
+                {formatNumber(selectedBranch.routeStops.length)}역
+              </span>
+            </div>
           </div>
         </div>
       ) : null}

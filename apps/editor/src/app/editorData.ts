@@ -10,6 +10,7 @@ import {
   type RailServiceType,
   type ManualBranchStationExclusion,
   type ManualBranchRouteOverride,
+  type ManualBranchRouteDirection,
   type ManualGeometryOverride,
   type ManualOverlayBundle,
   type ManualTrainPerformance,
@@ -34,6 +35,7 @@ export type CanonicalBranch = {
   terminal?: string | null;
   routeStops: CanonicalRouteStop[];
   isCircular?: boolean;
+  routeDirection?: ManualBranchRouteDirection;
 };
 
 export type CanonicalLine = {
@@ -66,6 +68,7 @@ export type EditorMapBranch = {
   geometryCoordinates: Array<[number, number]>;
   routeStopCount: number;
   isCircular?: boolean;
+  routeDirection?: ManualBranchRouteDirection;
   routeStops: Array<{
     id: string;
     sequence: number;
@@ -542,6 +545,7 @@ function toMapBranches(bundle: CanonicalBundle, stations: EditorStation[], geome
           ? [...geometryCoordinates, geometryCoordinates[0]!]
           : geometryCoordinates,
         isCircular: routeOverrideByBranchId.get(branch.id)?.circular === true || branch.isCircular === true,
+        routeDirection: routeOverrideByBranchId.get(branch.id)?.routeDirection ?? branch.routeDirection ?? "bidirectional",
         routeStopCount: routeStops.length,
         routeStops: routeStops.map((stop) => {
           const stationId = getRouteStopStationId(stop);
