@@ -1,473 +1,74 @@
 # CURRENT_TASK
 
-Status: active implementation handoff  
-Updated: 2026-07-02  
-Current version target: `13.20.1-docs-and-operation-cleanup`
-
-## 1. Current phase
-
-The project is now in implementation and hardening phase.
-
-The old source-design-only phase is complete. UI/editor/web implementation already exists and must be maintained.
-
-Current focus:
-
-1. keep data identity rules enforced;
-2. keep manual overlays durable through collector/export runs;
-3. reduce editor maintenance risk after module splitting;
-4. productize the public web map;
-5. keep documents synchronized with the current code.
-
-## 2. Recently completed work
-
-### Editor
-
-- Unified map editor is implemented.
-- Station position override flow exists.
-- Transfer group editor exists.
-- Geometry/line branch editing exists.
-- New station creation flow exists.
-- Existing station insertion into a line exists.
-- Circular line toggle exists.
-- Validation panel is readable and grouped by problem type.
-- Some repair actions are available per issue and in bulk.
-- Station insertion uses a compact ㄹ-shaped visual line diagram.
-- Editor module splitting has started:
-  - `branchRules.ts`
-  - `stationInsertion.tsx`
-  - `branchInspector.tsx`
-  - `validationPanel.tsx`
-  - `stationInspector.tsx`
-
-### Web
-
-- Public map is implemented.
-- Rail explorer UI exists.
-- User-facing HUD exists.
-- Selected station/line/transfer group panels exist.
-- Transfer group and line preview visuals exist.
-- Web metadata is updated for the Korean public rail map.
-
-### Collector/data
-
-- KRIC canonical app bundle generation exists.
-- Manual overlay export into web public data exists.
-- Station-line identity validation exists.
-- Manual overlay source-of-truth is `data/manual`.
-- Public export path is `apps/web/public/data`.
-
-## 3. Non-negotiable current data rules
-
-1. Do not create fake transit data.
-2. Do not infer timetable travel times.
-3. Do not merge same-name stations automatically.
-4. Do not use one `stationId` as a real station for multiple lines.
-5. A physical transfer location may contain multiple line-specific station icons.
-6. Cross-line geometry references must use `control` points, not foreign `stationId` station points.
-7. Circular lines cannot themselves branch-connect outward into another line.
-8. Non-circular lines may connect into a station on a circular line.
-9. Circular lines may still have internal branch additions.
-10. `data/manual` is the manual source of truth.
-
-## 4. Recommended next work
-
-### 13.21.0 collector/data validation hardening
-
-Recommended scope:
-
-- Add stricter collector-side validation for manual overlays.
-- Validate every geometry override point.
-- Validate every line branch override against circular-line branch rules.
-- Validate generated/public data parity.
-- Fail build/export when manual overlay cannot be safely applied.
-- Emit clear diagnostics that match editor validation categories.
-
-### 13.22.0 deployment/cache/version policy
-
-Recommended scope:
-
-- Define public data version metadata.
-- Define cache-busting behavior for app bundle and manual overlays.
-- Add release checklist.
-- Add deployment verification checklist.
-
-## 5. Do not do next
-
-- Do not redesign the project architecture from scratch.
-- Do not remove existing editor/web functionality while refactoring.
-- Do not reintroduce sample or dummy data.
-- Do not treat `apps/web/public/data` as the canonical manual source.
-- Do not use old documentation that says UI implementation is not allowed.
-- Do not silently auto-fix risky geometry problems without user-visible diagnostics.
-
-## 13.22.0 rail line category and intercity policy
-
-- `Line`은 기존 `Line -> Branch -> RouteStop -> Station` 구조를 유지하되 `category`와 `serviceTypes` 메타데이터를 가진다.
-- 허용 category: `urban_rail`, `gtx`, `conventional_rail`, `high_speed_rail`.
-- 허용 serviceTypes: `subway`, `gtx`, `ktx`, `srt`, `itx`, `saemaeul`, `mugunghwa`, `nuriro`, `airport_rail`, `unknown`.
-- 일반철도/고속철도는 별도 거대 모델로 갈아엎지 않는다. `경부선`, `호남선`, `장항선`, `경부고속선`, `호남고속선`, `수서평택고속선` 같은 선로/노선명을 `Line`으로 사용한다.
-- `KTX선`, `SRT선`은 만들지 않는다. KTX/SRT/ITX/무궁화 등은 `serviceTypes` 또는 후속 timetable metadata로 표현한다.
-- 같은 물리 역이어도 노선/선로 체계가 다르면 별도 `stationId`를 만들고, 같은 물리 역 연결은 환승 그룹으로 처리한다.
-
-## 13.23.0 manual rail line model
-
-일반철도/고속철 공식 데이터가 도시철도 수준으로 제공되지 않는 상황을 기준으로, 다음 단계는 자동 수집기보다 수기 노선 빌더 기반으로 전환한다.
-
-이번 단계는 UI 빌더를 한 번에 넣지 않고 안전하게 데이터 모델 기반만 추가한다.
-
-- `manualLineDefinitions`: canonical bundle에 없는 수기 Line 생성용 source-of-truth.
-- `manualBranchDefinitions`: 수기 Line의 정차역 순서/순환 여부 정의.
-- `railType`: `high_speed_rail`, `semi_high_speed_rail`, `trunk_rail`, `branch_rail`, `urban_rail`.
-- `serviceTypes`: KTX/SRT/ITX/새마을/무궁화/누리로/도시철도 등 서비스 메타데이터.
-- 수기 노선의 정차역은 기존 stationId 재사용이 아니라, 원칙적으로 해당 노선용 별도 stationId를 `stationOverrides`로 생성한 뒤 참조한다.
-- 같은 물리 역 연결은 stationId 공유가 아니라 환승 그룹으로 처리한다.
-
-후속 단계는 editor에서 노선 이름, 색상, 철도 유형, 서비스 타입을 입력하고 지도에서 역을 연속 선택하는 builder UI다.
-
-## 13.24.0 manual rail line builder UI
-
-이번 단계는 `13.23.0`에서 추가한 수기 노선 모델을 editor에서 직접 생성할 수 있게 하는 안전한 1차 UI다.
-
-- 지도 상단 액션에 `새 노선` 버튼을 추가한다.
-- 좌측 사이드바에 `수기 노선` 탭을 추가한다.
-- 새 노선 dialog에서 다음 값을 입력/선택한다.
-  - 노선 이름
-  - 노선 색상
-  - 철도 유형: 고속선, 준고속선, 간선철도, 지선철도, 도시철도
-  - 서비스 타입: 지하철, GTX, KTX, SRT, ITX, 새마을, 무궁화, 누리로, 공항철도, 미정
-  - 운영 상태: 개통, 공사중, 계획, 폐지/미사용
-  - 메모
-- 저장 결과는 `manualLineDefinitions`에 추가한다.
-- 저장 후 editor data를 reload해서 수기 노선 목록에 반영한다.
-- 이번 단계에서는 아직 지도에서 역을 연속으로 찍어 정차 순서를 만드는 기능은 넣지 않는다.
-- 다음 단계는 `13.25.0-manual-route-station-builder`로, 수기 노선에 역을 순서대로 추가하고 `manualBranchDefinitions`를 생성하는 기능이다.
-
-## 13.25.0-manual-route-station-builder
-
-- 수기 노선을 물리 선로/철도 노선 기준으로 만드는 정책을 editor UX에 반영한다.
-- `coverageStatus`를 추가해 큰 일반철도 노선을 `draft`/`partial`/`complete`로 관리한다.
-- 수기 노선 탭에서 노선별 `역 목록 만들기/수정`을 제공한다.
-- 지도 클릭으로 시작역부터 종점역까지 수기 역을 순서대로 추가한다.
-- 저장 시 다음 항목을 한 번에 생성/갱신한다.
-  - `stationOverrides`: 수기 노선 전용 stationId와 좌표
-  - `manualBranchDefinitions`: 해당 노선의 정차역 순서
-  - `geometryOverrides`: 역 좌표를 직선 연결한 1차 선형
-  - `manualLineDefinitions.coverageStatus`: 구축 상태
-- KTX/SRT/무궁화/수도권 전철은 Line이 아니라 serviceTypes/후속 정차 패턴으로 분리한다.
-
-## 13.26.0-manual-route-builder-ux-cleanup
-
-- 지도 하단 안내/위경도 표시를 제거해 지도 공간을 확보한다.
-- 수기 노선 빌더를 물리 노선 역 목록 작성에 집중하도록 단순화한다.
-- 역 이름이 비어 있는 상태에서 지도 좌클릭 시 역 이름 입력 dialog를 띄우고 Enter로 즉시 추가한다.
-- 수기 노선 빌더 중 지도 우클릭 시 가장 가까운 기존 역 이름을 빠른 추가 이름으로 복사한다. 이때 기존 데이터의 실제 역명은 바꾸지 않고, 복사값에서 괄호 보조 표기만 제거한다.
-- 빌더 중 작성 중인 노선 preview line/station을 지도에 즉시 표시하고, 기존 노선/역/환승 아이콘은 반투명 처리한다.
-- 역 목록 카드에서 위도/경도 노출을 제거하고 조밀한 목록, 순서 조정, 위치 수정 버튼을 제공한다.
-- 왼쪽 사이드바 하단에 현재 모드 단축키 dock과 더보기 modal을 추가한다.
-
-## 13.26.1-manual-route-station-move-cancel
-
-- 수기 노선 빌더에서 `위치 수정`을 시작한 뒤 취소할 수 없던 문제를 수정한다.
-- 위치 수정 중에는 상단 상태 배너에 수정 대상 역명과 `취소` 버튼을 표시한다.
-- 위치 수정 중 동일 역의 위치 수정 버튼은 취소 버튼처럼 동작한다.
-- `Esc` 키로 위치 수정 모드와 역 이름 입력 dialog를 취소할 수 있다.
-- 단축키 dock에 `수정 취소: Esc`를 추가한다.
-
-## 13.27.0-manual-line-review-and-validation
-
-- 검증 탭에 `수기 노선 점검` 카테고리를 추가한다.
-- 수기 노선에 역 목록이 없거나, 역이 2개 미만이거나, 저장된 역 ID/좌표가 누락된 경우를 명확히 표시한다.
-- 수기 노선 안에서 같은 역 ID 또는 같은 역명이 반복되는 경우 주의로 표시한다.
-- 같은 이름의 다른 역이 있는 경우 환승 그룹 후보로 안내한다. 단, 같은 물리 역인지 여부는 사용자가 판단한다.
-- 수기 노선 역 목록 빌더 안에 저장 전 점검 요약 카드를 추가해 역 수, 이름 누락, 좌표 누락, 중복명, 완성도를 바로 확인할 수 있게 한다.
-
-## 13.28.0-manual-route-builder-mode-hardening
-
-- route builder를 전용 작업 모드처럼 보이도록 정리했다.
-- 역 목록 완성도를 버튼 3개에서 드롭다운으로 바꿨다.
-- `빠른 추가 이름`을 `다음 역 이름` 입력으로 바꿨다.
-- 역 목록에서 위/아래/삭제 버튼을 제거하고 드래그 재정렬 + 드래그 제거 영역으로 바꿨다.
-- 역 이름은 목록에서 바로 클릭해 수정하고, 위치 수정은 단일 수정 아이콘으로 유지했다.
-- 역명 입력 modal에 주변 역 이름 추천 3개를 표시한다. 추천 이름은 괄호 보조 표기를 제거하고 중복 제거한다.
-- 단축키 더보기 modal을 사이드바 내부가 아닌 넓은 전체화면형 modal로 바꿨다.
-- 환승 시간표 편집 modal을 전체화면형으로 바꾸고 선택 셀의 행/열 header를 하이라이트한다.
-
-## 13.30.0-existing-station-position-clone-and-drag-move
-
-- 수기 노선 빌더에서 기존 역을 클릭하면 기존 `stationId`를 재사용하지 않고 이름/좌표만 복사해 새 노선용 역 draft를 추가한다.
-- 복사된 역 이름은 괄호 보조 표기를 제거한 값으로 제안하되, 기존 역 데이터 자체는 수정하지 않는다.
-- 지도 우클릭은 가장 가까운 기존 역의 이름/좌표를 새 노선용 역으로 복사한다.
-- `Shift+우클릭`은 기존처럼 이름만 `다음 역 이름` 입력에 복사한다.
-- 빌더에서 추가한 역 preview point를 직접 드래그해 실제 승강장 위치로 미세 조정할 수 있다.
-- 저장 시 복사 원본 역 ID는 새 수기 역의 stationId로 사용하지 않는다. 새 노선 전용 stationId는 기존 정책대로 저장 단계에서 생성한다.
-
-## 13.31.0-transfer-group-review-workflow
-
-- 환승 그룹 추천 검토 화면을 추가했다.
-- 같은/비슷하게 정규화된 역명이 가까운 반경에 모인 경우 환승 그룹 후보로 추천한다.
-- 추천은 검토 필요/전체/거절됨/승인됨 상태로 볼 수 있다.
-- 추천 후보는 거절하거나, 수정 후 승인 흐름으로 넘길 수 있다.
-- 승인 시 환승 그룹 편집 화면에서 그룹 이름/포함 역/환승 시간표를 조정한다.
-- 환승 시간표는 보류 저장 가능하며, 보류된 그룹은 검증에서 가벼운 경고로 표시한다.
-
-## 13.32.0-transfer-group-review-polish
-
-- 환승 추천 탭 진입/후보 선택 시 후보 역 묶음 위치로 지도를 자동 fitBounds 이동.
-- 환승 추천 UI의 굵은 글꼴과 불필요한 장문 설명을 줄이고, 줄바꿈이 깨지는 문구를 짧은 문구로 정리.
-- Dialog를 portal 기반으로 렌더링해 사이드바/패널 내부 clipping 영향을 받지 않도록 수정.
-- 환승 시간표 편집 dialog를 실제 viewport 전체 폭/높이 modal로 표시하도록 강화.
-- 환승 시간표 테이블의 행/열 header 하이라이트를 유지하고, 라벨을 짧게 정리.
-
-
-## 13.33.0-transfer-group-review-modal-and-map-highlight
+Status: active implementation
+Updated: 2026-07-10
+Current applied baseline: `13.70.0-route-search-diagnostics-import-comparison`
+Next patch target: `13.71.0-editor-maintenance-workflow`
 
-- 환승 시간표 편집을 브라우저 전체를 덮는 화면이 아니라 넓은 중앙 모달로 정리.
-- 환승 시간표 테이블을 더 flat하게 정리하고 선택 셀의 행/열 하이라이트를 유지.
-- 환승 추천 후보 선택 시 후보 역을 지도에서 링/라벨로 강조.
-- 환승 추천 이전/다음은 편집 화면을 열지 않고 후보 선택만 변경.
-- 환승 그룹 수정 화면에 주변 후보 역을 추가할 수 있는 보조 UX 추가.
-
-
-## 13.34.0-transfer-group-review-selection-polish
-
-- 환승 그룹 편집 화면에서 포함 역 선택, 지도 이동, 제거 확인을 더 명확하게 정리했다.
-- 주변 후보 역은 이름 일치/거리 정보를 함께 보여주고 바로 지도에서 확인한 뒤 추가할 수 있게 했다.
-- 환승 추천 거절 시 사유를 함께 저장하고, 거절됨/승인됨 상태를 추천 카드에 표시한다.
-
-## 13.35.0-manual-route-bulk-entry-and-transfer-review-flow
+## Current phase
 
-- 수기 노선 빌더에 역 이름 여러 줄 붙여넣기 modal을 추가했다.
-- 붙여넣은 역 이름은 괄호 보조 표기를 제거하고 중복을 제거한 뒤, 같은 이름의 기존 역 위치/이름을 복사해 새 노선용 역 draft로 추가한다.
-- 매칭되지 않는 역은 결과 메시지로 알려 주고, 기존 stationId는 재사용하지 않는다.
-- 환승 그룹 편집의 `시간표는 나중에 입력하고 저장` 버튼에 저장 아이콘을 추가했다.
-- 환승 추천 거절 사유 드롭다운을 기본 노출하지 않고, `거절` 클릭 시 별도 modal에서 사유 선택 후 반영하도록 변경했다.
-- 거절 modal에는 `취소` 버튼을 제공해 실수로 거절 상태가 저장되지 않도록 했다.
+The editor, public web viewer, collector/export pipeline, manual rail builder, transfer review, timetable input, route search, data version manifest, and audit foundation are implemented.
 
-## 13.36.0-manual-route-bulk-entry-polish-and-map-style
+Current focus is no longer foundation work. The next phase is operational hardening:
 
-- 수기 노선 대량 입력에서 매칭되지 않은 역을 별도 보정 영역으로 표시한다.
-- 미매칭 역은 지도에서 직접 찍거나, 기존 역 검색 결과의 위치를 복사해 새 노선용 역 draft로 추가할 수 있다.
-- 레이어 탭에 지도 스타일 선택을 추가했다: 기본, 라이트, 위성.
-- Dialog 공통 컴포넌트에 배경 클릭 닫기 옵션을 추가하고 주요 modal에 적용했다.
-- 환승 시간표 편집 버튼명을 `편집`으로 변경했다.
-- 환승 시간표 테이블의 행/열 header에 노선 색상 점을 표시해 역 소속을 더 쉽게 구분하도록 했다.
+1. make destructive maintenance actions previewable and reversible through normal overlay history;
+2. turn audit summaries into direct entry points for correction;
+3. keep implementation documents synchronized with current code;
+4. add repeatable route-quality regression cases before expanding fare/search policies.
 
-## 13.37.0 - route builder bulk correction map flow
+## Completed through 13.70.0
 
-- 대량 입력 결과를 추가/보정/제외로 나눠 표시한다.
-- 이미 노선 역 목록에 있는 이름은 제외 항목으로 분리한다.
-- 미매칭 역 보정 중 다음 후보로 바로 이동할 수 있게 한다.
-- 기존 역 위치 복사로 보정하면 보정 수가 줄고 추가 수가 갱신된다.
-- 지도에서 찍기 보정은 보정 목록에서 제거하고 지도 클릭 흐름으로 이동한다.
+- Transfer recommendation approval flow and nearest-next recommendation selection.
+- Manual route/station building and transfer-group review.
+- Service-pattern and train-run timetable authoring/import review.
+- Public route search with multiple candidate comparison.
+- Route quality diagnostics and comparison readiness.
+- Station-line identity detection and stationId split execution.
+- Manual data audit summary.
+- Public data version manifest generation and web loading.
 
+## 13.71.0 scope
 
-## 13.38.0-route-builder-bulk-import-review
+- Replace stationId split `window.confirm` with a central preview dialog.
+- Let the operator choose which line keeps the existing stationId.
+- Show affected service-pattern and train-run counts before execution.
+- Keep generated stations in a transfer group and mark transfer times pending.
+- Make audit risk rows navigate to the relevant correction tab.
+- Correct stale documents that no longer match the current code.
 
-- 수기 노선 대량 입력 결과를 바로 반영하지 않고 `추가 / 보정 / 제외` 리뷰 후 반영하도록 변경.
-- 매칭 성공 역은 `반영 대기` 목록으로 표시하고, 사용자가 확인 후 `반영`해야 역 목록에 추가된다.
-- 미매칭/중복 제외 항목은 기존처럼 별도 영역에서 확인하고 보정할 수 있다.
+## Recommended next work after 13.71.0
 
-## 13.39.0-route-builder-bulk-import-finalize
+### 13.72.0 route-search regression cases
 
-- 수기 노선 대량 입력 modal을 두 단계로 정리했다: 왼쪽 입력/분석, 오른쪽 반영 대기/위치 보정.
-- 분석 결과는 바로 역 목록에 반영하지 않고, 반영 대기 목록에서 이름 수정/삭제/순서 조정 후 반영한다.
-- 미매칭 역을 기존 역 검색으로 보정하면 즉시 실제 역 목록에 넣지 않고 반영 대기 목록으로 이동한다.
-- 반영 대기 목록의 역은 개별 제외, 이름 수정, 위/아래 이동이 가능하다.
-- 중복/이미 추가된 역은 제외 목록에 분리하고, 보정 완료/반영 대기/제외 개수를 일관되게 표시한다.
-- 반영 버튼을 누르면 반영 대기 목록만 실제 역 목록에 추가한다. 미매칭 역이 남아 있으면 modal을 유지해 이어서 보정할 수 있다.
+- Save origin/destination verification cases.
+- Define expected via stations or expected route characteristics.
+- Run all cases and filter failures.
+- Classify failures by timetable, performance, geometry, transfer time, and detour.
 
-## 13.40.0-transfer-history-and-service-timetable-foundation
+### 13.73.0 timetable import operations
 
-- 환승 그룹 추천/승인/거절/시간표 보류 작업을 `manualTransferReviewEvents`로 기록하는 기반을 추가했다.
-- 기록 탭에서 최근 환승 그룹 검토 이력을 확인할 수 있게 했다.
-- 보류 저장, 추천 승인, 추천 거절, 그룹 생성/수정/삭제를 작업 이력으로 남긴다.
-- `manualServicePatterns`를 추가해 물리 노선과 열차/운행계통의 정차 패턴을 분리하는 기반을 만들었다.
-- `manualTrainRuns`를 추가해 열차번호별 실제 도착/출발 시각을 정차 패턴과 별도로 저장할 수 있는 기반을 만들었다.
-- collector validation에서 service pattern과 train run의 line/branch/station/pattern 참조를 검증한다.
-- 아직 시간표 입력 UI는 만들지 않았으며, 다음 단계에서 service pattern 생성/편집 UX를 추가한다.
+- Bulk-resolve unmatched stations.
+- Remember mapping choices and connect them to station aliases.
+- Improve midnight rollover and duplicate-run conflict handling.
+- Provide before/after review and per-row exclusion.
 
-## 13.41.0-service-pattern-builder-ui
+### 13.74.0 cache and release hardening
 
-- `정차 패턴` 탭을 추가했다.
-- 노선/지선을 선택한 뒤 KTX, SRT, 무궁화, ITX 같은 서비스 타입별 정차 패턴을 만들 수 있게 했다.
-- 물리 노선의 전체 역 목록에서 실제 정차역만 선택해 저장한다.
-- 저장된 정차 패턴은 목록에서 확인하고 삭제할 수 있다.
-- 정차 패턴은 아직 열차번호별 시간표가 아니며, 다음 단계의 train run / timetable 입력 UI에서 사용한다.
+- Replace mtime/size versioning with content hashes.
+- Add release ID and schema compatibility checks.
+- Detect stale web data and define Cloudflare cache headers.
 
-## 13.42.0 - train run timetable builder UI
+### 13.75.0 fare model foundation
 
-- 정차 패턴 기반 열차 시간표 입력 UI 추가.
-- 열차번호/표시 이름/운행일/역별 도착·출발 시각 저장 지원.
-- 저장된 열차 시간표 목록과 삭제 기능 추가.
-- 실제 경로검색 그래프 변환은 후속 단계로 분리.
+- Add operator/line/service fare policies.
+- Add editor input and validation.
+- Prepare route result estimated fare and cost-first search.
 
+## Non-negotiable rules
 
-## 13.43.0-timetable-validation-and-review
-
-- 열차 시간표 저장 전 점검 카드를 추가했다.
-- 저장 전 점검에서 시각 형식, 누락 시각, 역 참조, 정차 패턴 순서 불일치, 운행일/열차번호 누락을 확인한다.
-- 오류가 있으면 열차 시간표 저장 버튼을 비활성화한다.
-- 검증 탭에서도 저장된 정차 패턴/열차 시간표의 참조 오류, 2개 미만 정차역, 시각 형식 오류, 누락 시각, 시간 순서 이상을 확인한다.
-- 시각은 `HH:mm` 형식을 기준으로 검증하며, 자정 이후 운행을 위해 24:00~47:59도 허용한다.
-
-## 13.44.0-service-pattern-editing-ui
-
-- 저장된 정차 패턴을 삭제만 하는 대신 다시 열어 수정할 수 있게 했다.
-- 정차 패턴 목록에 수정 버튼을 추가하고, 수정 진입 시 이름/노선/지선/서비스 타입/방향/정차역/메모를 기존 값으로 채운다.
-- 수정 중에는 저장 버튼 문구를 `정차 패턴 수정`으로 바꾸고, `수정 취소` 버튼으로 새 패턴 작성 상태로 되돌릴 수 있다.
-- 수정 저장 시 기존 pattern id를 유지하므로 연결된 열차 시간표가 같은 정차 패턴을 계속 참조한다.
-- 정차역 구성을 바꾼 경우 기존 열차 시간표는 삭제하지 않고, 검증 탭에서 시간표/정차 패턴 불일치 여부를 확인하도록 유지한다.
-
-## 13.45.0-public-service-pattern-display
-
-- public web 노선 상세 패널에 정차 패턴/대표 열차 시간표 요약을 읽기 전용으로 표시한다.
-- 노선별 정차 패턴 수, 연결된 열차 시간표 수, 서비스 타입, 방향, 정차역 수를 확인할 수 있게 했다.
-- 대표 열차는 각 정차 패턴 카드 안에 최대 3개까지 표시한다.
-- 13.44.0에서 발생한 정차 패턴 수정 타입 오류를 함께 수정했다.
-- 정차 패턴 수정 시 lineId/branchId/direction이 비어 있어도 안전한 기본값으로 처리한다.
-
-## 13.46.0 - timetable graph foundation
-
-- web에서 `manualServicePatterns`, `manualTrainRuns`가 누락되어도 빈 배열로 안전하게 처리한다.
-- public 노선 상세의 정차 패턴 카드에 경로검색용 timetable graph 준비 지표를 추가한다.
-- graph 지표는 역 노드 수, 정차 패턴 기반 구간 수, 시간표 기반 시간 간선 수를 계산한다.
-- 실제 경로검색 알고리즘 연결은 후속 단계로 분리한다.
-
-
-## 13.47.0
-
-- 정차 패턴/열차 시간표를 경로검색용 timetable graph 구조로 변환하는 기반을 추가했다.
-- 패턴 구간 edge와 실제 시간표 기반 timed edge를 분리했다.
-- 아직 실제 경로검색 UI 연결은 후속 단계로 남긴다.
-
-
-## 13.48.0
-
-- public web 노선 상세에서 정차 패턴의 정차역 흐름과 대표 열차 시간대를 더 자세히 볼 수 있게 했다.
-- 정차 패턴 요약 카드를 읽기 전용 상세 패널처럼 정리했다.
-
-
-## 13.49.0
-
-- 열차 시간표 입력에서 역명, 도착, 출발 형식의 CSV/탭 구분 붙여넣기를 지원했다.
-- 정차 패턴의 역명과 매칭되는 항목만 기존 시간표 입력 표에 반영하고, 미매칭 역명을 요약 표시한다.
-
-
-## 13.50.0
-
-- public web 경로검색 graph에 열차 시간표 기반 edge를 연결했다.
-- 시간표 edge는 durationMinutes를 이동 비용에 반영하고, 결과 카드에서 시간표 구간으로 따로 표시한다.
-
-
-## 13.51.0
-
-- public web 경로검색 결과에서 노선 구간, 시간표 구간, 수동 환승 구간을 구분해 표시했다.
-- 사용자가 시간표 기반 edge가 반영되었는지 결과 카드에서 바로 확인할 수 있게 했다.
-
-## 13.52.0-route-search-performance-time-estimate
-
-- 13.49.0 CSV import에서 누락된 `normalizeStationNameForSuggestion` 함수를 복구했다.
-- 새 수기 노선 생성 시 가속도(m/s²), 감속도(m/s²), 영업 최고속도(km/h)를 입력할 수 있게 했다.
-- 입력한 운행 성능은 manual line definition의 `trainPerformance`로 저장하고 public bundle의 수기 노선에도 전달한다.
-- public web 경로검색의 일반 노선 이동 시간은 역간 직선거리가 아니라 노선 선형 길이를 우선 사용해 계산한다.
-- 선형이 없을 때만 역 좌표 직선거리로 fallback한다.
-- 이동 시간은 가속/감속/최고속도 기반의 삼각/사다리꼴 속도 프로파일로 계산하고 분 단위 올림 처리한다.
-- 열차 시간표가 있는 edge는 기존처럼 실제 입력된 시간표 duration을 우선 사용한다.
-
-## 13.53.0-line-performance-settings
-
-- 기존 canonical 노선에도 가속도/감속도/영업 최고속도를 설정할 수 있는 편집 UI를 추가했다.
-- lineMetadataOverrides에 trainPerformance를 저장하고 editor/web에 전달한다.
-
-
-## 13.56.0-station-line-split-tool
-
-- 기존 canonical 노선 타입에 `trainPerformance` optional 필드를 추가해 기존 노선 성능 설정 타입 오류를 수정했다.
-- 한 stationId가 여러 노선에 직접 연결된 역을 검증 탭에서 감지하도록 했다.
-- 현재 데이터 기준으로 `까치산` stationId가 2호선/5호선에 동시에 연결된 문제를 확인했다.
-- 역 상세 패널에 `노선별 stationId 분할` 버튼을 추가했다.
-- 분할 실행 시 대표 노선 하나는 기존 stationId를 유지하고, 나머지 노선은 `::line:` scoped stationId로 새 stationOverride를 만든다.
-- 분할된 stationId를 branchRouteOverrides, geometryOverrides, lineBranchOverrides, servicePatterns, trainRuns에 함께 반영한다.
-- 같은 물리 역은 기존/신규 stationId를 환승 그룹으로 묶고, 환승 시간표는 보류 상태로 관리한다.
-
-## 13.57.0-route-search-result-ux-polish
-
-- public web 경로검색 결과 선택 시 해당 경로를 제외한 지도 노선/역을 반투명 처리한다.
-- 환승 연결은 지도 위 회색 점선으로 표시한다.
-- 경로 결과 카드의 시간/환승/거리/구간 정보를 더 읽기 쉬운 카드형 UI로 정리한다.
-- `수동 환승` 표현을 사용자용 `환승`으로 정리한다.
-- 출발/도착역 검색 dropdown을 absolute overlay로 표시해 레이아웃이 밀리지 않게 한다.
-- 최단 시간/최소 환승 결과를 비교해 서로 다를 때만 여러 후보를 표시한다.
-
-## 13.58.0-route-search-debug-and-tuning
-
-- web 경로검색 결과에 접을 수 있는 `계산 근거` 패널을 추가했다.
-- 선형 거리 기반 이동 시간, 시간표 기반 이동 시간, 환승 시간을 분리해 표시한다.
-- 각 구간의 계산 출처를 `선형 거리 + 성능값`, `시간표`, `환승 시간`으로 구분한다.
-- 다음 작업은 경로검색 정확도 튜닝이다.
-
-
-## 13.59.0-route-search-accuracy-tuning
-
-- 경로검색 score 계산을 정리해 환승 패널티가 결과 시간에 일관되게 반영되도록 했다.
-- 같은 노선의 지선/branch 전환은 낮은 비용으로 처리하고, 실제 노선 변경만 환승 횟수로 계산한다.
-- 시간표 edge에는 작은 우선 보정을 주어, 실제 입력된 시간표가 있는 구간이 동일 조건에서 더 자연스럽게 선택되도록 했다.
-- 최소 환승 결과는 환승 횟수를 최우선으로 두고, 동률일 때 시간/역 수를 보조 기준으로 사용한다.
-- 최단 시간/최소 환승 결과가 사실상 동일하거나 한 결과가 명확히 우세하면 후보를 하나만 노출하도록 정리했다.
-- 일반 ride edge의 기본 fallback 시간을 1분에서 2분으로 보정해 선형/성능값이 없는 구간이 과도하게 짧게 계산되지 않게 했다.
-
-## 13.60.0-route-search-tuning-controls
-
-- public web 경로검색 카드에 검색 기준 선택을 추가했다.
-- 기준은 `균형`, `빠른 경로`, `환승 적게`, `시간표 우선`으로 제공한다.
-- `균형`은 빠른 경로와 환승 적게 결과를 함께 비교하고, 중복/압도적 우세 결과는 하나만 표시한다.
-- `빠른 경로`는 예상 시간이 짧은 결과만 계산한다.
-- `환승 적게`는 환승 수를 우선 줄인 결과만 계산한다.
-- `시간표 우선`은 실제 시간표 edge가 있는 구간을 조금 더 우선해 탐색한다.
-- 검색 기준 변경 시 기존 결과를 초기화해, 새 기준으로 다시 검색하도록 했다.
-
-
-## 13.61.0-route-highlight-detail-polish
-- web 경로검색 선택 경로 외 지도 요소 반투명 처리 강화.
-- 환승 점선과 결과 요약 카드 시각 정보 개선.
-
-
-## 13.62.0-timetable-csv-import-hardening
-- 시간표 붙여넣기에서 HH:mm 정규화, 중복 제외, 미매칭/시각 오류 요약을 추가.
-
-
-## 13.63.0-public-timetable-detail-polish
-- public 노선 상세의 운행 패턴/시간표 요약을 더 명확한 정보 카드로 정리.
-
-## 13.64.0 cache version deploy policy
-
-- Fixed timetable CSV line splitting syntax generated by a malformed regex literal.
-- Added deploy/cache/version policy documentation for public data artifacts.
-- Clarified that `data/manual` remains source-of-truth and `apps/web/public/data` is export output.
-- Added release checklist for editor/web/collector type checks and public data parity.
-
-## 13.65.0 route search quality review
-
-- Added a compact route quality review card to public route search results.
-- The result now highlights whether timetable edges, geometry/performance estimates, fallback durations, and transfer links were used.
-- This makes route-search quality issues easier to spot before deeper algorithm changes.
-
-## 13.66.0 route search visual review
-
-- Strengthened public route-search map highlighting.
-- Route result lines now use each route segment's actual line color instead of a single green color.
-- Route casing and transfer dotted lines were tuned so selected routes read more naturally against dimmed non-route map layers.
-
-## 13.67.0 - timetable import review
-
-- 시간표 CSV/붙여넣기 결과를 바로 입력칸에 반영하지 않고, 먼저 반영 전 리뷰 영역에 표시한다.
-- 리뷰 영역에서 도착/출발 시각을 수정하거나 개별 항목을 제외한 뒤 반영할 수 있다.
-- 미매칭, 시각 오류, 중복 제외 항목을 별도로 요약한다.
-
-## 13.68.0 route search real data quality pass
-
-- 경로검색 score에 데이터 품질 보정을 추가했다.
-- 선형 거리/성능값이 없어 기본 시간으로 계산되는 ride edge는 동일 조건에서 덜 우선되도록 했다.
-- 매우 긴 환승 시간 edge도 동일 조건에서 약하게 불리하게 조정했다.
-- public web 경로 결과의 `품질 점검` 카드를 양호/주의/확인 필요 상태로 나눠 표시한다.
-- 시간표 구간, 선형 거리 계산 구간, 기본 시간 보정 구간, 긴 환승 구간을 더 명확히 보여준다.
+- No dummy or sample production transit data.
+- A stationId must not represent real stations on multiple lines.
+- Same physical station connections use transfer groups.
+- KTX/SRT are service types, not physical Line names.
+- `data/manual` remains the manual source of truth.
+- Do not perform risky geometry or identity repair silently.

@@ -4143,6 +4143,10 @@ export default function UnifiedMapEditor({
   const [activeTransferSuggestionKey, setActiveTransferSuggestionKey] = useState<string | null>(null);
   const [pendingTransferSelection, setPendingTransferSelection] =
     useState<PendingTransferSelection | null>(null);
+  const [stationLineSplitPreview, setStationLineSplitPreview] = useState<{
+    stationId: string;
+    keepBranchId: string;
+  } | null>(null);
 
   const geometryWorkspaceDrafts = useMemo(
     () => getGeometryDraftsFromMap(geometryDraftsByKey),
@@ -8161,7 +8165,7 @@ export default function UnifiedMapEditor({
     await saveStationLocationAndAddToBranch(nextDraft, insertion);
   }
 
-  async function splitSelectedStationByLine() {
+  function openSelectedStationLineSplitPreview() {
     if (!selectedStation) {
       showToast("분할할 역을 먼저 선택하세요", "error");
       return;
@@ -8173,28 +8177,26 @@ export default function UnifiedMapEditor({
       return;
     }
 
-    const keepBranch = targetBranches[0];
-    const splitBranches = targetBranches.slice(1);
-    const affectedPatternCount = overlays.manualServicePatterns.filter((pattern) =>
-      pattern.branchId && splitBranches.some((branch) => branch.id === pattern.branchId),
-    ).length;
-    const affectedTrainRunCount = overlays.manualTrainRuns.filter((run) => {
-      const pattern = overlays.manualServicePatterns.find((candidate) => candidate.id === run.patternId);
-      return Boolean(pattern?.branchId && splitBranches.some((branch) => branch.id === pattern.branchId));
-    }).length;
-    const previewLines = [
-      `${formatStationDisplayName(selectedStation)} 역을 ${targetBranches.length.toLocaleString("ko-KR")}개 노선별 stationId로 분할합니다.`,
-      "",
-      `대표 유지: ${keepBranch ? formatBranchDisplayName(keepBranch) : "첫 번째 노선"}`,
-      ...splitBranches.slice(0, 8).map((branch) => `분할 생성: ${formatBranchDisplayName(branch)}`),
-      splitBranches.length > 8 ? `외 ${splitBranches.length - 8}개 노선` : null,
-      "",
-      `영향 범위: 정차 패턴 ${affectedPatternCount.toLocaleString("ko-KR")}개 · 시간표 ${affectedTrainRunCount.toLocaleString("ko-KR")}개`,
-      "생성된 역은 같은 물리 역 환승 그룹으로 묶고, 환승 시간표는 보류 상태로 둡니다.",
-    ].filter((line): line is string => line !== null);
+    setStationLineSplitPreview({
+      stationId: selectedStation.id,
+      keepBranchId: targetBranches[0]!.id,
+    });
+  }
 
-    const confirmed = window.confirm(previewLines.join("\n"));
-    if (!confirmed) return;
+  async function splitSelectedStationByLine(keepBranchId: string) {
+    if (!selectedStation) {
+      showToast("분할할 역을 먼저 선택하세요", "error");
+      return;
+    }
+
+    const targetBranches = getDistinctLineBranches(getBranchesServingStation(data.branches, selectedStation.id));
+    if (targetBranches.length < 2) {
+      showToast("이 역은 여러 노선에 직접 연결되어 있지 않습니다", "info");
+      return;
+    }
+
+    const keepBranch = targetBranches.find((branch) => branch.id === keepBranchId) ?? targetBranches[0]!;
+    const splitBranches = targetBranches.filter((branch) => branch.id !== keepBranch.id);
 
     const existingStationIds = new Set([
       ...data.stations.map((station) => station.id),
@@ -8338,6 +8340,7 @@ export default function UnifiedMapEditor({
       `${formatStationDisplayName(selectedStation)} 역을 노선별 stationId로 분할했습니다`,
     );
     if (!saved) return;
+    setStationLineSplitPreview(null);
     await reloadEditorData();
     setSelection({ type: "station", id: selectedStation.id });
     setSidebarTab("validation");
@@ -8368,6 +8371,25 @@ export default function UnifiedMapEditor({
     : [];
   const selectedStationSplitCandidates = getDistinctLineBranches(selectedStationBranches);
   const selectedStationNeedsLineSplit = selectedStationSplitCandidates.length > 1;
+  const stationLineSplitPreviewStation = stationLineSplitPreview
+    ? (stationById.get(stationLineSplitPreview.stationId) ?? null)
+    : null;
+  const stationLineSplitPreviewBranches = stationLineSplitPreviewStation
+    ? getDistinctLineBranches(getBranchesServingStation(data.branches, stationLineSplitPreviewStation.id))
+    : [];
+  const stationLineSplitPreviewKeepBranch = stationLineSplitPreview
+    ? (stationLineSplitPreviewBranches.find((branch) => branch.id === stationLineSplitPreview.keepBranchId) ?? stationLineSplitPreviewBranches[0] ?? null)
+    : null;
+  const stationLineSplitPreviewSplitBranches = stationLineSplitPreviewKeepBranch
+    ? stationLineSplitPreviewBranches.filter((branch) => branch.id !== stationLineSplitPreviewKeepBranch.id)
+    : [];
+  const stationLineSplitAffectedPatternCount = overlays.manualServicePatterns.filter((pattern) =>
+    Boolean(pattern.branchId && stationLineSplitPreviewSplitBranches.some((branch) => branch.id === pattern.branchId)),
+  ).length;
+  const stationLineSplitAffectedTrainRunCount = overlays.manualTrainRuns.filter((run) => {
+    const pattern = overlays.manualServicePatterns.find((candidate) => candidate.id === run.patternId);
+    return Boolean(pattern?.branchId && stationLineSplitPreviewSplitBranches.some((branch) => branch.id === pattern.branchId));
+  }).length;
   const selectedStationTransferGroup = selectedStation
     ? (stationTransferGroupIndex.get(selectedStation.id) ?? null)
     : null;
@@ -8886,6 +8908,7 @@ export default function UnifiedMapEditor({
                 overlays={overlays}
                 stationById={displayStationById}
                 validationIssues={lineBranchIssues}
+                onNavigate={setSidebarTab}
               />
             ) : null}
 
@@ -9095,7 +9118,7 @@ export default function UnifiedMapEditor({
                 lineBranchOverrides={overlays.lineBranchOverrides}
                 lineSplitBranches={selectedStationSplitCandidates}
                 canSplitByLine={selectedStationNeedsLineSplit}
-                onSplitByLine={() => void splitSelectedStationByLine()}
+                onSplitByLine={openSelectedStationLineSplitPreview}
                 onExcludeFromBranch={(branchId) =>
                   void createBranchStationExclusion(
                     branchId,
@@ -9236,6 +9259,69 @@ export default function UnifiedMapEditor({
           </Button>
           <Button onClick={applyPendingSelectionAfterTransferDraftCancel}>
             새로 선택하기
+          </Button>
+        </div>
+      </Dialog>
+
+
+      <Dialog
+        open={Boolean(stationLineSplitPreview && stationLineSplitPreviewStation)}
+        onClose={() => setStationLineSplitPreview(null)}
+        className="flex max-h-[min(760px,calc(100dvh-24px))] w-[min(720px,calc(100vw-24px))] max-w-none flex-col overflow-hidden rounded-[28px]"
+      >
+        <div className="border-b border-slate-200 px-5 py-4">
+          <strong className="block text-base font-semibold text-slate-950">노선별 stationId 분할</strong>
+          <p className="mt-1 text-xs font-medium leading-5 text-slate-500">
+            {stationLineSplitPreviewStation ? `${formatStationDisplayName(stationLineSplitPreviewStation)}의 기존 stationId를 유지할 대표 노선을 선택하세요.` : "대표 노선을 선택하세요."}
+          </p>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          <div className="grid gap-2">
+            {stationLineSplitPreviewBranches.map((branch) => {
+              const selected = branch.id === stationLineSplitPreviewKeepBranch?.id;
+              return (
+                <button
+                  key={branch.id}
+                  type="button"
+                  onClick={() => setStationLineSplitPreview((current) => current ? { ...current, keepBranchId: branch.id } : current)}
+                  className={cn(
+                    "flex items-center gap-3 rounded-2xl border px-3 py-3 text-left transition",
+                    selected ? "border-blue-300 bg-blue-50" : "border-slate-200 bg-white hover:bg-slate-50",
+                  )}
+                >
+                  <span className="size-3 rounded-full" style={{ backgroundColor: branch.colorHex }} />
+                  <span className="min-w-0 flex-1">
+                    <strong className="block truncate text-sm font-semibold text-slate-900">{formatBranchDisplayName(branch)}</strong>
+                    <span className="mt-0.5 block text-[11px] font-medium text-slate-500">
+                      {selected ? "기존 stationId 유지" : "새 stationId 생성"}
+                    </span>
+                  </span>
+                  {selected ? <Badge className="bg-blue-100 text-blue-700">대표</Badge> : null}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+              <p className="text-[10px] font-semibold text-slate-400">영향받는 정차 패턴</p>
+              <strong className="mt-1 block text-lg font-semibold text-slate-900">{stationLineSplitAffectedPatternCount.toLocaleString("ko-KR")}</strong>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+              <p className="text-[10px] font-semibold text-slate-400">영향받는 시간표</p>
+              <strong className="mt-1 block text-lg font-semibold text-slate-900">{stationLineSplitAffectedTrainRunCount.toLocaleString("ko-KR")}</strong>
+            </div>
+          </div>
+          <div className="mt-4 rounded-2xl border border-amber-100 bg-amber-50 px-3 py-3 text-xs font-medium leading-5 text-amber-900">
+            새로 생성되는 역들은 같은 물리 역의 환승 그룹에 추가됩니다. 모든 역간 환승 시간은 보류 상태가 되므로 분할 후 시간표를 확인해야 합니다.
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 border-t border-slate-200 px-5 py-4">
+          <Button variant="ghost" onClick={() => setStationLineSplitPreview(null)}>취소</Button>
+          <Button
+            disabled={!stationLineSplitPreviewKeepBranch || stationLineSplitPreviewBranches.length < 2}
+            onClick={() => stationLineSplitPreviewKeepBranch ? void splitSelectedStationByLine(stationLineSplitPreviewKeepBranch.id) : undefined}
+          >
+            분할 실행
           </Button>
         </div>
       </Dialog>
@@ -9459,10 +9545,12 @@ function ManualDataAuditDashboard({
   overlays,
   stationById,
   validationIssues,
+  onNavigate,
 }: {
   overlays: ManualOverlayBundle;
   stationById: Map<string, EditorStation>;
   validationIssues: LineBranchValidationIssue[];
+  onNavigate: (tab: SidebarTab) => void;
 }) {
   const enabledManualLines = overlays.manualLineDefinitions.filter((line) => line.enabled !== false);
   const enabledTransferGroups = overlays.manualTransferGroups.filter((group) => group.enabled !== false);
@@ -9529,14 +9617,14 @@ function ManualDataAuditDashboard({
     { label: "검증 이슈", value: validationIssues.length, detail: `${missingStationReferences.length.toLocaleString("ko-KR")}개 역 참조 확인` },
   ];
   const riskItems = [
-    transferGroupsWithoutTime.length > 0 ? `환승 시간 미입력 ${transferGroupsWithoutTime.length.toLocaleString("ko-KR")}개` : null,
-    patternsWithoutTrainRuns.length > 0 ? `시간표 없는 정차 패턴 ${patternsWithoutTrainRuns.length.toLocaleString("ko-KR")}개` : null,
-    trainRunsWithSparseTimes.length > 0 ? `시각 부족 시간표 ${trainRunsWithSparseTimes.length.toLocaleString("ko-KR")}개` : null,
-    trainRunsWithTimeOrderWarnings.length > 0 ? `시간 순서 확인 ${trainRunsWithTimeOrderWarnings.length.toLocaleString("ko-KR")}개` : null,
-    manualLinesWithoutPerformance.length > 0 ? `성능값 누락 노선 ${manualLinesWithoutPerformance.length.toLocaleString("ko-KR")}개` : null,
-    missingStationReferences.length > 0 ? `없는 역 참조 ${missingStationReferences.length.toLocaleString("ko-KR")}개` : null,
-    validationIssues.length > 0 ? `검증 패널 이슈 ${validationIssues.length.toLocaleString("ko-KR")}개` : null,
-  ].filter((item): item is string => Boolean(item));
+    transferGroupsWithoutTime.length > 0 ? { label: `환승 시간 미입력 ${transferGroupsWithoutTime.length.toLocaleString("ko-KR")}개`, tab: "transfers" as const } : null,
+    patternsWithoutTrainRuns.length > 0 ? { label: `시간표 없는 정차 패턴 ${patternsWithoutTrainRuns.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
+    trainRunsWithSparseTimes.length > 0 ? { label: `시각 부족 시간표 ${trainRunsWithSparseTimes.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
+    trainRunsWithTimeOrderWarnings.length > 0 ? { label: `시간 순서 확인 ${trainRunsWithTimeOrderWarnings.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
+    manualLinesWithoutPerformance.length > 0 ? { label: `성능값 누락 노선 ${manualLinesWithoutPerformance.length.toLocaleString("ko-KR")}개`, tab: "manualLines" as const } : null,
+    missingStationReferences.length > 0 ? { label: `없는 역 참조 ${missingStationReferences.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
+    validationIssues.length > 0 ? { label: `검증 패널 이슈 ${validationIssues.length.toLocaleString("ko-KR")}개`, tab: "validation" as const } : null,
+  ].filter((item): item is { label: string; tab: SidebarTab } => Boolean(item));
 
   return (
     <div className="grid gap-3">
@@ -9597,9 +9685,15 @@ function ManualDataAuditDashboard({
         <strong className="text-sm font-semibold text-slate-900">위험 항목</strong>
         <div className="mt-3 grid gap-1.5">
           {riskItems.map((item) => (
-            <div key={item} className="rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-              {item}
-            </div>
+            <button
+              key={item.label}
+              type="button"
+              onClick={() => onNavigate(item.tab)}
+              className="flex items-center justify-between gap-2 rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-left text-xs font-medium text-amber-800 transition hover:border-amber-200 hover:bg-amber-100"
+            >
+              <span>{item.label}</span>
+              <ChevronRight className="size-3.5 shrink-0" />
+            </button>
           ))}
           {riskItems.length === 0 ? (
             <Placeholder title="위험 항목 없음" description="현재 수기 데이터 감사 기준에서는 큰 누락이 보이지 않습니다." />
