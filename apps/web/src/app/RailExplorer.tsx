@@ -4,6 +4,7 @@ import {
   useDeferredValue,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -1412,7 +1413,16 @@ function DataVersionBadge({
   manifest: PublicDataVersionManifest | null;
   compact?: boolean;
 }) {
+  const [releaseChanged, setReleaseChanged] = useState(false);
   const bundleGeneratedAt = manifest?.versions?.bundle?.generatedAt ?? manifest?.generatedAt ?? null;
+
+  useEffect(() => {
+    if (!manifest?.releaseId || typeof window === "undefined") return;
+    const storageKey = "railmap.data-release-id.v1";
+    const previousReleaseId = window.localStorage.getItem(storageKey);
+    setReleaseChanged(Boolean(previousReleaseId && previousReleaseId !== manifest.releaseId));
+    window.localStorage.setItem(storageKey, manifest.releaseId);
+  }, [manifest?.releaseId]);
   const label = manifest
     ? `데이터 ${manifest.acquiredDate ?? manifest.versions?.bundle?.acquiredDate ?? "버전 확인"}`
     : "데이터 버전 없음";
@@ -1430,10 +1440,12 @@ function DataVersionBadge({
   return (
     <div className={compact ? "mt-1" : "mt-2"}>
       <span
-        className="inline-flex max-w-full items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500"
-        title={title}
+        className={releaseChanged
+          ? "inline-flex max-w-full items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700"
+          : "inline-flex max-w-full items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500"}
+        title={releaseChanged ? `새 데이터 릴리스가 감지되었습니다.\n${title}` : title}
       >
-        {label}
+        {releaseChanged ? "데이터 업데이트" : label}
       </span>
     </div>
   );
@@ -2809,6 +2821,8 @@ function RouteRegressionCasePanel({
   stationById: Map<string, RailMapStation>;
 }) {
   const [cases, setCases] = useState<StoredRouteRegressionCase[]>([]);
+  const [importMessage, setImportMessage] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const originStationId = result.stationIds[0] ?? "";
   const destinationStationId = result.stationIds[result.stationIds.length - 1] ?? "";
 
@@ -2852,6 +2866,47 @@ function RouteRegressionCasePanel({
     persist(cases.filter((item) => item.id !== matchingCase.id));
   };
 
+  const exportCases = () => {
+    const payload = JSON.stringify({ schemaVersion: 1, exportedAt: new Date().toISOString(), cases }, null, 2);
+    const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `railmap-route-regression-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importCases = async (file: File | null) => {
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text()) as unknown;
+      const rawCases = Array.isArray(parsed)
+        ? parsed
+        : parsed && typeof parsed === "object" && Array.isArray((parsed as { cases?: unknown }).cases)
+          ? (parsed as { cases: unknown[] }).cases
+          : null;
+      if (!rawCases) throw new Error("cases 배열을 찾지 못했습니다.");
+      const imported = rawCases.filter((item): item is StoredRouteRegressionCase => {
+        if (!item || typeof item !== "object") return false;
+        const candidate = item as Partial<StoredRouteRegressionCase>;
+        return typeof candidate.id === "string"
+          && typeof candidate.originStationId === "string"
+          && typeof candidate.destinationStationId === "string"
+          && typeof candidate.expectedMinutes === "number"
+          && typeof candidate.expectedTransfers === "number"
+          && Array.isArray(candidate.expectedStationIds);
+      });
+      const merged = new Map(cases.map((item) => [item.id, item]));
+      for (const item of imported) merged.set(item.id, item);
+      persist([...merged.values()].slice(0, 200));
+      setImportMessage(`${imported.length.toLocaleString("ko-KR")}개 기준을 가져왔습니다.`);
+    } catch (error) {
+      setImportMessage(error instanceof Error ? error.message : "가져오기에 실패했습니다.");
+    } finally {
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="mt-2 rounded-2xl border border-indigo-100 bg-indigo-50/60 px-3 py-2 text-indigo-900">
       <div className="flex items-center justify-between gap-2">
@@ -2887,9 +2942,24 @@ function RouteRegressionCasePanel({
           ) : null}
         </div>
       ) : null}
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <button type="button" className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-indigo-700 shadow-sm disabled:opacity-40" disabled={cases.length === 0} onClick={exportCases}>
+          기준 내보내기
+        </button>
+        <button type="button" className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-indigo-700 shadow-sm" onClick={() => importInputRef.current?.click()}>
+          기준 가져오기
+        </button>
+        {cases.length > 0 ? (
+          <button type="button" className="rounded-full px-2.5 py-1 text-[10px] font-semibold text-rose-600" onClick={() => window.confirm("저장된 회귀 검증 기준을 모두 삭제할까요?") && persist([])}>
+            전체 삭제
+          </button>
+        ) : null}
+        <input ref={importInputRef} type="file" accept="application/json,.json" className="hidden" onChange={(event) => void importCases(event.target.files?.[0] ?? null)} />
+      </div>
       {cases.length > 0 ? (
         <p className="mt-1.5 text-[10px] font-medium text-indigo-700/70">저장된 검증 기준 {cases.length.toLocaleString("ko-KR")}개</p>
       ) : null}
+      {importMessage ? <p className="mt-1 text-[10px] font-medium text-indigo-700/70">{importMessage}</p> : null}
     </div>
   );
 }

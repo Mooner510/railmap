@@ -10118,6 +10118,51 @@ function ServicePatternBuilderPanel({
     });
   }
 
+  function resolveAllUniqueTrainCsvMissedItems() {
+    if (!activeTrainPattern) return;
+    setTrainCsvReview((current) => {
+      if (!current) return current;
+      const pending = [...current.pending];
+      const pendingKeys = new Set(pending.map((item) => `${item.stationId}:${item.sequence}`));
+      const duplicateStops = [...current.duplicateStops];
+      const missed: TrainCsvMissedReviewItem[] = [];
+
+      for (const item of current.missed) {
+        if (item.candidateStationIds.length !== 1) {
+          missed.push(item);
+          continue;
+        }
+        const stationId = item.candidateStationIds[0];
+        const stop = activeTrainPattern.stops.find((candidate) => candidate.stationId === stationId);
+        if (!stop) {
+          missed.push(item);
+          continue;
+        }
+        const key = `${stop.stationId}:${stop.sequence}`;
+        if (pendingKeys.has(key)) {
+          duplicateStops.push(item.sourceName);
+          continue;
+        }
+        pendingKeys.add(key);
+        pending.push({
+          stationId: stop.stationId,
+          sequence: stop.sequence,
+          stationName: stationById.get(stop.stationId)?.nameKo ?? stop.stationId,
+          sourceName: item.sourceName,
+          arrivalTime: item.arrivalTime,
+          departureTime: item.departureTime,
+        });
+      }
+
+      return {
+        ...current,
+        pending: pending.sort((a, b) => a.sequence - b.sequence),
+        missed,
+        duplicateStops,
+      };
+    });
+  }
+
   function commitTrainCsvReview() {
     if (!trainCsvReview) return;
     const nextTimes: Record<string, { arrivalTime: string; departureTime: string }> = {};
@@ -10403,7 +10448,14 @@ function ServicePatternBuilderPanel({
                   ) : null}
                   {trainCsvReview.missed.length > 0 ? (
                     <div className="mt-2 grid gap-2 rounded-xl border border-amber-100 bg-amber-50 p-2">
-                      <strong className="text-[11px] font-semibold text-amber-800">미매칭 역 보정</strong>
+                      <div className="flex items-center justify-between gap-2">
+                        <strong className="text-[11px] font-semibold text-amber-800">미매칭 역 보정</strong>
+                        {trainCsvReview.missed.some((item) => item.candidateStationIds.length === 1) ? (
+                          <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={resolveAllUniqueTrainCsvMissedItems}>
+                            단일 후보 모두 적용
+                          </Button>
+                        ) : null}
+                      </div>
                       {trainCsvReview.missed.slice(0, 6).map((item, index) => (
                         <div key={`${item.sourceName}:${index}`} className="rounded-xl bg-white/80 px-2 py-1.5">
                           <div className="flex items-center justify-between gap-2">
