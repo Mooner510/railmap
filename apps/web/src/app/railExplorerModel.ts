@@ -148,6 +148,8 @@ export interface CanonicalRouteStop {
   diagnostics?: string[];
 }
 
+export type ManualBranchRouteDirection = "bidirectional" | "forward" | "reverse";
+
 export interface CanonicalBranch {
   id: string;
   canonicalLineId: string;
@@ -158,6 +160,7 @@ export interface CanonicalBranch {
   terminal: string | null;
   routeStops: CanonicalRouteStop[];
   isCircular?: boolean;
+  routeDirection?: ManualBranchRouteDirection;
 }
 
 export interface CanonicalLine {
@@ -284,6 +287,8 @@ export interface ManualBranchRouteOverride {
   id: string;
   branchId: string;
   stationIds: string[];
+  circular?: boolean;
+  routeDirection?: ManualBranchRouteDirection;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;

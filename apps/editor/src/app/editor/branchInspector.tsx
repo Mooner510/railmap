@@ -9,6 +9,7 @@ import {
   formatRailServiceType,
   type EditorStation,
   type ManualBranchRouteOverride,
+  type ManualBranchRouteDirection,
   type ManualBranchStationExclusion,
   type ManualLineBranchOverride,
   type ManualTrainPerformance,
@@ -164,6 +165,7 @@ export function BranchInspector({
   onUpdateRoute,
   onResetRoute,
   onSetCircular,
+  onSetRouteDirection,
   onUpdateLineMetadata,
 }: {
   branch: EditorMapBranch;
@@ -177,6 +179,7 @@ export function BranchInspector({
   onUpdateRoute: (stationIds: string[], label: string, circular?: boolean) => void;
   onResetRoute: () => void;
   onSetCircular: (circular: boolean) => void;
+  onSetRouteDirection: (direction: ManualBranchRouteDirection) => void;
   onUpdateLineMetadata: (category: RailLineCategory, serviceTypes: RailServiceType[], trainPerformance?: ManualTrainPerformance | null) => void;
 }) {
   const branchStations = getBranchStopStations(branch);
@@ -201,6 +204,7 @@ export function BranchInspector({
   );
   const routeStationIds = branchStations.map((station) => station.id);
   const isCircular = branchRouteOverride?.circular === true || branch.isCircular === true;
+  const routeDirection = branchRouteOverride?.routeDirection ?? branch.routeDirection ?? "bidirectional";
   const [accelerationMps2, setAccelerationMps2] = useState("");
   const [decelerationMps2, setDecelerationMps2] = useState("");
   const [maxSpeedKph, setMaxSpeedKph] = useState("");
@@ -400,6 +404,40 @@ export function BranchInspector({
             </button>
           </div>
         </div>
+      </div>
+
+      <div className="grid gap-2 rounded-2xl border border-violet-100 bg-violet-50/70 p-3">
+        <div>
+          <strong className="text-xs font-semibold text-violet-900">운행 방향</strong>
+          <p className="mt-1 text-[11px] font-medium text-violet-700">정차역 목록의 위→아래 방향을 기준으로 경로검색에 반영합니다.</p>
+        </div>
+        <div className="grid grid-cols-3 gap-1.5">
+          {([
+            ["bidirectional", "양방향"],
+            ["forward", "위 → 아래"],
+            ["reverse", "아래 → 위"],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={cn(
+                "rounded-xl border px-2 py-2 text-[11px] font-bold transition",
+                routeDirection === value
+                  ? "border-violet-500 bg-violet-600 text-white shadow-sm"
+                  : "border-violet-100 bg-white text-violet-700 hover:border-violet-300",
+              )}
+              onClick={() => onSetRouteDirection(value)}
+              aria-pressed={routeDirection === value}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {routeDirection !== "bidirectional" ? (
+          <p className="rounded-xl bg-white/80 px-3 py-2 text-[11px] font-semibold text-violet-800">
+            단방향 설정됨 · 반대 방향 경로는 검색 그래프에서 제외됩니다.
+          </p>
+        ) : null}
       </div>
 
       <div className="grid gap-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-3">

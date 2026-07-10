@@ -319,11 +319,14 @@ export interface ManualBranchStationExclusion {
   note?: string | null;
 }
 
+export type ManualBranchRouteDirection = "bidirectional" | "forward" | "reverse";
+
 export interface ManualBranchRouteOverride {
   id: string;
   branchId: string;
   stationIds: string[];
   circular?: boolean;
+  routeDirection?: ManualBranchRouteDirection;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;

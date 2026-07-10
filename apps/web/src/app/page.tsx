@@ -42,6 +42,8 @@ interface CanonicalRouteStop {
   diagnostics?: string[];
 }
 
+type ManualBranchRouteDirection = "bidirectional" | "forward" | "reverse";
+
 interface CanonicalBranch {
   id: string;
   canonicalLineId: string;
@@ -52,6 +54,7 @@ interface CanonicalBranch {
   terminal: string | null;
   routeStops: CanonicalRouteStop[];
   isCircular?: boolean;
+  routeDirection?: ManualBranchRouteDirection;
 }
 
 interface CanonicalLine {
@@ -123,6 +126,7 @@ interface ManualBranchRouteOverride {
   branchId: string;
   stationIds: string[];
   circular?: boolean;
+  routeDirection?: ManualBranchRouteDirection;
   enabled: boolean;
   source?: "manual" | "editor" | string;
   note?: string | null;
@@ -729,6 +733,7 @@ function applyBranchRouteOverrides(
       return {
         ...branch,
         isCircular: override.circular === true,
+        routeDirection: override.routeDirection ?? "bidirectional",
         routeStops: override.stationIds.map((stationId, index) => {
           const existing = stopByStationId.get(stationId);
           const station = stationById.get(stationId);
