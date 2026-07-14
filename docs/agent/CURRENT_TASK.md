@@ -2,19 +2,21 @@
 
 ## Applied through
 
-- `13.98.0-14.0.0`
+- `13.101.0-13.103.0`
 
 ## Completed
 
-- Web station fill, casing and stroke fade together
-- non-selected Web lines remain selectable at low opacity
-- blank-map click returns Web to full-view state
-- normal and emphasized station labels no longer overlap
-- branch-only/manual-override stations are rendered and receive serving-line metadata
-- Editor station hit testing works independently of transfer-detail zoom mode
+- Web background line opacity reduced for selected-line and route-search states
+- background stations remain more visible than background lines
+- station fill, casing, stroke and label opacity are controlled by one shared policy
+- manual line branches follow their parent branch selection and route highlight
+- Web MapLibre emphasis expressions extracted from `RailMap.tsx`
+- common numeric emphasis policy moved to `packages/ui`
+- all faded map features remain interactive through unchanged hit layers
 
 ## Next
 
-- verify remaining source/layer/event responsibilities for extraction from `RailMap.tsx`
-- split Editor audit, transfer recommendation and timetable import sections
-- continue UI unification regression cleanup from user feedback
+- split Web map source construction from `RailMap.tsx`
+- split Web layer registration and event binding from `RailMap.tsx`
+- move shared Editor/Web hit-test priority constants into `packages/ui`
+- then split Editor audit, transfer recommendation and timetable import sections

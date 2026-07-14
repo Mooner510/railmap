@@ -288,3 +288,43 @@ export const RAIL_MAP_VISUAL_POLICY = {
 export function getRailStationLabelVisibility(zoom: number) {
   return zoom >= RAIL_MAP_VISUAL_POLICY.stationLabelMinZoom;
 }
+
+export type RailMapFocusMode = "idle" | "selection" | "route";
+
+export const RAIL_MAP_EMPHASIS_POLICY = {
+  line: {
+    idle: 0.76,
+    selected: 0.94,
+    route: 0.92,
+    contextOnSelection: 0.026,
+    contextOnRoute: 0.018,
+  },
+  station: {
+    emphasized: 0.99,
+    context: 0.97,
+    background: 0.18,
+    casingEmphasized: 0.99,
+    casingContext: 0.94,
+    casingBackground: 0.13,
+    strokeBackground: 0.2,
+    labelContext: 0.94,
+    labelBackground: 0.22,
+  },
+  transfer: {
+    context: 1,
+    background: 0.22,
+    labelBackground: 0.2,
+  },
+} as const;
+
+export function getRailMapFocusMode({
+  selectedBranchId,
+  highlightedRouteBranchIds,
+}: {
+  selectedBranchId?: string | null;
+  highlightedRouteBranchIds?: readonly string[];
+}): RailMapFocusMode {
+  if ((highlightedRouteBranchIds?.length ?? 0) > 0) return "route";
+  if (selectedBranchId) return "selection";
+  return "idle";
+}
