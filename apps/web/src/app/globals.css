@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @source "../../../../packages/ui/src";
+@import "../../../../packages/ui/src/rail-product-theme.css";
 
 :root {
   --background: #eef2f7;
@@ -38,7 +39,7 @@ body {
     BlinkMacSystemFont,
     "Segoe UI",
     sans-serif;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -692,4 +693,79 @@ summary:focus-visible {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Shared editor/web visual foundation — first unification pass */
+.web-explorer-shell {
+  background: var(--rail-bg);
+  color: var(--rail-text);
+  font-size: var(--rail-font-size);
+}
+
+.web-sidebar {
+  background: var(--rail-bg);
+  padding: 8px 0 8px 8px;
+}
+
+.web-sidebar-header,
+.web-sidebar-content {
+  border-color: var(--rail-border);
+  background: var(--rail-surface);
+  box-shadow: var(--rail-shadow-panel);
+}
+
+.web-sidebar-header {
+  margin-right: 8px;
+  border-radius: var(--rail-radius-lg) var(--rail-radius-lg) 0 0;
+  padding: 13px 14px 10px;
+}
+
+.web-sidebar-content {
+  margin-right: 8px;
+  border-radius: 0 0 var(--rail-radius-lg) var(--rail-radius-lg);
+}
+
+.web-filter-scroll {
+  padding: 12px;
+}
+
+.web-control-section,
+.web-search-results,
+.web-selected-panel,
+.web-route-search-panel {
+  border-radius: var(--rail-radius-md);
+}
+
+.web-control-heading span,
+.web-panel-title,
+.web-card-title {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.web-control-heading small,
+.web-card-description,
+.web-panel-description {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.web-filter-controls button,
+.web-chip-row button,
+.web-display-toggles button,
+.web-filter-actions button {
+  min-height: 30px;
+  border-radius: var(--rail-radius-sm);
+  font-size: 11px;
+}
+
+.web-brand-mark {
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  border-radius: 11px;
+}
+
+.web-search-field {
+  display: none;
 }

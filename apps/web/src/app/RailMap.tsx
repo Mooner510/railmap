@@ -5,6 +5,7 @@ import {
   buildTransferGroupCircleGeometry,
   isTransferDetailVisible,
   optimizeCoordinates,
+  RAIL_MAP_VISUAL_POLICY,
   smoothCoordinateRange,
   smoothCoordinates,
   TRANSFER_DETAIL_ZOOM_THRESHOLD,
@@ -686,11 +687,11 @@ interface RailMapProps {
 
 
 const MAP_RENDER_POLICY = {
-  branchLineWidth: 3,
-  branchLineCasingWidth: 5.2,
-  selectedBranchLineWidth: 7,
-  lineBranchLineWidth: 3,
-  lineBranchCasingWidth: 4.8,
+  branchLineWidth: RAIL_MAP_VISUAL_POLICY.baseLineWidth,
+  branchLineCasingWidth: RAIL_MAP_VISUAL_POLICY.lineCasingWidth,
+  selectedBranchLineWidth: RAIL_MAP_VISUAL_POLICY.selectedLineWidth,
+  lineBranchLineWidth: RAIL_MAP_VISUAL_POLICY.baseLineWidth,
+  lineBranchCasingWidth: RAIL_MAP_VISUAL_POLICY.lineCasingWidth,
   transferGroupHitRadius: 22,
   transferGroupIconSize: 0.0469,
   transferGroupSelectedIconSize: 0.0524,
@@ -1104,7 +1105,7 @@ export default function RailMap({
             paint: {
               "line-color": "#ffffff",
               "line-width": MAP_RENDER_POLICY.branchLineCasingWidth,
-              "line-opacity": 0.88,
+              "line-opacity": RAIL_MAP_VISUAL_POLICY.lineCasingOpacity,
             },
             layout: {
               "line-cap": "round",
@@ -1150,7 +1151,7 @@ export default function RailMap({
             paint: {
               "line-color": "#ffffff",
               "line-width": MAP_RENDER_POLICY.lineBranchCasingWidth,
-              "line-opacity": 0.88,
+              "line-opacity": RAIL_MAP_VISUAL_POLICY.lineCasingOpacity,
             },
             layout: { "line-cap": "round", "line-join": "round" },
           });
@@ -1299,11 +1300,11 @@ export default function RailMap({
             id: "transfer-group-collapsed-label",
             type: "symbol",
             source: "transfer-group-icons",
-            minzoom: 12,
+            minzoom: RAIL_MAP_VISUAL_POLICY.stationLabelMinZoom,
             layout: {
               "text-field": ["get", "nameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
-              "text-size": 11,
+              "text-size": RAIL_MAP_VISUAL_POLICY.stationLabelTextSize,
               "text-offset": [0, 1.45],
               "text-anchor": "top",
               "text-allow-overlap": false,
@@ -1312,7 +1313,7 @@ export default function RailMap({
             paint: {
               "text-color": "#0f172a",
               "text-halo-color": "#ffffff",
-              "text-halo-width": 1.5,
+              "text-halo-width": RAIL_MAP_VISUAL_POLICY.stationLabelHaloWidth,
               "text-opacity": 1,
             },
           });
@@ -1375,11 +1376,11 @@ export default function RailMap({
             id: "branch-preview-station-labels",
             type: "symbol",
             source: "branch-preview-stations",
-            minzoom: 12,
+            minzoom: RAIL_MAP_VISUAL_POLICY.stationLabelMinZoom,
             layout: {
               "text-field": ["get", "labelNameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
-              "text-size": 11,
+              "text-size": RAIL_MAP_VISUAL_POLICY.stationLabelTextSize,
               "text-offset": [0, -1.15],
               "text-anchor": "bottom",
               "text-allow-overlap": false,
@@ -1399,12 +1400,12 @@ export default function RailMap({
             id: "branch-preview-station-labels-emphasized",
             type: "symbol",
             source: "branch-preview-stations",
-            minzoom: 12,
+            minzoom: RAIL_MAP_VISUAL_POLICY.stationLabelMinZoom,
             filter: ["==", ["get", "isEmphasized"], true],
             layout: {
               "text-field": ["get", "nameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
-              "text-size": 12,
+              "text-size": RAIL_MAP_VISUAL_POLICY.selectedStationLabelTextSize,
               "text-offset": [0, -1.35],
               "text-anchor": "bottom",
               "text-allow-overlap": true,

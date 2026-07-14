@@ -272,3 +272,19 @@ export function optimizeCoordinates(
   if (last && result.at(-1) !== last) result.push(last);
   return result;
 }
+
+export const RAIL_MAP_VISUAL_POLICY = {
+  baseLineWidth: 3,
+  selectedLineWidth: 6,
+  lineCasingWidth: 0,
+  lineCasingOpacity: 0,
+  stationLabelMinZoom: 11.5,
+  stationLabelTextSize: 11,
+  selectedStationLabelTextSize: 12,
+  stationLabelHaloWidth: 1.5,
+  stationLabelOpacity: 1,
+} as const;
+
+export function getRailStationLabelVisibility(zoom: number) {
+  return zoom >= RAIL_MAP_VISUAL_POLICY.stationLabelMinZoom;
+}

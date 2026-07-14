@@ -1,5 +1,6 @@
 "use client";
 
+import { RailSearchField } from "@repo/ui/rail-product";
 import {
   useDeferredValue,
   useEffect,
@@ -934,7 +935,7 @@ export default function RailExplorer({
   };
 
   return (
-    <section className="web-explorer-shell grid h-[100dvh] w-full overflow-hidden bg-slate-100 text-slate-950 lg:grid-cols-[320px_minmax(0,1fr)]">
+    <section className="web-explorer-shell rail-product-root grid h-[100dvh] w-full overflow-hidden bg-slate-100 text-slate-950 lg:grid-cols-[320px_minmax(0,1fr)]">
       <aside className="web-sidebar z-20 hidden h-full min-h-0 flex-col border-r border-slate-200 bg-white lg:flex">
         <div className="web-sidebar-header border-b border-slate-200 px-2.5 py-2">
           <ExplorerTitle
@@ -1569,7 +1570,7 @@ function ExplorerTitle({
               : "mt-1 text-[13px] font-bold"
           }
         >
-          한국 철도 노선 지도
+          한국 철도 지도
         </h1>
         <p className="mt-1 text-[11px] leading-4 text-slate-500">
           노선 {formatNumber(filteredLineCount)} · 구간{" "}
@@ -1612,26 +1613,14 @@ function FilterControls({
 }: FilterControlsProps & { compact?: boolean }) {
   return (
     <div className="web-filter-controls space-y-2">
-      <div className="web-search-field relative">
-        <span className="web-search-icon" aria-hidden="true" />
-        <input
-          className="h-8 w-full rounded border border-slate-200 bg-white px-2.5 pr-8 text-xs font-medium text-slate-800 outline-none placeholder:text-slate-400 focus:border-sky-300 focus:ring-1 focus:ring-sky-100"
-          value={searchQuery}
-          aria-label="노선 또는 역 검색"
-          autoComplete="off"
-          placeholder="노선이나 역을 검색하세요"
-          onChange={(event) => onSearch(event.target.value)}
-        />
-        {searchQuery.trim() ? (
-          <button
-            type="button"
-            className="absolute right-1 top-1 h-6 rounded px-2 text-[11px] font-bold text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-            onClick={onClearSearch}
-          >
-            ×
-          </button>
-        ) : null}
-      </div>
+      <RailSearchField
+        value={searchQuery}
+        aria-label="역명 또는 노선명 검색"
+        autoComplete="off"
+        placeholder="역명 또는 노선명 검색"
+        onValueChange={onSearch}
+        onClear={onClearSearch}
+      />
 
       {showSearchResults ? (
         <SearchResults
@@ -1648,7 +1637,7 @@ function FilterControls({
       <div className="web-control-section">
         <div className="web-control-heading">
           <span>지도 표시</span>
-          <small>필요한 정보만 켜고 볼 수 있어요</small>
+          <small>지도에 표시할 정보를 선택하세요</small>
         </div>
         <MapDisplayToggles
           showMapLines={showMapLines}

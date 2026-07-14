@@ -10,6 +10,7 @@ import {
   isCollapsedTransferZoom,
   isTransferDetailVisible,
   optimizeCoordinates,
+  RAIL_MAP_VISUAL_POLICY,
   smoothCoordinateRange,
   smoothCoordinates,
 } from "@repo/ui/map/renderPolicy";
@@ -18,6 +19,7 @@ import { Dialog } from "@repo/ui/dialog";
 import { Input, Textarea } from "@repo/ui/input";
 import { AppShell, InspectorGrid } from "@repo/ui/layout";
 import { Panel, PanelBody, PanelHeader } from "@repo/ui/panel";
+import { RailSearchField, RailSearchResultCard } from "@repo/ui/rail-product";
 import { TabButton, TabList } from "@repo/ui/tabs";
 import { Toast, type ToastTone } from "@repo/ui/toast";
 import { cn } from "@repo/ui/utils";
@@ -5154,8 +5156,8 @@ export default function UnifiedMapEditor({
         source: "railmap-line-branches",
         paint: {
           "line-color": "#ffffff",
-          "line-width": 4.8,
-          "line-opacity": 0.88,
+          "line-width": RAIL_MAP_VISUAL_POLICY.lineCasingWidth,
+          "line-opacity": RAIL_MAP_VISUAL_POLICY.lineCasingOpacity,
         },
         layout: { "line-cap": "round", "line-join": "round" },
       });
@@ -5166,7 +5168,7 @@ export default function UnifiedMapEditor({
         source: "railmap-line-branches",
         paint: {
           "line-color": ["get", "colorHex"],
-          "line-width": 3,
+          "line-width": RAIL_MAP_VISUAL_POLICY.baseLineWidth,
           "line-opacity": 0.78,
         },
         layout: { "line-cap": "round", "line-join": "round" },
@@ -5244,10 +5246,10 @@ export default function UnifiedMapEditor({
         id: "railmap-transfer-group-label",
         type: "symbol",
         source: "railmap-transfer-group-icons",
-        minzoom: 11,
+        minzoom: RAIL_MAP_VISUAL_POLICY.stationLabelMinZoom,
         layout: {
           "text-field": ["get", "nameKo"],
-          "text-size": 11,
+          "text-size": RAIL_MAP_VISUAL_POLICY.stationLabelTextSize,
           "text-font": ["Open Sans Regular"],
           "text-offset": [0, 1.45],
           "text-anchor": "top",
@@ -5257,7 +5259,7 @@ export default function UnifiedMapEditor({
         paint: {
           "text-color": "#0f172a",
           "text-halo-color": "#ffffff",
-          "text-halo-width": 1.5,
+          "text-halo-width": RAIL_MAP_VISUAL_POLICY.stationLabelHaloWidth,
           "text-opacity": 1,
         },
       });
@@ -5338,7 +5340,7 @@ export default function UnifiedMapEditor({
         filter: ["==", ["get", "kind"], "station"],
         layout: {
           "text-field": ["get", "nameKo"],
-          "text-size": 11,
+          "text-size": RAIL_MAP_VISUAL_POLICY.stationLabelTextSize,
           "text-font": ["Open Sans Regular"],
           "text-offset": [0, 1.35],
           "text-anchor": "top",
@@ -5399,7 +5401,7 @@ export default function UnifiedMapEditor({
         filter: ["==", ["get", "kind"], "station"],
         layout: {
           "text-field": ["get", "nameKo"],
-          "text-size": 11,
+          "text-size": RAIL_MAP_VISUAL_POLICY.stationLabelTextSize,
           "text-font": ["Open Sans Regular"],
           "text-offset": [0, 1.2],
           "text-anchor": "top",
@@ -5419,7 +5421,7 @@ export default function UnifiedMapEditor({
         filter: ["==", ["get", "nonTransfer"], true],
         layout: {
           "text-field": "×",
-          "text-size": 12,
+          "text-size": RAIL_MAP_VISUAL_POLICY.selectedStationLabelTextSize,
           "text-font": ["Open Sans Regular"],
           "text-allow-overlap": true,
           "text-ignore-placement": true,
@@ -5436,11 +5438,11 @@ export default function UnifiedMapEditor({
         id: "railmap-stations-label",
         type: "symbol",
         source: "railmap-stations",
-        minzoom: 11,
+        minzoom: RAIL_MAP_VISUAL_POLICY.stationLabelMinZoom,
         filter: ["!=", ["get", "selected"], true],
         layout: {
           "text-field": ["get", "labelNameKo"],
-          "text-size": 12,
+          "text-size": RAIL_MAP_VISUAL_POLICY.selectedStationLabelTextSize,
           "text-font": ["Open Sans Regular"],
           "text-offset": [0, 1.05],
           "text-anchor": "top",
@@ -5450,7 +5452,7 @@ export default function UnifiedMapEditor({
         paint: {
           "text-color": "#0f172a",
           "text-halo-color": "#ffffff",
-          "text-halo-width": 1.5,
+          "text-halo-width": RAIL_MAP_VISUAL_POLICY.stationLabelHaloWidth,
           "text-opacity": 0.92,
         },
       });
@@ -5459,11 +5461,11 @@ export default function UnifiedMapEditor({
         id: "railmap-selected-stations-label",
         type: "symbol",
         source: "railmap-stations",
-        minzoom: 11,
+        minzoom: RAIL_MAP_VISUAL_POLICY.stationLabelMinZoom,
         filter: ["==", ["get", "selected"], true],
         layout: {
           "text-field": ["get", "labelNameKo"],
-          "text-size": 13,
+          "text-size": RAIL_MAP_VISUAL_POLICY.selectedStationLabelTextSize,
           "text-font": ["Open Sans Regular"],
           "text-offset": [0, -1.2],
           "text-anchor": "bottom",
@@ -8638,7 +8640,7 @@ export default function UnifiedMapEditor({
   }, []);
 
   return (
-    <AppShell className="editor-app-shell">
+    <AppShell className="editor-app-shell rail-product-root">
       <InspectorGrid className="editor-inspector-grid">
         <Panel className="flex min-h-0 flex-col overflow-hidden">
           <PanelHeader className="editor-panel-header">
@@ -8728,15 +8730,13 @@ export default function UnifiedMapEditor({
 
             {!isGeometryMode && sidebarTab === "search" ? (
               <div className="grid gap-3">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-                  <Input
-                    className="pl-9"
-                    placeholder="역명, 노선명, 역번호 검색"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                  />
-                </div>
+                <RailSearchField
+                  value={query}
+                  placeholder="역명, 노선명 또는 역번호 검색"
+                  aria-label="역명, 노선명 또는 역번호 검색"
+                  onValueChange={setQuery}
+                  onClear={() => setQuery("")}
+                />
                 <div className="flex items-center justify-between px-1 text-[11px] font-semibold text-slate-400">
                   <span>
                     {filteredStations.length.toLocaleString("ko-KR")}개 결과
@@ -8745,32 +8745,14 @@ export default function UnifiedMapEditor({
                 </div>
                 <div className="grid gap-2">
                   {filteredStations.map((station) => (
-                    <button
+                    <RailSearchResultCard
                       key={station.id}
-                      type="button"
-                      className={cn(
-                        "rounded-2xl border border-slate-200 bg-white p-3 text-left transition hover:border-blue-200 hover:bg-blue-50",
-                        selectedStationIds.has(station.id)
-                          ? "border-blue-300 bg-blue-50"
-                          : null,
-                      )}
+                      active={selectedStationIds.has(station.id)}
+                      color={station.colorHex ?? "#64748b"}
+                      title={station.nameKo}
+                      description={formatStationSubLabel(station)}
                       onClick={() => selectStation(station.id)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="size-2.5 rounded-full"
-                          style={{
-                            backgroundColor: station.colorHex ?? "#64748b",
-                          }}
-                        />
-                        <strong className="truncate text-sm font-semibold">
-                          {station.nameKo}
-                        </strong>
-                      </div>
-                      <p className="mt-1 truncate text-xs font-medium text-slate-500">
-                        {formatStationSubLabel(station)}
-                      </p>
-                    </button>
+                    />
                   ))}
                   {filteredStations.length === 0 ? (
                     <Placeholder
