@@ -1,13 +1,17 @@
-import type { Map as MapLibreMap, GeoJSONSource } from "maplibre-gl";
+import type {
+  Map as MapLibreMap,
+  GeoJSONSource,
+  GeoJSONSourceSpecification,
+} from "maplibre-gl";
 import {
   isTransferDetailVisible,
   RAIL_MAP_EMPHASIS_POLICY,
   RAIL_MAP_VISUAL_POLICY,
 } from "@repo/ui/map/renderPolicy";
 
-type RailFeatureCollection = GeoJSON.FeatureCollection<
-  GeoJSON.Point | GeoJSON.LineString | GeoJSON.Polygon,
-  GeoJSON.GeoJsonProperties
+type RailFeatureCollection = Exclude<
+  GeoJSONSourceSpecification["data"],
+  string
 >;
 
 export const RAIL_MAP_SOURCE_IDS = {

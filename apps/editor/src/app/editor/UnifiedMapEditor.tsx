@@ -4,6 +4,10 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 import { Badge } from "@repo/ui/badge";
 import {
+  buildRailMapHitBox,
+  pickRailMapInteractionTarget,
+} from "@repo/ui/map/interactionPolicy";
+import {
   buildSmoothConnectionCurve,
   buildTransferGroupCircleGeometry,
   getCoordinateDistance,
@@ -5954,10 +5958,7 @@ export default function UnifiedMapEditor({
         "railmap-selected-branches-line",
         "railmap-branches-line",
       ].filter((layerId) => map.getLayer(layerId));
-      const hitBox: [[number, number], [number, number]] = [
-        [event.point.x - 8, event.point.y - 8],
-        [event.point.x + 8, event.point.y + 8],
-      ];
+      const hitBox = buildRailMapHitBox(event.point);
       const features =
         queryLayers.length > 0
           ? map.queryRenderedFeatures(hitBox, { layers: queryLayers })
@@ -5968,27 +5969,31 @@ export default function UnifiedMapEditor({
         ["railmap-stations-hit", "railmap-stations-circle"],
         map.getZoom(),
       );
-      if (stationId) {
-        selectStationFromMapRef.current(stationId);
-        return;
-      }
-
       const transferGroupId = firstFeatureId(features, [
         collapsedTransferZoom
           ? "railmap-transfer-group-hit"
           : "railmap-transfer-group-area-fill",
       ]);
-      if (transferGroupId) {
-        selectTransferGroupFromMapRef.current(transferGroupId);
-        return;
-      }
-
       const branchId = firstFeatureId(features, [
         "railmap-selected-branches-line",
         "railmap-branches-line",
       ]);
-      if (branchId) {
-        selectBranchFromMapRef.current(branchId);
+      const target = pickRailMapInteractionTarget({
+        station: stationId,
+        transfer: transferGroupId,
+        branch: branchId,
+      });
+
+      if (target?.type === "station") {
+        selectStationFromMapRef.current(target.value);
+        return;
+      }
+      if (target?.type === "transfer") {
+        selectTransferGroupFromMapRef.current(target.value);
+        return;
+      }
+      if (target?.type === "branch") {
+        selectBranchFromMapRef.current(target.value);
         return;
       }
 
