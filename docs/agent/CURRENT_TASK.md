@@ -19,3 +19,9 @@
 - Editor/Web filter, tab, toggle and selected-detail component unification
 - RailExplorer and UnifiedMapEditor feature extraction
 - shared map source/layer factory migration to packages/ui
+
+## 13.88.0-13.90.0
+
+- Web 검색/필터 컴포넌트 분리
+- 공통 chip/toggle/action primitive 추가
+- 역 검색 결과 색상 타입 오류 수정

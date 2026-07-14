@@ -190,3 +190,56 @@
 .rail-section-header__action {
   flex: 0 0 auto;
 }
+
+.rail-choice-chip,
+.rail-toggle-button,
+.rail-action-button {
+  min-height: 28px;
+  border: 1px solid var(--rail-border);
+  border-radius: 10px;
+  background: var(--rail-surface);
+  color: var(--rail-muted);
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.2;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease, transform 120ms ease;
+}
+
+.rail-choice-chip:hover,
+.rail-toggle-button:hover,
+.rail-action-button:hover {
+  border-color: var(--rail-border-strong);
+  background: var(--rail-surface-soft);
+  color: var(--rail-text);
+}
+
+.rail-choice-chip:active,
+.rail-toggle-button:active,
+.rail-action-button:active {
+  transform: scale(0.99);
+}
+
+.rail-choice-chip.is-active {
+  border-color: var(--rail-accent);
+  background: var(--rail-accent);
+  color: #ffffff;
+}
+
+.rail-toggle-button.is-active {
+  border-color: #bfdbfe;
+  background: var(--rail-accent-soft);
+  color: #1d4ed8;
+  font-weight: 750;
+}
+
+.rail-action-button {
+  width: 100%;
+}
+
+.rail-action-button.is-primary {
+  border-color: #0f172a;
+  background: #0f172a;
+  color: #ffffff;
+  font-weight: 750;
+}
