@@ -1,6 +1,6 @@
 "use client";
 
-import { RailSearchField, RailSearchResultCard } from "@repo/ui/rail-product";
+import RailFilterControls from "./components/RailFilterControls";
 import {
   useDeferredValue,
   useEffect,
@@ -84,35 +84,6 @@ const ROUTE_STOP_STEP_PENALTY = 0.03;
 const FEWEST_TRANSFER_SCORE_WEIGHT = 100_000;
 const ROUTE_EQUIVALENT_TIME_GAP_MINUTES = 3;
 const ROUTE_DOMINANT_TIME_GAP_MINUTES = 8;
-
-interface FilterControlsProps {
-  areaCodes: string[];
-  selectedArea: string;
-  selectedCategory: RailLineCategory | "all";
-  searchQuery: string;
-  copiedShareUrl: boolean;
-  stationResults: RailMapStation[];
-  lineResults: CanonicalLine[];
-  selectedStationId: string | null;
-  selectedLineKey: string | null;
-  hasSelection: boolean;
-  showSearchResults: boolean;
-  focusSelectionLabel: string;
-  showMapLines: boolean;
-  showMapStations: boolean;
-  onToggleMapLines: () => void;
-  onToggleMapStations: () => void;
-  onSelectArea: (area: string) => void;
-  onSelectCategory: (category: RailLineCategory | "all") => void;
-  onSearch: (query: string) => void;
-  onClearSearch: () => void;
-  onSelectStation: (stationId: string) => void;
-  onSelectLine: (lineKey: string) => void;
-  onClearSelection: () => void;
-  onReset: () => void;
-  onFocusSelection: () => void;
-  onCopyUrl: () => void;
-}
 
 interface LineListProps {
   lines: CanonicalLine[];
@@ -591,6 +562,19 @@ export default function RailExplorer({
     return index;
   }, [mapBranches]);
 
+  const stationSearchColorById = useMemo(() => {
+    const colors = new Map<string, string>();
+
+    for (const station of mapStations) {
+      colors.set(
+        station.id,
+        stationServingIndex.get(station.id)?.[0]?.colorHex ?? "#64748b",
+      );
+    }
+
+    return colors;
+  }, [mapStations, stationServingIndex]);
+
   const selectedStationServingBranches = useMemo<StationServingBranch[]>(
     () =>
       selectedStationId
@@ -955,7 +939,7 @@ export default function RailExplorer({
         <div className="web-sidebar-content min-h-0 flex-1 overflow-hidden">
           {desktopPanelMode === "search" ? (
             <div className="web-filter-scroll h-full overflow-y-auto p-2">
-              <FilterControls
+              <RailFilterControls
                 areaCodes={areaCodes}
                 selectedArea={selectedArea}
                 selectedCategory={selectedCategory}
@@ -963,6 +947,7 @@ export default function RailExplorer({
                 copiedShareUrl={copiedShareUrl}
                 stationResults={stationSearchResults}
                 lineResults={lineSearchResults}
+                stationColorById={stationSearchColorById}
                 selectedStationId={selectedStationId}
                 selectedLineKey={selectedLineKey}
                 hasSelection={hasSelection}
@@ -1150,7 +1135,7 @@ export default function RailExplorer({
             {isMobilePanelExpanded ? (
               <div className="web-mobile-sheet-content max-h-[calc(68dvh-124px)] overflow-y-auto px-2.5 pb-4 pt-2">
                 {mobilePanelMode === "search" ? (
-                  <FilterControls
+                  <RailFilterControls
                     areaCodes={areaCodes}
                     selectedArea={selectedArea}
                     selectedCategory={selectedCategory}
@@ -1158,6 +1143,7 @@ export default function RailExplorer({
                     copiedShareUrl={copiedShareUrl}
                     stationResults={stationSearchResults}
                     lineResults={lineSearchResults}
+                    stationColorById={stationSearchColorById}
                     selectedStationId={selectedStationId}
                     selectedLineKey={selectedLineKey}
                     hasSelection={hasSelection}
@@ -1579,338 +1565,6 @@ function ExplorerTitle({
         </p>
       </div>
     </div>
-  );
-}
-
-function FilterControls({
-  areaCodes,
-  selectedArea,
-  selectedCategory,
-  searchQuery,
-  copiedShareUrl,
-  stationResults,
-  lineResults,
-  selectedStationId,
-  selectedLineKey,
-  hasSelection,
-  showSearchResults,
-  focusSelectionLabel,
-  showMapLines,
-  showMapStations,
-  onToggleMapLines,
-  onToggleMapStations,
-  onSelectArea,
-  onSelectCategory,
-  onSearch,
-  onClearSearch,
-  onSelectStation,
-  onSelectLine,
-  onClearSelection,
-  onReset,
-  onFocusSelection,
-  onCopyUrl,
-  compact = false,
-}: FilterControlsProps & { compact?: boolean }) {
-  return (
-    <div className="web-filter-controls space-y-2">
-      <RailSearchField
-        value={searchQuery}
-        aria-label="역명 또는 노선명 검색"
-        autoComplete="off"
-        placeholder="역명 또는 노선명 검색"
-        onValueChange={onSearch}
-        onClear={onClearSearch}
-      />
-
-      {showSearchResults ? (
-        <SearchResults
-          query={searchQuery}
-          selectedStationId={selectedStationId}
-          selectedLineKey={selectedLineKey}
-          stations={stationResults}
-          lines={lineResults}
-          onSelectStation={onSelectStation}
-          onSelectLine={onSelectLine}
-        />
-      ) : null}
-
-      <div className="web-control-section">
-        <div className="web-control-heading">
-          <span>지도 표시</span>
-          <small>지도에 표시할 정보를 선택하세요</small>
-        </div>
-        <MapDisplayToggles
-          showMapLines={showMapLines}
-          showMapStations={showMapStations}
-          onToggleMapLines={onToggleMapLines}
-          onToggleMapStations={onToggleMapStations}
-        />
-      </div>
-
-      {hasSelection ? (
-        <div className="grid grid-cols-2 gap-1.5">
-          <button
-            type="button"
-            className="h-7 rounded border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 transition duration-150 ease-out hover:bg-slate-50 active:scale-[0.99]"
-            onClick={onFocusSelection}
-          >
-            {focusSelectionLabel}
-          </button>
-          <button
-            type="button"
-            className="h-7 rounded border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 transition duration-150 ease-out hover:bg-slate-50 active:scale-[0.99]"
-            onClick={onClearSelection}
-          >
-            선택 해제
-          </button>
-        </div>
-      ) : null}
-
-      <div className="web-control-section">
-        <div className="web-control-heading">
-          <span>권역</span>
-        </div>
-        <div className="web-chip-row flex flex-wrap gap-1.5">
-          <FilterChip
-            active={selectedArea === "all"}
-            onClick={() => onSelectArea("all")}
-          >
-            전체
-          </FilterChip>
-          {areaCodes.map((areaCode) => (
-            <FilterChip
-              key={areaCode}
-              active={selectedArea === areaCode}
-              onClick={() => onSelectArea(areaCode)}
-            >
-              {formatAreaName(areaCode)}
-            </FilterChip>
-          ))}
-        </div>
-      </div>
-
-      <div className="web-control-section">
-        <div className="web-control-heading">
-          <span>철도 유형</span>
-        </div>
-        <div className="web-chip-row flex flex-wrap gap-1.5">
-          <FilterChip
-            active={selectedCategory === "all"}
-            onClick={() => onSelectCategory("all")}
-          >
-            전체 유형
-          </FilterChip>
-          {RAIL_LINE_CATEGORIES.map((category) => (
-            <FilterChip
-              key={category}
-              active={selectedCategory === category}
-              onClick={() => onSelectCategory(category)}
-            >
-              {formatRailLineCategory(category)}
-            </FilterChip>
-          ))}
-        </div>
-      </div>
-
-      <div className="web-filter-actions grid grid-cols-2 gap-1.5">
-        <button
-          type="button"
-          className="h-7 rounded border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition duration-150 ease-out hover:bg-slate-50 active:scale-[0.99]"
-          onClick={onReset}
-        >
-          전체 보기
-        </button>
-        <button
-          type="button"
-          className="h-7 rounded bg-slate-950 px-2.5 text-xs font-semibold text-white transition duration-150 ease-out hover:bg-slate-800 active:scale-[0.99]"
-          onClick={onCopyUrl}
-        >
-          {copiedShareUrl ? "복사됨" : compact ? "공유" : "URL 복사"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function MapDisplayToggles({
-  showMapLines,
-  showMapStations,
-  onToggleMapLines,
-  onToggleMapStations,
-}: {
-  showMapLines: boolean;
-  showMapStations: boolean;
-  onToggleMapLines: () => void;
-  onToggleMapStations: () => void;
-}) {
-  return (
-    <div className="web-display-toggles grid grid-cols-2 gap-1.5">
-      <ToggleButton active={showMapLines} onClick={onToggleMapLines}>
-        구간선
-      </ToggleButton>
-      <ToggleButton active={showMapStations} onClick={onToggleMapStations}>
-        역 표시
-      </ToggleButton>
-    </div>
-  );
-}
-
-function ToggleButton({
-  active,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  children: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      className={
-        active
-          ? "h-7 rounded border border-sky-200 bg-sky-50 px-2 text-xs font-bold text-sky-700"
-          : "h-7 rounded border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-500 hover:bg-slate-50"
-      }
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  );
-}
-
-function HighlightText({
-  text,
-  query,
-}: {
-  text: string;
-  query: string;
-}): ReactNode {
-  const keyword = query.trim();
-
-  if (!keyword) return text;
-
-  const textLower = text.toLocaleLowerCase("ko-KR");
-  const keywordLower = keyword.toLocaleLowerCase("ko-KR");
-  const index = textLower.indexOf(keywordLower);
-
-  if (index < 0) return text;
-
-  const before = text.slice(0, index);
-  const match = text.slice(index, index + keyword.length);
-  const after = text.slice(index + keyword.length);
-
-  return (
-    <>
-      {before}
-      <mark className="rounded-sm bg-amber-100 px-0.5 font-black text-amber-900">
-        {match}
-      </mark>
-      {after}
-    </>
-  );
-}
-
-function SearchResults({
-  query,
-  selectedStationId,
-  stations,
-  lines,
-  selectedLineKey,
-  onSelectStation,
-  onSelectLine,
-}: {
-  query: string;
-  selectedStationId: string | null;
-  selectedLineKey: string | null;
-  stations: RailMapStation[];
-  lines: CanonicalLine[];
-  onSelectStation: (stationId: string) => void;
-  onSelectLine: (lineKey: string) => void;
-}) {
-  const normalizedQuery = normalizeSearchText(query);
-  if (!normalizedQuery) return null;
-
-  const hasResults = stations.length > 0 || lines.length > 0;
-  return (
-    <div className="web-search-results" role="region" aria-label="검색 결과">
-      <div className="web-search-results__summary">
-        <strong>검색 결과</strong>
-        <span>노선 {formatNumber(lines.length)} · 역 {formatNumber(stations.length)}</span>
-      </div>
-      <div className="web-search-results__scroll">
-        {!hasResults ? (
-          <div className="web-search-results__empty">
-            <strong>{normalizedQuery.length < MIN_STATION_SEARCH_LENGTH ? "검색어를 조금 더 입력하세요" : "일치하는 결과가 없습니다"}</strong>
-            <span>역명, 노선명 또는 역번호를 확인하세요.</span>
-          </div>
-        ) : null}
-
-        {lines.length > 0 ? (
-          <section className="web-search-results__group">
-            <div className="web-search-results__group-title"><span>노선</span><small>{formatNumber(lines.length)}</small></div>
-            <div className="grid gap-1.5">
-              {lines.map((line) => (
-                <RailSearchResultCard
-                  key={line.canonicalKey}
-                  active={selectedLineKey === line.canonicalKey}
-                  color={line.colorHex}
-                  title={<HighlightText text={line.nameKo} query={query} />}
-                  description={`${formatAreaName(line.mreaWideCd)} · ${formatNumber(countRouteStops(line))}역`}
-                  trailing="노선"
-                  onClick={() => onSelectLine(line.canonicalKey)}
-                />
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {stations.length > 0 ? (
-          <section className="web-search-results__group">
-            <div className="web-search-results__group-title"><span>역</span><small>{formatNumber(stations.length)}</small></div>
-            <div className="grid gap-1.5">
-              {stations.map((station) => (
-                <RailSearchResultCard
-                  key={station.id}
-                  active={selectedStationId === station.id}
-                  color={station.colorHex ?? "#64748b"}
-                  title={<HighlightText text={station.nameKo} query={query} />}
-                  description={station.lineNameKo || "역 정보"}
-                  trailing="역"
-                  onClick={() => onSelectStation(station.id)}
-                />
-              ))}
-            </div>
-          </section>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function FilterChip({
-  active,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  children: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      className={
-        active
-          ? "shrink-0 rounded bg-sky-600 px-2.5 py-1 text-xs font-bold text-white"
-          : "shrink-0 rounded border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-      }
-      onClick={onClick}
-    >
-      {children}
-    </button>
   );
 }
 

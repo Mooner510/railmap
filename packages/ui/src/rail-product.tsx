@@ -92,3 +92,71 @@ export function RailSectionHeader({
     </div>
   );
 }
+
+export function RailChoiceChip({
+  active,
+  children,
+  onClick,
+  className,
+}: {
+  active: boolean;
+  children: ReactNode;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      className={cn("rail-choice-chip", active && "is-active", className)}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function RailToggleButton({
+  active,
+  children,
+  onClick,
+  className,
+}: {
+  active: boolean;
+  children: ReactNode;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      className={cn("rail-toggle-button", active && "is-active", className)}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function RailActionButton({
+  tone = "neutral",
+  children,
+  onClick,
+  className,
+}: {
+  tone?: "neutral" | "primary";
+  children: ReactNode;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={cn("rail-action-button", `is-${tone}`, className)}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
