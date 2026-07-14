@@ -5821,9 +5821,8 @@ export default function UnifiedMapEditor({
                 ...(isCollapsedTransferZoom(map.getZoom())
                   ? []
                   : ["railmap-transfer-group-area-fill"]),
-                ...(isCollapsedTransferZoom(map.getZoom())
-                  ? []
-                  : ["railmap-stations-hit", "railmap-stations-circle"]),
+                "railmap-stations-hit",
+                "railmap-stations-circle",
                 "railmap-selected-branches-line",
                 "railmap-branches-line",
               ].filter((layerId) => map.getLayer(layerId));
@@ -5948,13 +5947,10 @@ export default function UnifiedMapEditor({
 
       const collapsedTransferZoom = isCollapsedTransferZoom(map.getZoom());
       const queryLayers = [
-        ...(collapsedTransferZoom
-          ? ["railmap-transfer-group-hit"]
-          : [
-              "railmap-stations-hit",
-              "railmap-stations-circle",
-              "railmap-transfer-group-area-fill",
-            ]),
+        "railmap-stations-hit",
+        "railmap-stations-circle",
+        "railmap-transfer-group-hit",
+        ...(collapsedTransferZoom ? [] : ["railmap-transfer-group-area-fill"]),
         "railmap-selected-branches-line",
         "railmap-branches-line",
       ].filter((layerId) => map.getLayer(layerId));
@@ -5967,32 +5963,24 @@ export default function UnifiedMapEditor({
           ? map.queryRenderedFeatures(hitBox, { layers: queryLayers })
           : [];
 
-      if (collapsedTransferZoom) {
-        const transferGroupId = firstFeatureId(features, [
-          "railmap-transfer-group-hit",
-        ]);
-        if (transferGroupId) {
-          selectTransferGroupFromMapRef.current(transferGroupId);
-          return;
-        }
-      } else {
-        const stationId = firstVisibleStationFeatureId(
-          features,
-          ["railmap-stations-hit", "railmap-stations-circle"],
-          map.getZoom(),
-        );
-        if (stationId) {
-          selectStationFromMapRef.current(stationId);
-          return;
-        }
+      const stationId = firstVisibleStationFeatureId(
+        features,
+        ["railmap-stations-hit", "railmap-stations-circle"],
+        map.getZoom(),
+      );
+      if (stationId) {
+        selectStationFromMapRef.current(stationId);
+        return;
+      }
 
-        const transferGroupId = firstFeatureId(features, [
-          "railmap-transfer-group-area-fill",
-        ]);
-        if (transferGroupId) {
-          selectTransferGroupFromMapRef.current(transferGroupId);
-          return;
-        }
+      const transferGroupId = firstFeatureId(features, [
+        collapsedTransferZoom
+          ? "railmap-transfer-group-hit"
+          : "railmap-transfer-group-area-fill",
+      ]);
+      if (transferGroupId) {
+        selectTransferGroupFromMapRef.current(transferGroupId);
+        return;
       }
 
       const branchId = firstFeatureId(features, [
@@ -6021,13 +6009,10 @@ export default function UnifiedMapEditor({
       }
       const collapsedTransferZoom = isCollapsedTransferZoom(map.getZoom());
       const queryLayers = [
-        ...(collapsedTransferZoom
-          ? ["railmap-transfer-group-hit"]
-          : [
-              "railmap-transfer-group-area-fill",
-              "railmap-stations-hit",
-              "railmap-stations-circle",
-            ]),
+        "railmap-stations-hit",
+        "railmap-stations-circle",
+        "railmap-transfer-group-hit",
+        ...(collapsedTransferZoom ? [] : ["railmap-transfer-group-area-fill"]),
         "railmap-selected-branches-line",
         "railmap-branches-line",
       ].filter((layerId) => map.getLayer(layerId));
@@ -6038,13 +6023,11 @@ export default function UnifiedMapEditor({
       setContextMenu({
         x: event.point.x,
         y: event.point.y,
-        stationId: collapsedTransferZoom
-          ? undefined
-          : firstVisibleStationFeatureId(
-              features,
-              ["railmap-stations-hit", "railmap-stations-circle"],
-              map.getZoom(),
-            ),
+        stationId: firstVisibleStationFeatureId(
+          features,
+          ["railmap-stations-hit", "railmap-stations-circle"],
+          map.getZoom(),
+        ),
         branchId: firstFeatureId(features, [
           "railmap-selected-branches-line",
           "railmap-branches-line",

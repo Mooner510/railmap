@@ -920,8 +920,26 @@ export default function RailMap({
       }
     }
 
+    const branchById = new Map(branches.map((branch) => [branch.id, branch]));
+    for (const override of lineBranchOverrides) {
+      if (override.enabled === false) continue;
+      const parent = branchById.get(override.parentBranchId);
+      if (!parent) continue;
+      const stationIds = new Set<string>([
+        override.anchorStationId,
+        override.branchStationId ?? "",
+        override.connectedEndpointStationId ?? "",
+        ...(override.geometry ?? [])
+          .filter((point) => point.kind === "station" && point.stationId)
+          .map((point) => point.stationId ?? ""),
+      ]);
+      for (const stationId of stationIds) {
+        if (stationId && !index.has(stationId)) index.set(stationId, parent.colorHex);
+      }
+    }
+
     return index;
-  }, [branches, selectedBranch]);
+  }, [branches, lineBranchOverrides, selectedBranch]);
 
   const visibleBranchStations = useMemo(() => {
     const stationsInBranches = branches.flatMap((branch) =>
@@ -942,8 +960,14 @@ export default function RailMap({
 
   const markerStations = useMemo(() => {
     if (!showStations) return [];
-    if (visibleBranchStations.length > 0) return visibleBranchStations;
-    return validStations;
+
+    const unique = new Map<string, ValidRailMapStation>();
+    for (const station of visibleBranchStations) unique.set(station.id, station);
+    for (const station of validStations) {
+      if (!unique.has(station.id)) unique.set(station.id, station);
+    }
+
+    return [...unique.values()];
   }, [showStations, validStations, visibleBranchStations]);
 
   const stationFeatures = useMemo(
@@ -1098,7 +1122,7 @@ export default function RailMap({
             paint: {
               "line-color": "#ffffff",
               "line-width": MAP_RENDER_POLICY.branchLineCasingWidth,
-              "line-opacity": RAIL_MAP_VISUAL_POLICY.lineCasingOpacity,
+              "line-opacity": 0,
             },
             layout: {
               "line-cap": "round",
@@ -1113,7 +1137,7 @@ export default function RailMap({
             paint: {
               "line-color": ["coalesce", ["get", "colorHex"], "#0284c7"],
               "line-width": MAP_RENDER_POLICY.branchLineWidth,
-              "line-opacity": highlightedRouteStationIds.length > 0 ? 0.18 : 0.76,
+              "line-opacity": highlightedRouteStationIds.length > 0 ? 0.06 : 0.76,
             },
             layout: {
               "line-cap": "round",
@@ -1144,7 +1168,7 @@ export default function RailMap({
             paint: {
               "line-color": "#ffffff",
               "line-width": MAP_RENDER_POLICY.lineBranchCasingWidth,
-              "line-opacity": RAIL_MAP_VISUAL_POLICY.lineCasingOpacity,
+              "line-opacity": 0,
             },
             layout: { "line-cap": "round", "line-join": "round" },
           });
@@ -1156,7 +1180,7 @@ export default function RailMap({
             paint: {
               "line-color": ["get", "colorHex"],
               "line-width": MAP_RENDER_POLICY.lineBranchLineWidth,
-              "line-opacity": highlightedRouteStationIds.length > 0 ? 0.16 : 0.78,
+              "line-opacity": highlightedRouteStationIds.length > 0 ? 0.05 : 0.78,
             },
             layout: { "line-cap": "round", "line-join": "round" },
           });
@@ -1342,9 +1366,9 @@ export default function RailMap({
               ],
               "circle-opacity": [
                 "case",
-                ["==", ["get", "isRouteStation"], true], 0.96,
-                ["==", ["get", "isContextStation"], true], 0.96,
-                0.2,
+                ["==", ["get", "isEmphasized"], true], 0.98,
+                ["==", ["get", "isContextStation"], true], 0.9,
+                0.05,
               ],
             },
           });
@@ -1373,12 +1397,17 @@ export default function RailMap({
                 MAP_RENDER_POLICY.selectedStationStrokeWidth,
                 MAP_RENDER_POLICY.stationStrokeWidth,
               ],
-              "circle-stroke-opacity": 1,
+              "circle-stroke-opacity": [
+                "case",
+                ["==", ["get", "isEmphasized"], true], 1,
+                ["==", ["get", "isContextStation"], true], 0.96,
+                0.08,
+              ],
               "circle-opacity": [
                 "case",
-                ["==", ["get", "isRouteStation"], true], 0.96,
+                ["==", ["get", "isEmphasized"], true], 0.98,
                 ["==", ["get", "isContextStation"], true], 0.96,
-                0.18,
+                0.08,
               ],
             },
           });
@@ -1388,6 +1417,7 @@ export default function RailMap({
             type: "symbol",
             source: "branch-preview-stations",
             minzoom: RAIL_MAP_VISUAL_POLICY.stationLabelMinZoom,
+            filter: ["!=", ["get", "isEmphasized"], true],
             layout: {
               "text-field": ["get", "labelNameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
@@ -1417,7 +1447,7 @@ export default function RailMap({
             minzoom: RAIL_MAP_VISUAL_POLICY.stationLabelMinZoom,
             filter: ["==", ["get", "isEmphasized"], true],
             layout: {
-              "text-field": ["get", "nameKo"],
+              "text-field": ["get", "labelNameKo"],
               "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
               "text-size": RAIL_MAP_VISUAL_POLICY.selectedStationLabelTextSize,
               "text-offset": [0, -1.35],
@@ -1685,13 +1715,13 @@ export default function RailMap({
         "branch-preview-lines",
         "line-opacity",
         selectedBranchId
-          ? ["case", ["==", ["get", "id"], selectedBranchId], 0.42, 0.2]
+          ? ["case", ["==", ["get", "id"], selectedBranchId], 0.92, 0.055]
           : highlightedRouteBranchIds.length > 0
             ? [
                 "case",
                 ["in", ["get", "id"], ["literal", highlightedRouteBranchIds]],
-                0.38,
-                0.16,
+                0.9,
+                0.045,
               ]
             : 0.76,
       );
@@ -1701,11 +1731,7 @@ export default function RailMap({
       map.setPaintProperty(
         "branch-preview-lines-casing",
         "line-opacity",
-        selectedBranchId
-          ? 0.48
-          : highlightedRouteBranchIds.length > 0
-            ? 0.32
-            : 0.88,
+        0,
       );
     }
   }, [selectedBranchId, highlightedRouteBranchIds, mapReady]);
@@ -1716,21 +1742,28 @@ export default function RailMap({
 
     const stationOpacity = [
       "case",
-      ["==", ["get", "isRouteStation"], true], 0.96,
+      ["==", ["get", "isEmphasized"], true], 0.98,
       ["==", ["get", "isContextStation"], true], 0.96,
-      0.18,
+      0.08,
+    ];
+    const stationCasingOpacity = [
+      "case",
+      ["==", ["get", "isEmphasized"], true], 0.98,
+      ["==", ["get", "isContextStation"], true], 0.9,
+      0.05,
     ];
     const labelOpacity = [
       "case",
-      ["==", ["get", "isRouteStation"], true], 0.92,
       ["==", ["get", "isContextStation"], true], 0.92,
-      0.14,
+      0.08,
     ];
 
-    for (const layerId of ["branch-preview-stations-casing", "branch-preview-stations-dot"]) {
-      if (map.getLayer(layerId)) {
-        map.setPaintProperty(layerId, "circle-opacity", stationOpacity);
-      }
+    if (map.getLayer("branch-preview-stations-casing")) {
+      map.setPaintProperty("branch-preview-stations-casing", "circle-opacity", stationCasingOpacity);
+    }
+    if (map.getLayer("branch-preview-stations-dot")) {
+      map.setPaintProperty("branch-preview-stations-dot", "circle-opacity", stationOpacity);
+      map.setPaintProperty("branch-preview-stations-dot", "circle-stroke-opacity", stationOpacity);
     }
 
     if (map.getLayer("branch-preview-station-labels")) {

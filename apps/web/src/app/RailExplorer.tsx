@@ -529,13 +529,22 @@ export default function RailExplorer({
 
   const stationServingIndex = useMemo(() => {
     const index = new Map<string, StationServingBranch[]>();
+    const branchById = new Map(mapBranches.map((branch) => [branch.id, branch]));
+
+    const append = (stationId: string, item: StationServingBranch) => {
+      const items = index.get(stationId) ?? [];
+      if (!items.some((candidate) => candidate.branchId === item.branchId)) {
+        items.push(item);
+        index.set(stationId, items);
+      }
+    };
 
     for (const branch of mapBranches) {
       for (const stop of branch.routeStops) {
         const stationId = stop.station?.id;
         if (!stationId) continue;
 
-        const item: StationServingBranch = {
+        append(stationId, {
           branchId: branch.id,
           canonicalLineId: branch.canonicalLineId,
           lineNameKo: branch.canonicalLineNameKo,
@@ -547,21 +556,48 @@ export default function RailExplorer({
           routeStopCount: branch.routeStops.length,
           firstStopName: branch.routeStops[0]?.displayNameKo ?? "-",
           lastStopName:
-            branch.routeStops[branch.routeStops.length - 1]?.displayNameKo ??
-            "-",
-        };
-
-        const items = index.get(stationId);
-        if (items) {
-          items.push(item);
-        } else {
-          index.set(stationId, [item]);
-        }
+            branch.routeStops[branch.routeStops.length - 1]?.displayNameKo ?? "-",
+        });
       }
     }
 
+    for (const override of lineBranchOverrides) {
+      if (override.enabled === false) continue;
+      const parent = branchById.get(override.parentBranchId);
+      if (!parent) continue;
+
+      const stationIds = [
+        override.anchorStationId,
+        override.branchStationId,
+        override.connectedEndpointStationId,
+        ...(override.geometry ?? [])
+          .filter((point) => point.kind === "station")
+          .map((point) => point.stationId),
+      ].filter((stationId): stationId is string => Boolean(stationId));
+
+      const names = stationIds
+        .map((stationId) => stationById.get(stationId)?.nameKo)
+        .filter((name): name is string => Boolean(name));
+      const item: StationServingBranch = {
+        branchId: override.id,
+        canonicalLineId: parent.canonicalLineId,
+        lineNameKo: parent.canonicalLineNameKo,
+        sourceLineNumber: parent.sourceLineNumber,
+        sourceLineName:
+          override.mode === "add-station" ? `${parent.sourceLineName} 지선` : "노선 연결",
+        colorHex: parent.colorHex,
+        role: "branch",
+        sequence: 0,
+        routeStopCount: Math.max(2, stationIds.length),
+        firstStopName: names[0] ?? stationById.get(override.anchorStationId)?.nameKo ?? "-",
+        lastStopName: names[names.length - 1] ?? "-",
+      };
+
+      for (const stationId of new Set(stationIds)) append(stationId, item);
+    }
+
     return index;
-  }, [mapBranches]);
+  }, [lineBranchOverrides, mapBranches, stationById]);
 
   const stationSearchColorById = useMemo(() => {
     const colors = new Map<string, string>();
@@ -680,10 +716,25 @@ export default function RailExplorer({
 
   const visibleStationIds = useMemo(() => {
     const ids = new Set<string>();
+    const visibleBranchIds = new Set(visibleMapBranches.map((branch) => branch.id));
 
     for (const branch of visibleMapBranches) {
       for (const stop of branch.routeStops) {
         if (stop.station?.id) ids.add(stop.station.id);
+      }
+    }
+
+    for (const override of lineBranchOverrides) {
+      if (override.enabled === false || !visibleBranchIds.has(override.parentBranchId)) continue;
+      for (const stationId of [
+        override.anchorStationId,
+        override.branchStationId,
+        override.connectedEndpointStationId,
+        ...(override.geometry ?? [])
+          .filter((point) => point.kind === "station")
+          .map((point) => point.stationId),
+      ]) {
+        if (stationId) ids.add(stationId);
       }
     }
 
@@ -692,7 +743,7 @@ export default function RailExplorer({
     }
 
     return ids;
-  }, [activeRouteSearchResult, visibleMapBranches]);
+  }, [activeRouteSearchResult, lineBranchOverrides, visibleMapBranches]);
 
   const visibleMapStations = useMemo(
     () => mapStations.filter((station) => visibleStationIds.has(station.id)),
@@ -1003,10 +1054,7 @@ export default function RailExplorer({
           onSelectBranch={selectMapBranch}
           onSelectStation={selectMapStation}
           onSelectTransferGroup={selectMapTransferGroup}
-          onClearStation={() => {
-            setSelectedStationId(null);
-            setSelectedTransferGroupId(null);
-          }}
+          onClearStation={clearSelection}
         />
 
         <MapStatusHud
