@@ -132,6 +132,107 @@ export function smoothCoordinates(
   return result;
 }
 
+
+export type AdaptiveSmoothCoordinateOptions = {
+  minSpacing?: number;
+  maxSpacing?: number;
+  maxPoints?: number;
+  smoothingPasses?: number;
+};
+
+function interpolateCoordinate(
+  start: RailMapLngLatTuple,
+  end: RailMapLngLatTuple,
+  progress: number,
+): RailMapLngLatTuple {
+  return [
+    start[0] + (end[0] - start[0]) * progress,
+    start[1] + (end[1] - start[1]) * progress,
+  ];
+}
+
+function resampleCoordinatesByDistance(
+  coordinates: RailMapLngLatTuple[],
+  spacing: number,
+  maxPoints: number,
+): RailMapLngLatTuple[] {
+  if (coordinates.length < 2) return coordinates;
+
+  const cumulative = [0];
+  for (let index = 1; index < coordinates.length; index += 1) {
+    cumulative.push(
+      (cumulative[index - 1] ?? 0) +
+        getCoordinateDistance(coordinates[index - 1]!, coordinates[index]!),
+    );
+  }
+
+  const total = cumulative.at(-1) ?? 0;
+  if (!Number.isFinite(total) || total <= 0) return coordinates;
+
+  const requestedPointCount = Math.ceil(total / Math.max(spacing, 0.000001)) + 1;
+  const pointCount = Math.max(2, Math.min(maxPoints, requestedPointCount));
+  const result: RailMapLngLatTuple[] = [];
+  let segmentIndex = 1;
+
+  for (let pointIndex = 0; pointIndex < pointCount; pointIndex += 1) {
+    const distance = (total * pointIndex) / (pointCount - 1);
+    while (
+      segmentIndex < cumulative.length - 1 &&
+      (cumulative[segmentIndex] ?? 0) < distance
+    ) {
+      segmentIndex += 1;
+    }
+
+    const startIndex = Math.max(0, segmentIndex - 1);
+    const startDistance = cumulative[startIndex] ?? 0;
+    const endDistance = cumulative[segmentIndex] ?? total;
+    const span = Math.max(endDistance - startDistance, Number.EPSILON);
+    const progress = Math.max(0, Math.min(1, (distance - startDistance) / span));
+    result.push(
+      interpolateCoordinate(
+        coordinates[startIndex]!,
+        coordinates[segmentIndex]!,
+        progress,
+      ),
+    );
+  }
+
+  return result;
+}
+
+/**
+ * Builds a render-only railway polyline with approximately even spacing.
+ * The editable control/station points remain untouched, while long segments
+ * receive more samples and short segments receive fewer samples.
+ */
+export function buildAdaptiveSmoothCoordinates(
+  coordinates: ReadonlyArray<ReadonlyArray<number>>,
+  options: AdaptiveSmoothCoordinateOptions = {},
+): RailMapLngLatTuple[] {
+  const points = coordinates
+    .map(toLngLatTuple)
+    .filter((point): point is RailMapLngLatTuple => point !== null);
+  if (points.length < 2) return points;
+
+  const totalDistance = points.slice(1).reduce(
+    (sum, point, index) => sum + getCoordinateDistance(points[index]!, point),
+    0,
+  );
+  if (!Number.isFinite(totalDistance) || totalDistance <= 0) return points;
+
+  const minSpacing = options.minSpacing ?? 0.00018;
+  const maxSpacing = options.maxSpacing ?? 0.0018;
+  const maxPoints = options.maxPoints ?? 420;
+  const desiredSegments = Math.max(12, (points.length - 1) * 8);
+  const spacing = Math.max(
+    minSpacing,
+    Math.min(maxSpacing, totalDistance / desiredSegments),
+  );
+  const samplesPerSegment = Math.max(3, Math.min(10, options.smoothingPasses ?? 6));
+  const curved = points.length >= 3 ? smoothCoordinates(points, samplesPerSegment) : points;
+  return resampleCoordinatesByDistance(curved, spacing, maxPoints);
+}
+
 export function smoothCoordinateRange(
   coordinates: RailMapLngLatTuple[],
   startIndex: number,

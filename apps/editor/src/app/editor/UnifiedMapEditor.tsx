@@ -8,6 +8,7 @@ import {
   pickRailMapInteractionTarget,
 } from "@repo/ui/map/interactionPolicy";
 import {
+  buildAdaptiveSmoothCoordinates,
   buildSmoothConnectionCurve,
   buildTransferGroupCircleGeometry,
   getCoordinateDistance,
@@ -2358,7 +2359,8 @@ function buildLineBranchCoordinates(
   stationById: Map<string, EditorStation>,
 ) {
   const explicitGeometry = getLineBranchExplicitGeometry(override);
-  if (explicitGeometry.length >= 2) return explicitGeometry;
+  if (explicitGeometry.length >= 2)
+    return buildAdaptiveSmoothCoordinates(explicitGeometry);
 
   if (override.mode === "add-station") {
     return buildAddStationLineBranchCoordinates(
@@ -2604,7 +2606,7 @@ function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
   const override = (branch.geometryOverrideCoordinates ?? []).filter(
     ([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat),
   ) as LngLatTuple[];
-  if (override.length >= 2) return smoothCoordinates(override);
+  if (override.length >= 2) return buildAdaptiveSmoothCoordinates(override);
 
   const coordinates = (branch.geometryCoordinates ?? []).filter(
     ([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat),
@@ -2612,7 +2614,7 @@ function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
 
   if (coordinates.length < 2) return [];
 
-  const smoothed = smoothCoordinates(coordinates);
+  const smoothed = buildAdaptiveSmoothCoordinates(coordinates);
   return smoothed.length >= 2 ? smoothed : coordinates;
 }
 
@@ -3883,20 +3885,52 @@ function applyGeometryDraftsToBranches(
   branches: EditorMapBranch[],
   drafts: GeometryDraft[],
 ): EditorMapBranch[] {
-  return drafts.reduce(
-    (current, draft) => applyGeometryDraftToBranches(current, draft),
-    branches,
+  if (drafts.length < 1) return branches;
+  const draftByBranchId = new Map(
+    drafts
+      .filter((draft) => draft.targetType === "branch")
+      .map((draft) => [draft.branchId, draft]),
   );
+  if (draftByBranchId.size < 1) return branches;
+
+  return branches.map((branch) => {
+    const draft = draftByBranchId.get(branch.id);
+    if (!draft) return branch;
+    const coordinates = draft.points
+      .filter((point) => Number.isFinite(point.lng) && Number.isFinite(point.lat))
+      .map((point) => [point.lng, point.lat] as LngLatTuple);
+    if (coordinates.length < 2) return branch;
+    return {
+      ...branch,
+      geometryOverrideCoordinates: coordinates,
+      geometryCoordinates: coordinates,
+    };
+  });
 }
 
 function applyGeometryDraftsToLineBranchOverrides(
   overrides: ManualLineBranchOverride[],
   drafts: GeometryDraft[],
 ): ManualLineBranchOverride[] {
-  return drafts.reduce(
-    (current, draft) => applyGeometryDraftToLineBranchOverrides(current, draft),
-    overrides,
+  if (drafts.length < 1) return overrides;
+  const draftByTargetId = new Map(
+    drafts
+      .filter((draft) => draft.targetType === "lineBranch")
+      .map((draft) => [draft.targetId, draft]),
   );
+  if (draftByTargetId.size < 1) return overrides;
+
+  return overrides.map((override) => {
+    const draft = draftByTargetId.get(override.id);
+    if (!draft) return override;
+    const points = toLineBranchGeometryPoints(draft);
+    if (points.length < 2) return override;
+    return {
+      ...override,
+      geometry: points,
+      note: draft.note.trim() ? draft.note.trim() : (override.note ?? null),
+    };
+  });
 }
 
 function buildGeometryEditPointFeatures(
@@ -4031,6 +4065,8 @@ export default function UnifiedMapEditor({
   const selectionBoxStartRef = useRef<{ x: number; y: number } | null>(null);
   const mapPointerDownPointRef = useRef<{ x: number; y: number } | null>(null);
   const geometryPointDragRef = useRef<GeometryPointDragState>(null);
+  const geometryDragFrameRef = useRef<number | null>(null);
+  const pendingGeometryDragLngLatRef = useRef<{ lng: number; lat: number } | null>(null);
   const selectStationFromMapRef = useRef<(stationId: string) => void>(
     () => undefined,
   );
@@ -5777,33 +5813,46 @@ export default function UnifiedMapEditor({
 
       const geometryDrag = geometryPointDragRef.current;
       if (geometryDrag) {
-        const targetKey = getGeometryTargetKey(
-          geometryDrag.targetType,
-          geometryDrag.targetId,
-        );
-        const currentDraft =
-          geometryDraftsByKeyRef.current[targetKey] ?? geometryDraftRef.current;
-        if (
-          currentDraft &&
-          currentDraft.targetType === geometryDrag.targetType &&
-          currentDraft.targetId === geometryDrag.targetId
-        ) {
-          const target = currentDraft.points[geometryDrag.pointIndex];
-          if (target) {
-            const nextDraft: GeometryDraft = {
-              ...currentDraft,
-              points: currentDraft.points.map((point, index) =>
-                index === geometryDrag.pointIndex
-                  ? { ...point, lng: event.lngLat.lng, lat: event.lngLat.lat }
-                  : point,
-              ),
+        pendingGeometryDragLngLatRef.current = {
+          lng: event.lngLat.lng,
+          lat: event.lngLat.lat,
+        };
+        if (geometryDragFrameRef.current === null) {
+          geometryDragFrameRef.current = window.requestAnimationFrame(() => {
+            geometryDragFrameRef.current = null;
+            const activeDrag = geometryPointDragRef.current;
+            const nextCoordinate = pendingGeometryDragLngLatRef.current;
+            pendingGeometryDragLngLatRef.current = null;
+            if (!activeDrag || !nextCoordinate) return;
+
+            const targetKey = getGeometryTargetKey(
+              activeDrag.targetType,
+              activeDrag.targetId,
+            );
+            const currentDraft =
+              geometryDraftsByKeyRef.current[targetKey] ?? geometryDraftRef.current;
+            if (
+              !currentDraft ||
+              currentDraft.targetType !== activeDrag.targetType ||
+              currentDraft.targetId !== activeDrag.targetId ||
+              !currentDraft.points[activeDrag.pointIndex]
+            )
+              return;
+
+            const nextPoints = currentDraft.points.slice();
+            nextPoints[activeDrag.pointIndex] = {
+              ...nextPoints[activeDrag.pointIndex]!,
+              ...nextCoordinate,
+            };
+            const nextDraft: GeometryDraft = { ...currentDraft, points: nextPoints };
+            geometryDraftRef.current = nextDraft;
+            geometryDraftsByKeyRef.current = {
+              ...geometryDraftsByKeyRef.current,
+              [targetKey]: nextDraft,
             };
             setGeometryDraft(nextDraft);
-            setGeometryDraftsByKey((previous) => ({
-              ...previous,
-              [targetKey]: nextDraft,
-            }));
-          }
+            setGeometryDraftsByKey(geometryDraftsByKeyRef.current);
+          });
         }
         map.getCanvas().style.cursor = "grabbing";
       } else if (manualRouteBuilderDraftRef.current) {
@@ -6109,11 +6158,36 @@ export default function UnifiedMapEditor({
       }
 
       if (geometryPointDragRef.current) {
+        if (geometryDragFrameRef.current !== null) {
+          window.cancelAnimationFrame(geometryDragFrameRef.current);
+          geometryDragFrameRef.current = null;
+        }
         const geometryDrag = geometryPointDragRef.current;
         const targetKey = getGeometryTargetKey(
           geometryDrag.targetType,
           geometryDrag.targetId,
         );
+        const pendingCoordinate = pendingGeometryDragLngLatRef.current;
+        pendingGeometryDragLngLatRef.current = null;
+        if (pendingCoordinate) {
+          const currentDraft =
+            geometryDraftsByKeyRef.current[targetKey] ?? geometryDraftRef.current;
+          if (currentDraft?.points[geometryDrag.pointIndex]) {
+            const nextPoints = currentDraft.points.slice();
+            nextPoints[geometryDrag.pointIndex] = {
+              ...nextPoints[geometryDrag.pointIndex]!,
+              ...pendingCoordinate,
+            };
+            const nextDraft: GeometryDraft = { ...currentDraft, points: nextPoints };
+            geometryDraftRef.current = nextDraft;
+            geometryDraftsByKeyRef.current = {
+              ...geometryDraftsByKeyRef.current,
+              [targetKey]: nextDraft,
+            };
+            setGeometryDraft(nextDraft);
+            setGeometryDraftsByKey(geometryDraftsByKeyRef.current);
+          }
+        }
         const before = cloneGeometryDraft(geometryDragStartDraftRef.current);
         const after = cloneGeometryDraft(
           geometryDraftsByKeyRef.current[targetKey] ?? geometryDraftRef.current,

@@ -2,20 +2,21 @@
 
 ## Applied through
 
-- `13.104.0-13.106.0`
+- `13.110.0-13.113.0`
 
 ## Completed
 
-- Web MapLibre source and layer registration separated from `RailMap.tsx`
-- source and interactive layer IDs centralized
-- repeated GeoJSON source updates use one helper
-- Web click and hover event binding separated from `RailMap.tsx`
-- station-first hit-test behavior and blank-map selection clearing retained
-- map initialization, source/layer registration and data updates now have explicit boundaries
+- Editor geometry dragging throttled to one update per animation frame
+- final pointer position flushed before geometry history commit
+- geometry draft application changed to indexed one-pass updates
+- long railway segments now use adaptive curve smoothing and even-distance resampling
+- render-only generated samples keep saved station/control points compact
+- sample count bounded to protect MapLibre rendering performance
+- common geometry smoothing policy added to `packages/ui`
 
 ## Next
 
-- move common Editor/Web hit-test priority policy to `packages/ui`
-- align Editor and Web selection and deselection behavior
-- split Editor audit, transfer recommendation and timetable import sections
-- continue map regression fixes before fare model work
+- split Editor audit and diagnostics UI from `UnifiedMapEditor.tsx`
+- split transfer recommendation workflow
+- split timetable CSV import workflow
+- continue Editor/Web shared selection and rendering policy consolidation
