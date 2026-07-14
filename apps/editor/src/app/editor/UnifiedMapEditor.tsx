@@ -111,6 +111,15 @@ import { BranchInspector } from "./branchInspector";
 import { ManualDataAuditDashboard } from "./ManualDataAuditDashboard";
 import { TransferGroupReviewPanel } from "./TransferGroupReviewPanel";
 import {
+  removeTrainCsvPendingItem,
+  resolveAllUniqueTrainCsvMissedItems as resolveAllUniqueTrainCsvMissedItemsFromModel,
+  resolveTrainCsvMissedItem as resolveTrainCsvMissedItemFromModel,
+  updateTrainCsvPendingTime,
+  type TrainCsvMissedReviewItem,
+  type TrainCsvPendingReviewItem,
+  type TrainCsvReview,
+} from "./trainCsvReview";
+import {
   findNearestPendingTransferSuggestion as findNearestPendingTransferSuggestionFromModel,
   type TransferGroupReviewFilter,
   type TransferGroupSuggestion,
@@ -278,22 +287,6 @@ type TimetableReviewIssue = {
   level: "error" | "warning";
   title: string;
   message: string;
-};
-
-type TrainCsvPendingReviewItem = {
-  stationId: string;
-  sequence: number;
-  stationName: string;
-  sourceName: string;
-  arrivalTime: string;
-  departureTime: string;
-};
-
-type TrainCsvMissedReviewItem = {
-  sourceName: string;
-  arrivalTime: string;
-  departureTime: string;
-  candidateStationIds: string[];
 };
 
 type ShortcutItem = {
@@ -2340,7 +2333,7 @@ function buildLineBranchCoordinates(
   parentBranch: EditorMapBranch | null,
   connectedBranch: EditorMapBranch | null,
   stationById: Map<string, EditorStation>,
-  renderZoom: number,
+  renderZoom = 11.5,
 ) {
   const explicitGeometry = getLineBranchExplicitGeometry(override);
   if (explicitGeometry.length >= 2)
@@ -9812,12 +9805,7 @@ function ServicePatternBuilderPanel({
   const [trainStopTimes, setTrainStopTimes] = useState<Record<string, { arrivalTime: string; departureTime: string }>>({});
   const [trainCsvText, setTrainCsvText] = useState("");
   const [trainCsvMessage, setTrainCsvMessage] = useState<string | null>(null);
-  const [trainCsvReview, setTrainCsvReview] = useState<{
-    pending: TrainCsvPendingReviewItem[];
-    missed: TrainCsvMissedReviewItem[];
-    invalidTimes: string[];
-    duplicateStops: string[];
-  } | null>(null);
+  const [trainCsvReview, setTrainCsvReview] = useState<TrainCsvReview | null>(null);
   const normalizedOperatingDays = useMemo(
     () => operatingDaysText
       .split(/\r?\n|,/)
@@ -10020,99 +10008,31 @@ function ServicePatternBuilderPanel({
   }
 
   function updateTrainCsvReviewTime(index: number, field: "arrivalTime" | "departureTime", value: string) {
-    setTrainCsvReview((current) => {
-      if (!current) return current;
-      return {
-        ...current,
-        pending: current.pending.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item),
-      };
-    });
+    setTrainCsvReview((current) => current ? updateTrainCsvPendingTime(current, index, field, value) : current);
   }
 
   function removeTrainCsvReviewItem(index: number) {
-    setTrainCsvReview((current) => {
-      if (!current) return current;
-      return { ...current, pending: current.pending.filter((_, itemIndex) => itemIndex !== index) };
-    });
+    setTrainCsvReview((current) => current ? removeTrainCsvPendingItem(current, index) : current);
   }
 
   function resolveTrainCsvMissedItem(index: number, stationId: string) {
     if (!activeTrainPattern) return;
-    const stop = activeTrainPattern.stops.find((candidate) => candidate.stationId === stationId);
-    if (!stop) return;
-    setTrainCsvReview((current) => {
-      if (!current) return current;
-      const missed = current.missed[index];
-      if (!missed) return current;
-      const key = `${stop.stationId}:${stop.sequence}`;
-      if (current.pending.some((item) => `${item.stationId}:${item.sequence}` === key)) {
-        return {
-          ...current,
-          missed: current.missed.filter((_, itemIndex) => itemIndex !== index),
-          duplicateStops: [...current.duplicateStops, missed.sourceName],
-        };
-      }
-      return {
-        ...current,
-        pending: [
-          ...current.pending,
-          {
-            stationId: stop.stationId,
-            sequence: stop.sequence,
-            stationName: stationById.get(stop.stationId)?.nameKo ?? stop.stationId,
-            sourceName: missed.sourceName,
-            arrivalTime: missed.arrivalTime,
-            departureTime: missed.departureTime,
-          },
-        ].sort((a, b) => a.sequence - b.sequence),
-        missed: current.missed.filter((_, itemIndex) => itemIndex !== index),
-      };
-    });
+    setTrainCsvReview((current) => current ? resolveTrainCsvMissedItemFromModel({
+      review: current,
+      index,
+      stationId,
+      pattern: activeTrainPattern,
+      stationById,
+    }) : current);
   }
 
   function resolveAllUniqueTrainCsvMissedItems() {
     if (!activeTrainPattern) return;
-    setTrainCsvReview((current) => {
-      if (!current) return current;
-      const pending = [...current.pending];
-      const pendingKeys = new Set(pending.map((item) => `${item.stationId}:${item.sequence}`));
-      const duplicateStops = [...current.duplicateStops];
-      const missed: TrainCsvMissedReviewItem[] = [];
-
-      for (const item of current.missed) {
-        if (item.candidateStationIds.length !== 1) {
-          missed.push(item);
-          continue;
-        }
-        const stationId = item.candidateStationIds[0];
-        const stop = activeTrainPattern.stops.find((candidate) => candidate.stationId === stationId);
-        if (!stop) {
-          missed.push(item);
-          continue;
-        }
-        const key = `${stop.stationId}:${stop.sequence}`;
-        if (pendingKeys.has(key)) {
-          duplicateStops.push(item.sourceName);
-          continue;
-        }
-        pendingKeys.add(key);
-        pending.push({
-          stationId: stop.stationId,
-          sequence: stop.sequence,
-          stationName: stationById.get(stop.stationId)?.nameKo ?? stop.stationId,
-          sourceName: item.sourceName,
-          arrivalTime: item.arrivalTime,
-          departureTime: item.departureTime,
-        });
-      }
-
-      return {
-        ...current,
-        pending: pending.sort((a, b) => a.sequence - b.sequence),
-        missed,
-        duplicateStops,
-      };
-    });
+    setTrainCsvReview((current) => current ? resolveAllUniqueTrainCsvMissedItemsFromModel({
+      review: current,
+      pattern: activeTrainPattern,
+      stationById,
+    }) : current);
   }
 
   function commitTrainCsvReview() {

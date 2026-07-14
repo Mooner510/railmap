@@ -1,10 +1,9 @@
 # Current task
 
-## Applied through
+Applied through `13.123.1-13.126.0`.
 
-- 13.121.0-13.123.0 transfer recommendation component split and render optimization
+- Fixed nullable station coordinate distance calculation.
+- Synchronized zoom-adaptive geometry rendering API between editor and shared UI.
+- Split timetable CSV review state operations and optimized unique-candidate bulk resolution.
 
-## Next
-
-- 13.124.0-13.126.0 timetable CSV import component and correction logic split
-- 13.127.0-13.129.0 common Editor/Web selection model and focus-state alignment
+Next: `13.127.0-13.129.0` shared editor/web selection model and UI regression cleanup.

@@ -138,7 +138,20 @@ export type AdaptiveSmoothCoordinateOptions = {
   maxSpacing?: number;
   maxPoints?: number;
   smoothingPasses?: number;
+  zoom?: number;
 };
+
+export function getRailGeometryDensityScale(zoom: number) {
+  if (!Number.isFinite(zoom)) return 1.2;
+  if (zoom <= 9.5) return 0.9;
+  if (zoom <= 11.5) return 0.9 + ((zoom - 9.5) / 2) * 0.3;
+  if (zoom >= 14.5) return 1.4;
+  return 1.2 + ((zoom - 11.5) / 3) * 0.2;
+}
+
+export function getRailGeometryPointBudget(zoom: number, basePoints = 360) {
+  return Math.max(180, Math.round(basePoints * getRailGeometryDensityScale(zoom)));
+}
 
 function interpolateCoordinate(
   start: RailMapLngLatTuple,
@@ -249,10 +262,18 @@ export function buildAdaptiveSmoothCoordinates(
     );
   if (points.length < 2) return points;
 
+  const densityScale = getRailGeometryDensityScale(options.zoom ?? 11.5);
   const minSpacing = options.minSpacing ?? 0.000025;
   const maxSpacing = options.maxSpacing ?? 0.00022;
-  const maxPoints = Math.max(points.length, options.maxPoints ?? 1800);
-  const requestedDensity = Math.max(18, options.smoothingPasses ?? 28);
+  const baseMaxPoints = options.maxPoints ?? 1800;
+  const maxPoints = Math.max(
+    points.length,
+    Math.round(baseMaxPoints * Math.max(1, densityScale)),
+  );
+  const requestedDensity = Math.max(
+    16,
+    Math.round((options.smoothingPasses ?? 28) * densityScale),
+  );
 
   const segmentPointCounts = points.slice(0, -1).map((start, index) => {
     const end = points[index + 1]!;
@@ -271,10 +292,12 @@ export function buildAdaptiveSmoothCoordinates(
     // adding samples instead of flattening at the previous low per-segment cap.
     const distanceDrivenCount = Math.ceil(distance / targetSpacing) + 1;
     const longSegmentBoost = Math.ceil(Math.sqrt(Math.max(0, distance / maxSpacing)) * 2);
+    const minimumPointCount = Math.max(16, Math.round(18 * densityScale));
+    const maximumPointCount = Math.max(240, Math.round(280 * densityScale));
     return Math.max(
-      18,
+      minimumPointCount,
       Math.min(
-        280,
+        maximumPointCount,
         distanceDrivenCount + curvatureBoost + longSegmentBoost,
       ),
     );
@@ -294,7 +317,7 @@ export function buildAdaptiveSmoothCoordinates(
       10,
       Math.round(((segmentPointCounts[index] ?? 18) - 1) * scale) + 1,
     );
-    const denseCount = Math.max(48, Math.min(960, pointCount * 4));
+    const denseCount = Math.max(48, Math.min(1344, Math.round(pointCount * 4 * Math.max(1, densityScale))));
     const denseSegment: RailMapLngLatTuple[] = [p1];
 
     for (let step = 1; step <= denseCount; step += 1) {
