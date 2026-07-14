@@ -5,6 +5,7 @@ import {
   buildTransferGroupCircleGeometry,
   isTransferDetailVisible,
   optimizeCoordinates,
+  RAIL_MAP_EMPHASIS_POLICY,
   RAIL_MAP_VISUAL_POLICY,
   smoothCoordinateRange,
   smoothCoordinates,
@@ -18,6 +19,11 @@ import maplibregl, {
   type Map as MapLibreMap,
 } from "maplibre-gl";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  buildBranchLineOpacity,
+  buildLineBranchOpacity,
+  STATION_OPACITY_EXPRESSIONS,
+} from "./map/railMapEmphasis";
 
 export interface RailMapStation {
   id: string;
@@ -338,6 +344,7 @@ function buildLineBranchFeatures(
           type: "Feature" as const,
           properties: {
             id: override.id,
+            parentBranchId: override.parentBranchId,
             colorHex: parentBranch?.colorHex ?? "#0f766e",
             title,
             summary,
@@ -1137,7 +1144,9 @@ export default function RailMap({
             paint: {
               "line-color": ["coalesce", ["get", "colorHex"], "#0284c7"],
               "line-width": MAP_RENDER_POLICY.branchLineWidth,
-              "line-opacity": highlightedRouteStationIds.length > 0 ? 0.06 : 0.76,
+              "line-opacity": highlightedRouteStationIds.length > 0
+                ? RAIL_MAP_EMPHASIS_POLICY.line.contextOnRoute
+                : RAIL_MAP_EMPHASIS_POLICY.line.idle,
             },
             layout: {
               "line-cap": "round",
@@ -1153,7 +1162,7 @@ export default function RailMap({
             paint: {
               "line-color": ["coalesce", ["get", "colorHex"], "#0369a1"],
               "line-width": MAP_RENDER_POLICY.selectedBranchLineWidth,
-              "line-opacity": 0.96,
+              "line-opacity": RAIL_MAP_EMPHASIS_POLICY.line.selected,
             },
             layout: {
               "line-cap": "round",
@@ -1180,7 +1189,9 @@ export default function RailMap({
             paint: {
               "line-color": ["get", "colorHex"],
               "line-width": MAP_RENDER_POLICY.lineBranchLineWidth,
-              "line-opacity": highlightedRouteStationIds.length > 0 ? 0.05 : 0.78,
+              "line-opacity": highlightedRouteStationIds.length > 0
+                ? RAIL_MAP_EMPHASIS_POLICY.line.contextOnRoute
+                : RAIL_MAP_EMPHASIS_POLICY.line.idle,
             },
             layout: { "line-cap": "round", "line-join": "round" },
           });
@@ -1331,7 +1342,12 @@ export default function RailMap({
               "text-color": "#0f172a",
               "text-halo-color": "#ffffff",
               "text-halo-width": RAIL_MAP_VISUAL_POLICY.stationLabelHaloWidth,
-              "text-opacity": ["case", ["==", ["get", "isContext"], true], 1, 0.16],
+              "text-opacity": [
+                "case",
+                ["==", ["get", "isContext"], true],
+                RAIL_MAP_EMPHASIS_POLICY.transfer.context,
+                RAIL_MAP_EMPHASIS_POLICY.transfer.labelBackground,
+              ],
             },
           });
 
@@ -1366,9 +1382,11 @@ export default function RailMap({
               ],
               "circle-opacity": [
                 "case",
-                ["==", ["get", "isEmphasized"], true], 0.98,
-                ["==", ["get", "isContextStation"], true], 0.9,
-                0.05,
+                ["==", ["get", "isEmphasized"], true],
+                RAIL_MAP_EMPHASIS_POLICY.station.casingEmphasized,
+                ["==", ["get", "isContextStation"], true],
+                RAIL_MAP_EMPHASIS_POLICY.station.casingContext,
+                RAIL_MAP_EMPHASIS_POLICY.station.casingBackground,
               ],
             },
           });
@@ -1399,15 +1417,19 @@ export default function RailMap({
               ],
               "circle-stroke-opacity": [
                 "case",
-                ["==", ["get", "isEmphasized"], true], 1,
-                ["==", ["get", "isContextStation"], true], 0.96,
-                0.08,
+                ["==", ["get", "isEmphasized"], true],
+                RAIL_MAP_EMPHASIS_POLICY.station.emphasized,
+                ["==", ["get", "isContextStation"], true],
+                RAIL_MAP_EMPHASIS_POLICY.station.context,
+                RAIL_MAP_EMPHASIS_POLICY.station.strokeBackground,
               ],
               "circle-opacity": [
                 "case",
-                ["==", ["get", "isEmphasized"], true], 0.98,
-                ["==", ["get", "isContextStation"], true], 0.96,
-                0.08,
+                ["==", ["get", "isEmphasized"], true],
+                RAIL_MAP_EMPHASIS_POLICY.station.emphasized,
+                ["==", ["get", "isContextStation"], true],
+                RAIL_MAP_EMPHASIS_POLICY.station.context,
+                RAIL_MAP_EMPHASIS_POLICY.station.background,
               ],
             },
           });
@@ -1433,9 +1455,11 @@ export default function RailMap({
               "text-halo-width": 1.4,
               "text-opacity": [
                 "case",
-                ["==", ["get", "isRouteStation"], true], 0.92,
-                ["==", ["get", "isContextStation"], true], 0.92,
-                0.14,
+                ["==", ["get", "isRouteStation"], true],
+                RAIL_MAP_EMPHASIS_POLICY.station.labelContext,
+                ["==", ["get", "isContextStation"], true],
+                RAIL_MAP_EMPHASIS_POLICY.station.labelContext,
+                RAIL_MAP_EMPHASIS_POLICY.station.labelBackground,
               ],
             },
           });
@@ -1710,20 +1734,28 @@ export default function RailMap({
       ]);
     }
 
+    const branchLineOpacity = buildBranchLineOpacity({
+      selectedBranchId,
+      highlightedRouteBranchIds,
+    });
+    const lineBranchOpacity = buildLineBranchOpacity({
+      selectedBranchId,
+      highlightedRouteBranchIds,
+    });
+
     if (map.getLayer("branch-preview-lines")) {
       map.setPaintProperty(
         "branch-preview-lines",
         "line-opacity",
-        selectedBranchId
-          ? ["case", ["==", ["get", "id"], selectedBranchId], 0.92, 0.055]
-          : highlightedRouteBranchIds.length > 0
-            ? [
-                "case",
-                ["in", ["get", "id"], ["literal", highlightedRouteBranchIds]],
-                0.9,
-                0.045,
-              ]
-            : 0.76,
+        branchLineOpacity,
+      );
+    }
+
+    if (map.getLayer("line-branch-lines")) {
+      map.setPaintProperty(
+        "line-branch-lines",
+        "line-opacity",
+        lineBranchOpacity,
       );
     }
 
@@ -1740,34 +1772,32 @@ export default function RailMap({
     const map = mapRef.current;
     if (!map || !mapReady) return;
 
-    const stationOpacity = [
-      "case",
-      ["==", ["get", "isEmphasized"], true], 0.98,
-      ["==", ["get", "isContextStation"], true], 0.96,
-      0.08,
-    ];
-    const stationCasingOpacity = [
-      "case",
-      ["==", ["get", "isEmphasized"], true], 0.98,
-      ["==", ["get", "isContextStation"], true], 0.9,
-      0.05,
-    ];
-    const labelOpacity = [
-      "case",
-      ["==", ["get", "isContextStation"], true], 0.92,
-      0.08,
-    ];
-
     if (map.getLayer("branch-preview-stations-casing")) {
-      map.setPaintProperty("branch-preview-stations-casing", "circle-opacity", stationCasingOpacity);
+      map.setPaintProperty(
+        "branch-preview-stations-casing",
+        "circle-opacity",
+        STATION_OPACITY_EXPRESSIONS.casing,
+      );
     }
     if (map.getLayer("branch-preview-stations-dot")) {
-      map.setPaintProperty("branch-preview-stations-dot", "circle-opacity", stationOpacity);
-      map.setPaintProperty("branch-preview-stations-dot", "circle-stroke-opacity", stationOpacity);
+      map.setPaintProperty(
+        "branch-preview-stations-dot",
+        "circle-opacity",
+        STATION_OPACITY_EXPRESSIONS.dot,
+      );
+      map.setPaintProperty(
+        "branch-preview-stations-dot",
+        "circle-stroke-opacity",
+        STATION_OPACITY_EXPRESSIONS.stroke,
+      );
     }
 
     if (map.getLayer("branch-preview-station-labels")) {
-      map.setPaintProperty("branch-preview-station-labels", "text-opacity", labelOpacity);
+      map.setPaintProperty(
+        "branch-preview-station-labels",
+        "text-opacity",
+        STATION_OPACITY_EXPRESSIONS.label,
+      );
     }
   }, [highlightedRouteStationIds, mapReady]);
 
