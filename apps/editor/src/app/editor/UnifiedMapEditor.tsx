@@ -107,6 +107,7 @@ import type { EditorMapBranch, EditorMapLine, UnifiedEditorData } from "../edito
 import { getLineBranchConnectionBlockReason, isBranchCircular } from "./branchRules";
 import { AddStationInsertionDialog, type PendingAddStationInsertion } from "./stationInsertion";
 import { BranchInspector } from "./branchInspector";
+import { ManualDataAuditDashboard } from "./ManualDataAuditDashboard";
 import {
   LineBranchValidationPanel,
   type LineBranchValidationAutoFix,
@@ -4040,6 +4041,25 @@ function makeCommandRecord(
   };
 }
 
+function buildGeometryDragPreviewData(draft: GeometryDraft | null): RailFeatureCollection {
+  if (!draft || draft.points.length < 2) return EMPTY_FEATURE_COLLECTION;
+  const coordinates = buildAdaptiveSmoothCoordinates(
+    draft.points.map((point) => [point.lng, point.lat]),
+    { maxPoints: 480, smoothingPasses: 24 },
+  );
+  if (coordinates.length < 2) return EMPTY_FEATURE_COLLECTION;
+  return {
+    type: "FeatureCollection",
+    features: [
+      {
+        type: "Feature",
+        properties: { id: `${draft.targetType}:${draft.targetId}` },
+        geometry: { type: "LineString", coordinates },
+      },
+    ],
+  };
+}
+
 async function saveOverlays(nextOverlays: ManualOverlayBundle) {
   const response = await fetch("/api/manual-overlays", {
     method: "PUT",
@@ -4058,10 +4078,8 @@ export default function UnifiedMapEditor({
 }) {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const cursorFrameRef = useRef<number | null>(null);
-  const pendingCursorLngLatRef = useRef<{ lng: number; lat: number } | null>(
-    null,
-  );
+  const cursorVerticalRef = useRef<HTMLDivElement | null>(null);
+  const cursorHorizontalRef = useRef<HTMLDivElement | null>(null);
   const selectionBoxStartRef = useRef<{ x: number; y: number } | null>(null);
   const mapPointerDownPointRef = useRef<{ x: number; y: number } | null>(null);
   const geometryPointDragRef = useRef<GeometryPointDragState>(null);
@@ -4147,14 +4165,6 @@ export default function UnifiedMapEditor({
   const [baseMapStyleKey, setBaseMapStyleKey] = useState<BaseMapStyleKey>("osm");
   const [zoom, setZoom] = useState(7);
   const [transferDetailVisible, setTransferDetailVisible] = useState(false);
-  const [cursorLngLat, setCursorLngLat] = useState<{
-    lng: number;
-    lat: number;
-  } | null>(null);
-  const [cursorPoint, setCursorPoint] = useState<{
-    x: number;
-    y: number;
-  } | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
   const [geometryHistoryVersion, setGeometryHistoryVersion] = useState(0);
@@ -5111,6 +5121,10 @@ export default function UnifiedMapEditor({
         type: "geojson",
         data: EMPTY_FEATURE_COLLECTION,
       });
+      map.addSource("railmap-geometry-drag-preview", {
+        type: "geojson",
+        data: EMPTY_FEATURE_COLLECTION,
+      });
       map.addSource("railmap-manual-route-builder-preview", {
         type: "geojson",
         data: EMPTY_FEATURE_COLLECTION,
@@ -5140,6 +5154,18 @@ export default function UnifiedMapEditor({
         paint: {
           "line-color": ["get", "colorHex"],
           "line-width": 7,
+          "line-opacity": 0.95,
+        },
+        layout: { "line-cap": "round", "line-join": "round" },
+      });
+
+      map.addLayer({
+        id: "railmap-geometry-drag-preview",
+        type: "line",
+        source: "railmap-geometry-drag-preview",
+        paint: {
+          "line-color": "#2563eb",
+          "line-width": 5.5,
           "line-opacity": 0.95,
         },
         layout: { "line-cap": "round", "line-join": "round" },
@@ -5787,11 +5813,12 @@ export default function UnifiedMapEditor({
     };
 
     map.on("mousemove", (event) => {
-      pendingCursorLngLatRef.current = {
-        lng: event.lngLat.lng,
-        lat: event.lngLat.lat,
-      };
-      setCursorPoint({ x: event.point.x, y: event.point.y });
+      if (stationLocationPickModeRef.current) {
+        if (cursorVerticalRef.current)
+          cursorVerticalRef.current.style.transform = `translateX(${event.point.x}px)`;
+        if (cursorHorizontalRef.current)
+          cursorHorizontalRef.current.style.transform = `translateY(${event.point.y}px)`;
+      }
 
       const routeStationDrag = manualRouteStationDragRef.current;
       if (routeStationDrag) {
@@ -5850,8 +5877,21 @@ export default function UnifiedMapEditor({
               ...geometryDraftsByKeyRef.current,
               [targetKey]: nextDraft,
             };
-            setGeometryDraft(nextDraft);
-            setGeometryDraftsByKey(geometryDraftsByKeyRef.current);
+
+            const previewSource = map.getSource("railmap-geometry-drag-preview") as
+              | GeoJSONSource
+              | undefined;
+            previewSource?.setData(buildGeometryDragPreviewData(nextDraft));
+
+            const pointSource = map.getSource("railmap-geometry-edit-points") as
+              | GeoJSONSource
+              | undefined;
+            pointSource?.setData(
+              buildGeometryEditPointFeatures(
+                getGeometryDraftsFromMap(geometryDraftsByKeyRef.current),
+                true,
+              ),
+            );
           });
         }
         map.getCanvas().style.cursor = "grabbing";
@@ -5931,12 +5971,6 @@ export default function UnifiedMapEditor({
         }
       }
 
-      if (cursorFrameRef.current !== null) return;
-      cursorFrameRef.current = window.requestAnimationFrame(() => {
-        cursorFrameRef.current = null;
-        if (pendingCursorLngLatRef.current)
-          setCursorLngLat(pendingCursorLngLatRef.current);
-      });
     });
     const syncTransferVisibilityMode = () => {
       const nextZoom = map.getZoom();
@@ -6184,10 +6218,18 @@ export default function UnifiedMapEditor({
               ...geometryDraftsByKeyRef.current,
               [targetKey]: nextDraft,
             };
-            setGeometryDraft(nextDraft);
-            setGeometryDraftsByKey(geometryDraftsByKeyRef.current);
           }
         }
+        const committedDraft =
+          geometryDraftsByKeyRef.current[targetKey] ?? geometryDraftRef.current;
+        if (committedDraft) {
+          setGeometryDraft(committedDraft);
+          setGeometryDraftsByKey(geometryDraftsByKeyRef.current);
+        }
+        const previewSource = map.getSource("railmap-geometry-drag-preview") as
+          | GeoJSONSource
+          | undefined;
+        previewSource?.setData(EMPTY_FEATURE_COLLECTION);
         const before = cloneGeometryDraft(geometryDragStartDraftRef.current);
         const after = cloneGeometryDraft(
           geometryDraftsByKeyRef.current[targetKey] ?? geometryDraftRef.current,
@@ -6239,8 +6281,6 @@ export default function UnifiedMapEditor({
     });
 
     return () => {
-      if (cursorFrameRef.current !== null)
-        window.cancelAnimationFrame(cursorFrameRef.current);
       map.remove();
       mapRef.current = null;
     };
@@ -9106,15 +9146,15 @@ export default function UnifiedMapEditor({
               style={selectionBox}
             />
           ) : null}
-          {stationLocationPickMode && cursorPoint ? (
-            <div className="pointer-events-none absolute inset-0 z-20">
+          {stationLocationPickMode ? (
+            <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden">
               <div
-                className="absolute bottom-0 top-0 w-px bg-blue-500/70 shadow-[0_0_0_1px_rgba(255,255,255,0.85)]"
-                style={{ left: cursorPoint.x }}
+                ref={cursorVerticalRef}
+                className="absolute bottom-0 top-0 left-0 w-px bg-blue-500/70 shadow-[0_0_0_1px_rgba(255,255,255,0.85)] will-change-transform"
               />
               <div
-                className="absolute left-0 right-0 h-px bg-blue-500/70 shadow-[0_0_0_1px_rgba(255,255,255,0.85)]"
-                style={{ top: cursorPoint.y }}
+                ref={cursorHorizontalRef}
+                className="absolute left-0 right-0 top-0 h-px bg-blue-500/70 shadow-[0_0_0_1px_rgba(255,255,255,0.85)] will-change-transform"
               />
             </div>
           ) : null}
@@ -9629,201 +9669,6 @@ function formatTransferReviewEventType(type: ManualTransferReviewEvent["type"]) 
     case "transfer-time-completed":
       return "시간표 완료";
   }
-}
-
-function ManualDataAuditDashboard({
-  overlays,
-  stationById,
-  validationIssues,
-  onNavigate,
-}: {
-  overlays: ManualOverlayBundle;
-  stationById: Map<string, EditorStation>;
-  validationIssues: LineBranchValidationIssue[];
-  onNavigate: (tab: SidebarTab) => void;
-}) {
-  const enabledManualLines = overlays.manualLineDefinitions.filter((line) => line.enabled !== false);
-  const enabledTransferGroups = overlays.manualTransferGroups.filter((group) => group.enabled !== false);
-  const enabledPatterns = overlays.manualServicePatterns.filter((pattern) => pattern.enabled !== false);
-  const enabledTrainRuns = overlays.manualTrainRuns.filter((run) => run.enabled !== false);
-  const patternIdsWithTrainRuns = new Set(enabledTrainRuns.map((run) => run.patternId).filter(Boolean));
-  const patternsWithoutTrainRuns = enabledPatterns.filter((pattern) => !patternIdsWithTrainRuns.has(pattern.id));
-  const transferGroupsWithoutTime = enabledTransferGroups.filter((group) => {
-    const stationIds = group.stationIds.filter(Boolean);
-    if (stationIds.length < 2) return false;
-    for (let i = 0; i < stationIds.length - 1; i += 1) {
-      for (let j = i + 1; j < stationIds.length; j += 1) {
-        const fromStationId = stationIds[i];
-        const toStationId = stationIds[j];
-        if (!fromStationId || !toStationId) continue;
-        const pairKey = makeTransferPairKey(fromStationId, toStationId);
-        if (typeof group.transferMinutesByPair?.[pairKey] !== "number") return true;
-      }
-    }
-    return false;
-  });
-  const missingStationReferences = enabledPatterns.flatMap((pattern) =>
-    pattern.stops
-      .filter((stop) => !stationById.has(stop.stationId))
-      .map((stop) => `${pattern.nameKo}: ${stop.stationId}`),
-  );
-  const trainRunsWithSparseTimes = enabledTrainRuns.filter((run) =>
-    run.stopTimes.filter((stop) => stop.arrivalTime || stop.departureTime).length < 2,
-  );
-  const trainRunsWithTimeOrderWarnings = enabledTrainRuns.filter((run) => {
-    let previous: number | null = null;
-    for (const stop of run.stopTimes.slice().sort((a, b) => a.sequence - b.sequence)) {
-      const current = getManualTimetableTimeMinutes(getManualTimetablePrimaryTime(stop));
-      if (current === null) continue;
-      if (previous !== null && current < previous) return true;
-      previous = current;
-    }
-    return false;
-  });
-  const manualLinesWithoutPerformance = enabledManualLines.filter((line) => {
-    const performance = line.trainPerformance;
-    return !performance ||
-      typeof performance.accelerationMps2 !== "number" ||
-      typeof performance.decelerationMps2 !== "number" ||
-      typeof performance.maxSpeedKph !== "number";
-  });
-  const enabledOneWayBranches = overlays.branchRouteOverrides.filter(
-    (branch) => branch.enabled !== false && (branch.routeDirection === "forward" || branch.routeDirection === "reverse"),
-  );
-  const oneWayBranchesWithTooFewStops = enabledOneWayBranches.filter((branch) => branch.stationIds.filter(Boolean).length < 2);
-  const circularOneWayBranches = enabledOneWayBranches.filter((branch) => branch.circular === true);
-  const oneWayBranchById = new Map(enabledOneWayBranches.map((branch) => [branch.branchId, branch]));
-  const oneWayPatternDirectionIssues = enabledPatterns.filter((pattern) => {
-    if (!pattern.branchId) return false;
-    const branch = oneWayBranchById.get(pattern.branchId);
-    if (!branch) return false;
-    const indexByStationId = new Map(branch.stationIds.map((stationId, index) => [stationId, index]));
-    const orderedStops = pattern.stops.slice().sort((a, b) => a.sequence - b.sequence);
-    let previousIndex: number | null = null;
-    for (const stop of orderedStops) {
-      const currentIndex = indexByStationId.get(stop.stationId);
-      if (currentIndex === undefined) continue;
-      if (previousIndex !== null) {
-        if (branch.routeDirection === "forward" && currentIndex < previousIndex) return true;
-        if (branch.routeDirection === "reverse" && currentIndex > previousIndex) return true;
-      }
-      previousIndex = currentIndex;
-    }
-    return false;
-  });
-  const routeReadyPatternCount = enabledPatterns.filter((pattern) => patternIdsWithTrainRuns.has(pattern.id)).length;
-  const routeDiagnostics = [
-    { label: "시간표 우선 계산", value: enabledTrainRuns.length, detail: `${routeReadyPatternCount.toLocaleString("ko-KR")}개 패턴 연결`, tone: enabledTrainRuns.length > 0 ? "emerald" : "amber" },
-    { label: "성능 fallback", value: manualLinesWithoutPerformance.length, detail: "성능값 누락 노선", tone: manualLinesWithoutPerformance.length === 0 ? "emerald" : "amber" },
-    { label: "환승 edge", value: transferGroupsWithoutTime.length, detail: "환승 시간 미완성", tone: transferGroupsWithoutTime.length === 0 ? "emerald" : "amber" },
-    { label: "시간 순서", value: trainRunsWithTimeOrderWarnings.length, detail: "이전 역보다 빠른 시각", tone: trainRunsWithTimeOrderWarnings.length === 0 ? "emerald" : "amber" },
-    { label: "단방향 정합성", value: oneWayBranchesWithTooFewStops.length + circularOneWayBranches.length + oneWayPatternDirectionIssues.length, detail: `${enabledOneWayBranches.length.toLocaleString("ko-KR")}개 단방향 branch`, tone: oneWayBranchesWithTooFewStops.length + circularOneWayBranches.length + oneWayPatternDirectionIssues.length === 0 ? "emerald" : "amber" },
-  ];
-  const comparisonReadinessItems = [
-    { label: "최단 시간", ready: enabledTrainRuns.length > 0 || manualLinesWithoutPerformance.length < enabledManualLines.length, detail: "시간표 또는 성능 fallback 필요" },
-    { label: "최소 환승", ready: enabledTransferGroups.length > 0, detail: "환승 그룹/시간표 기준" },
-    { label: "시간표 우선", ready: routeReadyPatternCount > 0, detail: "정차 패턴+열차 시간표 연결" },
-  ];
-  const auditItems = [
-    { label: "수기 노선", value: enabledManualLines.length, detail: `${overlays.manualBranchDefinitions.length.toLocaleString("ko-KR")}개 지선` },
-    { label: "환승 그룹", value: enabledTransferGroups.length, detail: `${transferGroupsWithoutTime.length.toLocaleString("ko-KR")}개 시간 확인` },
-    { label: "정차 패턴", value: enabledPatterns.length, detail: `${patternsWithoutTrainRuns.length.toLocaleString("ko-KR")}개 시간표 없음` },
-    { label: "시간표", value: enabledTrainRuns.length, detail: `${trainRunsWithSparseTimes.length.toLocaleString("ko-KR")}개 시각 부족` },
-    { label: "검증 이슈", value: validationIssues.length, detail: `${missingStationReferences.length.toLocaleString("ko-KR")}개 역 참조 확인` },
-  ];
-  const riskItems = [
-    transferGroupsWithoutTime.length > 0 ? { label: `환승 시간 미입력 ${transferGroupsWithoutTime.length.toLocaleString("ko-KR")}개`, tab: "transfers" as const } : null,
-    patternsWithoutTrainRuns.length > 0 ? { label: `시간표 없는 정차 패턴 ${patternsWithoutTrainRuns.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
-    trainRunsWithSparseTimes.length > 0 ? { label: `시각 부족 시간표 ${trainRunsWithSparseTimes.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
-    trainRunsWithTimeOrderWarnings.length > 0 ? { label: `시간 순서 확인 ${trainRunsWithTimeOrderWarnings.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
-    manualLinesWithoutPerformance.length > 0 ? { label: `성능값 누락 노선 ${manualLinesWithoutPerformance.length.toLocaleString("ko-KR")}개`, tab: "manualLines" as const } : null,
-    oneWayBranchesWithTooFewStops.length > 0 ? { label: `정차역 부족 단방향 ${oneWayBranchesWithTooFewStops.length.toLocaleString("ko-KR")}개`, tab: "manualLines" as const } : null,
-    circularOneWayBranches.length > 0 ? { label: `순환·단방향 충돌 ${circularOneWayBranches.length.toLocaleString("ko-KR")}개`, tab: "manualLines" as const } : null,
-    oneWayPatternDirectionIssues.length > 0 ? { label: `단방향 역행 정차 패턴 ${oneWayPatternDirectionIssues.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
-    missingStationReferences.length > 0 ? { label: `없는 역 참조 ${missingStationReferences.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
-    validationIssues.length > 0 ? { label: `검증 패널 이슈 ${validationIssues.length.toLocaleString("ko-KR")}개`, tab: "validation" as const } : null,
-  ].filter((item): item is NonNullable<typeof item> => item !== null);
-
-  return (
-    <div className="grid gap-3">
-      <div className="rounded-3xl border border-slate-200 bg-white p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <strong className="block text-sm font-semibold text-slate-900">수기 데이터 감사</strong>
-            <p className="mt-1 text-xs font-medium text-slate-500">노선·환승·정차 패턴·시간표 상태를 한 번에 확인합니다.</p>
-          </div>
-          <Badge className={riskItems.length > 0 ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}>
-            {riskItems.length > 0 ? "확인 필요" : "양호"}
-          </Badge>
-        </div>
-        <div className="mt-3 grid gap-1.5">
-          {auditItems.map((item) => (
-            <div key={item.label} className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-              <div className="min-w-0">
-                <p className="truncate text-[11px] font-semibold text-slate-700">{item.label}</p>
-                <p className="truncate text-[10px] font-medium text-slate-500">{item.detail}</p>
-              </div>
-              <strong className="shrink-0 text-base font-semibold tabular-nums text-slate-900">{item.value.toLocaleString("ko-KR")}</strong>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-3xl border border-slate-200 bg-white p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <strong className="block text-sm font-semibold text-slate-900">경로검색 품질 진단</strong>
-            <p className="mt-1 text-xs font-medium text-slate-500">후보 점수에 영향을 주는 시간표·환승·fallback 상태입니다.</p>
-          </div>
-          <Badge className={routeDiagnostics.some((item) => item.tone === "amber") ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}>
-            {routeDiagnostics.some((item) => item.tone === "amber") ? "보정 필요" : "준비됨"}
-          </Badge>
-        </div>
-        <div className="mt-3 grid gap-1.5">
-          {routeDiagnostics.map((item) => (
-            <div key={item.label} className={cn("grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border px-3 py-2", item.tone === "emerald" ? "border-emerald-100 bg-emerald-50" : "border-amber-100 bg-amber-50")}>
-              <div className="min-w-0">
-                <p className={cn("truncate text-[11px] font-semibold", item.tone === "emerald" ? "text-emerald-700" : "text-amber-700")}>{item.label}</p>
-                <p className="truncate text-[10px] font-medium text-slate-500">{item.detail}</p>
-              </div>
-              <strong className="shrink-0 text-base font-semibold tabular-nums text-slate-900">{item.value.toLocaleString("ko-KR")}</strong>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 grid gap-1.5">
-          <strong className="text-[11px] font-semibold text-slate-500">경로 후보 비교 준비도</strong>
-          {comparisonReadinessItems.map((item) => (
-            <div key={item.label} className="flex items-center justify-between gap-2 rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2">
-              <span className="text-xs font-medium text-slate-700">{item.label}</span>
-              <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold", item.ready ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
-                {item.ready ? "비교 가능" : "데이터 부족"}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="rounded-3xl border border-slate-200 bg-white p-4">
-        <strong className="text-sm font-semibold text-slate-900">위험 항목</strong>
-        <div className="mt-3 grid gap-1.5">
-          {riskItems.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={() => onNavigate(item.tab)}
-              className="grid min-h-10 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-left text-[11px] font-medium leading-4 text-amber-800 transition hover:border-amber-200 hover:bg-amber-100"
-            >
-              <span className="min-w-0 truncate">{item.label}</span>
-              <ChevronRight className="size-3.5 shrink-0" />
-            </button>
-          ))}
-          {riskItems.length === 0 ? (
-            <Placeholder title="위험 항목 없음" description="현재 수기 데이터 감사 기준에서는 큰 누락이 보이지 않습니다." />
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
 }
 
 function CommandHistoryPanel({
