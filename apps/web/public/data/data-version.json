@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-10T07:44:12.514063Z",
+  "generatedAt": "2026-07-14T01:55:41.334Z",
   "acquiredDate": "2026-06-19",
-  "releaseId": "2b74c8c1babd866d",
+  "releaseId": "f266b1f919a701a5",
   "cachePolicy": {
     "manifest": "no-store",
     "dataArtifacts": "content-hash-versioned",
@@ -11,19 +11,19 @@
   "versions": {
     "bundle": {
       "id": "kric-canonical-app-bundle",
-      "generatedAt": "2026-07-07T06:38:03.911Z",
+      "generatedAt": "2026-07-14T01:55:41.259Z",
       "acquiredDate": "2026-06-19",
       "file": "kric-canonical-app-bundle.json",
       "bytes": 1981745,
-      "mtimeMs": 1783659620000,
-      "sha256": "ed750f70ea3b281b7fb8229d9904667259d3f77336cfa1949b46d16dd63838c6"
+      "mtimeMs": 1783994141275,
+      "sha256": "c64ede764e142d9154778ba0537e7f91bfd121ed5cff09c7a7303184e30e2933"
     },
     "manualOverlay": {
       "id": "manual-overlays",
       "file": "manual-overlays.json",
-      "bytes": 127797,
-      "mtimeMs": 1783659620000,
-      "sha256": "a6f0053b057fb50eb1f7f6fb25e29b72e169efcdee3af041d60f9e8f04262e35"
+      "bytes": 220234,
+      "mtimeMs": 1783994141276,
+      "sha256": "6b2851c6c262a32d744ed6f7cdfad27119b831a9249c08bb34dcea227987e7ed"
     }
   }
 }
