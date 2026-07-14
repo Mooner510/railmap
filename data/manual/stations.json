@@ -126,6 +126,33 @@
       "lng": 126.92656491514936,
       "enabled": true,
       "note": "수기 노선 빌더에서 생성한 물리 노선 역"
+    },
+    {
+      "stationId": "candidate:kric:urban-rail-station:I1101:1811:row-322",
+      "nameKo": "동인천역",
+      "colorHex": null,
+      "lat": 37.475419168585006,
+      "lng": 126.6326855001854,
+      "enabled": true,
+      "note": null
+    },
+    {
+      "stationId": "candidate:kric:urban-rail-station:I4401:1403:row-705",
+      "nameKo": "아산역",
+      "colorHex": null,
+      "lat": 36.79211902550922,
+      "lng": 127.10444202911685,
+      "enabled": true,
+      "note": null
+    },
+    {
+      "stationId": "candidate:kric:urban-rail-station:I4401:1404:row-1020",
+      "nameKo": "탕정역",
+      "colorHex": null,
+      "lat": 36.7882053675809,
+      "lng": 127.08450193600021,
+      "enabled": true,
+      "note": null
     }
   ],
   "nonTransferStationIds": [
