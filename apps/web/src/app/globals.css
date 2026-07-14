@@ -797,3 +797,11 @@ summary:focus-visible {
 .web-sidebar .route-result-card button,
 .web-sidebar .route-result-card span,
 .web-sidebar .route-result-card p { min-width: 0; }
+
+/* Route result panel: stable compact sidebar layout */
+.route-result-panel { width: 100%; max-width: 100%; }
+.route-result-timeline { max-height: min(46dvh, 520px); overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.route-result-detail { min-width: 0; overflow: hidden; border: 1px solid rgb(226 232 240); border-radius: 12px; background: white; padding: 8px 10px; }
+.route-result-detail > summary { cursor: pointer; list-style: none; font-size: 11px; font-weight: 700; color: rgb(71 85 105); }
+.route-result-detail > summary::-webkit-details-marker { display: none; }
+@media (max-width: 767px) { .route-result-timeline { max-height: 38dvh; } }

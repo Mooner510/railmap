@@ -1,6 +1,7 @@
 "use client";
 
 import RailFilterControls from "./components/RailFilterControls";
+import RouteResultPanel from "./components/RouteResultPanel";
 import {
   useDeferredValue,
   useEffect,
@@ -2288,249 +2289,6 @@ function makeRouteStateKey(stationId: string, branchId: string | null) {
   return `${stationId}::${branchId ?? "origin"}`;
 }
 
-function RouteResultSummary({
-  results,
-  activeResultIndex,
-  stationById,
-  onSelectResult,
-}: {
-  results: RouteSearchResult[];
-  activeResultIndex: number;
-  stationById: Map<string, RailMapStation>;
-  onSelectResult: (index: number) => void;
-}) {
-  const result = results[activeResultIndex] ?? results[0];
-  if (!result) return null;
-
-  const originName =
-    stationById.get(result.stationIds[0] ?? "")?.nameKo ?? "출발";
-  const destinationName =
-    stationById.get(result.stationIds[result.stationIds.length - 1] ?? "")
-      ?.nameKo ?? "도착";
-  const timedEdgeCount = result.edges.filter(
-    (edge) => edge.kind === "timetable",
-  ).length;
-  const rideEdgeCount = result.edges.filter(
-    (edge) => edge.kind === "ride",
-  ).length;
-  const transferEdgeCount = result.edges.filter(
-    (edge) => edge.kind === "manual-transfer",
-  ).length;
-  const totalMinutesLabel = `${Math.ceil(result.totalMinutes).toLocaleString("ko-KR")}분`;
-  const distanceLabel =
-    result.totalDistanceMeters >= 1000
-      ? `${(result.totalDistanceMeters / 1000).toFixed(result.totalDistanceMeters >= 10_000 ? 0 : 1)}km`
-      : `${Math.round(result.totalDistanceMeters).toLocaleString("ko-KR")}m`;
-
-  const segments: Array<{
-    branchId: string;
-    lineNameKo: string;
-    sourceLineName: string;
-    colorHex: string;
-    fromStationId: string;
-    toStationId: string;
-    edgeCount: number;
-    kind: RouteGraphEdge["kind"];
-    transferMinutes?: number | null;
-    durationMinutes?: number | null;
-  }> = [];
-
-  for (let index = 0; index < result.edges.length; index += 1) {
-    const edge = result.edges[index];
-    if (!edge) continue;
-
-    const fromStationId = result.stationIds[index];
-    const toStationId = result.stationIds[index + 1];
-    if (!fromStationId || !toStationId) continue;
-
-    const last = segments[segments.length - 1];
-
-    if (last && last.branchId === edge.branchId && edge.kind === "ride") {
-      last.toStationId = toStationId;
-      last.edgeCount += 1;
-      last.durationMinutes =
-        (last.durationMinutes ?? 0) + (edge.durationMinutes ?? 0);
-    } else {
-      segments.push({
-        branchId: edge.branchId,
-        lineNameKo: edge.lineNameKo,
-        sourceLineName: edge.sourceLineName,
-        colorHex: edge.colorHex,
-        fromStationId,
-        toStationId,
-        edgeCount: 1,
-        kind: edge.kind,
-        transferMinutes: edge.transferMinutes ?? null,
-        durationMinutes: edge.durationMinutes ?? null,
-      });
-    }
-  }
-
-  return (
-    <div className="mt-3 min-w-0 overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-lg shadow-slate-950/8">
-      <div className="border-b border-slate-100 bg-gradient-to-br from-slate-50 via-white to-sky-50/60 px-3 py-3">
-        <div className="flex min-w-0 items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold tracking-wide text-emerald-600 uppercase">
-              추천 경로
-            </p>
-            <p className="mt-1 break-words text-sm font-semibold leading-5 text-slate-950">
-              {originName} → {destinationName}
-            </p>
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-1.5">
-            <div className="rounded-2xl bg-slate-950 px-2.5 py-2 text-white">
-              <span className="block text-[10px] font-medium text-white/60">
-                예상
-              </span>
-              <strong className="mt-0.5 block text-sm font-semibold">
-                {totalMinutesLabel}
-              </strong>
-            </div>
-            <div className="rounded-2xl bg-slate-100 px-2.5 py-2 text-slate-700">
-              <span className="block text-[10px] font-medium text-slate-400">
-                환승
-              </span>
-              <strong className="mt-0.5 block text-sm font-semibold">
-                {result.transferCount.toLocaleString("ko-KR")}회
-              </strong>
-            </div>
-            <div className="rounded-2xl bg-slate-100 px-2.5 py-2 text-slate-700">
-              <span className="block text-[10px] font-medium text-slate-400">
-                거리
-              </span>
-              <strong className="mt-0.5 block text-sm font-semibold">
-                {distanceLabel}
-              </strong>
-            </div>
-          </div>
-          <div className="shrink-0 rounded-2xl bg-emerald-600 px-3 py-1.5 text-right text-white shadow-sm shadow-emerald-900/15">
-            <p className="text-[10px] font-medium opacity-80">예상</p>
-            <p className="text-sm font-semibold">
-              {formatNumber(result.totalMinutes)}분
-            </p>
-          </div>
-        </div>
-
-        {results.length > 1 ? (
-          <div className="mt-3 grid grid-cols-2 gap-1.5 rounded-2xl bg-emerald-100/60 p-1">
-            {results.map((candidate, index) => (
-              <button
-                key={`${candidate.criterion}:${index}`}
-                type="button"
-                className={`rounded-xl px-2 py-1.5 text-[11px] font-semibold transition ${index === activeResultIndex ? "bg-white text-emerald-700 shadow-sm" : "text-emerald-700/70 hover:bg-white/60"}`}
-                onClick={() => onSelectResult(index)}
-              >
-                {candidate.label} · {formatNumber(candidate.totalMinutes)}분
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {results.length > 1 ? (
-          <RouteResultComparisonPanel
-            results={results}
-            activeResultIndex={activeResultIndex}
-            onSelectResult={onSelectResult}
-          />
-        ) : null}
-
-        <div className="mt-3 grid grid-cols-3 gap-1.5">
-          <RouteMetric
-            label="역"
-            value={`${formatNumber(result.stationIds.length)}개`}
-          />
-          <RouteMetric
-            label="환승"
-            value={`${formatNumber(result.transferCount)}회`}
-          />
-          <RouteMetric
-            label="거리"
-            value={formatDistance(result.totalDistanceMeters)}
-          />
-        </div>
-        <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-          <RouteMetric
-            label="이동"
-            value={`${formatNumber(rideEdgeCount)}구간`}
-          />
-          <RouteMetric
-            label="시간표"
-            value={`${formatNumber(timedEdgeCount)}구간`}
-          />
-          <RouteMetric
-            label="환승"
-            value={`${formatNumber(transferEdgeCount)}회`}
-          />
-        </div>
-        <details className="mt-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2">
-          <summary className="cursor-pointer list-none text-[11px] font-semibold text-slate-600">상세 진단 보기</summary>
-          <RouteQualityReviewPanel result={result} />
-          <RouteRegressionCasePanel result={result} stationById={stationById} />
-        </details>
-      </div>
-
-      <details className="border-b border-slate-100 px-3 py-2">
-        <summary className="cursor-pointer list-none rounded-xl bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-600">계산 근거 보기</summary>
-        <RouteCalculationDebugPanel result={result} stationById={stationById} />
-      </details>
-
-      <div className="grid min-w-0 gap-2.5 px-3 py-3">
-        {segments.map((segment, index) => {
-          const fromName =
-            stationById.get(segment.fromStationId)?.nameKo ?? "이전 역";
-          const toName =
-            stationById.get(segment.toStationId)?.nameKo ?? "다음 역";
-          const isTransfer = index > 0;
-
-          if (segment.kind === "manual-transfer") {
-            return (
-              <RouteTransferConnection
-                key={`${segment.branchId}:${index}:${segment.fromStationId}:${segment.toStationId}`}
-                fromStationName={fromName}
-                toStationName={toName}
-                transferMinutes={segment.transferMinutes}
-              />
-            );
-          }
-
-          if (segment.kind === "timetable") {
-            return (
-              <RouteTimedSegment
-                key={`${segment.branchId}:${index}:${segment.fromStationId}:${segment.toStationId}`}
-                colorHex={segment.colorHex}
-                lineName={segment.lineNameKo}
-                sourceLineName={segment.sourceLineName}
-                fromStationName={fromName}
-                toStationName={toName}
-                durationMinutes={segment.durationMinutes}
-              />
-            );
-          }
-
-          return (
-            <div
-              key={`${segment.branchId}:${index}:${segment.fromStationId}:${segment.toStationId}`}
-              className="min-w-0"
-            >
-              {isTransfer ? <RouteTransferStep stationName={fromName} /> : null}
-              <RouteRoadmapSegment
-                colorHex={segment.colorHex}
-                lineName={segment.lineNameKo}
-                sourceLineName={segment.sourceLineName}
-                fromStationName={fromName}
-                toStationName={toName}
-                stationCount={segment.edgeCount + 1}
-                durationMinutes={segment.durationMinutes}
-              />
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 function RouteResultComparisonPanel({
   results,
   activeResultIndex,
@@ -3116,156 +2874,6 @@ function formatDistance(distanceMeters: number) {
   return `${formatNumber(Math.round(distanceMeters))}m`;
 }
 
-function RouteTimedSegment({
-  colorHex,
-  lineName,
-  sourceLineName,
-  fromStationName,
-  toStationName,
-  durationMinutes,
-}: {
-  colorHex: string;
-  lineName: string;
-  sourceLineName: string;
-  fromStationName: string;
-  toStationName: string;
-  durationMinutes?: number | null;
-}) {
-  return (
-    <div className="min-w-0 rounded border border-blue-100 bg-blue-50 px-2 py-1.5">
-      <div className="flex min-w-0 items-center gap-2">
-        <span
-          className="h-2.5 w-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: colorHex }}
-        />
-        <p className="min-w-0 break-words text-[11px] font-semibold leading-4 text-slate-800">
-          {lineName} · {sourceLineName}
-        </p>
-      </div>
-      <p className="mt-1 text-[10px] text-slate-500">
-        {fromStationName} → {toStationName}
-        {typeof durationMinutes === "number"
-          ? ` · ${formatNumber(durationMinutes)}분`
-          : ""}
-      </p>
-    </div>
-  );
-}
-
-function RouteTransferConnection({
-  fromStationName,
-  toStationName,
-  transferMinutes,
-}: {
-  fromStationName: string;
-  toStationName: string;
-  transferMinutes?: number | null;
-}) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-dashed border-slate-300 bg-slate-50/85 px-3 py-2">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-white">
-          환승
-        </span>
-        <p className="min-w-0 break-words text-[11px] font-bold leading-4 text-slate-700">
-          {fromStationName === toStationName
-            ? `${fromStationName}에서 갈아타기`
-            : `${fromStationName} ↔ ${toStationName}`}
-        </p>
-      </div>
-      {typeof transferMinutes === "number" ? (
-        <p className="mt-1 text-[10px] font-semibold text-slate-500">
-          약 {formatNumber(transferMinutes)}분 환승
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function RouteTransferStep({ stationName }: { stationName: string }) {
-  return (
-    <div className="mb-1.5 flex min-w-0 items-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50/85 px-3 py-2">
-      <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-bold text-white">
-        환승
-      </span>
-      <p className="min-w-0 break-words text-[11px] font-bold leading-4 text-slate-700">
-        {stationName}에서 갈아타기
-      </p>
-    </div>
-  );
-}
-
-function RouteRoadmapSegment({
-  colorHex,
-  lineName,
-  sourceLineName,
-  fromStationName,
-  toStationName,
-  stationCount,
-  durationMinutes,
-}: {
-  colorHex: string;
-  lineName: string;
-  sourceLineName: string;
-  fromStationName: string;
-  toStationName: string;
-  stationCount: number;
-  durationMinutes?: number | null;
-}) {
-  const lineLabel =
-    sourceLineName && sourceLineName !== lineName
-      ? `${lineName} · ${sourceLineName}`
-      : lineName;
-
-  return (
-    <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
-      <div className="flex min-w-0 items-center gap-2 border-b border-slate-100 bg-slate-50 px-2 py-1.5">
-        <span
-          className="h-3 w-3 shrink-0 rounded-full"
-          style={{ backgroundColor: colorHex }}
-        />
-        <p className="min-w-0 break-words text-xs font-semibold leading-4 text-slate-950">
-          {lineLabel}
-        </p>
-      </div>
-
-      <div className="grid min-w-0 grid-cols-[18px_minmax(0,1fr)] px-2 py-2">
-        <RouteRoadmapStationDot colorHex={colorHex} />
-        <p className="min-w-0 break-words text-xs font-semibold leading-4 text-slate-950">
-          {fromStationName}
-        </p>
-
-        <div
-          className="mx-auto min-h-7 w-0.5"
-          style={{ backgroundColor: colorHex }}
-        />
-        <div className="flex min-w-0 items-center py-1">
-          <p className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
-            {formatNumber(Math.max(1, stationCount - 1))}개 구간
-            {typeof durationMinutes === "number" && durationMinutes > 0
-              ? ` · 약 ${formatNumber(Math.ceil(durationMinutes))}분`
-              : ""}
-          </p>
-        </div>
-
-        <RouteRoadmapStationDot colorHex={colorHex} />
-        <p className="min-w-0 break-words text-xs font-semibold leading-4 text-slate-950">
-          {toStationName}
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function RouteRoadmapStationDot({ colorHex }: { colorHex: string }) {
-  return (
-    <span
-      className="mt-0.5 h-3.5 w-3.5 rounded-full border-2 border-white shadow-sm"
-      style={{ backgroundColor: colorHex }}
-    />
-  );
-}
-
 function RouteDraftCard({
   originStation,
   destinationStation,
@@ -3376,11 +2984,33 @@ function RouteDraftCard({
       />
 
       {results.length > 0 ? (
-        <RouteResultSummary
+        <RouteResultPanel
           results={results}
           activeResultIndex={activeResultIndex}
           stationById={stationById}
           onSelectResult={onSelectResult}
+          comparisonContent={results.length > 1 ? (
+            <RouteResultComparisonPanel
+              results={results}
+              activeResultIndex={activeResultIndex}
+              onSelectResult={onSelectResult}
+            />
+          ) : null}
+          diagnosticContent={
+            <>
+              <RouteQualityReviewPanel result={results[activeResultIndex] ?? results[0]!} />
+              <RouteRegressionCasePanel
+                result={results[activeResultIndex] ?? results[0]!}
+                stationById={stationById}
+              />
+            </>
+          }
+          calculationContent={
+            <RouteCalculationDebugPanel
+              result={results[activeResultIndex] ?? results[0]!}
+              stationById={stationById}
+            />
+          }
         />
       ) : null}
 
