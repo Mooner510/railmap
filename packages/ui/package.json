@@ -18,7 +18,8 @@
     "./code": "./src/code.tsx",
     "./map/renderPolicy": "./src/map/renderPolicy.ts",
     "./rail-product": "./src/rail-product.tsx",
-    "./rail-product-theme.css": "./src/rail-product-theme.css"
+    "./rail-product-theme.css": "./src/rail-product-theme.css",
+    "./map/interactionPolicy": "./src/map/interactionPolicy.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",

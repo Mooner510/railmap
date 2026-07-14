@@ -1,3 +1,7 @@
+import {
+  buildRailMapHitBox,
+  pickRailMapInteractionTarget,
+} from "@repo/ui/map/interactionPolicy";
 import { isTransferDetailVisible } from "@repo/ui/map/renderPolicy";
 import type { Map as MapLibreMap } from "maplibre-gl";
 import type {
@@ -84,18 +88,29 @@ export function bindRailMapInteractions({
 
   map.on("click", (event) => {
     const transferDetailVisible = isTransferDetailVisible(map.getZoom());
+    const transferLayer = transferDetailVisible ? transferArea : transferCollapsed;
     const interactiveLayers = [
+      stationHit,
+      transferLayer,
       branchLine,
       selectedBranchLine,
-      ...(transferDetailVisible
-        ? [transferArea, stationHit]
-        : [transferCollapsed, stationHit]),
     ].filter((layerId) => map.getLayer(layerId));
 
-    const interactiveFeatures = interactiveLayers.length
-      ? map.queryRenderedFeatures(event.point, { layers: interactiveLayers })
+    const features = interactiveLayers.length
+      ? map.queryRenderedFeatures(buildRailMapHitBox(event.point), {
+          layers: interactiveLayers,
+        })
       : [];
+    const selected = pickRailMapInteractionTarget({
+      station: features.find((feature) => feature.layer.id === stationHit),
+      transfer: features.find((feature) => feature.layer.id === transferLayer),
+      branch: features.find(
+        (feature) =>
+          feature.layer.id === branchLine ||
+          feature.layer.id === selectedBranchLine,
+      ),
+    });
 
-    if (interactiveFeatures.length === 0) onClearSelection();
+    if (!selected) onClearSelection();
   });
 }
