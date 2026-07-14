@@ -28,12 +28,21 @@ export function filterTransferGroupSuggestions(
 }
 
 function approximateDistanceMeters(left: EditorStation, right: EditorStation) {
-  if (![left.lng, left.lat, right.lng, right.lat].every(Number.isFinite)) {
+  const leftLng = left.lng;
+  const leftLat = left.lat;
+  const rightLng = right.lng;
+  const rightLat = right.lat;
+  if (
+    typeof leftLng !== "number" || !Number.isFinite(leftLng) ||
+    typeof leftLat !== "number" || !Number.isFinite(leftLat) ||
+    typeof rightLng !== "number" || !Number.isFinite(rightLng) ||
+    typeof rightLat !== "number" || !Number.isFinite(rightLat)
+  ) {
     return Number.POSITIVE_INFINITY;
   }
-  const latitudeRadians = ((left.lat + right.lat) / 2) * Math.PI / 180;
-  const dx = (left.lng - right.lng) * 111_320 * Math.cos(latitudeRadians);
-  const dy = (left.lat - right.lat) * 110_540;
+  const latitudeRadians = ((leftLat + rightLat) / 2) * Math.PI / 180;
+  const dx = (leftLng - rightLng) * 111_320 * Math.cos(latitudeRadians);
+  const dy = (leftLat - rightLat) * 110_540;
   return Math.sqrt(dx * dx + dy * dy);
 }
 
