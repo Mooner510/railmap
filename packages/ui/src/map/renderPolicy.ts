@@ -155,6 +155,7 @@ function resampleCoordinatesByDistance(
   coordinates: RailMapLngLatTuple[],
   spacing: number,
   maxPoints: number,
+  minPoints = 2,
 ): RailMapLngLatTuple[] {
   if (coordinates.length < 2) return coordinates;
 
@@ -170,7 +171,10 @@ function resampleCoordinatesByDistance(
   if (!Number.isFinite(total) || total <= 0) return coordinates;
 
   const requestedPointCount = Math.ceil(total / Math.max(spacing, 0.000001)) + 1;
-  const pointCount = Math.max(2, Math.min(maxPoints, requestedPointCount));
+  const pointCount = Math.max(
+    2,
+    Math.min(maxPoints, Math.max(minPoints, requestedPointCount)),
+  );
   const result: RailMapLngLatTuple[] = [];
   let segmentIndex = 1;
 
@@ -202,8 +206,9 @@ function resampleCoordinatesByDistance(
 
 /**
  * Builds a render-only railway polyline with approximately even spacing.
- * The editable control/station points remain untouched, while long segments
- * receive more samples and short segments receive fewer samples.
+ * The editable control/station points remain untouched. Render samples are
+ * distributed evenly, with a minimum density for short curved sections and
+ * additional points for sections with greater accumulated turning.
  */
 export function buildAdaptiveSmoothCoordinates(
   coordinates: ReadonlyArray<ReadonlyArray<number>>,
@@ -220,17 +225,62 @@ export function buildAdaptiveSmoothCoordinates(
   );
   if (!Number.isFinite(totalDistance) || totalDistance <= 0) return points;
 
-  const minSpacing = options.minSpacing ?? 0.00018;
+  const minSpacing = options.minSpacing ?? 0.00006;
   const maxSpacing = options.maxSpacing ?? 0.0018;
   const maxPoints = options.maxPoints ?? 420;
-  const desiredSegments = Math.max(12, (points.length - 1) * 8);
+  const controlSegmentCount = Math.max(1, points.length - 1);
+  const desiredSegments = Math.max(18, controlSegmentCount * 10);
   const spacing = Math.max(
     minSpacing,
     Math.min(maxSpacing, totalDistance / desiredSegments),
   );
-  const samplesPerSegment = Math.max(3, Math.min(10, options.smoothingPasses ?? 6));
-  const curved = points.length >= 3 ? smoothCoordinates(points, samplesPerSegment) : points;
-  return resampleCoordinatesByDistance(curved, spacing, maxPoints);
+
+  let accumulatedTurn = 0;
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const previous = points[index - 1]!;
+    const current = points[index]!;
+    const next = points[index + 1]!;
+    const incomingX = current[0] - previous[0];
+    const incomingY = current[1] - previous[1];
+    const outgoingX = next[0] - current[0];
+    const outgoingY = next[1] - current[1];
+    const incomingLength = Math.hypot(incomingX, incomingY);
+    const outgoingLength = Math.hypot(outgoingX, outgoingY);
+    if (
+      incomingLength <= Number.EPSILON ||
+      outgoingLength <= Number.EPSILON
+    ) {
+      continue;
+    }
+
+    const cosine = Math.max(
+      -1,
+      Math.min(
+        1,
+        (incomingX * outgoingX + incomingY * outgoingY) /
+          (incomingLength * outgoingLength),
+      ),
+    );
+    accumulatedTurn += Math.acos(cosine);
+  }
+
+  const curvatureExtraPoints = Math.ceil((accumulatedTurn / Math.PI) * 16);
+  const minimumRenderPoints = Math.min(
+    maxPoints,
+    Math.max(19, controlSegmentCount * 10 + 1 + curvatureExtraPoints),
+  );
+  const samplesPerSegment = Math.max(
+    8,
+    Math.min(16, options.smoothingPasses ?? 10),
+  );
+  const curved =
+    points.length >= 3 ? smoothCoordinates(points, samplesPerSegment) : points;
+  return resampleCoordinatesByDistance(
+    curved,
+    spacing,
+    maxPoints,
+    minimumRenderPoints,
+  );
 }
 
 export function smoothCoordinateRange(
