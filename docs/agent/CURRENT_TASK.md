@@ -2,21 +2,9 @@
 
 ## Applied through
 
-- `13.110.0-13.113.0`
-
-## Completed
-
-- Editor geometry dragging throttled to one update per animation frame
-- final pointer position flushed before geometry history commit
-- geometry draft application changed to indexed one-pass updates
-- long railway segments now use adaptive curve smoothing and even-distance resampling
-- render-only generated samples keep saved station/control points compact
-- sample count bounded to protect MapLibre rendering performance
-- common geometry smoothing policy added to `packages/ui`
+- 13.121.0-13.123.0 transfer recommendation component split and render optimization
 
 ## Next
 
-- split Editor audit and diagnostics UI from `UnifiedMapEditor.tsx`
-- split transfer recommendation workflow
-- split timetable CSV import workflow
-- continue Editor/Web shared selection and rendering policy consolidation
+- 13.124.0-13.126.0 timetable CSV import component and correction logic split
+- 13.127.0-13.129.0 common Editor/Web selection model and focus-state alignment
