@@ -28,16 +28,17 @@
 
 .rail-search-field input {
   width: 100%;
-  height: 36px;
-  border: 1px solid var(--rail-border);
-  border-radius: var(--rail-radius-md);
-  background: var(--rail-surface);
+  height: 40px;
+  border: 1px solid color-mix(in srgb, var(--rail-border) 78%, #94a3b8);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   color: var(--rail-text);
   padding: 0 34px 0 34px;
   font-size: 12px;
   font-weight: 550;
   outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), inset 0 1px 0 rgb(255 255 255 / 0.9);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background 120ms ease, transform 120ms ease;
 }
 
 .rail-search-field input::placeholder {
@@ -45,8 +46,9 @@
 }
 
 .rail-search-field input:focus {
-  border-color: #93c5fd;
-  box-shadow: 0 0 0 3px rgb(37 99 235 / 0.1);
+  border-color: #60a5fa;
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgb(37 99 235 / 0.11), 0 8px 24px rgb(15 23 42 / 0.08);
 }
 
 .rail-search-field__icon {

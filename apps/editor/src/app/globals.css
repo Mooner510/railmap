@@ -1546,3 +1546,7 @@ details[open] > summary {
 .unified-map-editor select {
   font-size: 12px;
 }
+
+.rail-editor-search-results { display:grid; align-content:start; gap:8px; height:calc(100dvh - 290px); min-height:320px; overflow-y:auto; overscroll-behavior:contain; padding:2px 3px 8px 1px; scrollbar-width:thin; scrollbar-color:#cbd5e1 transparent; }
+.rail-editor-search-results::-webkit-scrollbar { width:8px; }
+.rail-editor-search-results::-webkit-scrollbar-thumb { border:2px solid transparent; border-radius:999px; background:#cbd5e1; background-clip:padding-box; }
