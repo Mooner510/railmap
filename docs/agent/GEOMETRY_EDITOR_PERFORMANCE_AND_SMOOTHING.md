@@ -22,3 +22,11 @@
 - adding or moving a control point immediately recalculates the curve
 - long segments receive more render samples and short segments receive fewer
 - adjacent rendered samples remain approximately evenly spaced
+
+
+## 13.113.1 short segment smoothing hotfix
+
+- 짧은 구간도 최소 19개의 렌더 정점을 확보한다.
+- 제어점 사이의 누적 회전각에 따라 곡률 보정 정점을 추가한다.
+- 기본 Catmull-Rom 샘플 밀도를 높이고 거리 기준으로 다시 균등 배치한다.
+- 저장 제어점과 최대 렌더 정점 제한은 유지한다.
