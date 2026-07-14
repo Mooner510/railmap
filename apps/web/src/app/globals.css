@@ -789,3 +789,11 @@ summary:focus-visible {
 .web-station-detail__section-title { display:flex; align-items:flex-end; justify-content:space-between; gap:8px; margin-top:12px; }
 .web-station-detail__section-title strong { color:#334155; font-size:11px; }
 .web-station-detail__section-title span { color:#94a3b8; font-size:9px; }
+
+/* route result readability pass */
+.web-sidebar details > summary::-webkit-details-marker { display: none; }
+.web-sidebar details[open] > summary { color: #047857; }
+.web-sidebar .route-result-card { overflow-wrap: normal; word-break: keep-all; }
+.web-sidebar .route-result-card button,
+.web-sidebar .route-result-card span,
+.web-sidebar .route-result-card p { min-width: 0; }

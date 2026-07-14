@@ -531,12 +531,12 @@ function buildStationFeatures(
   stationColorIndex: Map<string, string>,
   stationTransferGroupIndex: Map<string, RailMapTransferGroup>,
   transferDetailVisible: boolean,
+  contextStationIds: ReadonlySet<string>,
 ) {
   return {
     type: "FeatureCollection" as const,
     features: stations.flatMap((station) => {
       const transferGroup = stationTransferGroupIndex.get(station.id) ?? null;
-      if (transferGroup && !transferDetailVisible) return [];
       const lineNameKo = station.lineNameKo ?? "";
       const isSelected = selectedStationId === station.id;
       const isRouteStation = highlightedRouteStationIdSet.has(station.id);
@@ -552,6 +552,7 @@ function buildStationFeatures(
           colorHex: stationColorIndex.get(station.id) ?? "#64748b",
           isSelected,
           isRouteStation,
+          isContextStation: contextStationIds.size === 0 || contextStationIds.has(station.id),
           isEmphasized: isSelected || isRouteStation,
           isTransferChild: Boolean(transferGroup),
           transferGroupId: transferGroup?.id ?? "",
@@ -588,6 +589,7 @@ function buildTransferGroupFeatures(
   transferGroups: RailMapTransferGroup[],
   stationIndex: Map<string, ValidRailMapStation>,
   selectedTransferGroupIds: ReadonlySet<string>,
+  contextStationIds: ReadonlySet<string>,
 ) {
   const areaFeatures: RailFeatureCollection["features"] = [];
   const iconFeatures: RailFeatureCollection["features"] = [];
@@ -605,6 +607,7 @@ function buildTransferGroupFeatures(
       nameKo: group.nameKo,
       stationCount: members.length,
       isSelected: selectedTransferGroupIds.has(group.id),
+      isContext: contextStationIds.size === 0 || group.stationIds.some((stationId) => contextStationIds.has(stationId)),
       radius: circle.radius,
     };
 
@@ -801,14 +804,31 @@ export default function RailMap({
     () => new Map(transferGroups.map((group) => [group.id, group])),
     [transferGroups],
   );
+  const selectedBranch = useMemo(
+    () => branches.find((branch) => branch.id === selectedBranchId) ?? null,
+    [branches, selectedBranchId],
+  );
+  const selectedBranchStationIds = useMemo(() => {
+    if (!selectedBranch) return new Set<string>();
+    return new Set(
+      selectedBranch.routeStops
+        .map((stop) => stop.station?.id)
+        .filter((id): id is string => typeof id === "string"),
+    );
+  }, [selectedBranch]);
+  const highlightedRouteStationIdSet = useMemo(
+    () => new Set(highlightedRouteStationIds),
+    [highlightedRouteStationIds],
+  );
   const transferGroupFeatures = useMemo(
     () =>
       buildTransferGroupFeatures(
         transferGroups,
         validStationIndex,
         selectedTransferGroupIds,
+        selectedBranchStationIds.size > 0 ? selectedBranchStationIds : highlightedRouteStationIdSet,
       ),
-    [selectedTransferGroupIds, transferGroups, validStationIndex],
+    [selectedBranchStationIds, highlightedRouteStationIdSet, selectedTransferGroupIds, transferGroups, validStationIndex],
   );
   const transferGroupAreaFeatures = transferGroupFeatures.areas;
   const transferGroupIconFeatures = transferGroupFeatures.icons;
@@ -851,11 +871,6 @@ export default function RailMap({
   const transferGroupIconFeaturesRef = useRef(transferGroupIconFeatures);
   const stationTransferGroupIndexRef = useRef(stationTransferGroupIndex);
   const transferGroupIndexRef = useRef(transferGroupIndex);
-  const highlightedRouteStationIdSet = useMemo(
-    () => new Set(highlightedRouteStationIds),
-    [highlightedRouteStationIds],
-  );
-
   useEffect(() => {
     branchFeaturesRef.current = branchFeatures;
   }, [branchFeatures]);
@@ -887,21 +902,6 @@ export default function RailMap({
   useEffect(() => {
     transferGroupIndexRef.current = transferGroupIndex;
   }, [transferGroupIndex]);
-  const selectedBranch = useMemo(
-    () => branches.find((branch) => branch.id === selectedBranchId) ?? null,
-    [branches, selectedBranchId],
-  );
-
-  const selectedBranchStationIds = useMemo(() => {
-    if (!selectedBranch) return new Set<string>();
-
-    return new Set(
-      selectedBranch.routeStops
-        .map((stop) => stop.station?.id)
-        .filter((id): id is string => typeof id === "string"),
-    );
-  }, [selectedBranch]);
-
   const stationColorIndex = useMemo(() => {
     const index = new Map<string, string>();
 
@@ -942,18 +942,9 @@ export default function RailMap({
 
   const markerStations = useMemo(() => {
     if (!showStations) return [];
-    if (selectedBranchStationIds.size > 0)
-      return validStations.filter((station) =>
-        selectedBranchStationIds.has(station.id),
-      );
     if (visibleBranchStations.length > 0) return visibleBranchStations;
     return validStations;
-  }, [
-    showStations,
-    selectedBranchStationIds,
-    validStations,
-    visibleBranchStations,
-  ]);
+  }, [showStations, validStations, visibleBranchStations]);
 
   const stationFeatures = useMemo(
     () =>
@@ -964,6 +955,7 @@ export default function RailMap({
         stationColorIndex,
         stationTransferGroupIndex,
         transferDetailVisible,
+        selectedBranchStationIds.size > 0 ? selectedBranchStationIds : highlightedRouteStationIdSet,
       ),
     [
       highlightedRouteStationIdSet,
@@ -972,6 +964,7 @@ export default function RailMap({
       stationColorIndex,
       stationTransferGroupIndex,
       transferDetailVisible,
+      selectedBranchStationIds,
     ],
   );
   const stationFeaturesRef = useRef(stationFeatures);
@@ -1241,9 +1234,9 @@ export default function RailMap({
               ],
               "fill-opacity": [
                 "case",
-                ["==", ["get", "isSelected"], true],
-                0.34,
-                0.22,
+                ["==", ["get", "isSelected"], true], 0.34,
+                ["==", ["get", "isContext"], true], 0.22,
+                0.06,
               ],
             },
           });
@@ -1260,7 +1253,7 @@ export default function RailMap({
                 "#64748b",
               ],
               "line-width": ["case", ["==", ["get", "isSelected"], true], 3.4, 2.2],
-              "line-opacity": 0.9,
+              "line-opacity": ["case", ["==", ["get", "isContext"], true], 0.9, 0.16],
             },
           });
 
@@ -1292,7 +1285,7 @@ export default function RailMap({
               "icon-ignore-placement": true,
             },
             paint: {
-              "icon-opacity": 1,
+              "icon-opacity": ["case", ["==", ["get", "isContext"], true], 1, 0.18],
             },
           });
 
@@ -1314,13 +1307,25 @@ export default function RailMap({
               "text-color": "#0f172a",
               "text-halo-color": "#ffffff",
               "text-halo-width": RAIL_MAP_VISUAL_POLICY.stationLabelHaloWidth,
-              "text-opacity": 1,
+              "text-opacity": ["case", ["==", ["get", "isContext"], true], 1, 0.16],
             },
           });
 
           map.addSource("branch-preview-stations", {
             type: "geojson",
             data: stationFeaturesRef.current,
+          });
+
+          map.addLayer({
+            id: "branch-preview-stations-hit",
+            type: "circle",
+            source: "branch-preview-stations",
+            paint: {
+              "circle-radius": 12,
+              "circle-color": "rgba(0,0,0,0)",
+              "circle-opacity": 0,
+              "circle-stroke-opacity": 0,
+            },
           });
 
           map.addLayer({
@@ -1335,9 +1340,12 @@ export default function RailMap({
                 MAP_RENDER_POLICY.selectedStationCasingRadius,
                 MAP_RENDER_POLICY.stationCasingRadius,
               ],
-              "circle-opacity": highlightedRouteStationIds.length > 0
-                ? ["case", ["==", ["get", "isRouteStation"], true], 0.96, 0.28]
-                : 0.96,
+              "circle-opacity": [
+                "case",
+                ["==", ["get", "isRouteStation"], true], 0.96,
+                ["==", ["get", "isContextStation"], true], 0.96,
+                0.2,
+              ],
             },
           });
 
@@ -1366,9 +1374,12 @@ export default function RailMap({
                 MAP_RENDER_POLICY.stationStrokeWidth,
               ],
               "circle-stroke-opacity": 1,
-              "circle-opacity": highlightedRouteStationIds.length > 0
-                ? ["case", ["==", ["get", "isRouteStation"], true], 0.96, 0.24]
-                : 0.96,
+              "circle-opacity": [
+                "case",
+                ["==", ["get", "isRouteStation"], true], 0.96,
+                ["==", ["get", "isContextStation"], true], 0.96,
+                0.18,
+              ],
             },
           });
 
@@ -1390,9 +1401,12 @@ export default function RailMap({
               "text-color": "#0f172a",
               "text-halo-color": "#ffffff",
               "text-halo-width": 1.4,
-              "text-opacity": highlightedRouteStationIds.length > 0
-                ? ["case", ["==", ["get", "isRouteStation"], true], 0.92, 0.24]
-                : 0.92,
+              "text-opacity": [
+                "case",
+                ["==", ["get", "isRouteStation"], true], 0.92,
+                ["==", ["get", "isContextStation"], true], 0.92,
+                0.14,
+              ],
             },
           });
 
@@ -1436,6 +1450,10 @@ export default function RailMap({
           });
 
           map.on("click", "branch-preview-lines", (event) => {
+            const stationHits = map.queryRenderedFeatures(event.point, {
+              layers: map.getLayer("branch-preview-stations-hit") ? ["branch-preview-stations-hit"] : [],
+            });
+            if (stationHits.length > 0) return;
             const feature = event.features?.[0];
             if (!feature) return;
 
@@ -1481,24 +1499,18 @@ export default function RailMap({
             selectTransferGroupFromFeature(event.features?.[0]);
           });
 
-          map.on("mouseenter", "branch-preview-stations-dot", () => {
+          map.on("mouseenter", "branch-preview-stations-hit", () => {
             map.getCanvas().style.cursor = "pointer";
           });
 
-          map.on("mouseleave", "branch-preview-stations-dot", () => {
+          map.on("mouseleave", "branch-preview-stations-hit", () => {
             map.getCanvas().style.cursor = "";
           });
 
-          map.on("click", "branch-preview-stations-dot", (event) => {
+          map.on("click", "branch-preview-stations-hit", (event) => {
             const feature = event.features?.[0];
             const properties = feature?.properties as
               Record<string, unknown> | undefined;
-            if (
-              map.getZoom() < TRANSFER_DETAIL_ZOOM_THRESHOLD &&
-              properties?.isTransferChild === true
-            ) {
-              return;
-            }
             const stationId = String(properties?.id ?? "");
             const station = stationByIdRef.current.get(stationId);
             if (station) onSelectStationRef.current?.(station);
@@ -1511,8 +1523,8 @@ export default function RailMap({
               "branch-preview-lines",
               "branch-preview-lines-selected",
               ...(transferDetailVisible
-                ? ["transfer-group-areas-fill", "branch-preview-stations-dot"]
-                : ["transfer-group-collapsed-hit"]),
+                ? ["transfer-group-areas-fill", "branch-preview-stations-hit"]
+                : ["transfer-group-collapsed-hit", "branch-preview-stations-hit"]),
             ].filter((layerId) => map.getLayer(layerId));
             const interactiveFeatures = interactiveLayers.length
               ? map.queryRenderedFeatures(event.point, {
@@ -1702,13 +1714,18 @@ export default function RailMap({
     const map = mapRef.current;
     if (!map || !mapReady) return;
 
-    const routeActive = highlightedRouteStationIds.length > 0;
-    const stationOpacity = routeActive
-      ? ["case", ["==", ["get", "isRouteStation"], true], 0.96, 0.24]
-      : 0.96;
-    const labelOpacity = routeActive
-      ? ["case", ["==", ["get", "isRouteStation"], true], 0.92, 0.22]
-      : 0.92;
+    const stationOpacity = [
+      "case",
+      ["==", ["get", "isRouteStation"], true], 0.96,
+      ["==", ["get", "isContextStation"], true], 0.96,
+      0.18,
+    ];
+    const labelOpacity = [
+      "case",
+      ["==", ["get", "isRouteStation"], true], 0.92,
+      ["==", ["get", "isContextStation"], true], 0.92,
+      0.14,
+    ];
 
     for (const layerId of ["branch-preview-stations-casing", "branch-preview-stations-dot"]) {
       if (map.getLayer(layerId)) {
