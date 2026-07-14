@@ -31,7 +31,6 @@ import {
   type ManualLineBranchOverride,
   type ManualServicePattern,
   type ManualTrainRun,
-  type ManualTrainPerformance,
   type ManualTransferEdge,
   type RailLineCategory,
   type RailServiceType,
@@ -43,8 +42,17 @@ interface PublicDataVersionManifest {
   acquiredDate?: string;
   releaseId?: string;
   versions?: {
-    bundle?: { generatedAt?: string | null; acquiredDate?: string | null; bytes?: number | null; sha256?: string | null };
-    manualOverlay?: { bytes?: number | null; mtimeMs?: number | null; sha256?: string | null };
+    bundle?: {
+      generatedAt?: string | null;
+      acquiredDate?: string | null;
+      bytes?: number | null;
+      sha256?: string | null;
+    };
+    manualOverlay?: {
+      bytes?: number | null;
+      mtimeMs?: number | null;
+      sha256?: string | null;
+    };
   };
 }
 
@@ -160,7 +168,10 @@ interface TimetableRouteGraph {
   edgesByStationId: Map<string, TimetableRouteGraphEdge[]>;
 }
 
-type RouteSearchCriterion = "fastest" | "fewest-transfers" | "timetable-priority";
+type RouteSearchCriterion =
+  | "fastest"
+  | "fewest-transfers"
+  | "timetable-priority";
 type RouteSearchPreference = "balanced" | RouteSearchCriterion;
 
 interface RouteSearchResult {
@@ -223,7 +234,9 @@ export default function RailExplorer({
   );
 
   const [selectedArea, setSelectedArea] = useState<string>("all");
-  const [selectedCategory, setSelectedCategory] = useState<RailLineCategory | "all">("all");
+  const [selectedCategory, setSelectedCategory] = useState<
+    RailLineCategory | "all"
+  >("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLineKey, setSelectedLineKey] = useState<string | null>(null);
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
@@ -242,8 +255,9 @@ export default function RailExplorer({
   const [routeSearchMessage, setRouteSearchMessage] = useState<string | null>(
     null,
   );
-  const [routeSearchResults, setRouteSearchResults] =
-    useState<RouteSearchResult[]>([]);
+  const [routeSearchResults, setRouteSearchResults] = useState<
+    RouteSearchResult[]
+  >([]);
   const [selectedRouteResultIndex, setSelectedRouteResultIndex] = useState(0);
   const [routeSearchPreference, setRouteSearchPreference] =
     useState<RouteSearchPreference>("balanced");
@@ -254,6 +268,7 @@ export default function RailExplorer({
   const [showMapStations, setShowMapStations] = useState(true);
   const [mobilePanelMode, setMobilePanelMode] =
     useState<MobilePanelMode>("search");
+  const [isMobilePanelExpanded, setIsMobilePanelExpanded] = useState(false);
   const [desktopPanelMode, setDesktopPanelMode] =
     useState<DesktopPanelMode>("search");
   const [isSearchResultsOpen, setIsSearchResultsOpen] = useState(false);
@@ -375,7 +390,13 @@ export default function RailExplorer({
 
       return lineSearchIndex.get(line.canonicalKey)?.includes(query) ?? false;
     });
-  }, [deferredSearchQuery, lineSearchIndex, selectedArea, selectedCategory, sortedLines]);
+  }, [
+    deferredSearchQuery,
+    lineSearchIndex,
+    selectedArea,
+    selectedCategory,
+    sortedLines,
+  ]);
 
   const stationSearchResults = useMemo(() => {
     const query = normalizeSearchText(deferredSearchQuery);
@@ -422,7 +443,8 @@ export default function RailExplorer({
 
     for (const line of sortedLines) {
       if (selectedArea !== "all" && line.mreaWideCd !== selectedArea) continue;
-      if (selectedCategory !== "all" && line.category !== selectedCategory) continue;
+      if (selectedCategory !== "all" && line.category !== selectedCategory)
+        continue;
       if (!(lineSearchIndex.get(line.canonicalKey)?.includes(query) ?? false))
         continue;
 
@@ -432,7 +454,13 @@ export default function RailExplorer({
     }
 
     return results;
-  }, [deferredSearchQuery, lineSearchIndex, selectedArea, selectedCategory, sortedLines]);
+  }, [
+    deferredSearchQuery,
+    lineSearchIndex,
+    selectedArea,
+    selectedCategory,
+    sortedLines,
+  ]);
 
   const selectedLine = useMemo(
     () =>
@@ -491,7 +519,10 @@ export default function RailExplorer({
     [mapStations, routeDestinationStationId],
   );
 
-  const activeRouteSearchResult = routeSearchResults[selectedRouteResultIndex] ?? routeSearchResults[0] ?? null;
+  const activeRouteSearchResult =
+    routeSearchResults[selectedRouteResultIndex] ??
+    routeSearchResults[0] ??
+    null;
 
   const routeGraph = useMemo(
     () =>
@@ -503,7 +534,14 @@ export default function RailExplorer({
         trainRuns,
         mapBranches,
       ),
-    [bundle.lines, bundle.manualTransferEdges, lineBranchOverrides, servicePatterns, trainRuns, mapBranches],
+    [
+      bundle.lines,
+      bundle.manualTransferEdges,
+      lineBranchOverrides,
+      servicePatterns,
+      trainRuns,
+      mapBranches,
+    ],
   );
   const routeResultStationIds = useMemo(
     () => activeRouteSearchResult?.stationIds ?? [],
@@ -615,6 +653,7 @@ export default function RailExplorer({
       selectedTransferGroupId
     ) {
       setMobilePanelMode("selected");
+      setIsMobilePanelExpanded(true);
     }
   }, [
     selectedBranchId,
@@ -626,6 +665,7 @@ export default function RailExplorer({
   useEffect(() => {
     if (searchQuery.trim()) {
       setMobilePanelMode("search");
+      setIsMobilePanelExpanded(true);
     }
   }, [searchQuery]);
 
@@ -893,9 +933,9 @@ export default function RailExplorer({
   };
 
   return (
-    <section className="grid h-[100dvh] w-full overflow-hidden bg-slate-100 text-slate-950 lg:grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="z-20 hidden h-full min-h-0 flex-col border-r border-slate-200 bg-white lg:flex">
-        <div className="border-b border-slate-200 px-2.5 py-2">
+    <section className="web-explorer-shell grid h-[100dvh] w-full overflow-hidden bg-slate-100 text-slate-950 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <aside className="web-sidebar z-20 hidden h-full min-h-0 flex-col border-r border-slate-200 bg-white lg:flex">
+        <div className="web-sidebar-header border-b border-slate-200 px-2.5 py-2">
           <ExplorerTitle
             filteredLineCount={filteredLines.length}
             visibleBranchCount={visibleMapBranches.length}
@@ -910,9 +950,9 @@ export default function RailExplorer({
           />
         </div>
 
-        <div className="min-h-0 flex-1 overflow-hidden">
+        <div className="web-sidebar-content min-h-0 flex-1 overflow-hidden">
           {desktopPanelMode === "search" ? (
-            <div className="h-full overflow-y-auto p-2">
+            <div className="web-filter-scroll h-full overflow-y-auto p-2">
               <FilterControls
                 areaCodes={areaCodes}
                 selectedArea={selectedArea}
@@ -956,9 +996,9 @@ export default function RailExplorer({
         </div>
       </aside>
 
-      <div className="relative h-full min-h-0 min-w-0 overflow-hidden">
+      <div className="web-map-workspace relative h-full min-h-0 min-w-0 overflow-hidden">
         <RailMap
-          className="absolute inset-0 h-full min-h-[100dvh] w-full"
+          className="web-map-canvas absolute inset-0 h-full min-h-[100dvh] w-full"
           stations={visibleMapStations}
           branches={visibleMapBranches}
           selectedBranchId={selectedBranchId}
@@ -1001,8 +1041,8 @@ export default function RailExplorer({
         selectedTransferGroup ||
         routeOriginStation ||
         routeDestinationStation ? (
-          <div className="pointer-events-none absolute right-3 top-3 z-10 hidden w-[280px] max-w-[calc(100vw-24px)] lg:block">
-            <div className="pointer-events-auto grid min-w-0 w-full max-w-full max-h-[calc(100dvh-24px)] gap-2 overflow-x-hidden overflow-y-auto [overflow-wrap:anywhere] rounded-2xl border border-white/70 bg-white/95 p-2 shadow-xl shadow-slate-950/12 backdrop-blur">
+          <div className="web-detail-dock pointer-events-none absolute right-3 top-3 z-10 hidden w-[340px] max-w-[calc(100vw-24px)] lg:block">
+            <div className="web-detail-stack pointer-events-auto grid min-w-0 w-full max-w-full max-h-[calc(100dvh-24px)] gap-2 overflow-x-hidden overflow-y-auto [overflow-wrap:anywhere] rounded-2xl border border-white/70 bg-white/95 p-2 shadow-xl shadow-slate-950/12 backdrop-blur">
               {routeOriginStation || routeDestinationStation ? (
                 <RouteDraftCard
                   originStation={routeOriginStation}
@@ -1065,10 +1105,25 @@ export default function RailExplorer({
         ) : null}
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 lg:hidden">
-          <div className="pointer-events-auto max-h-[56dvh] overflow-hidden border-t border-slate-200 bg-white/97 shadow-md shadow-slate-950/10 backdrop-blur">
-            <div className="mx-auto mt-1.5 h-0.5 w-8 rounded bg-slate-300" />
+          <div
+            className={`web-mobile-sheet pointer-events-auto overflow-hidden border-t border-slate-200 bg-white/97 shadow-md shadow-slate-950/10 backdrop-blur ${isMobilePanelExpanded ? "is-expanded" : "is-collapsed"}`}
+          >
+            <button
+              type="button"
+              className="web-mobile-sheet-toggle"
+              aria-expanded={isMobilePanelExpanded}
+              aria-label={
+                isMobilePanelExpanded ? "지도 패널 접기" : "지도 패널 펼치기"
+              }
+              onClick={() => setIsMobilePanelExpanded((value) => !value)}
+            >
+              <span aria-hidden="true" />
+              {isMobilePanelExpanded
+                ? "지도 넓게 보기"
+                : "검색과 선택 정보 열기"}
+            </button>
 
-            <div className="border-b border-slate-200 px-2.5 pb-2 pt-1.5">
+            <div className="web-mobile-sheet-header border-b border-slate-200 px-2.5 pb-2 pt-1.5">
               <ExplorerTitle
                 filteredLineCount={filteredLines.length}
                 visibleBranchCount={visibleMapBranches.length}
@@ -1083,125 +1138,133 @@ export default function RailExplorer({
                   stationSearchResults.length + lineSearchResults.length
                 }
                 lineCount={filteredLines.length}
-                onChange={setMobilePanelMode}
+                onChange={(mode) => {
+                  setMobilePanelMode(mode);
+                  setIsMobilePanelExpanded(true);
+                }}
               />
             </div>
 
-            <div className="max-h-[calc(56dvh-82px)] overflow-y-auto px-2.5 pb-4 pt-2">
-              {mobilePanelMode === "search" ? (
-                <FilterControls
-                  areaCodes={areaCodes}
-                  selectedArea={selectedArea}
-                  selectedCategory={selectedCategory}
-                  searchQuery={searchQuery}
-                  copiedShareUrl={copiedShareUrl}
-                  stationResults={stationSearchResults}
-                  lineResults={lineSearchResults}
-                  selectedStationId={selectedStationId}
-                  selectedLineKey={selectedLineKey}
-                  hasSelection={hasSelection}
-                  showSearchResults={isSearchResultsOpen}
-                  focusSelectionLabel={focusSelectionLabel}
-                  showMapLines={showMapLines}
-                  showMapStations={showMapStations}
-                  onToggleMapLines={() => setShowMapLines((value) => !value)}
-                  onToggleMapStations={() =>
-                    setShowMapStations((value) => !value)
-                  }
-                  onSelectArea={selectArea}
-                  onSelectCategory={selectCategory}
-                  onSearch={search}
-                  onClearSearch={clearSearch}
-                  onSelectStation={selectStationFromSearch}
-                  onSelectLine={selectLine}
-                  onClearSelection={clearSelection}
-                  onReset={resetFilters}
-                  onFocusSelection={focusSelection}
-                  onCopyUrl={copyUrl}
-                  compact
-                />
-              ) : null}
-
-              {mobilePanelMode === "selected" ? (
-                <div className="grid gap-1.5">
-                  {routeOriginStation || routeDestinationStation ? (
-                    <RouteDraftCard
-                      originStation={routeOriginStation}
-                      destinationStation={routeDestinationStation}
-                      message={routeSearchMessage}
-                      results={routeSearchResults}
-                      activeResultIndex={selectedRouteResultIndex}
-                      stationById={stationById}
-                      allStations={mapStations}
-                      onSelectResult={setSelectedRouteResultIndex}
-                      routeSearchPreference={routeSearchPreference}
-                      onRouteSearchPreferenceChange={changeRouteSearchPreference}
-                      onSetRoutePoint={setRoutePoint}
-                      onClearOrigin={() => clearRoutePoint("origin")}
-                      onClearDestination={() => clearRoutePoint("destination")}
-                      onSwap={swapRoutePoints}
-                      onSubmit={submitRouteSearch}
-                      compact
-                    />
-                  ) : null}
-
-                  {selectedTransferGroup ? (
-                    <SelectedTransferGroupPanel
-                      group={selectedTransferGroup}
-                      stations={selectedTransferGroupStations}
-                      servingBranchIndex={stationServingIndex}
-                      routeOriginStationId={routeOriginStationId}
-                      routeDestinationStationId={routeDestinationStationId}
-                      onSelectStation={selectStationFromSearch}
-                      onSetRoutePoint={setRoutePoint}
-                      onClear={() => setSelectedTransferGroupId(null)}
-                      compact
-                    />
-                  ) : null}
-
-                  {selectedStation ? (
-                    <SelectedStationPanel
-                      station={selectedStation}
-                      servingBranches={selectedStationServingBranches}
-                      routeOriginStationId={routeOriginStationId}
-                      routeDestinationStationId={routeDestinationStationId}
-                      onSelectServingBranch={selectServingBranch}
-                      onSetRoutePoint={setRoutePoint}
-                      onClear={() => setSelectedStationId(null)}
-                      compact
-                    />
-                  ) : null}
-
-                  <SelectedLinePanel
-                    selectedLine={selectedLine}
-                    selectedBranchId={selectedBranchId}
-                    selectedBranch={selectedBranch}
-                    servicePatterns={servicePatterns}
-                    trainRuns={trainRuns}
-                    stationById={stationById}
-                    onSelectBranch={setSelectedBranchId}
-                    onClearBranch={() => setSelectedBranchId(null)}
+            {isMobilePanelExpanded ? (
+              <div className="web-mobile-sheet-content max-h-[calc(68dvh-124px)] overflow-y-auto px-2.5 pb-4 pt-2">
+                {mobilePanelMode === "search" ? (
+                  <FilterControls
+                    areaCodes={areaCodes}
+                    selectedArea={selectedArea}
+                    selectedCategory={selectedCategory}
+                    searchQuery={searchQuery}
+                    copiedShareUrl={copiedShareUrl}
+                    stationResults={stationSearchResults}
+                    lineResults={lineSearchResults}
+                    selectedStationId={selectedStationId}
+                    selectedLineKey={selectedLineKey}
+                    hasSelection={hasSelection}
+                    showSearchResults={isSearchResultsOpen}
+                    focusSelectionLabel={focusSelectionLabel}
+                    showMapLines={showMapLines}
+                    showMapStations={showMapStations}
+                    onToggleMapLines={() => setShowMapLines((value) => !value)}
+                    onToggleMapStations={() =>
+                      setShowMapStations((value) => !value)
+                    }
+                    onSelectArea={selectArea}
+                    onSelectCategory={selectCategory}
+                    onSearch={search}
+                    onClearSearch={clearSearch}
+                    onSelectStation={selectStationFromSearch}
+                    onSelectLine={selectLine}
+                    onClearSelection={clearSelection}
+                    onReset={resetFilters}
+                    onFocusSelection={focusSelection}
+                    onCopyUrl={copyUrl}
                     compact
                   />
-                </div>
-              ) : null}
+                ) : null}
 
-              {mobilePanelMode === "lines" ? (
-                <LineList
-                  lines={filteredLines}
-                  selectedLineKey={selectedLineKey}
-                  onSelectLine={selectLine}
-                  compact
-                />
-              ) : null}
-            </div>
+                {mobilePanelMode === "selected" ? (
+                  <div className="grid gap-1.5">
+                    {routeOriginStation || routeDestinationStation ? (
+                      <RouteDraftCard
+                        originStation={routeOriginStation}
+                        destinationStation={routeDestinationStation}
+                        message={routeSearchMessage}
+                        results={routeSearchResults}
+                        activeResultIndex={selectedRouteResultIndex}
+                        stationById={stationById}
+                        allStations={mapStations}
+                        onSelectResult={setSelectedRouteResultIndex}
+                        routeSearchPreference={routeSearchPreference}
+                        onRouteSearchPreferenceChange={
+                          changeRouteSearchPreference
+                        }
+                        onSetRoutePoint={setRoutePoint}
+                        onClearOrigin={() => clearRoutePoint("origin")}
+                        onClearDestination={() =>
+                          clearRoutePoint("destination")
+                        }
+                        onSwap={swapRoutePoints}
+                        onSubmit={submitRouteSearch}
+                        compact
+                      />
+                    ) : null}
+
+                    {selectedTransferGroup ? (
+                      <SelectedTransferGroupPanel
+                        group={selectedTransferGroup}
+                        stations={selectedTransferGroupStations}
+                        servingBranchIndex={stationServingIndex}
+                        routeOriginStationId={routeOriginStationId}
+                        routeDestinationStationId={routeDestinationStationId}
+                        onSelectStation={selectStationFromSearch}
+                        onSetRoutePoint={setRoutePoint}
+                        onClear={() => setSelectedTransferGroupId(null)}
+                        compact
+                      />
+                    ) : null}
+
+                    {selectedStation ? (
+                      <SelectedStationPanel
+                        station={selectedStation}
+                        servingBranches={selectedStationServingBranches}
+                        routeOriginStationId={routeOriginStationId}
+                        routeDestinationStationId={routeDestinationStationId}
+                        onSelectServingBranch={selectServingBranch}
+                        onSetRoutePoint={setRoutePoint}
+                        onClear={() => setSelectedStationId(null)}
+                        compact
+                      />
+                    ) : null}
+
+                    <SelectedLinePanel
+                      selectedLine={selectedLine}
+                      selectedBranchId={selectedBranchId}
+                      selectedBranch={selectedBranch}
+                      servicePatterns={servicePatterns}
+                      trainRuns={trainRuns}
+                      stationById={stationById}
+                      onSelectBranch={setSelectedBranchId}
+                      onClearBranch={() => setSelectedBranchId(null)}
+                      compact
+                    />
+                  </div>
+                ) : null}
+
+                {mobilePanelMode === "lines" ? (
+                  <LineList
+                    lines={filteredLines}
+                    selectedLineKey={selectedLineKey}
+                    onSelectLine={selectLine}
+                    compact
+                  />
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
     </section>
   );
 }
-
 
 function MapStatusHud({
   visibleBranchCount,
@@ -1233,14 +1296,16 @@ function MapStatusHud({
   onCopyUrl: () => void;
 }) {
   return (
-    <div className="pointer-events-none absolute left-3 top-3 z-10 hidden max-w-[calc(100vw-24px)] lg:block">
-      <div className="pointer-events-auto flex max-w-[560px] flex-wrap items-center gap-1.5 rounded-2xl border border-white/70 bg-white/92 px-2 py-2 shadow-xl shadow-slate-950/10 backdrop-blur">
+    <div className="web-map-hud pointer-events-none absolute left-3 top-3 z-10 hidden max-w-[calc(100vw-24px)] lg:block">
+      <div className="pointer-events-auto flex max-w-[640px] flex-wrap items-center gap-1.5 rounded-2xl border border-white/70 bg-white/92 px-2 py-2 shadow-xl shadow-slate-950/10 backdrop-blur">
         <div className="mr-1 grid gap-0.5 px-1">
           <p className="text-[10px] font-black uppercase tracking-[0.14em] text-sky-600">
             Live map
           </p>
           <p className="text-[11px] font-bold text-slate-700">
-            {formatNumber(visibleBranchCount)}구간 · {formatNumber(visibleStationCount)}역 · 환승 {formatNumber(transferGroupCount)}
+            {formatNumber(visibleBranchCount)}구간 ·{" "}
+            {formatNumber(visibleStationCount)}역 · 환승{" "}
+            {formatNumber(transferGroupCount)}
           </p>
         </div>
         <HudToggle active={showMapLines} onClick={onToggleMapLines}>
@@ -1324,7 +1389,11 @@ function DesktopPanelTabs({
   ];
 
   return (
-    <div className="mt-2 grid grid-cols-2 gap-1 rounded bg-slate-100 p-0.5">
+    <div
+      className="web-panel-tabs mt-2 grid grid-cols-2 gap-1 rounded bg-slate-100 p-0.5"
+      role="tablist"
+      aria-label="탐색 패널"
+    >
       {items.map((item) => {
         const active = activeMode === item.mode;
 
@@ -1332,6 +1401,8 @@ function DesktopPanelTabs({
           <button
             key={item.mode}
             type="button"
+            role="tab"
+            aria-selected={active}
             className={
               active
                 ? "h-7 rounded bg-white px-2 text-[11px] font-bold text-slate-950 shadow-sm"
@@ -1377,7 +1448,11 @@ function MobilePanelTabs({
   ];
 
   return (
-    <div className="mt-1.5 grid grid-cols-3 gap-1 rounded bg-slate-100 p-0.5">
+    <div
+      className="web-panel-tabs mt-1.5 grid grid-cols-3 gap-1 rounded bg-slate-100 p-0.5"
+      role="tablist"
+      aria-label="모바일 탐색 패널"
+    >
       {items.map((item) => {
         const active = activeMode === item.mode;
 
@@ -1385,6 +1460,8 @@ function MobilePanelTabs({
           <button
             key={item.mode}
             type="button"
+            role="tab"
+            aria-selected={active}
             className={
               active
                 ? "h-7 rounded bg-white px-2 text-[11px] font-bold text-slate-950 shadow-sm"
@@ -1414,36 +1491,48 @@ function DataVersionBadge({
   compact?: boolean;
 }) {
   const [releaseChanged, setReleaseChanged] = useState(false);
-  const bundleGeneratedAt = manifest?.versions?.bundle?.generatedAt ?? manifest?.generatedAt ?? null;
+  const bundleGeneratedAt =
+    manifest?.versions?.bundle?.generatedAt ?? manifest?.generatedAt ?? null;
 
   useEffect(() => {
     if (!manifest?.releaseId || typeof window === "undefined") return;
     const storageKey = "railmap.data-release-id.v1";
     const previousReleaseId = window.localStorage.getItem(storageKey);
-    setReleaseChanged(Boolean(previousReleaseId && previousReleaseId !== manifest.releaseId));
+    setReleaseChanged(
+      Boolean(previousReleaseId && previousReleaseId !== manifest.releaseId),
+    );
     window.localStorage.setItem(storageKey, manifest.releaseId);
   }, [manifest?.releaseId]);
   const label = manifest
     ? `데이터 ${manifest.acquiredDate ?? manifest.versions?.bundle?.acquiredDate ?? "버전 확인"}`
     : "데이터 버전 없음";
   const bundleHash = manifest?.versions?.bundle?.sha256?.slice(0, 12) ?? null;
-  const overlayHash = manifest?.versions?.manualOverlay?.sha256?.slice(0, 12) ?? null;
+  const overlayHash =
+    manifest?.versions?.manualOverlay?.sha256?.slice(0, 12) ?? null;
   const title = manifest
     ? [
         manifest.releaseId ? `release: ${manifest.releaseId}` : null,
         bundleGeneratedAt ? `bundle generatedAt: ${bundleGeneratedAt}` : null,
         bundleHash ? `bundle sha256: ${bundleHash}` : null,
         overlayHash ? `manual overlay sha256: ${overlayHash}` : null,
-      ].filter(Boolean).join("\n")
+      ]
+        .filter(Boolean)
+        .join("\n")
     : "data-version.json을 찾지 못했습니다.";
 
   return (
     <div className={compact ? "mt-1" : "mt-2"}>
       <span
-        className={releaseChanged
-          ? "inline-flex max-w-full items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700"
-          : "inline-flex max-w-full items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500"}
-        title={releaseChanged ? `새 데이터 릴리스가 감지되었습니다.\n${title}` : title}
+        className={
+          releaseChanged
+            ? "inline-flex max-w-full items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700"
+            : "inline-flex max-w-full items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500"
+        }
+        title={
+          releaseChanged
+            ? `새 데이터 릴리스가 감지되었습니다.\n${title}`
+            : title
+        }
       >
         {releaseChanged ? "데이터 업데이트" : label}
       </span>
@@ -1463,24 +1552,30 @@ function ExplorerTitle({
   compact?: boolean;
 }) {
   return (
-    <div>
-      <p className="text-[10px] font-bold tracking-[0.14em] text-sky-600 uppercase">
-        Korea Rail Map
-      </p>
-      <h1
-        className={
-          compact
-            ? "mt-0.5 text-[13px] font-bold"
-            : "mt-1 text-[13px] font-bold"
-        }
-      >
-        철도 노선 지도
-      </h1>
-      <p className="mt-1 text-[11px] leading-4 text-slate-500">
-        {formatNumber(filteredLineCount)}개 노선 ·{" "}
-        {formatNumber(visibleBranchCount)}개 구간 · 지도 역{" "}
-        {formatNumber(visibleStationCount)}개
-      </p>
+    <div className={`web-brand ${compact ? "is-compact" : ""}`}>
+      <div className="web-brand-mark" aria-hidden="true">
+        <span />
+        <span />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold tracking-[0.14em] text-sky-600 uppercase">
+          Railmap
+        </p>
+        <h1
+          className={
+            compact
+              ? "mt-0.5 text-[13px] font-bold"
+              : "mt-1 text-[13px] font-bold"
+          }
+        >
+          한국 철도 노선 지도
+        </h1>
+        <p className="mt-1 text-[11px] leading-4 text-slate-500">
+          노선 {formatNumber(filteredLineCount)} · 구간{" "}
+          {formatNumber(visibleBranchCount)} · 역{" "}
+          {formatNumber(visibleStationCount)}
+        </p>
+      </div>
     </div>
   );
 }
@@ -1515,12 +1610,15 @@ function FilterControls({
   compact = false,
 }: FilterControlsProps & { compact?: boolean }) {
   return (
-    <div className="space-y-2">
-      <div className="relative">
+    <div className="web-filter-controls space-y-2">
+      <div className="web-search-field relative">
+        <span className="web-search-icon" aria-hidden="true" />
         <input
           className="h-8 w-full rounded border border-slate-200 bg-white px-2.5 pr-8 text-xs font-medium text-slate-800 outline-none placeholder:text-slate-400 focus:border-sky-300 focus:ring-1 focus:ring-sky-100"
           value={searchQuery}
-          placeholder="노선명, 역명, 코드 검색"
+          aria-label="노선 또는 역 검색"
+          autoComplete="off"
+          placeholder="노선이나 역을 검색하세요"
           onChange={(event) => onSearch(event.target.value)}
         />
         {searchQuery.trim() ? (
@@ -1546,12 +1644,18 @@ function FilterControls({
         />
       ) : null}
 
-      <MapDisplayToggles
-        showMapLines={showMapLines}
-        showMapStations={showMapStations}
-        onToggleMapLines={onToggleMapLines}
-        onToggleMapStations={onToggleMapStations}
-      />
+      <div className="web-control-section">
+        <div className="web-control-heading">
+          <span>지도 표시</span>
+          <small>필요한 정보만 켜고 볼 수 있어요</small>
+        </div>
+        <MapDisplayToggles
+          showMapLines={showMapLines}
+          showMapStations={showMapStations}
+          onToggleMapLines={onToggleMapLines}
+          onToggleMapStations={onToggleMapStations}
+        />
+      </div>
 
       {hasSelection ? (
         <div className="grid grid-cols-2 gap-1.5">
@@ -1572,43 +1676,53 @@ function FilterControls({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-1.5">
-        <FilterChip
-          active={selectedArea === "all"}
-          onClick={() => onSelectArea("all")}
-        >
-          전체
-        </FilterChip>
-        {areaCodes.map((areaCode) => (
+      <div className="web-control-section">
+        <div className="web-control-heading">
+          <span>권역</span>
+        </div>
+        <div className="web-chip-row flex flex-wrap gap-1.5">
           <FilterChip
-            key={areaCode}
-            active={selectedArea === areaCode}
-            onClick={() => onSelectArea(areaCode)}
+            active={selectedArea === "all"}
+            onClick={() => onSelectArea("all")}
           >
-            {formatAreaName(areaCode)}
+            전체
           </FilterChip>
-        ))}
+          {areaCodes.map((areaCode) => (
+            <FilterChip
+              key={areaCode}
+              active={selectedArea === areaCode}
+              onClick={() => onSelectArea(areaCode)}
+            >
+              {formatAreaName(areaCode)}
+            </FilterChip>
+          ))}
+        </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        <FilterChip
-          active={selectedCategory === "all"}
-          onClick={() => onSelectCategory("all")}
-        >
-          전체 유형
-        </FilterChip>
-        {RAIL_LINE_CATEGORIES.map((category) => (
+      <div className="web-control-section">
+        <div className="web-control-heading">
+          <span>철도 유형</span>
+        </div>
+        <div className="web-chip-row flex flex-wrap gap-1.5">
           <FilterChip
-            key={category}
-            active={selectedCategory === category}
-            onClick={() => onSelectCategory(category)}
+            active={selectedCategory === "all"}
+            onClick={() => onSelectCategory("all")}
           >
-            {formatRailLineCategory(category)}
+            전체 유형
           </FilterChip>
-        ))}
+          {RAIL_LINE_CATEGORIES.map((category) => (
+            <FilterChip
+              key={category}
+              active={selectedCategory === category}
+              onClick={() => onSelectCategory(category)}
+            >
+              {formatRailLineCategory(category)}
+            </FilterChip>
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="web-filter-actions grid grid-cols-2 gap-1.5">
         <button
           type="button"
           className="h-7 rounded border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition duration-150 ease-out hover:bg-slate-50 active:scale-[0.99]"
@@ -1640,7 +1754,7 @@ function MapDisplayToggles({
   onToggleMapStations: () => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-1.5">
+    <div className="web-display-toggles grid grid-cols-2 gap-1.5">
       <ToggleButton active={showMapLines} onClick={onToggleMapLines}>
         구간선
       </ToggleButton>
@@ -1663,6 +1777,7 @@ function ToggleButton({
   return (
     <button
       type="button"
+      aria-pressed={active}
       className={
         active
           ? "h-7 rounded border border-sky-200 bg-sky-50 px-2 text-xs font-bold text-sky-700"
@@ -1734,7 +1849,7 @@ function SearchResults({
     lines.length === 0
   ) {
     return (
-      <div className="border border-dashed border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-500">
+      <div className="web-empty-state border border-dashed border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-500">
         검색 결과를 표시하려면 역명이나 노선명을 입력하세요.
       </div>
     );
@@ -1742,14 +1857,14 @@ function SearchResults({
 
   if (stations.length === 0 && lines.length === 0) {
     return (
-      <div className="border border-dashed border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-500">
+      <div className="web-empty-state border border-dashed border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-500">
         일치하는 역이나 노선이 없습니다.
       </div>
     );
   }
 
   return (
-    <div className="border border-slate-200 bg-slate-50 p-1.5">
+    <div className="web-search-results border border-slate-200 bg-slate-50 p-1.5">
       {lines.length > 0 ? (
         <div>
           <div className="flex items-center justify-between gap-2 px-0.5">
@@ -1850,6 +1965,7 @@ function FilterChip({
   return (
     <button
       type="button"
+      aria-pressed={active}
       className={
         active
           ? "shrink-0 rounded bg-sky-600 px-2.5 py-1 text-xs font-bold text-white"
@@ -1870,7 +1986,7 @@ function LineList({
 }: LineListProps & { compact?: boolean }) {
   if (lines.length === 0) {
     return (
-      <div className="rounded border border-dashed border-slate-300 bg-slate-50 p-4 text-center">
+      <div className="web-empty-state rounded border border-dashed border-slate-300 bg-slate-50 p-4 text-center">
         <p className="text-xs font-semibold text-slate-900">검색 결과 없음</p>
         <p className="mt-0.5 text-[11px] text-slate-500">
           검색어 또는 권역 필터를 조정하세요.
@@ -1880,7 +1996,9 @@ function LineList({
   }
 
   return (
-    <div className={compact ? "grid gap-1.5" : "flex-1 overflow-y-auto p-2"}>
+    <div
+      className={`web-line-list ${compact ? "grid gap-1.5" : "flex-1 overflow-y-auto p-2"}`}
+    >
       <div className="grid gap-1.5">
         {lines.map((line) => (
           <LineCard
@@ -1907,10 +2025,11 @@ function LineCard({
   return (
     <button
       type="button"
+      aria-pressed={selected}
       className={
         selected
-          ? "rounded border border-sky-300 bg-sky-50 p-2 text-left ring-1 ring-sky-100 transition duration-150 ease-out"
-          : "rounded border border-slate-200 bg-white p-2 text-left transition duration-150 ease-out hover:border-sky-200 hover:bg-sky-50/60 active:scale-[0.995]"
+          ? "web-line-card is-selected rounded border border-sky-300 bg-sky-50 p-2 text-left ring-1 ring-sky-100 transition duration-150 ease-out"
+          : "web-line-card rounded border border-slate-200 bg-white p-2 text-left transition duration-150 ease-out hover:border-sky-200 hover:bg-sky-50/60 active:scale-[0.995]"
       }
       onClick={onClick}
     >
@@ -1927,7 +2046,9 @@ function LineCard({
             </p>
           </div>
           <p className="mt-1 text-[11px] font-medium text-slate-500">
-            {formatRailLineCategory(line.category)} · {line.serviceTypes.map(formatRailServiceType).join("/")} · 구간 {line.branches.length}개 · 정차역{" "}
+            {formatRailLineCategory(line.category)} ·{" "}
+            {line.serviceTypes.map(formatRailServiceType).join("/")} · 구간{" "}
+            {line.branches.length}개 · 정차역{" "}
             {formatNumber(countRouteStops(line))}개
           </p>
         </div>
@@ -1949,41 +2070,72 @@ interface TrainPerformanceProfile {
   maxSpeedKph: number;
 }
 
-const DEFAULT_TRAIN_PERFORMANCE_BY_SERVICE: Partial<Record<RailServiceType, TrainPerformanceProfile>> = {
+const DEFAULT_TRAIN_PERFORMANCE_BY_SERVICE: Partial<
+  Record<RailServiceType, TrainPerformanceProfile>
+> = {
   subway: { accelerationMps2: 0.8, decelerationMps2: 0.9, maxSpeedKph: 80 },
   gtx: { accelerationMps2: 0.9, decelerationMps2: 1.0, maxSpeedKph: 180 },
-  airport_rail: { accelerationMps2: 0.65, decelerationMps2: 0.75, maxSpeedKph: 110 },
+  airport_rail: {
+    accelerationMps2: 0.65,
+    decelerationMps2: 0.75,
+    maxSpeedKph: 110,
+  },
   ktx: { accelerationMps2: 0.45, decelerationMps2: 0.55, maxSpeedKph: 300 },
   srt: { accelerationMps2: 0.45, decelerationMps2: 0.55, maxSpeedKph: 300 },
   itx: { accelerationMps2: 0.55, decelerationMps2: 0.65, maxSpeedKph: 180 },
   saemaeul: { accelerationMps2: 0.5, decelerationMps2: 0.6, maxSpeedKph: 150 },
-  mugunghwa: { accelerationMps2: 0.45, decelerationMps2: 0.55, maxSpeedKph: 120 },
+  mugunghwa: {
+    accelerationMps2: 0.45,
+    decelerationMps2: 0.55,
+    maxSpeedKph: 120,
+  },
   nuriro: { accelerationMps2: 0.55, decelerationMps2: 0.65, maxSpeedKph: 120 },
 };
 
-function getFallbackTrainPerformanceProfile(line: CanonicalLine): TrainPerformanceProfile {
+function getFallbackTrainPerformanceProfile(
+  line: CanonicalLine,
+): TrainPerformanceProfile {
   for (const serviceType of line.serviceTypes ?? []) {
     const profile = DEFAULT_TRAIN_PERFORMANCE_BY_SERVICE[serviceType];
     if (profile) return profile;
   }
 
-  if (line.category === "high_speed_rail") return { accelerationMps2: 0.45, decelerationMps2: 0.55, maxSpeedKph: 300 };
-  if (line.category === "gtx") return { accelerationMps2: 0.9, decelerationMps2: 1.0, maxSpeedKph: 180 };
-  if (line.category === "conventional_rail") return { accelerationMps2: 0.45, decelerationMps2: 0.55, maxSpeedKph: 120 };
+  if (line.category === "high_speed_rail")
+    return { accelerationMps2: 0.45, decelerationMps2: 0.55, maxSpeedKph: 300 };
+  if (line.category === "gtx")
+    return { accelerationMps2: 0.9, decelerationMps2: 1.0, maxSpeedKph: 180 };
+  if (line.category === "conventional_rail")
+    return { accelerationMps2: 0.45, decelerationMps2: 0.55, maxSpeedKph: 120 };
   return { accelerationMps2: 0.8, decelerationMps2: 0.9, maxSpeedKph: 80 };
 }
 
-function getTrainPerformanceProfile(line: CanonicalLine): TrainPerformanceProfile {
+function getTrainPerformanceProfile(
+  line: CanonicalLine,
+): TrainPerformanceProfile {
   const fallback = getFallbackTrainPerformanceProfile(line);
   const override = line.trainPerformance;
   return {
-    accelerationMps2: typeof override?.accelerationMps2 === "number" && override.accelerationMps2 > 0 ? override.accelerationMps2 : fallback.accelerationMps2,
-    decelerationMps2: typeof override?.decelerationMps2 === "number" && override.decelerationMps2 > 0 ? override.decelerationMps2 : fallback.decelerationMps2,
-    maxSpeedKph: typeof override?.maxSpeedKph === "number" && override.maxSpeedKph > 0 ? override.maxSpeedKph : fallback.maxSpeedKph,
+    accelerationMps2:
+      typeof override?.accelerationMps2 === "number" &&
+      override.accelerationMps2 > 0
+        ? override.accelerationMps2
+        : fallback.accelerationMps2,
+    decelerationMps2:
+      typeof override?.decelerationMps2 === "number" &&
+      override.decelerationMps2 > 0
+        ? override.decelerationMps2
+        : fallback.decelerationMps2,
+    maxSpeedKph:
+      typeof override?.maxSpeedKph === "number" && override.maxSpeedKph > 0
+        ? override.maxSpeedKph
+        : fallback.maxSpeedKph,
   };
 }
 
-function calculateRideDurationMinutes(distanceMeters: number | null, profile: TrainPerformanceProfile): number | null {
+function calculateRideDurationMinutes(
+  distanceMeters: number | null,
+  profile: TrainPerformanceProfile,
+): number | null {
   if (!distanceMeters || distanceMeters <= 0) return null;
   const acceleration = Math.max(0.05, profile.accelerationMps2);
   const deceleration = Math.max(0.05, profile.decelerationMps2);
@@ -1993,9 +2145,15 @@ function calculateRideDurationMinutes(distanceMeters: number | null, profile: Tr
 
   let seconds: number;
   if (distanceMeters >= accelDistance + decelDistance) {
-    seconds = maxSpeedMps / acceleration + maxSpeedMps / deceleration + (distanceMeters - accelDistance - decelDistance) / maxSpeedMps;
+    seconds =
+      maxSpeedMps / acceleration +
+      maxSpeedMps / deceleration +
+      (distanceMeters - accelDistance - decelDistance) / maxSpeedMps;
   } else {
-    const peakSpeed = Math.sqrt((2 * distanceMeters * acceleration * deceleration) / (acceleration + deceleration));
+    const peakSpeed = Math.sqrt(
+      (2 * distanceMeters * acceleration * deceleration) /
+        (acceleration + deceleration),
+    );
     seconds = peakSpeed / acceleration + peakSpeed / deceleration;
   }
 
@@ -2003,13 +2161,16 @@ function calculateRideDurationMinutes(distanceMeters: number | null, profile: Tr
 }
 
 function distanceLngLatMeters(left: [number, number], right: [number, number]) {
-  const lat = ((left[1] + right[1]) / 2) * Math.PI / 180;
+  const lat = (((left[1] + right[1]) / 2) * Math.PI) / 180;
   const dx = (right[0] - left[0]) * 111_320 * Math.cos(lat);
   const dy = (right[1] - left[1]) * 110_540;
   return Math.sqrt(dx * dx + dy * dy);
 }
 
-function nearestCoordinateIndex(coordinates: Array<[number, number]>, target: [number, number]) {
+function nearestCoordinateIndex(
+  coordinates: Array<[number, number]>,
+  target: [number, number],
+) {
   let bestIndex = 0;
   let bestDistance = Number.POSITIVE_INFINITY;
   for (let index = 0; index < coordinates.length; index += 1) {
@@ -2022,19 +2183,42 @@ function nearestCoordinateIndex(coordinates: Array<[number, number]>, target: [n
   return bestIndex;
 }
 
-function estimateBranchSegmentDistanceMeters(branch: RailMapBranch | undefined, fromStationId: string, toStationId: string): number | null {
-  const fromStop = branch?.routeStops.find((stop) => stop.station?.id === fromStationId);
-  const toStop = branch?.routeStops.find((stop) => stop.station?.id === toStationId);
+function estimateBranchSegmentDistanceMeters(
+  branch: RailMapBranch | undefined,
+  fromStationId: string,
+  toStationId: string,
+): number | null {
+  const fromStop = branch?.routeStops.find(
+    (stop) => stop.station?.id === fromStationId,
+  );
+  const toStop = branch?.routeStops.find(
+    (stop) => stop.station?.id === toStationId,
+  );
   const fromStation = fromStop?.station;
   const toStation = toStop?.station;
-  if (typeof fromStation?.lng !== "number" || typeof fromStation.lat !== "number" || typeof toStation?.lng !== "number" || typeof toStation.lat !== "number") return null;
+  if (
+    typeof fromStation?.lng !== "number" ||
+    typeof fromStation.lat !== "number" ||
+    typeof toStation?.lng !== "number" ||
+    typeof toStation.lat !== "number"
+  )
+    return null;
 
-  const fallbackDistance = distanceLngLatMeters([fromStation.lng, fromStation.lat], [toStation.lng, toStation.lat]);
+  const fallbackDistance = distanceLngLatMeters(
+    [fromStation.lng, fromStation.lat],
+    [toStation.lng, toStation.lat],
+  );
   const coordinates = branch?.geometryOverrideCoordinates;
   if (!coordinates || coordinates.length < 2) return fallbackDistance;
 
-  const fromIndex = nearestCoordinateIndex(coordinates, [fromStation.lng, fromStation.lat]);
-  const toIndex = nearestCoordinateIndex(coordinates, [toStation.lng, toStation.lat]);
+  const fromIndex = nearestCoordinateIndex(coordinates, [
+    fromStation.lng,
+    fromStation.lat,
+  ]);
+  const toIndex = nearestCoordinateIndex(coordinates, [
+    toStation.lng,
+    toStation.lat,
+  ]);
   if (fromIndex === toIndex) return fallbackDistance;
 
   const start = Math.min(fromIndex, toIndex);
@@ -2063,7 +2247,9 @@ function buildRouteGraph(
     string,
     { branch: CanonicalBranch; line: CanonicalLine }
   >();
-  const mapBranchById = new Map(mapBranches.map((branch) => [branch.id, branch]));
+  const mapBranchById = new Map(
+    mapBranches.map((branch) => [branch.id, branch]),
+  );
 
   const addEdge = (fromStationId: string, edge: RouteGraphEdge) => {
     const edges = graph.get(fromStationId) ?? [];
@@ -2197,17 +2383,28 @@ function buildRouteGraph(
     }
   }
 
-  const patternById = new Map(servicePatterns.map((pattern) => [pattern.id, pattern]));
-  for (const timedEdge of buildTimetableRouteGraph(servicePatterns, trainRuns).timedEdges) {
+  const patternById = new Map(
+    servicePatterns.map((pattern) => [pattern.id, pattern]),
+  );
+  for (const timedEdge of buildTimetableRouteGraph(servicePatterns, trainRuns)
+    .timedEdges) {
     const pattern = patternById.get(timedEdge.patternId);
     const line = pattern?.lineId
-      ? lines.find((candidate) => candidate.id === pattern.lineId || candidate.canonicalKey === pattern.lineId)
+      ? lines.find(
+          (candidate) =>
+            candidate.id === pattern.lineId ||
+            candidate.canonicalKey === pattern.lineId,
+        )
       : null;
     addEdge(timedEdge.fromStationId, {
       toStationId: timedEdge.toStationId,
       branchId: `timetable:${timedEdge.trainRunId ?? timedEdge.patternId}`,
-      lineNameKo: line?.nameKo ?? formatRailServiceType(timedEdge.serviceType as RailServiceType),
-      sourceLineName: timedEdge.trainNumber ? `열차 ${timedEdge.trainNumber}` : "시간표",
+      lineNameKo:
+        line?.nameKo ??
+        formatRailServiceType(timedEdge.serviceType as RailServiceType),
+      sourceLineName: timedEdge.trainNumber
+        ? `열차 ${timedEdge.trainNumber}`
+        : "시간표",
       colorHex: line?.colorHex ?? "#2563eb",
       kind: "timetable",
       departureMinutes: timedEdge.departureMinutes ?? null,
@@ -2227,11 +2424,11 @@ function findRouteResults(
   preference: RouteSearchPreference = "balanced",
 ): RouteSearchResult[] {
   const criteria: RouteSearchCriterion[] =
-    preference === "balanced"
-      ? ["fastest", "fewest-transfers"]
-      : [preference];
+    preference === "balanced" ? ["fastest", "fewest-transfers"] : [preference];
   const results = criteria
-    .map((criterion) => findRoute(graph, originStationId, destinationStationId, criterion))
+    .map((criterion) =>
+      findRoute(graph, originStationId, destinationStationId, criterion),
+    )
     .filter((result): result is RouteSearchResult => result !== null);
   const deduped: RouteSearchResult[] = [];
   const signatures = new Set<string>();
@@ -2256,12 +2453,14 @@ function findRouteResults(
     if (isClearlyDominantRoute(second, first)) return [second];
   }
 
-  return deduped.slice(0, 2).sort(
-    (a, b) =>
-      a.transferCount - b.transferCount ||
-      a.totalMinutes - b.totalMinutes ||
-      a.stationIds.length - b.stationIds.length,
-  );
+  return deduped
+    .slice(0, 2)
+    .sort(
+      (a, b) =>
+        a.transferCount - b.transferCount ||
+        a.totalMinutes - b.totalMinutes ||
+        a.stationIds.length - b.stationIds.length,
+    );
 }
 
 function getRouteEdgeDurationMinutes(edge: RouteGraphEdge): number {
@@ -2269,7 +2468,11 @@ function getRouteEdgeDurationMinutes(edge: RouteGraphEdge): number {
     return Math.max(1, edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY);
   }
 
-  if (typeof edge.durationMinutes === "number" && Number.isFinite(edge.durationMinutes) && edge.durationMinutes > 0) {
+  if (
+    typeof edge.durationMinutes === "number" &&
+    Number.isFinite(edge.durationMinutes) &&
+    edge.durationMinutes > 0
+  ) {
     return Math.max(0.5, edge.durationMinutes);
   }
 
@@ -2277,7 +2480,10 @@ function getRouteEdgeDurationMinutes(edge: RouteGraphEdge): number {
   return 1;
 }
 
-function isClearlyDominantRoute(left: RouteSearchResult, right: RouteSearchResult): boolean {
+function isClearlyDominantRoute(
+  left: RouteSearchResult,
+  right: RouteSearchResult,
+): boolean {
   return (
     left.transferCount <= right.transferCount &&
     left.totalMinutes <= right.totalMinutes &&
@@ -2349,7 +2555,8 @@ function findRoute(
         current.previousBranchId && current.previousBranchId !== edge.branchId,
       );
       const isLineChange = Boolean(
-        current.previousLineNameKo && current.previousLineNameKo !== edge.lineNameKo,
+        current.previousLineNameKo &&
+        current.previousLineNameKo !== edge.lineNameKo,
       );
       const isTransfer = isManualTransfer || (isBranchChange && isLineChange);
       const branchChangePenalty = !isBranchChange
@@ -2359,16 +2566,38 @@ function findRoute(
           : SAME_LINE_BRANCH_CHANGE_PENALTY;
       const durationMinutes = getRouteEdgeDurationMinutes(edge);
       const transferCount = current.transferCount + (isTransfer ? 1 : 0);
-      const totalMinutes = current.totalMinutes + durationMinutes + (isManualTransfer ? 0 : branchChangePenalty);
-      const timetablePriority = edge.kind === "timetable" ? TIMETABLE_EDGE_PRIORITY_BONUS : 0;
-      const fallbackRidePenalty = edge.kind === "ride" && (!edge.distanceMeters || !edge.durationMinutes) ? 4 : 0;
-      const longTransferPenalty = edge.kind === "manual-transfer" && (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY) >= 20 ? 2 : 0;
+      const totalMinutes =
+        current.totalMinutes +
+        durationMinutes +
+        (isManualTransfer ? 0 : branchChangePenalty);
+      const timetablePriority =
+        edge.kind === "timetable" ? TIMETABLE_EDGE_PRIORITY_BONUS : 0;
+      const fallbackRidePenalty =
+        edge.kind === "ride" && (!edge.distanceMeters || !edge.durationMinutes)
+          ? 4
+          : 0;
+      const longTransferPenalty =
+        edge.kind === "manual-transfer" &&
+        (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY) >= 20
+          ? 2
+          : 0;
       const dataQualityPenalty = fallbackRidePenalty + longTransferPenalty;
-      const nextScore = criterion === "fewest-transfers"
-        ? transferCount * FEWEST_TRANSFER_SCORE_WEIGHT + totalMinutes + dataQualityPenalty + current.stopCount * ROUTE_STOP_STEP_PENALTY
-        : criterion === "timetable-priority"
-          ? totalMinutes - timetablePriority * 6 + transferCount * 3 + dataQualityPenalty + current.stopCount * ROUTE_STOP_STEP_PENALTY
-          : totalMinutes - timetablePriority + dataQualityPenalty + current.stopCount * ROUTE_STOP_STEP_PENALTY;
+      const nextScore =
+        criterion === "fewest-transfers"
+          ? transferCount * FEWEST_TRANSFER_SCORE_WEIGHT +
+            totalMinutes +
+            dataQualityPenalty +
+            current.stopCount * ROUTE_STOP_STEP_PENALTY
+          : criterion === "timetable-priority"
+            ? totalMinutes -
+              timetablePriority * 6 +
+              transferCount * 3 +
+              dataQualityPenalty +
+              current.stopCount * ROUTE_STOP_STEP_PENALTY
+            : totalMinutes -
+              timetablePriority +
+              dataQualityPenalty +
+              current.stopCount * ROUTE_STOP_STEP_PENALTY;
       const nextPreviousBranchId = isManualTransfer ? null : edge.branchId;
       const nextPreviousLineNameKo = isManualTransfer ? null : edge.lineNameKo;
       const nextKey = makeRouteStateKey(edge.toStationId, nextPreviousBranchId);
@@ -2418,15 +2647,21 @@ function findRoute(
 
   for (const edge of edges) {
     const isManualTransfer = edge.kind === "manual-transfer";
-    const isBranchChange = Boolean(previousBranchId && edge.branchId !== previousBranchId);
-    const isLineChange = Boolean(previousLineNameKo && edge.lineNameKo !== previousLineNameKo);
+    const isBranchChange = Boolean(
+      previousBranchId && edge.branchId !== previousBranchId,
+    );
+    const isLineChange = Boolean(
+      previousLineNameKo && edge.lineNameKo !== previousLineNameKo,
+    );
     const branchChangePenalty = !isBranchChange
       ? 0
       : isLineChange
         ? ROUTE_TRANSFER_PENALTY
         : SAME_LINE_BRANCH_CHANGE_PENALTY;
 
-    totalMinutes += getRouteEdgeDurationMinutes(edge) + (isManualTransfer ? 0 : branchChangePenalty);
+    totalMinutes +=
+      getRouteEdgeDurationMinutes(edge) +
+      (isManualTransfer ? 0 : branchChangePenalty);
     totalDistanceMeters += edge.distanceMeters ?? 0;
 
     if (isManualTransfer) {
@@ -2448,7 +2683,12 @@ function findRoute(
     totalMinutes: Math.ceil(totalMinutes),
     totalDistanceMeters,
     criterion,
-    label: criterion === "fewest-transfers" ? "환승 적게" : criterion === "timetable-priority" ? "시간표 우선" : "빠른 경로",
+    label:
+      criterion === "fewest-transfers"
+        ? "환승 적게"
+        : criterion === "timetable-priority"
+          ? "시간표 우선"
+          : "빠른 경로",
   };
 }
 
@@ -2475,13 +2715,20 @@ function RouteResultSummary({
   const destinationName =
     stationById.get(result.stationIds[result.stationIds.length - 1] ?? "")
       ?.nameKo ?? "도착";
-  const timedEdgeCount = result.edges.filter((edge) => edge.kind === "timetable").length;
-  const rideEdgeCount = result.edges.filter((edge) => edge.kind === "ride").length;
-  const transferEdgeCount = result.edges.filter((edge) => edge.kind === "manual-transfer").length;
+  const timedEdgeCount = result.edges.filter(
+    (edge) => edge.kind === "timetable",
+  ).length;
+  const rideEdgeCount = result.edges.filter(
+    (edge) => edge.kind === "ride",
+  ).length;
+  const transferEdgeCount = result.edges.filter(
+    (edge) => edge.kind === "manual-transfer",
+  ).length;
   const totalMinutesLabel = `${Math.ceil(result.totalMinutes).toLocaleString("ko-KR")}분`;
-  const distanceLabel = result.totalDistanceMeters >= 1000
-    ? `${(result.totalDistanceMeters / 1000).toFixed(result.totalDistanceMeters >= 10_000 ? 0 : 1)}km`
-    : `${Math.round(result.totalDistanceMeters).toLocaleString("ko-KR")}m`;
+  const distanceLabel =
+    result.totalDistanceMeters >= 1000
+      ? `${(result.totalDistanceMeters / 1000).toFixed(result.totalDistanceMeters >= 10_000 ? 0 : 1)}km`
+      : `${Math.round(result.totalDistanceMeters).toLocaleString("ko-KR")}m`;
 
   const segments: Array<{
     branchId: string;
@@ -2509,7 +2756,8 @@ function RouteResultSummary({
     if (last && last.branchId === edge.branchId && edge.kind === "ride") {
       last.toStationId = toStationId;
       last.edgeCount += 1;
-      last.durationMinutes = (last.durationMinutes ?? 0) + (edge.durationMinutes ?? 0);
+      last.durationMinutes =
+        (last.durationMinutes ?? 0) + (edge.durationMinutes ?? 0);
     } else {
       segments.push({
         branchId: edge.branchId,
@@ -2538,23 +2786,37 @@ function RouteResultSummary({
               {originName} → {destinationName}
             </p>
           </div>
-        <div className="mt-3 grid grid-cols-3 gap-1.5">
-          <div className="rounded-2xl bg-slate-950 px-2.5 py-2 text-white">
-            <span className="block text-[10px] font-medium text-white/60">예상</span>
-            <strong className="mt-0.5 block text-sm font-semibold">{totalMinutesLabel}</strong>
+          <div className="mt-3 grid grid-cols-3 gap-1.5">
+            <div className="rounded-2xl bg-slate-950 px-2.5 py-2 text-white">
+              <span className="block text-[10px] font-medium text-white/60">
+                예상
+              </span>
+              <strong className="mt-0.5 block text-sm font-semibold">
+                {totalMinutesLabel}
+              </strong>
+            </div>
+            <div className="rounded-2xl bg-slate-100 px-2.5 py-2 text-slate-700">
+              <span className="block text-[10px] font-medium text-slate-400">
+                환승
+              </span>
+              <strong className="mt-0.5 block text-sm font-semibold">
+                {result.transferCount.toLocaleString("ko-KR")}회
+              </strong>
+            </div>
+            <div className="rounded-2xl bg-slate-100 px-2.5 py-2 text-slate-700">
+              <span className="block text-[10px] font-medium text-slate-400">
+                거리
+              </span>
+              <strong className="mt-0.5 block text-sm font-semibold">
+                {distanceLabel}
+              </strong>
+            </div>
           </div>
-          <div className="rounded-2xl bg-slate-100 px-2.5 py-2 text-slate-700">
-            <span className="block text-[10px] font-medium text-slate-400">환승</span>
-            <strong className="mt-0.5 block text-sm font-semibold">{result.transferCount.toLocaleString("ko-KR")}회</strong>
-          </div>
-          <div className="rounded-2xl bg-slate-100 px-2.5 py-2 text-slate-700">
-            <span className="block text-[10px] font-medium text-slate-400">거리</span>
-            <strong className="mt-0.5 block text-sm font-semibold">{distanceLabel}</strong>
-          </div>
-        </div>
           <div className="shrink-0 rounded-2xl bg-emerald-600 px-3 py-1.5 text-right text-white shadow-sm shadow-emerald-900/15">
             <p className="text-[10px] font-medium opacity-80">예상</p>
-            <p className="text-sm font-semibold">{formatNumber(result.totalMinutes)}분</p>
+            <p className="text-sm font-semibold">
+              {formatNumber(result.totalMinutes)}분
+            </p>
           </div>
         </div>
 
@@ -2582,14 +2844,32 @@ function RouteResultSummary({
         ) : null}
 
         <div className="mt-3 grid grid-cols-3 gap-1.5">
-          <RouteMetric label="역" value={`${formatNumber(result.stationIds.length)}개`} />
-          <RouteMetric label="환승" value={`${formatNumber(result.transferCount)}회`} />
-          <RouteMetric label="거리" value={formatDistance(result.totalDistanceMeters)} />
+          <RouteMetric
+            label="역"
+            value={`${formatNumber(result.stationIds.length)}개`}
+          />
+          <RouteMetric
+            label="환승"
+            value={`${formatNumber(result.transferCount)}회`}
+          />
+          <RouteMetric
+            label="거리"
+            value={formatDistance(result.totalDistanceMeters)}
+          />
         </div>
         <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-          <RouteMetric label="이동" value={`${formatNumber(rideEdgeCount)}구간`} />
-          <RouteMetric label="시간표" value={`${formatNumber(timedEdgeCount)}구간`} />
-          <RouteMetric label="환승" value={`${formatNumber(transferEdgeCount)}회`} />
+          <RouteMetric
+            label="이동"
+            value={`${formatNumber(rideEdgeCount)}구간`}
+          />
+          <RouteMetric
+            label="시간표"
+            value={`${formatNumber(timedEdgeCount)}구간`}
+          />
+          <RouteMetric
+            label="환승"
+            value={`${formatNumber(transferEdgeCount)}회`}
+          />
         </div>
         <RouteQualityReviewPanel result={result} />
         <RouteRegressionCasePanel result={result} stationById={stationById} />
@@ -2664,8 +2944,12 @@ function RouteResultComparisonPanel({
   activeResultIndex: number;
   onSelectResult: (index: number) => void;
 }) {
-  const fastestMinutes = Math.min(...results.map((result) => result.totalMinutes));
-  const fewestTransfers = Math.min(...results.map((result) => result.transferCount));
+  const fastestMinutes = Math.min(
+    ...results.map((result) => result.totalMinutes),
+  );
+  const fewestTransfers = Math.min(
+    ...results.map((result) => result.transferCount),
+  );
 
   return (
     <div className="mt-2 overflow-hidden rounded-2xl border border-white/80 bg-white/85 shadow-sm shadow-slate-950/5">
@@ -2693,8 +2977,12 @@ function RouteResultComparisonPanel({
               {isFastest ? " · 빠름" : ""}
               {isFewestTransfer ? " · 적음" : ""}
             </span>
-            <span className="text-right font-bold">{formatNumber(candidate.totalMinutes)}분</span>
-            <span className="text-right font-bold">{formatNumber(candidate.transferCount)}회</span>
+            <span className="text-right font-bold">
+              {formatNumber(candidate.totalMinutes)}분
+            </span>
+            <span className="text-right font-bold">
+              {formatNumber(candidate.transferCount)}회
+            </span>
             <span className="text-right font-bold">{diagnostics.level}</span>
           </button>
         );
@@ -2705,15 +2993,24 @@ function RouteResultComparisonPanel({
 
 function getRouteQualityDiagnostics(result: RouteSearchResult) {
   const fallbackRideCount = result.edges.filter(
-    (edge) => edge.kind === "ride" && (!edge.distanceMeters || !edge.durationMinutes),
+    (edge) =>
+      edge.kind === "ride" && (!edge.distanceMeters || !edge.durationMinutes),
   ).length;
-  const timetableCount = result.edges.filter((edge) => edge.kind === "timetable").length;
-  const transferCount = result.edges.filter((edge) => edge.kind === "manual-transfer").length;
+  const timetableCount = result.edges.filter(
+    (edge) => edge.kind === "timetable",
+  ).length;
+  const transferCount = result.edges.filter(
+    (edge) => edge.kind === "manual-transfer",
+  ).length;
   const geometryRideCount = result.edges.filter(
-    (edge) => edge.kind === "ride" && Boolean(edge.distanceMeters && edge.durationMinutes),
+    (edge) =>
+      edge.kind === "ride" &&
+      Boolean(edge.distanceMeters && edge.durationMinutes),
   ).length;
   const longTransferCount = result.edges.filter(
-    (edge) => edge.kind === "manual-transfer" && (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY) >= 20,
+    (edge) =>
+      edge.kind === "manual-transfer" &&
+      (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY) >= 20,
   ).length;
   const noDistanceRideCount = result.edges.filter(
     (edge) => edge.kind === "ride" && !edge.distanceMeters,
@@ -2721,17 +3018,20 @@ function getRouteQualityDiagnostics(result: RouteSearchResult) {
   const noDurationRideCount = result.edges.filter(
     (edge) => edge.kind === "ride" && !edge.durationMinutes,
   ).length;
-  const timetableShare = result.edges.length > 0
-    ? Math.round((timetableCount / result.edges.length) * 100)
-    : 0;
-  const fallbackShare = result.edges.length > 0
-    ? Math.round((fallbackRideCount / result.edges.length) * 100)
-    : 0;
-  const level = fallbackRideCount > 0 || noDistanceRideCount > 0 || noDurationRideCount > 0
-    ? "확인 필요"
-    : longTransferCount > 0
-      ? "주의"
-      : "양호";
+  const timetableShare =
+    result.edges.length > 0
+      ? Math.round((timetableCount / result.edges.length) * 100)
+      : 0;
+  const fallbackShare =
+    result.edges.length > 0
+      ? Math.round((fallbackRideCount / result.edges.length) * 100)
+      : 0;
+  const level =
+    fallbackRideCount > 0 || noDistanceRideCount > 0 || noDurationRideCount > 0
+      ? "확인 필요"
+      : longTransferCount > 0
+        ? "주의"
+        : "양호";
 
   return {
     level,
@@ -2749,17 +3049,28 @@ function getRouteQualityDiagnostics(result: RouteSearchResult) {
 
 function RouteQualityReviewPanel({ result }: { result: RouteSearchResult }) {
   const diagnostics = getRouteQualityDiagnostics(result);
-  const qualityTone = diagnostics.level === "양호"
-    ? "border-emerald-100 bg-emerald-50/70 text-emerald-800"
-    : diagnostics.level === "주의"
-      ? "border-amber-100 bg-amber-50/70 text-amber-800"
-      : "border-rose-100 bg-rose-50/70 text-rose-800";
+  const qualityTone =
+    diagnostics.level === "양호"
+      ? "border-emerald-100 bg-emerald-50/70 text-emerald-800"
+      : diagnostics.level === "주의"
+        ? "border-amber-100 bg-amber-50/70 text-amber-800"
+        : "border-rose-100 bg-rose-50/70 text-rose-800";
   const qualityItems = [
-    diagnostics.timetableCount > 0 ? `${formatNumber(diagnostics.timetableCount)}개 시간표 구간` : null,
-    diagnostics.geometryRideCount > 0 ? `${formatNumber(diagnostics.geometryRideCount)}개 선형 거리 계산` : null,
-    diagnostics.fallbackRideCount > 0 ? `${formatNumber(diagnostics.fallbackRideCount)}개 기본 시간 보정` : null,
-    diagnostics.transferCount > 0 ? `${formatNumber(diagnostics.transferCount)}회 환승` : null,
-    diagnostics.longTransferCount > 0 ? `${formatNumber(diagnostics.longTransferCount)}개 긴 환승 시간` : null,
+    diagnostics.timetableCount > 0
+      ? `${formatNumber(diagnostics.timetableCount)}개 시간표 구간`
+      : null,
+    diagnostics.geometryRideCount > 0
+      ? `${formatNumber(diagnostics.geometryRideCount)}개 선형 거리 계산`
+      : null,
+    diagnostics.fallbackRideCount > 0
+      ? `${formatNumber(diagnostics.fallbackRideCount)}개 기본 시간 보정`
+      : null,
+    diagnostics.transferCount > 0
+      ? `${formatNumber(diagnostics.transferCount)}회 환승`
+      : null,
+    diagnostics.longTransferCount > 0
+      ? `${formatNumber(diagnostics.longTransferCount)}개 긴 환승 시간`
+      : null,
   ].filter((item): item is string => Boolean(item));
 
   return (
@@ -2771,9 +3082,18 @@ function RouteQualityReviewPanel({ result }: { result: RouteSearchResult }) {
         </span>
       </div>
       <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-        <RouteMetric label="시간표" value={`${formatNumber(diagnostics.timetableShare)}%`} />
-        <RouteMetric label="기본값" value={`${formatNumber(diagnostics.fallbackShare)}%`} />
-        <RouteMetric label="구간" value={`${formatNumber(result.edges.length)}개`} />
+        <RouteMetric
+          label="시간표"
+          value={`${formatNumber(diagnostics.timetableShare)}%`}
+        />
+        <RouteMetric
+          label="기본값"
+          value={`${formatNumber(diagnostics.fallbackShare)}%`}
+        />
+        <RouteMetric
+          label="구간"
+          value={`${formatNumber(result.edges.length)}개`}
+        />
       </div>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {qualityItems.map((item) => (
@@ -2811,7 +3131,9 @@ const ROUTE_REGRESSION_STORAGE_KEY = "railmap.route-regression-cases.v1";
 function readStoredRouteRegressionCases(): StoredRouteRegressionCase[] {
   if (typeof window === "undefined") return [];
   try {
-    const parsed = JSON.parse(window.localStorage.getItem(ROUTE_REGRESSION_STORAGE_KEY) ?? "[]");
+    const parsed = JSON.parse(
+      window.localStorage.getItem(ROUTE_REGRESSION_STORAGE_KEY) ?? "[]",
+    );
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
@@ -2829,7 +3151,8 @@ function RouteRegressionCasePanel({
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const importInputRef = useRef<HTMLInputElement | null>(null);
   const originStationId = result.stationIds[0] ?? "";
-  const destinationStationId = result.stationIds[result.stationIds.length - 1] ?? "";
+  const destinationStationId =
+    result.stationIds[result.stationIds.length - 1] ?? "";
 
   useEffect(() => {
     setCases(readStoredRouteRegressionCases());
@@ -2837,18 +3160,29 @@ function RouteRegressionCasePanel({
 
   const persist = (nextCases: StoredRouteRegressionCase[]) => {
     setCases(nextCases);
-    window.localStorage.setItem(ROUTE_REGRESSION_STORAGE_KEY, JSON.stringify(nextCases));
+    window.localStorage.setItem(
+      ROUTE_REGRESSION_STORAGE_KEY,
+      JSON.stringify(nextCases),
+    );
   };
 
   const matchingCase = cases.find(
-    (item) => item.originStationId === originStationId && item.destinationStationId === destinationStationId,
+    (item) =>
+      item.originStationId === originStationId &&
+      item.destinationStationId === destinationStationId,
   );
-  const minutesDelta = matchingCase ? Math.ceil(result.totalMinutes) - matchingCase.expectedMinutes : 0;
-  const transferDelta = matchingCase ? result.transferCount - matchingCase.expectedTransfers : 0;
+  const minutesDelta = matchingCase
+    ? Math.ceil(result.totalMinutes) - matchingCase.expectedMinutes
+    : 0;
+  const transferDelta = matchingCase
+    ? result.transferCount - matchingCase.expectedTransfers
+    : 0;
   const routeChanged = matchingCase
     ? matchingCase.expectedStationIds.join(">") !== result.stationIds.join(">")
     : false;
-  const regressionDetected = Boolean(matchingCase && (minutesDelta > 3 || transferDelta > 0 || routeChanged));
+  const regressionDetected = Boolean(
+    matchingCase && (minutesDelta > 3 || transferDelta > 0 || routeChanged),
+  );
 
   const saveCurrent = () => {
     if (!originStationId || !destinationStationId) return;
@@ -2857,13 +3191,19 @@ function RouteRegressionCasePanel({
       originStationId,
       destinationStationId,
       originName: stationById.get(originStationId)?.nameKo ?? originStationId,
-      destinationName: stationById.get(destinationStationId)?.nameKo ?? destinationStationId,
+      destinationName:
+        stationById.get(destinationStationId)?.nameKo ?? destinationStationId,
       expectedMinutes: Math.ceil(result.totalMinutes),
       expectedTransfers: result.transferCount,
       expectedStationIds: result.stationIds,
       createdAt: new Date().toISOString(),
     };
-    persist([nextCase, ...cases.filter((item) => item.id !== nextCase.id)].slice(0, 50));
+    persist(
+      [nextCase, ...cases.filter((item) => item.id !== nextCase.id)].slice(
+        0,
+        50,
+      ),
+    );
   };
 
   const removeCurrent = () => {
@@ -2872,8 +3212,14 @@ function RouteRegressionCasePanel({
   };
 
   const exportCases = () => {
-    const payload = JSON.stringify({ schemaVersion: 1, exportedAt: new Date().toISOString(), cases }, null, 2);
-    const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+    const payload = JSON.stringify(
+      { schemaVersion: 1, exportedAt: new Date().toISOString(), cases },
+      null,
+      2,
+    );
+    const url = URL.createObjectURL(
+      new Blob([payload], { type: "application/json" }),
+    );
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = `railmap-route-regression-${new Date().toISOString().slice(0, 10)}.json`;
@@ -2887,26 +3233,36 @@ function RouteRegressionCasePanel({
       const parsed = JSON.parse(await file.text()) as unknown;
       const rawCases = Array.isArray(parsed)
         ? parsed
-        : parsed && typeof parsed === "object" && Array.isArray((parsed as { cases?: unknown }).cases)
+        : parsed &&
+            typeof parsed === "object" &&
+            Array.isArray((parsed as { cases?: unknown }).cases)
           ? (parsed as { cases: unknown[] }).cases
           : null;
       if (!rawCases) throw new Error("cases 배열을 찾지 못했습니다.");
-      const imported = rawCases.filter((item): item is StoredRouteRegressionCase => {
-        if (!item || typeof item !== "object") return false;
-        const candidate = item as Partial<StoredRouteRegressionCase>;
-        return typeof candidate.id === "string"
-          && typeof candidate.originStationId === "string"
-          && typeof candidate.destinationStationId === "string"
-          && typeof candidate.expectedMinutes === "number"
-          && typeof candidate.expectedTransfers === "number"
-          && Array.isArray(candidate.expectedStationIds);
-      });
+      const imported = rawCases.filter(
+        (item): item is StoredRouteRegressionCase => {
+          if (!item || typeof item !== "object") return false;
+          const candidate = item as Partial<StoredRouteRegressionCase>;
+          return (
+            typeof candidate.id === "string" &&
+            typeof candidate.originStationId === "string" &&
+            typeof candidate.destinationStationId === "string" &&
+            typeof candidate.expectedMinutes === "number" &&
+            typeof candidate.expectedTransfers === "number" &&
+            Array.isArray(candidate.expectedStationIds)
+          );
+        },
+      );
       const merged = new Map(cases.map((item) => [item.id, item]));
       for (const item of imported) merged.set(item.id, item);
       persist([...merged.values()].slice(0, 200));
-      setImportMessage(`${imported.length.toLocaleString("ko-KR")}개 기준을 가져왔습니다.`);
+      setImportMessage(
+        `${imported.length.toLocaleString("ko-KR")}개 기준을 가져왔습니다.`,
+      );
     } catch (error) {
-      setImportMessage(error instanceof Error ? error.message : "가져오기에 실패했습니다.");
+      setImportMessage(
+        error instanceof Error ? error.message : "가져오기에 실패했습니다.",
+      );
     } finally {
       if (importInputRef.current) importInputRef.current.value = "";
     }
@@ -2930,13 +3286,25 @@ function RouteRegressionCasePanel({
         </button>
       </div>
       {matchingCase ? (
-        <div className={`mt-2 rounded-xl border px-2.5 py-2 ${regressionDetected ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+        <div
+          className={`mt-2 rounded-xl border px-2.5 py-2 ${regressionDetected ? "border-rose-200 bg-rose-50 text-rose-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}
+        >
           <div className="flex items-center justify-between gap-2">
-            <strong className="text-[10px]">{regressionDetected ? "변경 확인 필요" : "기준 통과"}</strong>
-            <button type="button" className="text-[10px] font-semibold opacity-70 hover:opacity-100" onClick={removeCurrent}>삭제</button>
+            <strong className="text-[10px]">
+              {regressionDetected ? "변경 확인 필요" : "기준 통과"}
+            </strong>
+            <button
+              type="button"
+              className="text-[10px] font-semibold opacity-70 hover:opacity-100"
+              onClick={removeCurrent}
+            >
+              삭제
+            </button>
           </div>
           <p className="mt-1 text-[10px] font-medium">
-            기준 {matchingCase.expectedMinutes}분 · {matchingCase.expectedTransfers}회 / 현재 {Math.ceil(result.totalMinutes)}분 · {result.transferCount}회
+            기준 {matchingCase.expectedMinutes}분 ·{" "}
+            {matchingCase.expectedTransfers}회 / 현재{" "}
+            {Math.ceil(result.totalMinutes)}분 · {result.transferCount}회
           </p>
           {regressionDetected ? (
             <p className="mt-1 text-[10px] font-medium">
@@ -2948,23 +3316,53 @@ function RouteRegressionCasePanel({
         </div>
       ) : null}
       <div className="mt-2 flex flex-wrap items-center gap-1.5">
-        <button type="button" className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-indigo-700 shadow-sm disabled:opacity-40" disabled={cases.length === 0} onClick={exportCases}>
+        <button
+          type="button"
+          className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-indigo-700 shadow-sm disabled:opacity-40"
+          disabled={cases.length === 0}
+          onClick={exportCases}
+        >
           기준 내보내기
         </button>
-        <button type="button" className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-indigo-700 shadow-sm" onClick={() => importInputRef.current?.click()}>
+        <button
+          type="button"
+          className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-indigo-700 shadow-sm"
+          onClick={() => importInputRef.current?.click()}
+        >
           기준 가져오기
         </button>
         {cases.length > 0 ? (
-          <button type="button" className="rounded-full px-2.5 py-1 text-[10px] font-semibold text-rose-600" onClick={() => window.confirm("저장된 회귀 검증 기준을 모두 삭제할까요?") && persist([])}>
+          <button
+            type="button"
+            className="rounded-full px-2.5 py-1 text-[10px] font-semibold text-rose-600"
+            onClick={() =>
+              window.confirm("저장된 회귀 검증 기준을 모두 삭제할까요?") &&
+              persist([])
+            }
+          >
             전체 삭제
           </button>
         ) : null}
-        <input ref={importInputRef} type="file" accept="application/json,.json" className="hidden" onChange={(event) => void importCases(event.target.files?.[0] ?? null)} />
+        <input
+          ref={importInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(event) =>
+            void importCases(event.target.files?.[0] ?? null)
+          }
+        />
       </div>
       {cases.length > 0 ? (
-        <p className="mt-1.5 text-[10px] font-medium text-indigo-700/70">저장된 검증 기준 {cases.length.toLocaleString("ko-KR")}개</p>
+        <p className="mt-1.5 text-[10px] font-medium text-indigo-700/70">
+          저장된 검증 기준 {cases.length.toLocaleString("ko-KR")}개
+        </p>
       ) : null}
-      {importMessage ? <p className="mt-1 text-[10px] font-medium text-indigo-700/70">{importMessage}</p> : null}
+      {importMessage ? (
+        <p className="mt-1 text-[10px] font-medium text-indigo-700/70">
+          {importMessage}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -2986,11 +3384,13 @@ function RouteCalculationDebugPanel({
   stationById: Map<string, RailMapStation>;
 }) {
   const rideDistanceMeters = result.edges.reduce(
-    (sum, edge) => sum + (edge.kind === "ride" ? (edge.distanceMeters ?? 0) : 0),
+    (sum, edge) =>
+      sum + (edge.kind === "ride" ? (edge.distanceMeters ?? 0) : 0),
     0,
   );
   const timetableMinutes = result.edges.reduce(
-    (sum, edge) => sum + (edge.kind === "timetable" ? (edge.durationMinutes ?? 0) : 0),
+    (sum, edge) =>
+      sum + (edge.kind === "timetable" ? (edge.durationMinutes ?? 0) : 0),
     0,
   );
   const transferMinutes = result.edges.reduce(
@@ -3003,30 +3403,34 @@ function RouteCalculationDebugPanel({
   );
   const diagnostics = getRouteQualityDiagnostics(result);
   const debugRows = result.edges.map((edge, index) => {
-    const fromName = stationById.get(result.stationIds[index] ?? "")?.nameKo ?? "출발";
+    const fromName =
+      stationById.get(result.stationIds[index] ?? "")?.nameKo ?? "출발";
     const toName = stationById.get(edge.toStationId)?.nameKo ?? "도착";
-    const duration = edge.kind === "manual-transfer"
-      ? (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY)
-      : (edge.durationMinutes ?? 1);
+    const duration =
+      edge.kind === "manual-transfer"
+        ? (edge.transferMinutes ?? MANUAL_TRANSFER_PENALTY)
+        : (edge.durationMinutes ?? 1);
 
     return {
       key: `${edge.kind}:${edge.branchId}:${edge.toStationId}:${index}`,
-      title: edge.kind === "timetable"
-        ? `${edge.lineNameKo} · ${edge.trainNumber ? `열차 ${edge.trainNumber}` : "시간표"}`
-        : edge.kind === "manual-transfer"
-          ? "환승"
-          : edge.lineNameKo,
+      title:
+        edge.kind === "timetable"
+          ? `${edge.lineNameKo} · ${edge.trainNumber ? `열차 ${edge.trainNumber}` : "시간표"}`
+          : edge.kind === "manual-transfer"
+            ? "환승"
+            : edge.lineNameKo,
       fromName,
       toName,
       duration,
       distanceMeters: edge.distanceMeters ?? null,
-      source: edge.kind === "timetable"
-        ? "시간표"
-        : edge.kind === "manual-transfer"
-          ? "환승 시간"
-          : edge.distanceMeters
-            ? "선형 거리 + 성능값"
-            : "기본 이동 시간",
+      source:
+        edge.kind === "timetable"
+          ? "시간표"
+          : edge.kind === "manual-transfer"
+            ? "환승 시간"
+            : edge.distanceMeters
+              ? "선형 거리 + 성능값"
+              : "기본 이동 시간",
     };
   });
 
@@ -3034,15 +3438,31 @@ function RouteCalculationDebugPanel({
     <details className="group rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-[11px] font-semibold text-slate-700">
         <span>계산 근거</span>
-        <span className="text-[10px] font-medium text-slate-400 group-open:hidden">열기</span>
-        <span className="hidden text-[10px] font-medium text-slate-400 group-open:inline">닫기</span>
+        <span className="text-[10px] font-medium text-slate-400 group-open:hidden">
+          열기
+        </span>
+        <span className="hidden text-[10px] font-medium text-slate-400 group-open:inline">
+          닫기
+        </span>
       </summary>
 
       <div className="mt-2 grid grid-cols-3 gap-1.5">
-        <RouteMetric label="선형거리" value={formatDistance(rideDistanceMeters)} />
-        <RouteMetric label="시간표" value={`${formatNumber(Math.ceil(timetableMinutes))}분`} />
-        <RouteMetric label="환승" value={`${formatNumber(Math.ceil(transferMinutes))}분`} />
-        <RouteMetric label="기본값" value={`${formatNumber(diagnostics.fallbackRideCount)}구간`} />
+        <RouteMetric
+          label="선형거리"
+          value={formatDistance(rideDistanceMeters)}
+        />
+        <RouteMetric
+          label="시간표"
+          value={`${formatNumber(Math.ceil(timetableMinutes))}분`}
+        />
+        <RouteMetric
+          label="환승"
+          value={`${formatNumber(Math.ceil(transferMinutes))}분`}
+        />
+        <RouteMetric
+          label="기본값"
+          value={`${formatNumber(diagnostics.fallbackRideCount)}구간`}
+        />
       </div>
 
       <div className="mt-2 grid gap-1.5">
@@ -3061,7 +3481,9 @@ function RouteCalculationDebugPanel({
             </div>
             <p className="mt-0.5 truncate text-[10px] font-medium text-slate-400">
               {row.fromName} → {row.toName} · {row.source}
-              {row.distanceMeters ? ` · ${formatDistance(row.distanceMeters)}` : ""}
+              {row.distanceMeters
+                ? ` · ${formatDistance(row.distanceMeters)}`
+                : ""}
             </p>
           </div>
         ))}
@@ -3077,7 +3499,8 @@ function RouteCalculationDebugPanel({
 
 function formatDistance(distanceMeters: number) {
   if (!Number.isFinite(distanceMeters) || distanceMeters <= 0) return "-";
-  if (distanceMeters >= 1000) return `${formatNumber(Math.round(distanceMeters / 100) / 10)}km`;
+  if (distanceMeters >= 1000)
+    return `${formatNumber(Math.round(distanceMeters / 100) / 10)}km`;
   return `${formatNumber(Math.round(distanceMeters))}m`;
 }
 
@@ -3099,14 +3522,19 @@ function RouteTimedSegment({
   return (
     <div className="min-w-0 rounded border border-blue-100 bg-blue-50 px-2 py-1.5">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: colorHex }} />
+        <span
+          className="h-2.5 w-2.5 shrink-0 rounded-full"
+          style={{ backgroundColor: colorHex }}
+        />
         <p className="min-w-0 break-words text-[11px] font-semibold leading-4 text-slate-800">
           {lineName} · {sourceLineName}
         </p>
       </div>
       <p className="mt-1 text-[10px] text-slate-500">
         {fromStationName} → {toStationName}
-        {typeof durationMinutes === "number" ? ` · ${formatNumber(durationMinutes)}분` : ""}
+        {typeof durationMinutes === "number"
+          ? ` · ${formatNumber(durationMinutes)}분`
+          : ""}
       </p>
     </div>
   );
@@ -3202,7 +3630,9 @@ function RouteRoadmapSegment({
         <div className="flex min-w-0 items-center py-1">
           <p className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500">
             {formatNumber(Math.max(1, stationCount - 1))}개 구간
-            {typeof durationMinutes === "number" && durationMinutes > 0 ? ` · 약 ${formatNumber(Math.ceil(durationMinutes))}분` : ""}
+            {typeof durationMinutes === "number" && durationMinutes > 0
+              ? ` · 약 ${formatNumber(Math.ceil(durationMinutes))}분`
+              : ""}
           </p>
         </div>
 
@@ -3361,11 +3791,31 @@ function RouteSearchPreferenceControl({
   value: RouteSearchPreference;
   onChange: (value: RouteSearchPreference) => void;
 }) {
-  const options: Array<{ value: RouteSearchPreference; label: string; hint: string }> = [
-    { value: "balanced", label: "균형", hint: "최단 시간과 환승 적게를 함께 비교" },
-    { value: "fastest", label: "빠른 경로", hint: "예상 시간이 가장 짧은 경로" },
-    { value: "fewest-transfers", label: "환승 적게", hint: "환승 수를 우선 줄인 경로" },
-    { value: "timetable-priority", label: "시간표 우선", hint: "실제 시간표가 있는 구간을 조금 더 우선" },
+  const options: Array<{
+    value: RouteSearchPreference;
+    label: string;
+    hint: string;
+  }> = [
+    {
+      value: "balanced",
+      label: "균형",
+      hint: "최단 시간과 환승 적게를 함께 비교",
+    },
+    {
+      value: "fastest",
+      label: "빠른 경로",
+      hint: "예상 시간이 가장 짧은 경로",
+    },
+    {
+      value: "fewest-transfers",
+      label: "환승 적게",
+      hint: "환승 수를 우선 줄인 경로",
+    },
+    {
+      value: "timetable-priority",
+      label: "시간표 우선",
+      hint: "실제 시간표가 있는 구간을 조금 더 우선",
+    },
   ];
 
   return (
@@ -3381,8 +3831,12 @@ function RouteSearchPreferenceControl({
               onClick={() => onChange(option.value)}
               title={option.hint}
             >
-              <span className="block text-[11px] font-semibold">{option.label}</span>
-              <span className="mt-0.5 block truncate text-[9px] font-medium opacity-70">{option.hint}</span>
+              <span className="block text-[11px] font-semibold">
+                {option.label}
+              </span>
+              <span className="mt-0.5 block truncate text-[9px] font-medium opacity-70">
+                {option.hint}
+              </span>
             </button>
           );
         })}
@@ -3411,11 +3865,16 @@ function RoutePointPicker({
   onClear: () => void;
 }) {
   const labelClass = accent === "sky" ? "text-sky-600" : "text-amber-600";
-  const ringClass = accent === "sky" ? "focus:border-sky-300 focus:ring-sky-100" : "focus:border-amber-300 focus:ring-amber-100";
+  const ringClass =
+    accent === "sky"
+      ? "focus:border-sky-300 focus:ring-sky-100"
+      : "focus:border-amber-300 focus:ring-amber-100";
   const normalizedQuery = normalizeSearchText(query);
   const results = normalizedQuery
     ? allStations
-        .filter((candidate) => normalizeSearchText(candidate.nameKo).includes(normalizedQuery))
+        .filter((candidate) =>
+          normalizeSearchText(candidate.nameKo).includes(normalizedQuery),
+        )
         .slice(0, 8)
     : [];
 
@@ -3462,40 +3921,6 @@ function RoutePointPicker({
             </button>
           ))}
         </div>
-      ) : null}
-    </div>
-  );
-}
-
-function RoutePointSlot({
-  label,
-  accent,
-  station,
-  onClear,
-}: {
-  label: string;
-  accent: "sky" | "amber";
-  station: RailMapStation | null;
-  onClear: () => void;
-}) {
-  const labelClass = accent === "sky" ? "text-sky-600" : "text-amber-600";
-
-  return (
-    <div className="flex min-w-0 items-center justify-between gap-2 rounded border border-slate-200 bg-white px-2 py-1.5">
-      <div className="min-w-0">
-        <p className={`text-[10px] font-bold ${labelClass}`}>{label}</p>
-        <p className="mt-0.5 truncate text-xs font-bold text-slate-900">
-          {station?.nameKo ?? "미지정"}
-        </p>
-      </div>
-      {station ? (
-        <button
-          type="button"
-          className="h-6 shrink-0 rounded px-1.5 text-[10px] font-semibold text-slate-400 transition duration-150 ease-out hover:bg-slate-100 hover:text-slate-700 active:scale-[0.99]"
-          onClick={onClear}
-        >
-          삭제
-        </button>
       ) : null}
     </div>
   );
@@ -3554,7 +3979,6 @@ function SelectedTransferGroupPanel({
     </section>
   );
 }
-
 
 function TransferStationRailCard({
   station,
@@ -3821,18 +4245,24 @@ function SelectedLinePanel({
   }
 
   const lineServicePatterns = servicePatterns.filter(
-    (pattern) => pattern.enabled !== false && (pattern.lineId === selectedLine.id || pattern.lineId === selectedLine.canonicalKey),
+    (pattern) =>
+      pattern.enabled !== false &&
+      (pattern.lineId === selectedLine.id ||
+        pattern.lineId === selectedLine.canonicalKey),
   );
-  const linePatternIds = new Set(lineServicePatterns.map((pattern) => pattern.id));
+  const linePatternIds = new Set(
+    lineServicePatterns.map((pattern) => pattern.id),
+  );
   const lineTrainRuns = trainRuns.filter(
-    (run) => run.enabled !== false && run.patternId && linePatternIds.has(run.patternId),
+    (run) =>
+      run.enabled !== false &&
+      run.patternId &&
+      linePatternIds.has(run.patternId),
   );
   const patternStationCount = lineServicePatterns.reduce(
     (sum, pattern) => sum + pattern.stops.length,
     0,
   );
-  const firstTrainRun = lineTrainRuns[0] ?? null;
-
   return (
     <section className="border border-slate-200 bg-white p-2.5">
       <div className="flex items-start justify-between gap-2">
@@ -3847,8 +4277,10 @@ function SelectedLinePanel({
             </h2>
           </div>
           <p className="mt-1 text-[11px] font-medium text-slate-500">
-            {formatAreaName(selectedLine.mreaWideCd)} · {formatRailLineCategory(selectedLine.category)} · {selectedLine.serviceTypes.map(formatRailServiceType).join("/")} · 구간{" "}
-            {formatNumber(selectedLine.branches.length)}개 · 정차역{" "}
+            {formatAreaName(selectedLine.mreaWideCd)} ·{" "}
+            {formatRailLineCategory(selectedLine.category)} ·{" "}
+            {selectedLine.serviceTypes.map(formatRailServiceType).join("/")} ·
+            구간 {formatNumber(selectedLine.branches.length)}개 · 정차역{" "}
             {formatNumber(countRouteStops(selectedLine))}개
           </p>
         </div>
@@ -3888,9 +4320,12 @@ function SelectedLinePanel({
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              {selectedBranch.routeDirection && selectedBranch.routeDirection !== "bidirectional" ? (
+              {selectedBranch.routeDirection &&
+              selectedBranch.routeDirection !== "bidirectional" ? (
                 <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
-                  {selectedBranch.routeDirection === "forward" ? "위→아래 단방향" : "아래→위 단방향"}
+                  {selectedBranch.routeDirection === "forward"
+                    ? "위→아래 단방향"
+                    : "아래→위 단방향"}
                 </span>
               ) : null}
               <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
@@ -3929,7 +4364,10 @@ function SelectedLinePanel({
         <span>lnCd: {selectedLine.lnCd}</span>
         <span>권역 코드: {selectedLine.mreaWideCd}</span>
         <span>철도 유형: {formatRailLineCategory(selectedLine.category)}</span>
-        <span>서비스 타입: {selectedLine.serviceTypes.map(formatRailServiceType).join(", ")}</span>
+        <span>
+          서비스 타입:{" "}
+          {selectedLine.serviceTypes.map(formatRailServiceType).join(", ")}
+        </span>
         {selectedBranch ? (
           <span>sourceLineNumber: {selectedBranch.sourceLineNumber}</span>
         ) : null}
@@ -3950,7 +4388,6 @@ function SelectedLinePanel({
   );
 }
 
-
 function formatPatternDirectionLabel(direction: string | null | undefined) {
   switch (direction) {
     case "up":
@@ -3966,7 +4403,8 @@ function formatPatternDirectionLabel(direction: string | null | undefined) {
 
 function formatOperatingDays(days: string[] | undefined) {
   if (!days || days.length === 0) return "운행일 미지정";
-  if (days.length > 3) return `${days.slice(0, 3).join(", ")} 외 ${days.length - 3}`;
+  if (days.length > 3)
+    return `${days.slice(0, 3).join(", ")} 외 ${days.length - 3}`;
   return days.join(", ");
 }
 
@@ -3985,7 +4423,9 @@ interface TimetableGraphSummary {
   runCount: number;
 }
 
-function parseTimetableMinutes(value: string | null | undefined): number | null {
+function parseTimetableMinutes(
+  value: string | null | undefined,
+): number | null {
   if (!value) return null;
   const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
   if (!match) return null;
@@ -3996,12 +4436,22 @@ function parseTimetableMinutes(value: string | null | undefined): number | null 
   return hours * 60 + minutes;
 }
 
-function getTrainStopDepartureMinutes(stop: ManualTrainRun["stopTimes"][number]): number | null {
-  return parseTimetableMinutes(stop.departureTime) ?? parseTimetableMinutes(stop.arrivalTime);
+function getTrainStopDepartureMinutes(
+  stop: ManualTrainRun["stopTimes"][number],
+): number | null {
+  return (
+    parseTimetableMinutes(stop.departureTime) ??
+    parseTimetableMinutes(stop.arrivalTime)
+  );
 }
 
-function getTrainStopArrivalMinutes(stop: ManualTrainRun["stopTimes"][number]): number | null {
-  return parseTimetableMinutes(stop.arrivalTime) ?? parseTimetableMinutes(stop.departureTime);
+function getTrainStopArrivalMinutes(
+  stop: ManualTrainRun["stopTimes"][number],
+): number | null {
+  return (
+    parseTimetableMinutes(stop.arrivalTime) ??
+    parseTimetableMinutes(stop.departureTime)
+  );
 }
 
 function buildTimetableRouteGraph(
@@ -4066,11 +4516,14 @@ function buildTimetableRouteGraph(
     for (let index = 0; index < stops.length - 1; index += 1) {
       const from = stops[index];
       const to = stops[index + 1];
-      if (!from?.stationId || !to?.stationId || from.stationId === to.stationId) continue;
+      if (!from?.stationId || !to?.stationId || from.stationId === to.stationId)
+        continue;
       const departureMinutes = getTrainStopDepartureMinutes(from);
       const arrivalMinutes = getTrainStopArrivalMinutes(to);
       const durationMinutes =
-        departureMinutes !== null && arrivalMinutes !== null && arrivalMinutes >= departureMinutes
+        departureMinutes !== null &&
+        arrivalMinutes !== null &&
+        arrivalMinutes >= departureMinutes
           ? arrivalMinutes - departureMinutes
           : null;
       addEdge(
@@ -4123,7 +4576,10 @@ function formatPatternStopNames(
 function formatTrainRunStopTimePreview(run: ManualTrainRun) {
   const stops = run.stopTimes.slice().sort((a, b) => a.sequence - b.sequence);
   const first = stops.find((stop) => stop.departureTime || stop.arrivalTime);
-  const last = stops.slice().reverse().find((stop) => stop.arrivalTime || stop.departureTime);
+  const last = stops
+    .slice()
+    .reverse()
+    .find((stop) => stop.arrivalTime || stop.departureTime);
   const firstTime = first?.departureTime ?? first?.arrivalTime ?? "--:--";
   const lastTime = last?.arrivalTime ?? last?.departureTime ?? "--:--";
   return `${firstTime} → ${lastTime}`;
@@ -4152,26 +4608,42 @@ function LineServicePatternSummary({
   return (
     <section className="mt-2 border border-slate-200 bg-white px-2 py-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold text-slate-900">운행 패턴과 시간표</h3>
+        <h3 className="text-xs font-semibold text-slate-900">
+          운행 패턴과 시간표
+        </h3>
         <span className="text-[11px] text-slate-400">
-          패턴 {formatNumber(patterns.length)} · 열차 {formatNumber(trainRuns.length)}
+          패턴 {formatNumber(patterns.length)} · 열차{" "}
+          {formatNumber(trainRuns.length)}
         </span>
       </div>
       <div className="mt-1.5 rounded bg-slate-50 px-2 py-1 text-[11px] text-slate-500">
-        그래프 준비: 역 {formatNumber(graphSummary.nodeCount)} · 패턴 구간 {formatNumber(graphSummary.patternSegmentCount)} · 시간 간선 {formatNumber(graphSummary.timedEdgeCount)}
+        그래프 준비: 역 {formatNumber(graphSummary.nodeCount)} · 패턴 구간{" "}
+        {formatNumber(graphSummary.patternSegmentCount)} · 시간 간선{" "}
+        {formatNumber(graphSummary.timedEdgeCount)}
       </div>
       <div className="mt-1.5 grid gap-1.5">
         {patterns.slice(0, 4).map((pattern) => {
           const runs = (runsByPatternId.get(pattern.id) ?? [])
             .slice()
-            .sort((a, b) => getTrainRunPrimaryTime(a).localeCompare(getTrainRunPrimaryTime(b)));
+            .sort((a, b) =>
+              getTrainRunPrimaryTime(a).localeCompare(
+                getTrainRunPrimaryTime(b),
+              ),
+            );
           return (
-            <div key={pattern.id} className="rounded border border-slate-100 bg-slate-50 px-2 py-1.5">
+            <div
+              key={pattern.id}
+              className="rounded border border-slate-100 bg-slate-50 px-2 py-1.5"
+            >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold text-slate-900">{pattern.nameKo}</p>
+                  <p className="truncate text-xs font-semibold text-slate-900">
+                    {pattern.nameKo}
+                  </p>
                   <p className="mt-0.5 text-[11px] text-slate-500">
-                    {formatRailServiceType(pattern.serviceType)} · {formatPatternDirectionLabel(pattern.direction)} · 정차 {formatNumber(pattern.stops.length)}역
+                    {formatRailServiceType(pattern.serviceType)} ·{" "}
+                    {formatPatternDirectionLabel(pattern.direction)} · 정차{" "}
+                    {formatNumber(pattern.stops.length)}역
                   </p>
                 </div>
                 <span className="shrink-0 rounded bg-white px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
@@ -4184,13 +4656,23 @@ function LineServicePatternSummary({
               {runs.length > 0 ? (
                 <div className="mt-1.5 grid gap-1">
                   {runs.slice(0, 4).map((run) => (
-                    <div key={run.id} className="flex items-center justify-between gap-2 rounded bg-white px-1.5 py-1 text-[10px] text-slate-600">
-                      <span className="truncate font-medium">{run.trainNumber || run.nameKo || "열차"}</span>
-                      <span className="shrink-0 text-slate-400">{formatTrainRunStopTimePreview(run)} · {formatOperatingDays(run.operatingDays)}</span>
+                    <div
+                      key={run.id}
+                      className="flex items-center justify-between gap-2 rounded bg-white px-1.5 py-1 text-[10px] text-slate-600"
+                    >
+                      <span className="truncate font-medium">
+                        {run.trainNumber || run.nameKo || "열차"}
+                      </span>
+                      <span className="shrink-0 text-slate-400">
+                        {formatTrainRunStopTimePreview(run)} ·{" "}
+                        {formatOperatingDays(run.operatingDays)}
+                      </span>
                     </div>
                   ))}
                   {runs.length > 4 ? (
-                    <p className="text-[10px] text-slate-400">외 {formatNumber(runs.length - 4)}개 열차</p>
+                    <p className="text-[10px] text-slate-400">
+                      외 {formatNumber(runs.length - 4)}개 열차
+                    </p>
                   ) : null}
                 </div>
               ) : null}
@@ -4231,7 +4713,6 @@ function BranchChip({
   );
 }
 
-
 function LineRoutePreview({
   line,
   branch,
@@ -4253,7 +4734,9 @@ function LineRoutePreview({
           {branch.sourceLineName}
         </p>
         <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 shadow-sm">
-          {("isCircular" in branch && branch.isCircular) ? "순환" : `${firstName} → ${lastName}`}
+          {"isCircular" in branch && branch.isCircular
+            ? "순환"
+            : `${firstName} → ${lastName}`}
         </span>
       </div>
       <div className="mt-2 flex min-w-0 items-center overflow-hidden px-1">
