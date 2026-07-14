@@ -1,6 +1,6 @@
 "use client";
 
-import { RailSearchField } from "@repo/ui/rail-product";
+import { RailSearchField, RailSearchResultCard } from "@repo/ui/rail-product";
 import {
   useDeferredValue,
   useEffect,
@@ -1830,115 +1830,61 @@ function SearchResults({
   onSelectLine: (lineKey: string) => void;
 }) {
   const normalizedQuery = normalizeSearchText(query);
-
   if (!normalizedQuery) return null;
 
-  if (
-    normalizedQuery.length < MIN_STATION_SEARCH_LENGTH &&
-    stations.length === 0 &&
-    lines.length === 0
-  ) {
-    return (
-      <div className="web-empty-state border border-dashed border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-500">
-        검색 결과를 표시하려면 역명이나 노선명을 입력하세요.
-      </div>
-    );
-  }
-
-  if (stations.length === 0 && lines.length === 0) {
-    return (
-      <div className="web-empty-state border border-dashed border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] font-medium text-slate-500">
-        일치하는 역이나 노선이 없습니다.
-      </div>
-    );
-  }
-
+  const hasResults = stations.length > 0 || lines.length > 0;
   return (
-    <div className="web-search-results border border-slate-200 bg-slate-50 p-1.5">
-      {lines.length > 0 ? (
-        <div>
-          <div className="flex items-center justify-between gap-2 px-0.5">
-            <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">
-              노선
-            </p>
-            <p className="text-[10px] font-semibold text-slate-400">
-              상위 {formatNumber(lines.length)}개
-            </p>
+    <div className="web-search-results" role="region" aria-label="검색 결과">
+      <div className="web-search-results__summary">
+        <strong>검색 결과</strong>
+        <span>노선 {formatNumber(lines.length)} · 역 {formatNumber(stations.length)}</span>
+      </div>
+      <div className="web-search-results__scroll">
+        {!hasResults ? (
+          <div className="web-search-results__empty">
+            <strong>{normalizedQuery.length < MIN_STATION_SEARCH_LENGTH ? "검색어를 조금 더 입력하세요" : "일치하는 결과가 없습니다"}</strong>
+            <span>역명, 노선명 또는 역번호를 확인하세요.</span>
           </div>
-          <div className="mt-1 grid gap-1">
-            {lines.map((line) => {
-              const isSelected = selectedLineKey === line.canonicalKey;
+        ) : null}
 
-              return (
-                <button
+        {lines.length > 0 ? (
+          <section className="web-search-results__group">
+            <div className="web-search-results__group-title"><span>노선</span><small>{formatNumber(lines.length)}</small></div>
+            <div className="grid gap-1.5">
+              {lines.map((line) => (
+                <RailSearchResultCard
                   key={line.canonicalKey}
-                  type="button"
-                  className={
-                    isSelected
-                      ? "rounded border border-sky-300 bg-sky-50 px-2 py-1 text-left text-[11px] font-bold text-sky-900 transition duration-150 ease-out"
-                      : "rounded border border-slate-200 bg-white px-2 py-1 text-left text-[11px] font-semibold text-slate-700 transition duration-150 ease-out hover:border-sky-200 hover:bg-sky-50 active:scale-[0.995]"
-                  }
+                  active={selectedLineKey === line.canonicalKey}
+                  color={line.colorHex}
+                  title={<HighlightText text={line.nameKo} query={query} />}
+                  description={`${formatAreaName(line.mreaWideCd)} · ${formatNumber(countRouteStops(line))}역`}
+                  trailing="노선"
                   onClick={() => onSelectLine(line.canonicalKey)}
-                >
-                  <span className="flex min-w-0 items-center gap-1.5 truncate">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                      style={{ backgroundColor: line.colorHex }}
-                    />
-                    <span className="truncate">
-                      <HighlightText text={line.nameKo} query={query} />
-                    </span>
-                  </span>
-                  <span className="mt-0.5 block text-[10px] font-medium text-slate-400">
-                    {formatAreaName(line.mreaWideCd)} ·{" "}
-                    {formatNumber(countRouteStops(line))}역
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
 
-      {stations.length > 0 ? (
-        <div className={lines.length > 0 ? "mt-2" : undefined}>
-          <div className="flex items-center justify-between gap-2 px-0.5">
-            <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">
-              역
-            </p>
-            <p className="text-[10px] font-semibold text-slate-400">
-              상위 {formatNumber(stations.length)}개
-            </p>
-          </div>
-          <div className="mt-1 grid gap-1">
-            {stations.map((station) => {
-              const isSelected = selectedStationId === station.id;
-
-              return (
-                <button
+        {stations.length > 0 ? (
+          <section className="web-search-results__group">
+            <div className="web-search-results__group-title"><span>역</span><small>{formatNumber(stations.length)}</small></div>
+            <div className="grid gap-1.5">
+              {stations.map((station) => (
+                <RailSearchResultCard
                   key={station.id}
-                  type="button"
-                  className={
-                    isSelected
-                      ? "rounded border border-amber-300 bg-amber-50 px-2 py-1 text-left text-[11px] font-bold text-amber-900 transition duration-150 ease-out"
-                      : "rounded border border-slate-200 bg-white px-2 py-1 text-left text-[11px] font-semibold text-slate-700 transition duration-150 ease-out hover:border-sky-200 hover:bg-sky-50 active:scale-[0.995]"
-                  }
+                  active={selectedStationId === station.id}
+                  color={station.colorHex ?? "#64748b"}
+                  title={<HighlightText text={station.nameKo} query={query} />}
+                  description={station.lineNameKo || "역 정보"}
+                  trailing="역"
                   onClick={() => onSelectStation(station.id)}
-                >
-                  <span className="block truncate">
-                    <HighlightText text={station.nameKo} query={query} />
-                  </span>
-                  {station.lineNameKo ? (
-                    <span className="mt-0.5 block truncate text-[10px] font-medium text-slate-400">
-                      {station.lineNameKo}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+                />
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -4098,19 +4044,14 @@ function SelectedStationPanel({
   const isDestination = routeDestinationStationId === station.id;
 
   return (
-    <section className="min-w-0 overflow-hidden border border-slate-200 bg-white p-2.5 transition duration-150 ease-out">
+    <section className="web-station-detail">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-[10px] font-bold tracking-wide text-amber-600 uppercase">
-            선택 역
-          </p>
-          <h2 className="mt-0.5 truncate text-sm font-bold text-slate-950">
+          <p className="web-station-detail__eyebrow">역 정보</p>
+          <h2 className="web-station-detail__title">
             {station.nameKo}
           </h2>
-          <p className="mt-1 text-[11px] font-medium text-slate-500">
-            노선 {formatNumber(uniqueLineCount)}개 · 구간{" "}
-            {formatNumber(servingBranches.length)}개
-          </p>
+          <p className="web-station-detail__summary">이 역에서 이용 가능한 노선과 이동 정보를 확인하세요.</p>
         </div>
         <button
           type="button"
@@ -4168,9 +4109,9 @@ function SelectedStationPanel({
         </button>
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-1.5 text-xs sm:grid-cols-4">
-        <MetricMini label="노선" value={uniqueLineCount} />
-        <MetricMini label="구간" value={servingBranches.length} />
+      <div className="web-station-detail__metrics">
+        <MetricMini label="이용 노선" value={uniqueLineCount} />
+        <MetricMini label="정차 구간" value={servingBranches.length} />
       </div>
 
       <DetailDisclosure>
@@ -4185,9 +4126,7 @@ function SelectedStationPanel({
 
       {servingBranches.length > 0 ? (
         <div className="mt-2">
-          <p className="text-[10px] font-bold tracking-wide text-slate-400 uppercase">
-            정차 구간
-          </p>
+          <div className="web-station-detail__section-title"><strong>이용 가능한 노선</strong><span>선택하면 노선 정보를 엽니다</span></div>
           <div className="mt-1.5 grid gap-1.5">
             {visibleBranches.map((branch) => (
               <button

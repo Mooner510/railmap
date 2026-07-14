@@ -5958,9 +5958,13 @@ export default function UnifiedMapEditor({
         "railmap-selected-branches-line",
         "railmap-branches-line",
       ].filter((layerId) => map.getLayer(layerId));
+      const hitBox: [[number, number], [number, number]] = [
+        [event.point.x - 8, event.point.y - 8],
+        [event.point.x + 8, event.point.y + 8],
+      ];
       const features =
         queryLayers.length > 0
-          ? map.queryRenderedFeatures(event.point, { layers: queryLayers })
+          ? map.queryRenderedFeatures(hitBox, { layers: queryLayers })
           : [];
 
       if (collapsedTransferZoom) {
@@ -8743,7 +8747,7 @@ export default function UnifiedMapEditor({
                   </span>
                   <span>전체 {data.stations.length.toLocaleString("ko-KR")}개</span>
                 </div>
-                <div className="grid gap-2">
+                <div className="rail-editor-search-results">
                   {filteredStations.map((station) => (
                     <RailSearchResultCard
                       key={station.id}
