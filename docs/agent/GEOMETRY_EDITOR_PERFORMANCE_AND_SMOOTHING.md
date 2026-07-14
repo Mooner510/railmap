@@ -23,10 +23,10 @@
 - long segments receive more render samples and short segments receive fewer
 - adjacent rendered samples remain approximately evenly spaced
 
+## 13.113.2 anchor-preserving smoothing hotfix
 
-## 13.113.1 short segment smoothing hotfix
-
-- 짧은 구간도 최소 19개의 렌더 정점을 확보한다.
-- 제어점 사이의 누적 회전각에 따라 곡률 보정 정점을 추가한다.
-- 기본 Catmull-Rom 샘플 밀도를 높이고 거리 기준으로 다시 균등 배치한다.
-- 저장 제어점과 최대 렌더 정점 제한은 유지한다.
+- 곡선 전체를 한 번에 재샘플링하지 않고 역/제어점 사이 구간별로 보간한다.
+- 모든 역과 제어점 좌표를 최종 렌더 선형에 정확히 포함한다.
+- 짧은 구간도 구간당 최소 샘플 수를 보장하고, 굽은 정도에 따라 추가 샘플을 배정한다.
+- 각 구간은 고밀도 Catmull-Rom 생성 후 호 길이 기준으로 균등 재배치한다.
+- 전체 정점 상한은 유지해 편집 성능을 보호한다.
