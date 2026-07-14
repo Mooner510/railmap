@@ -2,21 +2,20 @@
 
 ## Applied through
 
-- `13.101.0-13.103.0`
+- `13.104.0-13.106.0`
 
 ## Completed
 
-- Web background line opacity reduced for selected-line and route-search states
-- background stations remain more visible than background lines
-- station fill, casing, stroke and label opacity are controlled by one shared policy
-- manual line branches follow their parent branch selection and route highlight
-- Web MapLibre emphasis expressions extracted from `RailMap.tsx`
-- common numeric emphasis policy moved to `packages/ui`
-- all faded map features remain interactive through unchanged hit layers
+- Web MapLibre source and layer registration separated from `RailMap.tsx`
+- source and interactive layer IDs centralized
+- repeated GeoJSON source updates use one helper
+- Web click and hover event binding separated from `RailMap.tsx`
+- station-first hit-test behavior and blank-map selection clearing retained
+- map initialization, source/layer registration and data updates now have explicit boundaries
 
 ## Next
 
-- split Web map source construction from `RailMap.tsx`
-- split Web layer registration and event binding from `RailMap.tsx`
-- move shared Editor/Web hit-test priority constants into `packages/ui`
-- then split Editor audit, transfer recommendation and timetable import sections
+- move common Editor/Web hit-test priority policy to `packages/ui`
+- align Editor and Web selection and deselection behavior
+- split Editor audit, transfer recommendation and timetable import sections
+- continue map regression fixes before fare model work
