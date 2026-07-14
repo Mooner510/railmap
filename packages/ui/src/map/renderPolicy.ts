@@ -249,10 +249,10 @@ export function buildAdaptiveSmoothCoordinates(
     );
   if (points.length < 2) return points;
 
-  const minSpacing = options.minSpacing ?? 0.000035;
-  const maxSpacing = options.maxSpacing ?? 0.00055;
-  const maxPoints = Math.max(points.length, options.maxPoints ?? 720);
-  const requestedDensity = Math.max(12, options.smoothingPasses ?? 18);
+  const minSpacing = options.minSpacing ?? 0.000025;
+  const maxSpacing = options.maxSpacing ?? 0.00022;
+  const maxPoints = Math.max(points.length, options.maxPoints ?? 1800);
+  const requestedDensity = Math.max(18, options.smoothingPasses ?? 28);
 
   const segmentPointCounts = points.slice(0, -1).map((start, index) => {
     const end = points[index + 1]!;
@@ -267,10 +267,16 @@ export function buildAdaptiveSmoothCoordinates(
       Math.min(maxSpacing, distance / requestedDensity),
     );
 
-    // Even very short sections need enough samples to read as a curve.
+    // Short sections retain a minimum curve density, while long sections keep
+    // adding samples instead of flattening at the previous low per-segment cap.
+    const distanceDrivenCount = Math.ceil(distance / targetSpacing) + 1;
+    const longSegmentBoost = Math.ceil(Math.sqrt(Math.max(0, distance / maxSpacing)) * 2);
     return Math.max(
-      14,
-      Math.min(72, Math.ceil(distance / targetSpacing) + 1 + curvatureBoost),
+      18,
+      Math.min(
+        280,
+        distanceDrivenCount + curvatureBoost + longSegmentBoost,
+      ),
     );
   });
 
@@ -285,10 +291,10 @@ export function buildAdaptiveSmoothCoordinates(
     const p2 = points[index + 1]!;
     const p3 = points[Math.min(points.length - 1, index + 2)] ?? p2;
     const pointCount = Math.max(
-      6,
-      Math.round(((segmentPointCounts[index] ?? 14) - 1) * scale) + 1,
+      10,
+      Math.round(((segmentPointCounts[index] ?? 18) - 1) * scale) + 1,
     );
-    const denseCount = Math.max(32, pointCount * 3);
+    const denseCount = Math.max(48, Math.min(960, pointCount * 4));
     const denseSegment: RailMapLngLatTuple[] = [p1];
 
     for (let step = 1; step <= denseCount; step += 1) {
