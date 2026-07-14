@@ -146,6 +146,7 @@ interface RouteGraphEdge {
   durationMinutes?: number | null;
   distanceMeters?: number | null;
   trainNumber?: string | null;
+  routeDirection?: "bidirectional" | "forward" | "reverse";
 }
 
 interface TimetableRouteGraphEdge {
@@ -2289,6 +2290,7 @@ function buildRouteGraph(
           kind: "ride",
           durationMinutes,
           distanceMeters,
+          routeDirection: branch.routeDirection ?? "bidirectional",
         };
 
         const routeDirection = branch.routeDirection ?? "bidirectional";
@@ -3018,6 +3020,9 @@ function getRouteQualityDiagnostics(result: RouteSearchResult) {
   const noDurationRideCount = result.edges.filter(
     (edge) => edge.kind === "ride" && !edge.durationMinutes,
   ).length;
+  const oneWayRideCount = result.edges.filter(
+    (edge) => edge.kind === "ride" && edge.routeDirection && edge.routeDirection !== "bidirectional",
+  ).length;
   const timetableShare =
     result.edges.length > 0
       ? Math.round((timetableCount / result.edges.length) * 100)
@@ -3042,6 +3047,7 @@ function getRouteQualityDiagnostics(result: RouteSearchResult) {
     longTransferCount,
     noDistanceRideCount,
     noDurationRideCount,
+    oneWayRideCount,
     timetableShare,
     fallbackShare,
   };
@@ -3070,6 +3076,9 @@ function RouteQualityReviewPanel({ result }: { result: RouteSearchResult }) {
       : null,
     diagnostics.longTransferCount > 0
       ? `${formatNumber(diagnostics.longTransferCount)}개 긴 환승 시간`
+      : null,
+    diagnostics.oneWayRideCount > 0
+      ? `${formatNumber(diagnostics.oneWayRideCount)}개 단방향 구간`
       : null,
   ].filter((item): item is string => Boolean(item));
 
@@ -3108,6 +3117,11 @@ function RouteQualityReviewPanel({ result }: { result: RouteSearchResult }) {
       {diagnostics.fallbackRideCount > 0 ? (
         <p className="mt-1.5 text-[10px] font-medium opacity-75">
           선형 거리 또는 성능값이 부족한 이동 구간은 기본 시간으로 계산했습니다.
+        </p>
+      ) : null}
+      {diagnostics.oneWayRideCount > 0 ? (
+        <p className="mt-1.5 text-[10px] font-medium opacity-75">
+          이 경로는 단방향 운행이 허용된 방향으로만 계산되었습니다. 반대 방향 검색에서는 해당 구간이 제외되어 우회하거나 결과가 없을 수 있습니다.
         </p>
       ) : null}
     </div>
@@ -3429,8 +3443,12 @@ function RouteCalculationDebugPanel({
           : edge.kind === "manual-transfer"
             ? "환승 시간"
             : edge.distanceMeters
-              ? "선형 거리 + 성능값"
-              : "기본 이동 시간",
+              ? edge.routeDirection && edge.routeDirection !== "bidirectional"
+                ? "단방향 허용 방향 · 선형 거리 + 성능값"
+                : "선형 거리 + 성능값"
+              : edge.routeDirection && edge.routeDirection !== "bidirectional"
+                ? "단방향 허용 방향 · 기본 이동 시간"
+                : "기본 이동 시간",
     };
   });
 
@@ -4324,8 +4342,8 @@ function SelectedLinePanel({
               selectedBranch.routeDirection !== "bidirectional" ? (
                 <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-700">
                   {selectedBranch.routeDirection === "forward"
-                    ? "위→아래 단방향"
-                    : "아래→위 단방향"}
+                    ? `${selectedBranch.origin ?? getFirstStop(selectedBranch)}→${selectedBranch.terminal ?? getLastStop(selectedBranch)}`
+                    : `${selectedBranch.terminal ?? getLastStop(selectedBranch)}→${selectedBranch.origin ?? getFirstStop(selectedBranch)}`} 단방향
                 </span>
               ) : null}
               <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">

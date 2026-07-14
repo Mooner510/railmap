@@ -9639,12 +9639,37 @@ function ManualDataAuditDashboard({
       typeof performance.decelerationMps2 !== "number" ||
       typeof performance.maxSpeedKph !== "number";
   });
+  const enabledOneWayBranches = overlays.branchRouteOverrides.filter(
+    (branch) => branch.enabled !== false && (branch.routeDirection === "forward" || branch.routeDirection === "reverse"),
+  );
+  const oneWayBranchesWithTooFewStops = enabledOneWayBranches.filter((branch) => branch.stationIds.filter(Boolean).length < 2);
+  const circularOneWayBranches = enabledOneWayBranches.filter((branch) => branch.circular === true);
+  const oneWayBranchById = new Map(enabledOneWayBranches.map((branch) => [branch.branchId, branch]));
+  const oneWayPatternDirectionIssues = enabledPatterns.filter((pattern) => {
+    if (!pattern.branchId) return false;
+    const branch = oneWayBranchById.get(pattern.branchId);
+    if (!branch) return false;
+    const indexByStationId = new Map(branch.stationIds.map((stationId, index) => [stationId, index]));
+    const orderedStops = pattern.stops.slice().sort((a, b) => a.sequence - b.sequence);
+    let previousIndex: number | null = null;
+    for (const stop of orderedStops) {
+      const currentIndex = indexByStationId.get(stop.stationId);
+      if (currentIndex === undefined) continue;
+      if (previousIndex !== null) {
+        if (branch.routeDirection === "forward" && currentIndex < previousIndex) return true;
+        if (branch.routeDirection === "reverse" && currentIndex > previousIndex) return true;
+      }
+      previousIndex = currentIndex;
+    }
+    return false;
+  });
   const routeReadyPatternCount = enabledPatterns.filter((pattern) => patternIdsWithTrainRuns.has(pattern.id)).length;
   const routeDiagnostics = [
     { label: "시간표 우선 계산", value: enabledTrainRuns.length, detail: `${routeReadyPatternCount.toLocaleString("ko-KR")}개 패턴 연결`, tone: enabledTrainRuns.length > 0 ? "emerald" : "amber" },
     { label: "성능 fallback", value: manualLinesWithoutPerformance.length, detail: "성능값 누락 노선", tone: manualLinesWithoutPerformance.length === 0 ? "emerald" : "amber" },
     { label: "환승 edge", value: transferGroupsWithoutTime.length, detail: "환승 시간 미완성", tone: transferGroupsWithoutTime.length === 0 ? "emerald" : "amber" },
     { label: "시간 순서", value: trainRunsWithTimeOrderWarnings.length, detail: "이전 역보다 빠른 시각", tone: trainRunsWithTimeOrderWarnings.length === 0 ? "emerald" : "amber" },
+    { label: "단방향 정합성", value: oneWayBranchesWithTooFewStops.length + circularOneWayBranches.length + oneWayPatternDirectionIssues.length, detail: `${enabledOneWayBranches.length.toLocaleString("ko-KR")}개 단방향 branch`, tone: oneWayBranchesWithTooFewStops.length + circularOneWayBranches.length + oneWayPatternDirectionIssues.length === 0 ? "emerald" : "amber" },
   ];
   const comparisonReadinessItems = [
     { label: "최단 시간", ready: enabledTrainRuns.length > 0 || manualLinesWithoutPerformance.length < enabledManualLines.length, detail: "시간표 또는 성능 fallback 필요" },
@@ -9664,6 +9689,9 @@ function ManualDataAuditDashboard({
     trainRunsWithSparseTimes.length > 0 ? { label: `시각 부족 시간표 ${trainRunsWithSparseTimes.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
     trainRunsWithTimeOrderWarnings.length > 0 ? { label: `시간 순서 확인 ${trainRunsWithTimeOrderWarnings.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
     manualLinesWithoutPerformance.length > 0 ? { label: `성능값 누락 노선 ${manualLinesWithoutPerformance.length.toLocaleString("ko-KR")}개`, tab: "manualLines" as const } : null,
+    oneWayBranchesWithTooFewStops.length > 0 ? { label: `정차역 부족 단방향 ${oneWayBranchesWithTooFewStops.length.toLocaleString("ko-KR")}개`, tab: "manualLines" as const } : null,
+    circularOneWayBranches.length > 0 ? { label: `순환·단방향 충돌 ${circularOneWayBranches.length.toLocaleString("ko-KR")}개`, tab: "manualLines" as const } : null,
+    oneWayPatternDirectionIssues.length > 0 ? { label: `단방향 역행 정차 패턴 ${oneWayPatternDirectionIssues.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
     missingStationReferences.length > 0 ? { label: `없는 역 참조 ${missingStationReferences.length.toLocaleString("ko-KR")}개`, tab: "patterns" as const } : null,
     validationIssues.length > 0 ? { label: `검증 패널 이슈 ${validationIssues.length.toLocaleString("ko-KR")}개`, tab: "validation" as const } : null,
   ].filter((item): item is NonNullable<typeof item> => item !== null);
