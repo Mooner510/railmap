@@ -103,7 +103,12 @@ export function resolveAllUniqueTrainCsvMissedItems(input: {
       missed.push(item);
       continue;
     }
-    const stop = stopByStationId.get(item.candidateStationIds[0]);
+    const [candidateStationId] = item.candidateStationIds;
+    if (!candidateStationId) {
+      missed.push(item);
+      continue;
+    }
+    const stop = stopByStationId.get(candidateStationId);
     if (!stop) {
       missed.push(item);
       continue;

@@ -19,7 +19,8 @@
     "./map/renderPolicy": "./src/map/renderPolicy.ts",
     "./rail-product": "./src/rail-product.tsx",
     "./rail-product-theme.css": "./src/rail-product-theme.css",
-    "./map/interactionPolicy": "./src/map/interactionPolicy.ts"
+    "./map/interactionPolicy": "./src/map/interactionPolicy.ts",
+    "./map/selectionPolicy": "./src/map/selectionPolicy.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
