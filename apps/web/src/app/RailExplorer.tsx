@@ -3,6 +3,13 @@
 import RailFilterControls from "./components/RailFilterControls";
 import RouteResultPanel from "./components/RouteResultPanel";
 import {
+  EMPTY_RAIL_MAP_SELECTION,
+  getRailMapSelectionLabel,
+  hasRailMapSelection,
+  selectRailMapTarget,
+  type RailMapSelection,
+} from "@repo/ui/map/selectionPolicy";
+import {
   useDeferredValue,
   useEffect,
   useMemo,
@@ -246,6 +253,13 @@ export default function RailExplorer({
   const [desktopPanelMode, setDesktopPanelMode] =
     useState<DesktopPanelMode>("search");
   const [isSearchResultsOpen, setIsSearchResultsOpen] = useState(false);
+
+  const applyMapSelection = (selection: RailMapSelection) => {
+    setSelectedLineKey(selection.lineKey);
+    setSelectedBranchId(selection.branchId);
+    setSelectedStationId(selection.stationId);
+    setSelectedTransferGroupId(selection.transferGroupId);
+  };
 
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
@@ -755,10 +769,7 @@ export default function RailExplorer({
     setSelectedCategory("all");
     setSearchQuery("");
     setIsSearchResultsOpen(false);
-    setSelectedLineKey(null);
-    setSelectedBranchId(null);
-    setSelectedStationId(null);
-    setSelectedTransferGroupId(null);
+    applyMapSelection(EMPTY_RAIL_MAP_SELECTION);
     setRouteOriginStationId(null);
     setRouteDestinationStationId(null);
     setRouteSearchMessage(null);
@@ -766,10 +777,10 @@ export default function RailExplorer({
   };
 
   const clearSelection = () => {
-    setSelectedLineKey(null);
-    setSelectedBranchId(null);
-    setSelectedStationId(null);
-    setSelectedTransferGroupId(null);
+    applyMapSelection(EMPTY_RAIL_MAP_SELECTION);
+    setRouteSearchResults([]);
+    setSelectedRouteResultIndex(0);
+    setRouteSearchMessage(null);
     setMobilePanelMode("lines");
     setDesktopPanelMode("lines");
   };
@@ -874,37 +885,32 @@ export default function RailExplorer({
     setMapFocusVersion((version) => version + 1);
   };
 
-  const hasSelection = Boolean(
-    selectedLineKey ||
-    selectedBranchId ||
-    selectedStationId ||
-    selectedTransferGroupId,
+  const mapSelection = useMemo<RailMapSelection>(
+    () => ({
+      lineKey: selectedLineKey,
+      branchId: selectedBranchId,
+      stationId: selectedStationId,
+      transferGroupId: selectedTransferGroupId,
+    }),
+    [
+      selectedBranchId,
+      selectedLineKey,
+      selectedStationId,
+      selectedTransferGroupId,
+    ],
   );
-  const focusSelectionLabel = selectedTransferGroupId
-    ? "환승역 보기"
-    : selectedStationId
-      ? "역으로 이동"
-      : selectedBranchId
-        ? "구간 보기"
-        : selectedLineKey
-          ? "노선 보기"
-          : "선택 이동";
+  const hasSelection = hasRailMapSelection(mapSelection);
+  const focusSelectionLabel = getRailMapSelectionLabel(mapSelection);
 
   const selectArea = (area: string) => {
     setSelectedArea(area);
-    setSelectedLineKey(null);
-    setSelectedBranchId(null);
-    setSelectedStationId(null);
-    setSelectedTransferGroupId(null);
+    applyMapSelection(EMPTY_RAIL_MAP_SELECTION);
     setMobilePanelMode("lines");
   };
 
   const selectCategory = (category: RailLineCategory | "all") => {
     setSelectedCategory(category);
-    setSelectedLineKey(null);
-    setSelectedBranchId(null);
-    setSelectedStationId(null);
-    setSelectedTransferGroupId(null);
+    applyMapSelection(EMPTY_RAIL_MAP_SELECTION);
     setMobilePanelMode("lines");
   };
 
@@ -916,50 +922,54 @@ export default function RailExplorer({
   };
 
   const selectLine = (lineKey: string) => {
-    setSelectedLineKey(lineKey);
-    setSelectedBranchId(null);
-    setSelectedStationId(null);
-    setSelectedTransferGroupId(null);
+    applyMapSelection(selectRailMapTarget({ type: "line", lineKey }));
     setIsSearchResultsOpen(false);
     setMobilePanelMode("selected");
     setDesktopPanelMode("lines");
   };
 
   const selectMapBranch = (branch: RailMapBranch) => {
-    setSelectedLineKey(branch.canonicalLineId);
-    setSelectedBranchId(branch.id);
-    setSelectedStationId(null);
-    setSelectedTransferGroupId(null);
+    applyMapSelection(
+      selectRailMapTarget({
+        type: "branch",
+        lineKey: branch.canonicalLineId,
+        branchId: branch.id,
+      }),
+    );
     setIsSearchResultsOpen(false);
     setMobilePanelMode("selected");
   };
 
   const selectServingBranch = (branch: StationServingBranch) => {
-    setSelectedLineKey(branch.canonicalLineId);
-    setSelectedBranchId(branch.branchId);
+    applyMapSelection(
+      selectRailMapTarget({
+        type: "branch",
+        lineKey: branch.canonicalLineId,
+        branchId: branch.branchId,
+      }),
+    );
     setIsSearchResultsOpen(false);
     setMobilePanelMode("selected");
   };
 
   const selectMapStation = (station: RailMapStation) => {
-    setSelectedStationId(station.id);
-    setSelectedTransferGroupId(null);
+    applyMapSelection(
+      selectRailMapTarget({ type: "station", stationId: station.id }),
+    );
     setIsSearchResultsOpen(false);
     setMobilePanelMode("selected");
   };
 
   const selectMapTransferGroup = (group: RailMapTransferGroup) => {
-    setSelectedTransferGroupId(group.id);
-    setSelectedStationId(null);
-    setSelectedLineKey(null);
-    setSelectedBranchId(null);
+    applyMapSelection(
+      selectRailMapTarget({ type: "transfer", transferGroupId: group.id }),
+    );
     setIsSearchResultsOpen(false);
     setMobilePanelMode("selected");
   };
 
   const selectStationFromSearch = (stationId: string) => {
-    setSelectedStationId(stationId);
-    setSelectedTransferGroupId(null);
+    applyMapSelection(selectRailMapTarget({ type: "station", stationId }));
     setIsSearchResultsOpen(false);
     setMapFocusVersion((version) => version + 1);
     setMobilePanelMode("selected");
