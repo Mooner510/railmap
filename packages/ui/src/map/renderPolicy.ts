@@ -153,11 +153,13 @@ function interpolateCoordinate(
 
 function resampleCoordinatesByDistance(
   coordinates: RailMapLngLatTuple[],
-  spacing: number,
-  maxPoints: number,
-  minPoints = 2,
+  pointCount: number,
 ): RailMapLngLatTuple[] {
-  if (coordinates.length < 2) return coordinates;
+  if (coordinates.length < 2 || pointCount <= 2) {
+    const first = coordinates[0];
+    const last = coordinates.at(-1);
+    return first && last ? [first, last] : coordinates;
+  }
 
   const cumulative = [0];
   for (let index = 1; index < coordinates.length; index += 1) {
@@ -170,11 +172,6 @@ function resampleCoordinatesByDistance(
   const total = cumulative.at(-1) ?? 0;
   if (!Number.isFinite(total) || total <= 0) return coordinates;
 
-  const requestedPointCount = Math.ceil(total / Math.max(spacing, 0.000001)) + 1;
-  const pointCount = Math.max(
-    2,
-    Math.min(maxPoints, Math.max(minPoints, requestedPointCount)),
-  );
   const result: RailMapLngLatTuple[] = [];
   let segmentIndex = 1;
 
@@ -201,14 +198,43 @@ function resampleCoordinatesByDistance(
     );
   }
 
+  // Arc-length resampling must never move the editable anchors.
+  result[0] = coordinates[0]!;
+  result[result.length - 1] = coordinates.at(-1)!;
   return result;
 }
 
+function coordinateTurnAngle(
+  previous: RailMapLngLatTuple,
+  current: RailMapLngLatTuple,
+  next: RailMapLngLatTuple,
+) {
+  const incomingX = current[0] - previous[0];
+  const incomingY = current[1] - previous[1];
+  const outgoingX = next[0] - current[0];
+  const outgoingY = next[1] - current[1];
+  const incomingLength = Math.hypot(incomingX, incomingY);
+  const outgoingLength = Math.hypot(outgoingX, outgoingY);
+  if (incomingLength <= Number.EPSILON || outgoingLength <= Number.EPSILON) {
+    return 0;
+  }
+
+  const cosine = Math.max(
+    -1,
+    Math.min(
+      1,
+      (incomingX * outgoingX + incomingY * outgoingY) /
+        (incomingLength * outgoingLength),
+    ),
+  );
+  return Math.acos(cosine);
+}
+
 /**
- * Builds a render-only railway polyline with approximately even spacing.
- * The editable control/station points remain untouched. Render samples are
- * distributed evenly, with a minimum density for short curved sections and
- * additional points for sections with greater accumulated turning.
+ * Builds a render-only railway polyline while preserving every editable point
+ * exactly. Each pair of station/control anchors is smoothed and arc-length
+ * resampled independently, so a later global resample can never cut across a
+ * station or leave the rendered line short of its coordinate.
  */
 export function buildAdaptiveSmoothCoordinates(
   coordinates: ReadonlyArray<ReadonlyArray<number>>,
@@ -216,71 +242,87 @@ export function buildAdaptiveSmoothCoordinates(
 ): RailMapLngLatTuple[] {
   const points = coordinates
     .map(toLngLatTuple)
-    .filter((point): point is RailMapLngLatTuple => point !== null);
+    .filter((point): point is RailMapLngLatTuple => point !== null)
+    .filter(
+      (point, index, source) =>
+        index === 0 || getCoordinateDistance(source[index - 1]!, point) > 1e-10,
+    );
   if (points.length < 2) return points;
 
-  const totalDistance = points.slice(1).reduce(
-    (sum, point, index) => sum + getCoordinateDistance(points[index]!, point),
-    0,
-  );
-  if (!Number.isFinite(totalDistance) || totalDistance <= 0) return points;
+  const minSpacing = options.minSpacing ?? 0.000035;
+  const maxSpacing = options.maxSpacing ?? 0.00055;
+  const maxPoints = Math.max(points.length, options.maxPoints ?? 720);
+  const requestedDensity = Math.max(12, options.smoothingPasses ?? 18);
 
-  const minSpacing = options.minSpacing ?? 0.00006;
-  const maxSpacing = options.maxSpacing ?? 0.0018;
-  const maxPoints = options.maxPoints ?? 420;
-  const controlSegmentCount = Math.max(1, points.length - 1);
-  const desiredSegments = Math.max(18, controlSegmentCount * 10);
-  const spacing = Math.max(
-    minSpacing,
-    Math.min(maxSpacing, totalDistance / desiredSegments),
-  );
+  const segmentPointCounts = points.slice(0, -1).map((start, index) => {
+    const end = points[index + 1]!;
+    const distance = getCoordinateDistance(start, end);
+    const previous = points[Math.max(0, index - 1)] ?? start;
+    const next = points[Math.min(points.length - 1, index + 2)] ?? end;
+    const turnBefore = coordinateTurnAngle(previous, start, end);
+    const turnAfter = coordinateTurnAngle(start, end, next);
+    const curvatureBoost = Math.ceil(((turnBefore + turnAfter) / Math.PI) * 18);
+    const targetSpacing = Math.max(
+      minSpacing,
+      Math.min(maxSpacing, distance / requestedDensity),
+    );
 
-  let accumulatedTurn = 0;
-  for (let index = 1; index < points.length - 1; index += 1) {
-    const previous = points[index - 1]!;
-    const current = points[index]!;
-    const next = points[index + 1]!;
-    const incomingX = current[0] - previous[0];
-    const incomingY = current[1] - previous[1];
-    const outgoingX = next[0] - current[0];
-    const outgoingY = next[1] - current[1];
-    const incomingLength = Math.hypot(incomingX, incomingY);
-    const outgoingLength = Math.hypot(outgoingX, outgoingY);
-    if (
-      incomingLength <= Number.EPSILON ||
-      outgoingLength <= Number.EPSILON
-    ) {
-      continue;
+    // Even very short sections need enough samples to read as a curve.
+    return Math.max(
+      14,
+      Math.min(72, Math.ceil(distance / targetSpacing) + 1 + curvatureBoost),
+    );
+  });
+
+  const requestedTotal =
+    1 + segmentPointCounts.reduce((sum, pointCount) => sum + pointCount - 1, 0);
+  const scale = requestedTotal > maxPoints ? (maxPoints - 1) / (requestedTotal - 1) : 1;
+  const result: RailMapLngLatTuple[] = [];
+
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const p0 = points[Math.max(0, index - 1)] ?? points[index]!;
+    const p1 = points[index]!;
+    const p2 = points[index + 1]!;
+    const p3 = points[Math.min(points.length - 1, index + 2)] ?? p2;
+    const pointCount = Math.max(
+      6,
+      Math.round(((segmentPointCounts[index] ?? 14) - 1) * scale) + 1,
+    );
+    const denseCount = Math.max(32, pointCount * 3);
+    const denseSegment: RailMapLngLatTuple[] = [p1];
+
+    for (let step = 1; step <= denseCount; step += 1) {
+      denseSegment.push(
+        catmullRomPoint(p0, p1, p2, p3, step / denseCount),
+      );
     }
 
-    const cosine = Math.max(
-      -1,
-      Math.min(
-        1,
-        (incomingX * outgoingX + incomingY * outgoingY) /
-          (incomingLength * outgoingLength),
-      ),
-    );
-    accumulatedTurn += Math.acos(cosine);
+    // Reassert exact station/control coordinates before and after resampling.
+    denseSegment[0] = p1;
+    denseSegment[denseSegment.length - 1] = p2;
+    const segment = resampleCoordinatesByDistance(denseSegment, pointCount);
+    segment[0] = p1;
+    segment[segment.length - 1] = p2;
+
+    if (index === 0) result.push(segment[0]!);
+    result.push(...segment.slice(1));
   }
 
-  const curvatureExtraPoints = Math.ceil((accumulatedTurn / Math.PI) * 16);
-  const minimumRenderPoints = Math.min(
-    maxPoints,
-    Math.max(19, controlSegmentCount * 10 + 1 + curvatureExtraPoints),
-  );
-  const samplesPerSegment = Math.max(
-    8,
-    Math.min(16, options.smoothingPasses ?? 10),
-  );
-  const curved =
-    points.length >= 3 ? smoothCoordinates(points, samplesPerSegment) : points;
-  return resampleCoordinatesByDistance(
-    curved,
-    spacing,
-    maxPoints,
-    minimumRenderPoints,
-  );
+  // Final safety: all original anchors must exist byte-for-byte in the result.
+  let resultIndex = 0;
+  for (const anchor of points) {
+    while (
+      resultIndex < result.length - 1 &&
+      getCoordinateDistance(result[resultIndex]!, anchor) > 1e-10
+    ) {
+      resultIndex += 1;
+    }
+    if (getCoordinateDistance(result[resultIndex]!, anchor) <= 1e-10) {
+      result[resultIndex] = anchor;
+    }
+  }
+
+  return result;
 }
 
 export function smoothCoordinateRange(
