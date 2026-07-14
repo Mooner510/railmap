@@ -9,6 +9,7 @@ import {
 } from "@repo/ui/map/interactionPolicy";
 import {
   buildAdaptiveSmoothCoordinates,
+  getRailGeometryPointBudget,
   buildSmoothConnectionCurve,
   buildTransferGroupCircleGeometry,
   getCoordinateDistance,
@@ -108,6 +109,12 @@ import { getLineBranchConnectionBlockReason, isBranchCircular } from "./branchRu
 import { AddStationInsertionDialog, type PendingAddStationInsertion } from "./stationInsertion";
 import { BranchInspector } from "./branchInspector";
 import { ManualDataAuditDashboard } from "./ManualDataAuditDashboard";
+import { TransferGroupReviewPanel } from "./TransferGroupReviewPanel";
+import {
+  findNearestPendingTransferSuggestion as findNearestPendingTransferSuggestionFromModel,
+  type TransferGroupReviewFilter,
+  type TransferGroupSuggestion,
+} from "./transferRecommendation";
 import {
   LineBranchValidationPanel,
   type LineBranchValidationAutoFix,
@@ -240,17 +247,6 @@ type PendingManualRouteStationPlacement = {
   nameKo: string;
   suggestions: string[];
 };
-
-type TransferGroupSuggestion = {
-  key: string;
-  nameKo: string;
-  stationIds: string[];
-  reasonLabels: string[];
-  confidence: "strong" | "weak";
-  maxDistanceMeters: number;
-};
-
-type TransferGroupReviewFilter = "pending" | "dismissed" | "approved" | "all";
 
 type ServicePatternBuilderInput = {
   id?: string;
@@ -622,24 +618,6 @@ function buildTransferGroupSuggestions(
   });
 }
 
-function getTransferSuggestionNearestDistanceMeters(
-  sourceStationIds: string[],
-  suggestion: TransferGroupSuggestion,
-  stationById: Map<string, EditorStation>,
-) {
-  let nearest = Number.POSITIVE_INFINITY;
-  for (const sourceStationId of sourceStationIds) {
-    const sourceStation = stationById.get(sourceStationId);
-    if (!sourceStation || !isValidStation(sourceStation)) continue;
-    for (const targetStationId of suggestion.stationIds) {
-      const targetStation = stationById.get(targetStationId);
-      if (!targetStation || !isValidStation(targetStation)) continue;
-      nearest = Math.min(nearest, getApproxDistanceMeters(sourceStation, targetStation));
-    }
-  }
-  return nearest;
-}
-
 type OverlayCommandRecord = {
   id: string;
   label: string;
@@ -850,6 +828,7 @@ function yieldToMainThread() {
 
 async function buildBranchFeaturesChunked(
   branches: EditorMapBranch[],
+  renderZoom: number,
   visible: boolean,
   isCancelled: () => boolean,
 ): Promise<RailFeatureCollection | null> {
@@ -862,7 +841,7 @@ async function buildBranchFeaturesChunked(
     if (isCancelled()) return null;
 
     for (const branch of branches.slice(start, start + batchSize)) {
-      const coordinates = branchCoordinates(branch);
+      const coordinates = branchCoordinates(branch, renderZoom);
       if (coordinates.length < 2) continue;
 
       features.push({
@@ -874,7 +853,10 @@ async function buildBranchFeaturesChunked(
         },
         geometry: {
           type: "LineString",
-          coordinates: optimizeCoordinates(coordinates, 360),
+          coordinates: optimizeCoordinates(
+            coordinates,
+            getRailGeometryPointBudget(renderZoom),
+          ),
         },
       });
     }
@@ -2358,10 +2340,11 @@ function buildLineBranchCoordinates(
   parentBranch: EditorMapBranch | null,
   connectedBranch: EditorMapBranch | null,
   stationById: Map<string, EditorStation>,
+  renderZoom: number,
 ) {
   const explicitGeometry = getLineBranchExplicitGeometry(override);
   if (explicitGeometry.length >= 2)
-    return buildAdaptiveSmoothCoordinates(explicitGeometry);
+    return buildAdaptiveSmoothCoordinates(explicitGeometry, { zoom: renderZoom });
 
   if (override.mode === "add-station") {
     return buildAddStationLineBranchCoordinates(
@@ -2382,6 +2365,7 @@ async function buildLineBranchFeaturesChunked(
   overrides: ManualLineBranchOverride[],
   branchById: Map<string, EditorMapBranch>,
   stationById: Map<string, EditorStation>,
+  renderZoom: number,
   visible: boolean,
   isCancelled: () => boolean,
 ): Promise<RailFeatureCollection | null> {
@@ -2406,6 +2390,7 @@ async function buildLineBranchFeaturesChunked(
         parentBranch,
         connectedBranch,
         stationById,
+        renderZoom,
       );
 
       if (coordinates.length < 2) continue;
@@ -2421,7 +2406,10 @@ async function buildLineBranchFeaturesChunked(
         },
         geometry: {
           type: "LineString",
-          coordinates: optimizeCoordinates(coordinates, 360),
+          coordinates: optimizeCoordinates(
+            coordinates,
+            getRailGeometryPointBudget(renderZoom),
+          ),
         },
       });
     }
@@ -2603,11 +2591,15 @@ function getGeometryDraftStationPositionChangeLabels(
     .filter((label, index, labels) => labels.indexOf(label) === index);
 }
 
-function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
+function branchCoordinates(
+  branch: EditorMapBranch,
+  renderZoom = 11.5,
+): LngLatTuple[] {
   const override = (branch.geometryOverrideCoordinates ?? []).filter(
     ([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat),
   ) as LngLatTuple[];
-  if (override.length >= 2) return buildAdaptiveSmoothCoordinates(override);
+  if (override.length >= 2)
+    return buildAdaptiveSmoothCoordinates(override, { zoom: renderZoom });
 
   const coordinates = (branch.geometryCoordinates ?? []).filter(
     ([lng, lat]) => Number.isFinite(lng) && Number.isFinite(lat),
@@ -2615,7 +2607,7 @@ function branchCoordinates(branch: EditorMapBranch): LngLatTuple[] {
 
   if (coordinates.length < 2) return [];
 
-  const smoothed = buildAdaptiveSmoothCoordinates(coordinates);
+  const smoothed = buildAdaptiveSmoothCoordinates(coordinates, { zoom: renderZoom });
   return smoothed.length >= 2 ? smoothed : coordinates;
 }
 
@@ -4164,6 +4156,7 @@ export default function UnifiedMapEditor({
   const [layers, setLayers] = useState(defaultLayers);
   const [baseMapStyleKey, setBaseMapStyleKey] = useState<BaseMapStyleKey>("osm");
   const [zoom, setZoom] = useState(7);
+  const [geometryRenderZoom, setGeometryRenderZoom] = useState(9.5);
   const [transferDetailVisible, setTransferDetailVisible] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [historyVersion, setHistoryVersion] = useState(0);
@@ -4483,31 +4476,14 @@ export default function UnifiedMapEditor({
   const findNearestPendingTransferSuggestion = useCallback((
     sourceStationIds: string[],
     excludeKey: string | null,
-  ) => {
-    const dismissed = new Set(overlays.dismissedTransferGroupSuggestionKeys ?? []);
-    return transferGroupSuggestions
-      .filter((suggestion) => {
-        if (suggestion.key === excludeKey) return false;
-        if (approvedTransferSuggestionKeys.has(suggestion.key)) return false;
-        if (dismissed.has(suggestion.key)) return false;
-        return true;
-      })
-      .map((suggestion) => ({
-        suggestion,
-        distance: getTransferSuggestionNearestDistanceMeters(
-          sourceStationIds,
-          suggestion,
-          stationById,
-        ),
-      }))
-      .sort((left, right) => {
-        if (left.distance !== right.distance) return left.distance - right.distance;
-        if (left.suggestion.confidence !== right.suggestion.confidence) {
-          return left.suggestion.confidence === "strong" ? -1 : 1;
-        }
-        return left.suggestion.maxDistanceMeters - right.suggestion.maxDistanceMeters;
-      })[0]?.suggestion ?? null;
-  }, [
+  ) => findNearestPendingTransferSuggestionFromModel({
+    sourceStationIds,
+    excludeKey,
+    suggestions: transferGroupSuggestions,
+    approvedKeys: approvedTransferSuggestionKeys,
+    dismissedKeys: new Set(overlays.dismissedTransferGroupSuggestionKeys ?? []),
+    stationById,
+  }), [
     approvedTransferSuggestionKeys,
     overlays.dismissedTransferGroupSuggestionKeys,
     stationById,
@@ -5977,9 +5953,14 @@ export default function UnifiedMapEditor({
       setZoom(nextZoom);
       setTransferDetailVisible(isTransferDetailVisible(nextZoom));
     };
+    const syncGeometryRenderZoom = () => {
+      setGeometryRenderZoom(map.getZoom());
+    };
     syncTransferVisibilityMode();
+    syncGeometryRenderZoom();
     map.on("zoom", syncTransferVisibilityMode);
     map.on("zoomend", syncTransferVisibilityMode);
+    map.on("zoomend", syncGeometryRenderZoom);
 
     map.on("click", (event) => {
       if (isClickAfterDrag(event.point)) return;
@@ -6347,6 +6328,7 @@ export default function UnifiedMapEditor({
       void (async () => {
         const features = await buildBranchFeaturesChunked(
           displayBranches,
+          geometryRenderZoom,
           layers.lines,
           () => cancelled,
         );
@@ -6361,7 +6343,7 @@ export default function UnifiedMapEditor({
       cancelled = true;
       cancelIdle(idleId);
     };
-  }, [dataLoading, displayBranches, layers.lines, mapLoaded]);
+  }, [dataLoading, displayBranches, geometryRenderZoom, layers.lines, mapLoaded]);
 
   useEffect(() => {
     if (!mapLoaded || dataLoading) return;
@@ -6381,6 +6363,7 @@ export default function UnifiedMapEditor({
           displayLineBranchOverrides,
           branchById,
           displayStationById,
+          geometryRenderZoom,
           layers.lines,
           () => cancelled,
         );
@@ -6398,6 +6381,7 @@ export default function UnifiedMapEditor({
   }, [
     branchById,
     dataLoading,
+    geometryRenderZoom,
     layers.lines,
     mapLoaded,
     displayLineBranchOverrides,
@@ -8991,6 +8975,7 @@ export default function UnifiedMapEditor({
                 activeKey={activeTransferSuggestionKey}
                 filter={transferReviewFilter}
                 stationById={displayStationById}
+                formatStationSubLabel={formatStationSubLabel}
                 onChangeFilter={setTransferReviewFilter}
                 onOpenSuggestion={openTransferGroupSuggestion}
                 onSelectSuggestion={(suggestion) => setActiveTransferSuggestionKey(suggestion.key)}
@@ -12095,200 +12080,6 @@ function TransferGroupInspector({
   );
 }
 
-
-function TransferGroupReviewPanel({
-  suggestions,
-  dismissedKeys,
-  dismissedNotes,
-  approvedKeys,
-  activeKey,
-  filter,
-  stationById,
-  onChangeFilter,
-  onOpenSuggestion,
-  onSelectSuggestion,
-  onDismissSuggestion,
-}: {
-  suggestions: TransferGroupSuggestion[];
-  dismissedKeys: string[];
-  dismissedNotes: Record<string, string>;
-  approvedKeys: Set<string>;
-  activeKey: string | null;
-  filter: TransferGroupReviewFilter;
-  stationById: Map<string, EditorStation>;
-  onChangeFilter: (filter: TransferGroupReviewFilter) => void;
-  onOpenSuggestion: (suggestion: TransferGroupSuggestion) => void;
-  onSelectSuggestion: (suggestion: TransferGroupSuggestion) => void;
-  onDismissSuggestion: (suggestion: TransferGroupSuggestion, reason?: string) => void;
-}) {
-  const dismissed = new Set(dismissedKeys);
-  const [dismissReason, setDismissReason] = useState("환승역 아님");
-  const [dismissTarget, setDismissTarget] = useState<TransferGroupSuggestion | null>(null);
-  const filteredSuggestions = suggestions.filter((suggestion) => {
-    const approved = approvedKeys.has(suggestion.key);
-    const isDismissed = dismissed.has(suggestion.key);
-    if (filter === "approved") return approved;
-    if (filter === "dismissed") return isDismissed;
-    if (filter === "pending") return !approved && !isDismissed;
-    return true;
-  });
-  const activeIndex = Math.max(0, filteredSuggestions.findIndex((suggestion) => suggestion.key === activeKey));
-  const activeSuggestion = filteredSuggestions[activeIndex] ?? filteredSuggestions[0] ?? null;
-
-  return (
-    <div className="grid gap-2">
-      <div className="rounded-2xl border border-violet-100 bg-white p-3 shadow-sm">
-        <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
-            <strong className="block truncate text-sm font-medium text-slate-900">환승 추천</strong>
-            <p className="mt-0.5 text-[11px] font-normal text-slate-500">후보 선택 시 지도에 강조됩니다.</p>
-          </div>
-          <Badge className="bg-violet-50 text-violet-700">{filteredSuggestions.length}개</Badge>
-        </div>
-        <select
-          className="mt-2 h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-normal text-slate-700 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
-          value={filter}
-          onChange={(event) => onChangeFilter(event.target.value as TransferGroupReviewFilter)}
-        >
-          <option value="pending">검토 필요</option>
-          <option value="all">전체</option>
-          <option value="dismissed">거절됨</option>
-          <option value="approved">승인됨</option>
-        </select>
-      </div>
-
-      {activeSuggestion ? (
-        <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-[11px] font-medium text-slate-400">
-                {activeIndex + 1} / {filteredSuggestions.length}
-              </p>
-              <strong className="mt-0.5 block truncate text-base font-medium text-slate-950">
-                {activeSuggestion.nameKo}
-              </strong>
-              <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
-                {activeSuggestion.confidence === "strong" ? "강한 추천" : "확인 필요"} · 최대 {Math.ceil(activeSuggestion.maxDistanceMeters).toLocaleString("ko-KR")}m
-              </p>
-            </div>
-            <div className="grid justify-items-end gap-1">
-              <Badge className={activeSuggestion.confidence === "strong" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}>
-                {activeSuggestion.stationIds.length}개 역
-              </Badge>
-              {approvedKeys.has(activeSuggestion.key) ? (
-                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">승인됨</span>
-              ) : dismissed.has(activeSuggestion.key) ? (
-                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">거절됨</span>
-              ) : null}
-            </div>
-          </div>
-
-          <div className="mt-2 flex flex-wrap gap-1">
-            {activeSuggestion.reasonLabels.map((label) => (
-              <span key={label} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
-                {label}
-              </span>
-            ))}
-          </div>
-
-          {dismissed.has(activeSuggestion.key) && dismissedNotes[activeSuggestion.key] ? (
-            <p className="mt-2 rounded-xl bg-slate-100 px-3 py-2 text-[11px] font-normal text-slate-600">
-              거절 사유: {dismissedNotes[activeSuggestion.key]}
-            </p>
-          ) : null}
-
-          <div className="mt-2 grid gap-1 rounded-2xl border border-slate-100 bg-slate-50 p-1.5">
-            {activeSuggestion.stationIds.map((stationId) => {
-              const station = stationById.get(stationId);
-              return (
-                <div key={stationId} className="flex min-w-0 items-center gap-2 rounded-xl bg-white px-2 py-1.5">
-                  <span
-                    className="size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: station?.colorHex ?? "#64748b" }}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-medium text-slate-800">{station?.nameKo ?? stationId}</span>
-                    <span className="block truncate text-[10px] font-medium text-slate-400">{station ? formatStationSubLabel(station) : "존재하지 않는 역"}</span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-
-          {!approvedKeys.has(activeSuggestion.key) && !dismissed.has(activeSuggestion.key) ? (
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button variant="outline" onClick={() => {
-                setDismissReason("환승역 아님");
-                setDismissTarget(activeSuggestion);
-              }}>
-                거절
-              </Button>
-              <Button onClick={() => onOpenSuggestion(activeSuggestion)}>
-                수정 후 승인
-              </Button>
-            </div>
-          ) : null}
-        </div>
-      ) : (
-        <Placeholder title="검토할 추천 없음" description="필터를 전체로 바꾸거나 수기 역을 더 추가하세요." />
-      )}
-
-      {filteredSuggestions.length > 1 ? (
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            variant="outline"
-            disabled={activeIndex <= 0}
-            onClick={() => onSelectSuggestion(filteredSuggestions[Math.max(0, activeIndex - 1)]!)}
-          >
-            이전
-          </Button>
-          <Button
-            variant="outline"
-            disabled={activeIndex >= filteredSuggestions.length - 1}
-            onClick={() => onSelectSuggestion(filteredSuggestions[Math.min(filteredSuggestions.length - 1, activeIndex + 1)]!)}
-          >
-            다음
-          </Button>
-        </div>
-      ) : null}
-
-      <Dialog open={Boolean(dismissTarget)} onClose={() => setDismissTarget(null)} className="max-w-md overflow-hidden rounded-[28px]">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <strong className="block text-sm font-medium text-slate-950">추천 거절</strong>
-          <p className="mt-1 text-xs font-normal text-slate-500">거절 사유를 선택한 뒤 반영하세요.</p>
-        </div>
-        <div className="grid gap-3 p-4">
-          <div className="rounded-2xl bg-slate-50 px-3 py-2">
-            <p className="text-xs font-medium text-slate-500">대상</p>
-            <p className="mt-0.5 truncate text-sm font-medium text-slate-900">{dismissTarget?.nameKo ?? "환승 추천"}</p>
-          </div>
-          <select
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm font-normal text-slate-700 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
-            value={dismissReason}
-            onChange={(event) => setDismissReason(event.target.value)}
-          >
-            <option value="환승역 아님">환승역 아님</option>
-            <option value="거리가 멂">거리가 멂</option>
-            <option value="동명이역">동명이역</option>
-            <option value="나중에 재검토">나중에 재검토</option>
-          </select>
-        </div>
-        <div className="grid grid-cols-2 gap-2 border-t border-slate-200 px-4 py-3">
-          <Button variant="outline" onClick={() => setDismissTarget(null)}>취소</Button>
-          <Button
-            onClick={() => {
-              if (!dismissTarget) return;
-              onDismissSuggestion(dismissTarget, dismissReason);
-              setDismissTarget(null);
-            }}
-          >
-            거절 반영
-          </Button>
-        </div>
-      </Dialog>
-    </div>
-  );
-}
 
 function ManualRailLinePanel({
   lines,
