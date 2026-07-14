@@ -659,13 +659,14 @@ export default function RailExplorer({
     () =>
       new Set(
         sortedLines
-          .filter(
-            (line) =>
-              selectedArea === "all" || line.mreaWideCd === selectedArea,
-          )
+          .filter((line) => {
+            if (selectedArea !== "all" && line.mreaWideCd !== selectedArea) return false;
+            if (selectedCategory !== "all" && line.category !== selectedCategory) return false;
+            return true;
+          })
           .map((line) => line.canonicalKey),
       ),
-    [selectedArea, sortedLines],
+    [selectedArea, selectedCategory, sortedLines],
   );
 
   const visibleMapBranches = useMemo(
@@ -2462,13 +2463,17 @@ function RouteResultSummary({
             value={`${formatNumber(transferEdgeCount)}회`}
           />
         </div>
-        <RouteQualityReviewPanel result={result} />
-        <RouteRegressionCasePanel result={result} stationById={stationById} />
+        <details className="mt-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2">
+          <summary className="cursor-pointer list-none text-[11px] font-semibold text-slate-600">상세 진단 보기</summary>
+          <RouteQualityReviewPanel result={result} />
+          <RouteRegressionCasePanel result={result} stationById={stationById} />
+        </details>
       </div>
 
-      <div className="border-b border-slate-100 px-3 py-2">
+      <details className="border-b border-slate-100 px-3 py-2">
+        <summary className="cursor-pointer list-none rounded-xl bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-600">계산 근거 보기</summary>
         <RouteCalculationDebugPanel result={result} stationById={stationById} />
-      </div>
+      </details>
 
       <div className="grid min-w-0 gap-2.5 px-3 py-3">
         {segments.map((segment, index) => {

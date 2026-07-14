@@ -9694,12 +9694,14 @@ function ManualDataAuditDashboard({
             {riskItems.length > 0 ? "확인 필요" : "양호"}
           </Badge>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid gap-1.5">
           {auditItems.map((item) => (
-            <div key={item.label} className="rounded-2xl border border-slate-100 bg-slate-50 px-3 py-2">
-              <p className="text-[10px] font-semibold text-slate-400">{item.label}</p>
-              <strong className="mt-1 block text-lg font-semibold text-slate-900">{item.value.toLocaleString("ko-KR")}</strong>
-              <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">{item.detail}</p>
+            <div key={item.label} className="grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-semibold text-slate-700">{item.label}</p>
+                <p className="truncate text-[10px] font-medium text-slate-500">{item.detail}</p>
+              </div>
+              <strong className="shrink-0 text-base font-semibold tabular-nums text-slate-900">{item.value.toLocaleString("ko-KR")}</strong>
             </div>
           ))}
         </div>
@@ -9715,12 +9717,14 @@ function ManualDataAuditDashboard({
             {routeDiagnostics.some((item) => item.tone === "amber") ? "보정 필요" : "준비됨"}
           </Badge>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid gap-1.5">
           {routeDiagnostics.map((item) => (
-            <div key={item.label} className={cn("rounded-2xl border px-3 py-2", item.tone === "emerald" ? "border-emerald-100 bg-emerald-50" : "border-amber-100 bg-amber-50")}>
-              <p className={cn("text-[10px] font-semibold", item.tone === "emerald" ? "text-emerald-700" : "text-amber-700")}>{item.label}</p>
-              <strong className="mt-1 block text-lg font-semibold text-slate-900">{item.value.toLocaleString("ko-KR")}</strong>
-              <p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">{item.detail}</p>
+            <div key={item.label} className={cn("grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-xl border px-3 py-2", item.tone === "emerald" ? "border-emerald-100 bg-emerald-50" : "border-amber-100 bg-amber-50")}>
+              <div className="min-w-0">
+                <p className={cn("truncate text-[11px] font-semibold", item.tone === "emerald" ? "text-emerald-700" : "text-amber-700")}>{item.label}</p>
+                <p className="truncate text-[10px] font-medium text-slate-500">{item.detail}</p>
+              </div>
+              <strong className="shrink-0 text-base font-semibold tabular-nums text-slate-900">{item.value.toLocaleString("ko-KR")}</strong>
             </div>
           ))}
         </div>
@@ -9745,9 +9749,9 @@ function ManualDataAuditDashboard({
               key={item.label}
               type="button"
               onClick={() => onNavigate(item.tab)}
-              className="flex items-center justify-between gap-2 rounded-2xl border border-amber-100 bg-amber-50 px-3 py-2 text-left text-xs font-medium text-amber-800 transition hover:border-amber-200 hover:bg-amber-100"
+              className="grid min-h-10 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-left text-[11px] font-medium leading-4 text-amber-800 transition hover:border-amber-200 hover:bg-amber-100"
             >
-              <span>{item.label}</span>
+              <span className="min-w-0 truncate">{item.label}</span>
               <ChevronRight className="size-3.5 shrink-0" />
             </button>
           ))}
